@@ -1,0 +1,43 @@
+﻿# Build outputs
+build/
+out/
+*.o
+*.obj
+*.elf
+*.bin
+*.hex
+*.map
+*.lst
+*.a
+*.lib
+*.so
+*.dll
+*.exe
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.bak
+.DS_Store
+
+# S32 Design Studio
+Debug/
+Debug_FLASH/
+Debug_RAM/
+Release/
+*.launch
+
+# Temp files
+*.tmp
+*.log
+*.stackdump
+__pycache__/
+*.pyc
+
+# Agent-local/runtime files
+.claude/*
+.agents/*
+.codex/*
