@@ -1,4 +1,0 @@
-interface:
-  display_name: "Spec Documentation Quality"
-  short_description: "Write maintainable specs with review tracking"
-  default_prompt: "Use this skill to draft or revise project specs with maintainable metadata, review comment tracking, references, tests, roadmaps, and changelogs."
