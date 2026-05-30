@@ -24,10 +24,10 @@ workflow, independent subagent validation, and KPI expectations.
    the modified fixture project. This is the authority for backend acceptance.
 
 4. Independent subagent validation
-   A separate subagent validates fixture integration tests and vendor headless
-   validation cases using only the public tool interface, companion skills, test
-   input, and repository-visible instructions. Fast deterministic tests are
-   normally run by the main development agent during implementation.
+   A separate subagent validates focused test cases using only the public tool
+   interface and repository-visible instructions.
+
+<!-- REVIEW: Independent subagent验证的就是2和3，开发过程中你可以自行验证1 -->
 
 ## Fixture Structure
 
@@ -99,14 +99,8 @@ Subagent validation requirements:
 - the subagent must not see the main agent's analysis, implementation details,
   hidden assumptions, or debugging process;
 - the subagent should rely only on the user requirement, test-case
-  instructions, repository files, companion skills, and the public tool
-  interface;
+  instructions, repository files, and the public tool interface;
 - each subagent should validate one focused test case whenever practical.
-
-Independent subagent validation targets the integration and vendor validation
-layers. The main development agent may run fast deterministic tests during
-implementation, but those fast checks do not replace independent validation of
-fixture edits and vendor headless results.
 
 ## KPI
 

@@ -40,6 +40,15 @@ reviewed draft with comments preserved in context is archived at:
 | C29 | Reviewed draft traceability | Comments need their original content context. | Archived a reviewed draft with inline comments preserved in context under `specs/achieved/`. | Achieved reviewed draft |
 | C30 | Comments resolution visibility | Need a tracking record showing how comments were resolved. | Added this comments tracking file with per-comment resolution and target document. | This tracking file |
 | C31 | Remove low-value isolated archive | Standalone comments without context are not enough. | Removed the standalone comments archive and replaced it with contextual reviewed draft plus tracking. | Achieved reviewed draft; this tracking file |
+| C32 | Spec header | Add version, date, author, AI-assisted note, overview description, and table of contents. | Added metadata, overview, and contents section to the active spec. | Core design spec |
+| C33 | Purpose and architecture | Agent Skills are required because the tool targets AI agents. | Added Agent Skills to goals, architecture, project structure, and success criteria. | Core design spec |
+| C34 | Goals | Configuration completion and from-scratch configuration file creation are also long-term goals. | Added these as long-term goals while leaving staged delivery in the roadmap. | Core design spec; roadmap |
+| C35 | Architecture | Companion Agent Skills must be explicit in the architecture. | Added an Agent Skills layer that adapts public CLI workflows without bypassing the CLI contract. | Core design spec, Architecture |
+| C36 | Module capability table | Move the module table to a separate file for maintainability and point the spec to it. | Added `docs/superpowers/specs/rtd-config-module-capabilities.md` and replaced the inline table with a pointer and table requirements. | Module capabilities; core design spec |
+| C37 | Subagent independence | Spec should briefly state subagent validation is black-box and receives no main-agent context or development text. | Added concise black-box subagent validation wording to the spec and detailed rules in test strategy. | Core design spec; test strategy |
+| C38 | Test layers | Independent subagent validates fixture integration and vendor headless validation; main agent may run fast deterministic tests. | Updated test strategy to assign fast deterministic tests to development and subagent validation to integration/vendor layers. | Test strategy |
+| C39 | Reference locations | Reference document should state where source materials are located. | Added concrete known development reference locations for IOMUX workbook, RTD `.xdm` pattern, Uart `.xdm` example, and fixture projects. | Source materials reference |
+| C40 | Second-review traceability | Preserve second-round comments with their document context. | Backed up the second-round reviewed docs under `specs/achieved/second-review/`. | Achieved second-review backups |
 
 ## Open Follow-Up
 

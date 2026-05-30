@@ -1,44 +1,16 @@
 # RTD Configuration Tool Core Design
 
-Version: 0.2.0
-Date: 2026-05-30
-Author: autoMBD <tkung.lqk@foxmali.com>
-Authoring note: AI-assisted design document prepared through human review.
-
-## Overview
-
-The RTD Configuration Tool is a CLI-first configuration system for RTD projects.
-It prepares deterministic runtime data, accepts structured configuration
-requests, edits vendor project files through backend-specific document cores,
-and verifies results through static checks and vendor validation. Companion
-Agent Skills are part of the deliverable so AI agents can discover the tool,
-translate user requests into intents or shortcut commands, run validation, and
-interpret diagnostics without reading implementation code.
-
-## Contents
-
-- [Purpose](#purpose)
-- [Goals](#goals)
-- [Supported Configuration Backends](#supported-configuration-backends)
-- [Architecture](#architecture)
-- [Backend Document Core](#backend-document-core)
-- [Module Capability Model](#module-capability-model)
-- [Resource And Constraint Data](#resource-and-constraint-data)
-- [Intent And Commands](#intent-and-commands)
-- [Runtime Configuration](#runtime-configuration)
-- [Diagnostics](#diagnostics)
-- [Validation Pipeline](#validation-pipeline)
-- [Performance Requirements](#performance-requirements)
-- [Fixtures](#fixtures)
-- [Tests And Acceptance](#tests-and-acceptance)
-- [Suggested Project Structure](#suggested-project-structure)
-- [Success Criteria](#success-criteria)
+<!-- REVIEW: 添加版本、时间、作者（作者是autoMBD<tkung.lqk@foxmali.com>，可以添加说明有AI辅助）overview description -->
+<!-- REVIEW: 添加目录 -->
 
 ## Purpose
 
 This project builds a deterministic RTD configuration tool that AI agents can
 use directly to configure low-level driver software quickly, efficiently,
 accurately, and reliably.
+
+<!-- REVIEW: 还有一个很重要的需求没有提，既然是面向AI Agent的工具，一定要配有相关skills文件，让AI Agent可以使用该工具，这也非常重要，必须设计到架构中 -->
+<!-- REVIEW: 添加说明配套的Skills帮助AI agents使用该工具 -->
 
 The tool's long-term target is to support the full RTD configuration surface:
 driver modules, official RTD RTOS integration, stacks, and supported external
@@ -66,14 +38,12 @@ in the testing and development-process documents.
 - Separate development-time source material from runtime assets.
 - Preserve module ownership boundaries so new modules and set features can be
   added without entangling existing providers.
-- Support completion of missing configuration and creation of new configuration
-  files through prepared runtime templates when those capabilities are planned
-  for the relevant backend.
-- Provide companion Agent Skills that explain how agents should use the tool,
-  prepare intents, run commands, validate results, and react to diagnostics.
 - Treat vendor validation as the authority after tool edits.
 - Keep specs, module capability tables, references, test cases, and roadmaps
   maintainable and updateable.
+
+<!-- REVIEW: 配置空缺补充和从零创建配置文件也是目标 -->
+<!-- REVIEW: 补充Agent Skills -->
 
 ## Supported Configuration Backends
 
@@ -102,31 +72,26 @@ The architecture has these layers:
    build normalized intent and then use the same plan/apply/check/validate
    pipeline.
 
-2. Agent Skills layer
-   Provides repository skills that teach AI agents how to select workflows,
-   convert user requests into intents or shortcut commands, call the CLI, run
-   validation, and interpret JSON diagnostics. Skills are documentation and
-   workflow adapters over the public CLI; they must not bypass the CLI contract
-   or depend on private implementation details.
-
-3. Intent and plan layer
+2. Intent and plan layer
    Loads JSON intent or shortcut command arguments, normalizes requests, checks
    constraints, resolves dependencies, and produces deterministic plans before
    writes.
 
-4. Backend document core
+3. Backend document core
    Parses backend project files, builds efficient indexes, provides structured
    editing helpers, performs localized writes, and keeps diffs reviewable.
 
-5. Module providers
+4. Module providers
    Each module owns its own planning and apply logic. Providers publish their
    supported actions, dependencies, constraints, resources, and tests through a
    maintainable module capability table.
 
-6. Shared resource services
+5. Shared resource services
    Provide pin mapping, schema/cache access, references, constraints,
    diagnostics, validation command construction, runtime configuration loading,
    and performance instrumentation.
+
+<!-- REVIEW: 在架构中写明配套的Agent Skills -->
 
 Two architecture rules are mandatory:
 
@@ -161,14 +126,21 @@ that backend is planned.
 
 ## Module Capability Model
 
-Module responsibilities are maintained in a separate capability table rather
-than embedded only in this spec. The active table is:
+Module responsibilities are maintained in a capability table rather than
+embedded only in prose. The table must be easy to extend when a new RTD module
+or set feature is added.
 
-`docs/superpowers/specs/rtd-config-module-capabilities.md`
+| Module | Ownership | Key dependencies | Capability direction |
+| --- | --- | --- | --- |
+| Mcu | Clock and MCU configuration owned by Mcu | Resource requests from drivers and stacks | Clock references, peripheral clocks, mode/clock settings |
+| BaseNXP | BaseNXP global configuration | Platform and driver timing needs | Available BaseNXP parameters, OsIf, timer basis |
+| Platform | Platform and interrupt configuration | Interrupt-driven drivers | Interrupt controller, IRQ enablement, priority, handler/vector basics |
+| Port | Pin mux and pad configuration | Any module needing pins | Generic pin configuration from versioned pin mapping |
+| Dio | Dio ports and channels | GPIO users and external peripheral control | Generic port/channel configuration and uniqueness checks |
+| Mcl | Mcl and FlexIO resources | FlexIO users and future DMA/resource users | FlexIO common, channels, timers, shifters, shared resources |
+| Uart | Uart channels and Uart parameters | Mcu, Port, Platform, Mcl as needed | LPUART, FlexIO Uart, polling/interrupt, communication parameters |
 
-The table is the maintainable index for module ownership, dependencies,
-supported actions, constraints, runtime data, shortcut mappings, and test
-coverage. It must be updated whenever a new RTD module or set feature is added.
+<!-- REVIEW: 这个表放到一个单独的文件里才好维护，Spec简明它的作用，并指向该表的位置和。 -->
 
 The capability table must support:
 
@@ -371,11 +343,7 @@ The spec requires maintainable test documentation. Test cases, module-specific
 test steps, staged coverage, and subagent validation process belong in the test
 strategy document.
 
-Independent subagent validation is black-box validation of the delivered tool
-and companion skills. The subagent must not receive main-agent context,
-implementation notes, hidden assumptions, or development text. It uses only the
-public deliverables, test input, repository-visible instructions, and public CLI
-to complete the assigned validation target.
+<!-- REVIEW: 这里要简要说明Subagent是独立测试，不获取任何main agent上下文信息，不输入任何开发文本，仅根据工具deliverables（skills和工具本身），根据测试输入，完成测试目标 -->
 
 Acceptance is based on two criteria:
 
@@ -426,16 +394,12 @@ rtd_config/
     constraints.py
   checks/
     static.py
-.skills/
-  rtd-config/
-    <agent-facing workflow skills>
 data/
 fixtures/
 tests/
 docs/
   superpowers/
     specs/
-      rtd-config-module-capabilities.md
     references/
     tests/
     roadmaps/
@@ -446,8 +410,6 @@ docs/
 The project is successful when:
 
 - core CLI commands return stable JSON;
-- companion Agent Skills guide AI agents through tool usage without relying on
-  private implementation details;
 - shortcut commands normalize to the same intent pipeline;
 - backend document cores can configure vendor projects through structured,
   localized edits;

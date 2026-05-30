@@ -37,17 +37,16 @@ Runtime commands must not load:
 
 ## Known Development Inputs
 
-Known local development inputs are listed here for traceability. These paths are
-development references, not runtime dependencies. If a local path changes,
-update this document or add a project-specific reference note; do not hard-code
-the path into runtime code.
+Known local development inputs can be listed here when used, but should not be
+hard-coded into spec or runtime code.
 
-| Source | Reference location | Use | Notes |
-| --- | --- | --- | --- |
-| S32K344/S32K324/S32K314 IOMUX workbook | `D:\WorkSpace\ExploreSpace\Copy of S32K344_S32K324_S32K314_IOMUX.xlsx` | Build S32K3 pin mapping data | Development input only |
-| S32K3 RTD module `.xdm` files | `C:\NXP\S32DS.3.6.7\S32DS\software\PlatformSDK_S32K3\RTD\<ModulePackage>\config\<Module>.xdm` | Build module schema and constraints | Development input only |
-| Uart RTD descriptor example | `C:\NXP\S32DS.3.6.7\S32DS\software\PlatformSDK_S32K3\RTD\Uart_TS_T40D34M70I1R0\config\Uart.xdm` | Build Uart schema and constraints | Development input only |
-| S32DS ConfigTools projects | `fixtures/projects/<backend>/<family>/<device>/<scenario>/` | Build and validate fixtures | Keep generated/build artifacts out |
+| Source | Use | Notes |
+| --- | --- | --- |
+| S32K344/S32K324/S32K314 IOMUX workbook | Build S32K3 pin mapping data | Development input only |
+| RTD module `.xdm` files | Build module schema and constraints | Development input only |
+| S32DS ConfigTools projects | Build and validate fixtures | Keep generated/build artifacts out |
+
+<!-- REVIEW: 这里就要写明参考的位置在哪里 -->
 
 ## Data Preparation Rule
 
