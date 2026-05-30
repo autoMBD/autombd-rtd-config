@@ -1,5 +1,10 @@
 # Reviewed Draft Backup: S32K3 RTD 7.0.1 MEX Configuration Core Design
 
+Version: 0.1.1
+Date: 2026-05-30
+Author: autoMBD <tkung.lqk@foxmali.com>
+Authoring note: AI-assisted archived reviewed draft; preserved for traceability.
+
 This archived draft preserves the reviewed spec with the user's inline
 `REVIEW` comments in their original content context. It is kept for traceability
 only; the active spec is `../2026-05-30-s32k3-rtd-mex-config-core-design.md`.
@@ -556,3 +561,8 @@ Phase 1 is successful when:
 <!-- REVIEW: 当前Spec需要新增一些文件来增强可维护性，包括参考文件、测试文件等，详见上面的comments -->
 <!-- REVIEW: 要区分开发模式和Spec，开发模式可能会因为不可预测的问题改变路线，而Spec是描述项目本身的目标、功能、技术栈等信息，是我们开发的指南针 -->
 <!-- REVIEW: 要注意开发过程中的工具资源引用和runtime时的资源调度和依赖，不能把开发过程中调用、依赖的一些文件带到runtime时使用，因为runtime环境是不确定的。例如pin映射表，开发过程中你会引用我给你的excel表，在工具内构建映射、查找关系，runtime时就不再需要这个excel表了。 -->
+
+## Changelog
+
+- 2026-05-30 v0.1.1: Standardized archive metadata and added changelog.
+- 2026-05-30 v0.1.0: Archived reviewed draft with inline comments preserved in context.

@@ -1,6 +1,6 @@
 # RTD Configuration Tool Core Design
 
-Version: 0.2.0
+Version: 0.2.1
 Date: 2026-05-30
 Author: autoMBD <tkung.lqk@foxmali.com>
 Authoring note: AI-assisted design document prepared through human review.
@@ -460,3 +460,9 @@ The project is successful when:
 - module capability tables, references, tests, and roadmaps remain maintainable;
 - required test cases pass;
 - focused validation meets the 3-minute KPI.
+
+## Changelog
+
+- 2026-05-30 v0.2.1: Standardized document metadata and added changelog.
+- 2026-05-30 v0.2.0: Integrated second-round review updates and Agent Skills architecture.
+- 2026-05-30 v0.1.0: Created initial RTD configuration core design.

@@ -1,5 +1,10 @@
 # RTD Configuration Test Strategy
 
+Version: 0.1.1
+Date: 2026-05-30
+Author: autoMBD <tkung.lqk@foxmali.com>
+Authoring note: AI-assisted archived second-round reviewed test strategy draft; preserved for traceability.
+
 ## Purpose
 
 This document defines the maintainable testing process for the RTD
@@ -122,3 +127,8 @@ A module or feature is accepted when:
 - focused independent subagent validation meets the KPI;
 - failures produce actionable diagnostics rather than tracebacks or ambiguous
   logs.
+
+## Changelog
+
+- 2026-05-30 v0.1.1: Standardized archive metadata and added changelog.
+- 2026-05-30 v0.1.0: Archived second-round reviewed test strategy draft.

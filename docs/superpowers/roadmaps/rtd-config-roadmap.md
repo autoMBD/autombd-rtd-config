@@ -1,5 +1,10 @@
 # RTD Configuration Tool Roadmap
 
+Version: 0.1.1
+Date: 2026-05-30
+Author: autoMBD <tkung.lqk@foxmali.com>
+Authoring note: AI-assisted roadmap prepared through human review.
+
 ## Purpose
 
 This roadmap records delivery order and staged limits. It intentionally lives
@@ -84,3 +89,8 @@ Expected additions:
 - EB validation integration;
 - shared intent/resource/module model reuse;
 - EB-specific fixtures and test cases.
+
+## Changelog
+
+- 2026-05-30 v0.1.1: Standardized document metadata and added changelog.
+- 2026-05-30 v0.1.0: Created staged RTD configuration tool roadmap.

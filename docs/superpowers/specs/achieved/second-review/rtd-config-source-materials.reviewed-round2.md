@@ -1,5 +1,10 @@
 # RTD Configuration Source Materials
 
+Version: 0.1.1
+Date: 2026-05-30
+Author: autoMBD <tkung.lqk@foxmali.com>
+Authoring note: AI-assisted archived second-round reviewed reference draft; preserved for traceability.
+
 This document records the types of source material used to build runtime data
 assets for the RTD configuration tool. Source material is for development and
 data preparation only. Runtime commands must not depend on these files being
@@ -54,3 +59,8 @@ When source material is used, convert the needed information into committed,
 versioned runtime JSON/cache data. The tool should be able to configure a
 project in a clean runtime environment using only repository assets, the target
 project, and configured vendor validation tools.
+
+## Changelog
+
+- 2026-05-30 v0.1.1: Standardized archive metadata and added changelog.
+- 2026-05-30 v0.1.0: Archived second-round reviewed source-materials draft.

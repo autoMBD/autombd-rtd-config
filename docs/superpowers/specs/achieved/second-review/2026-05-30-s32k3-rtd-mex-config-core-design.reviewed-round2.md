@@ -1,5 +1,10 @@
 # RTD Configuration Tool Core Design
 
+Version: 0.1.1
+Date: 2026-05-30
+Author: autoMBD <tkung.lqk@foxmali.com>
+Authoring note: AI-assisted archived second-round reviewed draft; preserved for traceability.
+
 <!-- REVIEW: 添加版本、时间、作者（作者是autoMBD<tkung.lqk@foxmali.com>，可以添加说明有AI辅助）overview description -->
 <!-- REVIEW: 添加目录 -->
 
@@ -422,3 +427,8 @@ The project is successful when:
 - module capability tables, references, tests, and roadmaps remain maintainable;
 - required test cases pass;
 - focused validation meets the 3-minute KPI.
+
+## Changelog
+
+- 2026-05-30 v0.1.1: Standardized archive metadata and added changelog.
+- 2026-05-30 v0.1.0: Archived second-round reviewed design draft with inline comments.

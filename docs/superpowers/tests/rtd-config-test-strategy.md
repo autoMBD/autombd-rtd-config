@@ -1,5 +1,10 @@
 # RTD Configuration Test Strategy
 
+Version: 0.2.0
+Date: 2026-05-30
+Author: autoMBD <tkung.lqk@foxmali.com>
+Authoring note: AI-assisted test strategy prepared through human review.
+
 ## Purpose
 
 This document defines the maintainable testing process for the RTD
@@ -128,3 +133,8 @@ A module or feature is accepted when:
 - focused independent subagent validation meets the KPI;
 - failures produce actionable diagnostics rather than tracebacks or ambiguous
   logs.
+
+## Changelog
+
+- 2026-05-30 v0.2.0: Clarified independent subagent validation scope.
+- 2026-05-30 v0.1.0: Created RTD configuration test strategy.

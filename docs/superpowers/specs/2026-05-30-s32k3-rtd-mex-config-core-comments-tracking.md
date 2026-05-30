@@ -1,5 +1,10 @@
 # RTD Config Core Spec Comments Tracking
 
+Version: 0.2.0
+Date: 2026-05-30
+Author: autoMBD <tkung.lqk@foxmali.com>
+Authoring note: AI-assisted review tracking document prepared through human review.
+
 This file tracks how the user's inline `REVIEW` comments were resolved. The
 reviewed draft with comments preserved in context is archived at:
 
@@ -56,3 +61,8 @@ The current documents separate project spec, roadmap, source references, and
 test strategy. A future development-process document should capture the
 human-assisted agent development loop, skill growth, and closed-loop validation
 workflow as that process becomes concrete.
+
+## Changelog
+
+- 2026-05-30 v0.2.0: Added second-round review tracking records.
+- 2026-05-30 v0.1.0: Created review comment tracking table.

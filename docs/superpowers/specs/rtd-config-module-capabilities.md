@@ -1,6 +1,6 @@
 # RTD Configuration Module Capabilities
 
-Version: 0.1.0
+Version: 0.1.1
 Date: 2026-05-30
 Author: autoMBD <tkung.lqk@foxmali.com>
 Authoring note: AI-assisted capability table prepared through human review.
@@ -41,3 +41,8 @@ Every new module entry must define:
 
 A module may only write configuration regions it owns. Cross-module needs must
 be expressed as dependency requests and applied by the owning provider.
+
+## Changelog
+
+- 2026-05-30 v0.1.1: Standardized document metadata and added changelog.
+- 2026-05-30 v0.1.0: Created maintainable module capability table.
