@@ -7,7 +7,7 @@ Authoring note: AI-assisted archived reviewed draft; preserved for traceability.
 
 This archived draft preserves the reviewed spec with the user's inline
 `REVIEW` comments in their original content context. It is kept for traceability
-only; the active spec is `../2026-05-30-s32k3-rtd-mex-config-core-design.md`.
+only; the active spec is `../rtd-config-core-design.md`.
 
 ---
 
@@ -564,5 +564,6 @@ Phase 1 is successful when:
 
 ## Changelog
 
+- 2026-05-30 v0.1.2: Renamed archived reviewed draft to remove date from filename.
 - 2026-05-30 v0.1.1: Standardized archive metadata and added changelog.
 - 2026-05-30 v0.1.0: Archived reviewed draft with inline comments preserved in context.

@@ -8,7 +8,7 @@ Authoring note: AI-assisted review tracking document prepared through human revi
 This file tracks how the user's inline `REVIEW` comments were resolved. The
 reviewed draft with comments preserved in context is archived at:
 
-`docs/superpowers/specs/achieved/2026-05-30-s32k3-rtd-mex-config-core-design.reviewed.md`
+`docs/superpowers/specs/achieved/rtd-config-core-design.reviewed.md`
 
 ## Tracking Table
 
@@ -54,6 +54,7 @@ reviewed draft with comments preserved in context is archived at:
 | C38 | Test layers | Independent subagent validates fixture integration and vendor headless validation; main agent may run fast deterministic tests. | Updated test strategy to assign fast deterministic tests to development and subagent validation to integration/vendor layers. | Test strategy |
 | C39 | Reference locations | Reference document should state where source materials are located. | Added concrete known development reference locations for IOMUX workbook, RTD `.xdm` pattern, Uart `.xdm` example, and fixture projects. | Source materials reference |
 | C40 | Second-review traceability | Preserve second-round comments with their document context. | Backed up the second-round reviewed docs under `specs/achieved/second-review/`. | Achieved second-review backups |
+| C41 | File naming | Do not put dates in filenames because changelogs already carry date information. | Renamed dated documentation files to semantic names and updated internal links. | Documentation filenames; this tracking file |
 
 ## Open Follow-Up
 
@@ -64,5 +65,6 @@ workflow as that process becomes concrete.
 
 ## Changelog
 
+- 2026-05-30 v0.2.1: Removed dates from documentation filenames and updated tracking.
 - 2026-05-30 v0.2.0: Added second-round review tracking records.
 - 2026-05-30 v0.1.0: Created review comment tracking table.

@@ -430,5 +430,6 @@ The project is successful when:
 
 ## Changelog
 
+- 2026-05-30 v0.1.2: Renamed second-round reviewed design draft to remove date from filename.
 - 2026-05-30 v0.1.1: Standardized archive metadata and added changelog.
 - 2026-05-30 v0.1.0: Archived second-round reviewed design draft with inline comments.

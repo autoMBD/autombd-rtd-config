@@ -463,6 +463,7 @@ The project is successful when:
 
 ## Changelog
 
+- 2026-05-30 v0.2.2: Renamed design document to remove date from filename.
 - 2026-05-30 v0.2.1: Standardized document metadata and added changelog.
 - 2026-05-30 v0.2.0: Integrated second-round review updates and Agent Skills architecture.
 - 2026-05-30 v0.1.0: Created initial RTD configuration core design.
