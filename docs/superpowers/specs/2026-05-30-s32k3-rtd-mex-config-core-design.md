@@ -1,195 +1,210 @@
-# S32K3 RTD 7.0.1 MEX Configuration Core Design
+# RTD Configuration Tool Core Design
 
 ## Purpose
 
-This project builds a deterministic configuration tool for S32K3 RTD 7.0.1
-projects that use S32 ConfigTools `.mex` files. The first formal phase focuses
-on modifying existing S32DS projects efficiently and safely enough for
-human-agent collaboration.
+This project builds a deterministic RTD configuration tool that AI agents can
+use directly to configure low-level driver software quickly, efficiently,
+accurately, and reliably.
 
-The external contract is a CLI that emits stable JSON. Internal Python modules
-should be clean and testable, but their API is not the compatibility boundary
-for the first phase.
+The tool's long-term target is to support the full RTD configuration surface:
+driver modules, official RTD RTOS integration, stacks, and supported external
+peripheral driver configuration. It must support S32 ConfigTools `.mex`
+projects and be extensible to EB tresos configuration projects. It must also be
+extensible across S32K families such as K3, K1, and K5, across RTD releases,
+and across new modules added over time.
 
-This design deliberately does not define an AI Agent workflow platform. The
-development and validation loop will be guided during the project. Independent
-subagent validation is included only as a verification requirement.
+The stable external contract is a CLI that accepts structured requests and
+emits stable JSON. Internal Python modules should be clear and testable, but
+the CLI/JSON contract is the first compatibility boundary.
 
-## Scope
+This document describes the project and architecture. Milestone order, staged
+feature limits, and delivery sequencing belong in the roadmap and
+implementation plan. Development workflow and agent validation discipline belong
+in the testing and development-process documents.
 
-Phase 1 supports:
+## Goals
 
-- S32K3 RTD 7.0.1.
-- S32 ConfigTools `.mex` configuration.
-- Existing S32DS projects only.
-- Device architecture extensible to S32K3, with validation committed for
-  S32K344 first.
-- Seven RTD modules: `Mcu`, `BaseNXP`, `Platform`, `Port`, `Dio`, `Mcl`,
-  and `Uart`.
-- Uart configuration for LPUART and FlexIO Uart.
-- Interrupt and polling modes.
-- Basic Uart communication parameters: baudrate, word length, stop bits,
-  parity, timeout, callback, channel id, hardware channel, and references.
-- Generic Port pin configuration through complete versioned pin mapping data.
-- Generic Dio port/channel basic configuration.
-- Mcl FlexIO basic configuration.
-- JSON intent files and module-specific shortcut commands.
-- In-place `.mex` modification as the normal workflow.
-- Optional `--backup`, disabled by default.
-- Fast static checks plus no-window S32DS headless validation.
+- Enable AI agents to configure RTD projects without hand-editing vendor XML.
+- Keep configuration deterministic and repeatable for a given project, data
+  cache, tool version, and request.
+- Make routine commands fast enough for repeated autonomous use.
+- Keep runtime dependencies minimal and predictable.
+- Separate development-time source material from runtime assets.
+- Preserve module ownership boundaries so new modules and set features can be
+  added without entangling existing providers.
+- Treat vendor validation as the authority after tool edits.
+- Keep specs, module capability tables, references, test cases, and roadmaps
+  maintainable and updateable.
 
-Phase 1 does not support:
+## Supported Configuration Backends
 
-- Creating a `.mex` from scratch.
-- Completing missing modules in a partial `.mex`.
-- DMA.
-- EB tresos.
-- K1/K5 validation.
-- Runtime Excel parsing.
-- Default copy-output workflows.
+The architecture supports multiple configuration backends through backend
+providers. Each backend provider owns its file model, validation integration,
+and backend-specific write strategy.
 
-From-scratch creation and missing-module completion are deferred until after
-DMA support.
+| Backend | Configuration format | Primary use |
+| --- | --- | --- |
+| S32 ConfigTools | `.mex` | S32DS ConfigTools projects |
+| EB tresos | `.xdm` and related EB project files | EB tresos projects |
 
-## Chosen Architecture
+S32 ConfigTools `.mex` is the first backend to implement. EB tresos support
+must reuse the same intent, planning, diagnostics, resource cache, module
+capability, and testing concepts where practical, while using its own document
+model and writer.
+
+## Architecture
 
 Use a modular configuration core with a CLI shell.
 
-The design has five layers:
+The architecture has these layers:
 
 1. CLI layer
-   Provides core commands and shortcut commands. Shortcut commands only build
-   normalized intent and then use the same plan/apply/check/validate pipeline.
+   Provides core commands and module shortcut commands. Shortcut commands only
+   build normalized intent and then use the same plan/apply/check/validate
+   pipeline.
 
 2. Intent and plan layer
-   Loads JSON intent or shortcut command arguments, normalizes requests, and
-   produces a deterministic plan before any write.
+   Loads JSON intent or shortcut command arguments, normalizes requests, checks
+   constraints, resolves dependencies, and produces deterministic plans before
+   writes.
 
-3. MEX document core
-   Parses `.mex` XML, builds an efficient document index, provides structured
-   setting/container upsert helpers, performs localized writes, and preserves
-   small diffs where practical.
+3. Backend document core
+   Parses backend project files, builds efficient indexes, provides structured
+   editing helpers, performs localized writes, and keeps diffs reviewable.
 
 4. Module providers
-   Each module owns its own plan/apply logic and only writes its own `.mex`
-   configuration area.
+   Each module owns its own planning and apply logic. Providers publish their
+   supported actions, dependencies, constraints, resources, and tests through a
+   maintainable module capability table.
 
 5. Shared resource services
-   Provide pin mapping, schema/cache access, references, diagnostics,
-   validation command construction, and runtime configuration loading.
+   Provide pin mapping, schema/cache access, references, constraints,
+   diagnostics, validation command construction, runtime configuration loading,
+   and performance instrumentation.
 
 Two architecture rules are mandatory:
 
 - A module provider may only write the configuration area it owns.
-- Shared concerns such as XML editing, pin mapping, diagnostics, schema/cache,
-  and validation must live in core/shared layers, not inside individual module
-  implementations.
+- Shared concerns such as document editing, pin mapping, diagnostics,
+  schema/cache, constraints, references, and validation must live in core/shared
+  layers, not inside individual module implementations.
 
-These rules specifically prevent the PoC problem where Uart logic wrote Port
-configuration directly. Uart may request pins, clocks, interrupts, or FlexIO
-resources, but Port, Mcu, Platform, and Mcl providers must perform their own
-writes.
+Cross-module dependencies are explicit plan relationships. For example, a Uart
+request may require Port pins, Mcu clocks, Mcl FlexIO resources, and Platform
+interrupts. Uart may declare those requirements, but the owning providers must
+plan and apply their own edits.
 
-## Module Responsibilities
+## Backend Document Core
 
-### Mcu
+The document core must be efficient and backend-specific.
 
-Phase 1 only covers the clock and reference functionality needed by Uart:
+For `.mex` projects, the document core should:
 
-- confirm or set LPUART and FlexIO related clock references;
-- confirm or enable required peripheral clocks;
-- expose clock/reference lookup to other providers.
+- parse project XML and build only the indexes needed by the current command;
+- avoid scanning unrelated large subtrees where a targeted index is sufficient;
+- allow the indexing strategy to evolve after measuring real project sizes;
+- provide setting/container lookup and upsert helpers;
+- keep localized edits small enough for review;
+- avoid broad whole-file rewrites;
+- expose diagnostics instead of raw parser or Python tracebacks.
 
-Only `Mcu` may write Mcu configuration.
+For EB tresos projects, the `.xdm` writer should follow the same concepts:
+structured parsing, targeted indexes, localized edits, explicit constraints,
+and stable diagnostics. EB-specific details belong in the EB backend design when
+that backend is planned.
 
-### BaseNXP
+## Module Capability Model
 
-`BaseNXP` is small enough for broad phase-1 coverage. It should support set
-operations for its available parameters, including OsIf and timer basis
-settings.
+Module responsibilities are maintained in a capability table rather than
+embedded only in prose. The table must be easy to extend when a new RTD module
+or set feature is added.
 
-Only `BaseNXP` may write BaseNXP configuration.
+| Module | Ownership | Key dependencies | Capability direction |
+| --- | --- | --- | --- |
+| Mcu | Clock and MCU configuration owned by Mcu | Resource requests from drivers and stacks | Clock references, peripheral clocks, mode/clock settings |
+| BaseNXP | BaseNXP global configuration | Platform and driver timing needs | Available BaseNXP parameters, OsIf, timer basis |
+| Platform | Platform and interrupt configuration | Interrupt-driven drivers | Interrupt controller, IRQ enablement, priority, handler/vector basics |
+| Port | Pin mux and pad configuration | Any module needing pins | Generic pin configuration from versioned pin mapping |
+| Dio | Dio ports and channels | GPIO users and external peripheral control | Generic port/channel configuration and uniqueness checks |
+| Mcl | Mcl and FlexIO resources | FlexIO users and future DMA/resource users | FlexIO common, channels, timers, shifters, shared resources |
+| Uart | Uart channels and Uart parameters | Mcu, Port, Platform, Mcl as needed | LPUART, FlexIO Uart, polling/interrupt, communication parameters |
 
-### Platform
+The capability table must support:
 
-Phase 1 covers Uart-related interrupt configuration:
+- supported actions;
+- owned paths or owned configuration regions per backend;
+- dependencies and dependency direction;
+- constraints and resource limits;
+- data/cache files used at runtime;
+- shortcut command mappings;
+- tests and validation cases.
 
-- interrupt controller enablement;
-- IRQ enable/disable;
-- priority;
-- handler/vector basics.
+Different devices and RTD releases can impose different limits, such as
+available pins, peripheral counts, interrupt names, and valid enum values. Those
+constraints must come from prepared runtime cache data, not from ad hoc code or
+runtime vendor-directory scans.
 
-Polling mode should not require unnecessary interrupt writes.
+## Resource And Constraint Data
 
-Only `Platform` may write Platform configuration.
+Runtime data is committed as versioned JSON/cache files. Runtime commands must
+not require development source material such as Excel workbooks or installed
+RTD package files.
 
-### Port
+Data assets include:
 
-`Port` must implement generic pin configuration, not Uart-specific pin
-configuration.
+- module manifests and capability metadata;
+- schema/constraint cache extracted from vendor configuration descriptions;
+- pin mapping by family, device, package, peripheral, signal, and pin;
+- validation profiles;
+- known generated-file and reference patterns when needed.
 
-The input model should support device, package, pin, peripheral, signal,
-function, direction, and pad-related fields. Uart is only the first consumer.
-Future modules must use the same Port provider path for pins.
+Suggested structure:
 
-Runtime pin data comes from versioned JSON committed in the repository. The
-Excel file and RTD installation data are development inputs only.
+```text
+data/
+  s32k/
+    families/
+      s32k3/
+        devices/
+          s32k344/
+            packages/
+              <package>/
+                pins.json
+            rtd/
+              7_0_1/
+                schemas/
+                modules/
+```
 
-Only `Port` may write Port configuration.
+Development-time source documents are described in a separate references
+document. The spec only defines what kinds of source material are needed:
 
-### Dio
+- pin mux references;
+- RTD module `.xdm` or equivalent constraint descriptions;
+- ConfigTools project examples;
+- vendor validation command references;
+- RTD release/package metadata.
 
-`Dio` supports generic port/channel basics:
+The build process may use these materials to create runtime JSON/cache assets.
+The runtime tool must only load the prepared assets.
 
-- port name/id;
-- channel name/id;
-- direction and initial value where represented in the target configuration;
-- uniqueness checks for ids within the relevant owner.
+## Intent And Commands
 
-Dio must not be tied to Uart.
-
-Only `Dio` may write Dio configuration.
-
-### Mcl
-
-`Mcl` supports generic FlexIO foundation configuration:
-
-- FlexIO common resources;
-- logic channels;
-- timers and shifters;
-- references needed by FlexIO Uart.
-
-The first validation path is FlexIO Uart, but Mcl should not be designed as a
-Uart-only helper.
-
-Only `Mcl` may write Mcl configuration.
-
-### Uart
-
-`Uart` supports:
-
-- LPUART channels;
-- FlexIO Uart channels;
-- interrupt and polling modes;
-- baudrate, word length, stop bits, parity, timeout, callback, channel id,
-  hardware channel, clock reference, and resource references.
-
-DMA is deferred. Uart must not write Port, Mcu, Platform, or Mcl areas.
-
-## CLI Contract
+JSON intent is the core request format. Shortcut commands are convenience
+wrappers that normalize into the same intent model.
 
 Core commands:
 
 ```powershell
-rtd-config inspect --mex app.mex --json
-rtd-config plan --mex app.mex --intent intent.json --json
-rtd-config configure --mex app.mex --intent intent.json --json
-rtd-config check --mex app.mex --json
-rtd-config validate --mex app.mex --project app --json
-rtd-config pin-options --device S32K344 --package <package> --peripheral LPUART_6 --json
+rtd-config inspect --project <project> --json
+rtd-config plan --project <project> --intent intent.json --json
+rtd-config configure --project <project> --intent intent.json --json
+rtd-config check --project <project> --json
+rtd-config validate --project <project> --json
+rtd-config pin-options --device <device> --package <package> --peripheral <peripheral> --json
 ```
 
-Shortcut command groups:
+Shortcut commands follow module groupings:
 
 ```powershell
 rtd-config uart set ...
@@ -201,86 +216,27 @@ rtd-config basenxp set ...
 rtd-config mcl set-flexio ...
 ```
 
-Shortcut commands are convenience wrappers. They must normalize into the same
-intent model used by `plan` and `configure`.
-
-`configure` is non-interactive. Users who need review should run `plan`
-explicitly before `configure`.
+The CLI must remain non-interactive for automation. Users who need review
+should run `plan` before `configure`.
 
 ## Runtime Configuration
 
-Use a repository JSON configuration file for default paths and settings. CLI
-parameters may override JSON values.
+Use repository or workspace JSON configuration files for default paths and
+settings. CLI parameters may override JSON values.
 
-The configuration should cover:
+Configuration should cover:
 
-- S32DS root;
+- backend selection;
+- S32DS or EB tresos tool roots;
 - workspace path;
 - default project path when useful;
-- default device and package;
-- RTD/schema/cache locations;
+- default family, device, package, and RTD version;
+- runtime data/cache locations;
 - validation timeout;
 - validation log directory.
 
 The format is JSON to avoid runtime dependencies beyond the Python standard
 library.
-
-## Data Assets
-
-Runtime data is committed as JSON/cache files. The structure should be
-extensible across S32K3 devices even though phase-1 validation is for S32K344.
-
-Suggested structure:
-
-```text
-data/
-  s32k3/
-    s32k344/
-      pins/
-        <package>.pins.json
-      rtd_7_0_1/
-        schemas/
-          mcu.json
-          basenxp.json
-          platform.json
-          port.json
-          dio.json
-          mcl.json
-          uart.json
-        modules/
-          mcu.json
-          basenxp.json
-          platform.json
-          port.json
-          dio.json
-          mcl.json
-          uart.json
-```
-
-The pin mapping JSON is a first-class asset. It should be complete enough for
-the supported S32K344 package used by the real fixture project. Data may include
-multiple packages, but only the fixture package is required for phase-1
-acceptance.
-
-The Excel file
-`D:\WorkSpace\ExploreSpace\Copy of S32K344_S32K324_S32K314_IOMUX.xlsx` and RTD
-installation resources may be used to build the JSON asset during development.
-The runtime tool must not read Excel.
-
-## MEX Editing Strategy
-
-Use structured XML/document operations as the primary implementation strategy.
-
-Requirements:
-
-- parse once per command and share one context across providers;
-- build a document index for module instances, containers, settings,
-  references, pins, and interrupts;
-- use upsert helpers for settings and containers;
-- avoid broad whole-file rewrites;
-- keep diffs small enough for review;
-- use controlled localized text handling only where ConfigTools XML requires it;
-- never expose Python tracebacks as the command interface.
 
 ## Diagnostics
 
@@ -302,129 +258,87 @@ All commands return stable JSON diagnostics:
 }
 ```
 
-Diagnostics must be actionable. They should identify the module, missing or
-invalid resource, and useful details for correction.
+Diagnostics must be actionable. They should identify the module, invalid or
+missing resource, constraint that failed, and useful details for correction.
 
 ## Validation Pipeline
 
-`configure` runs:
+`configure` runs the same high-level pipeline for every backend:
 
-1. load configuration;
-2. parse/index `.mex`;
+1. load runtime configuration;
+2. load and index the project through the backend document core;
 3. normalize intent;
-4. plan;
-5. apply in place;
-6. run static checks;
-7. run S32DS headless validation without opening a window;
-8. return changed modules, diagnostics, validation logs, and status.
+4. resolve dependencies and constraints;
+5. plan;
+6. apply owned edits;
+7. run static checks;
+8. run backend vendor validation when configured;
+9. return changed modules, diagnostics, validation logs, and status.
 
-`validate --dry-run` should remain available for path and command diagnosis.
-`configure` defaults to real validation.
+S32 ConfigTools validation requirements:
 
-S32DS validation requirements:
-
-- no visible GUI window;
+- headless execution without a visible GUI window;
 - configurable timeout;
 - stdout/stderr/log capture;
 - JSON result with command, resolved paths, exit code, and log paths;
 - clear failure diagnostics.
 
+EB tresos validation should follow equivalent principles once that backend is
+introduced.
+
 ## Performance Requirements
 
-Commands must be efficient.
+Commands must be efficient enough for autonomous agent use.
 
 - Runtime commands must not scan RTD installation directories.
-- Runtime commands must not read Excel.
-- `inspect`, `plan`, `check`, and `pin-options` must not launch S32DS.
-- Single command execution should parse `.mex` once and reuse indexes.
-- Versioned JSON/cache data must be used for module and pin knowledge.
-- `configure` may be slower because S32DS validation is required, but tool
-  overhead before validation should remain small.
+- Runtime commands must not read Excel or other development-only source files.
+- Inspect, plan, check, and resource-query commands must not launch vendor
+  tools.
+- A single command should parse/index each project file only as needed and
+  reuse indexes across providers.
+- Runtime module and resource knowledge must come from committed JSON/cache
+  assets.
+- The tool must expose enough timing information to identify slow indexing,
+  planning, writing, or validation steps.
+- If runtime `.mex` parsing or indexing becomes too slow on real projects, the
+  document core must support replacing broad indexing with measured targeted
+  indexes or prepared project summaries.
 
 ## Fixtures
 
-The primary real project fixture lives under:
+Fixtures use a generic structure. Each fixture is a real vendor project for a
+specific backend, device, RTD version, and module scenario.
 
 ```text
 fixtures/
   projects/
-    s32k344_uart/
+    <backend>/
+      <family>/
+        <device>/
+          <scenario>/
 ```
 
-The fixture should be a real, complete UART S32DS project. It should include
-files needed for S32DS headless validation, while excluding build/debug/generated
-artifacts that do not belong in source control.
+Fixtures must include the files required for vendor validation and exclude
+build/debug/generated artifacts that do not belong in source control.
 
-Future modules should add similar real project fixtures:
+Specific fixture scenarios are documented in the test strategy, not in this
+spec.
 
-```text
-fixtures/projects/s32k344_spi/
-fixtures/projects/s32k344_pwm/
-fixtures/projects/s32k344_adc/
-```
+## Tests And Acceptance
 
-## Tests
+The spec requires maintainable test documentation. Test cases, module-specific
+test steps, staged coverage, and subagent validation process belong in the test
+strategy document.
 
-Testing has two layers.
+Acceptance is based on two criteria:
 
-Fast deterministic tests do not require S32DS and cover:
+- the required test cases pass;
+- the KPI for focused module configuration validation is met.
 
-- intent validation;
-- shortcut command normalization;
-- pin mapping lookup;
-- MEX indexing;
-- localized XML edits;
-- provider ownership boundaries;
-- provider plan/apply behavior;
-- diagnostics;
-- static checks;
-- validation command construction.
-
-Real project validation modifies the `.mex` inside the fixture project and then
-runs no-window S32DS headless validation on that project. This is the highest
-phase-1 acceptance standard.
-
-The test matrix must cover all phase-1 functionality:
-
-- seven module shortcut set paths;
-- JSON intent path;
-- LPUART Uart interrupt mode;
-- LPUART Uart polling mode;
-- FlexIO Uart interrupt mode;
-- FlexIO Uart polling mode;
-- generic Port pin mapping and application;
-- generic Dio channel configuration;
-- Mcu Uart-related clock/ref configuration;
-- BaseNXP parameter set coverage;
-- Platform Uart-related IRQ configuration;
-- Mcl FlexIO base configuration;
-- static check failures;
-- S32DS validation failures;
-- missing or invalid mapping diagnostics;
-- optional `--backup`.
-
-## Independent Subagent Validation
-
-Key test cases must also be validated by independent subagents.
-
-Subagent validation requirements:
-
-- each subagent call must set `"fork_context": false`;
-- with `"fork_context": false`, the subagent is fully independent from the main
-  agent and has isolated context;
-- the subagent must not see the main agent's analysis, implementation details,
-  hidden assumptions, or debugging process;
-- the subagent should rely only on the user requirement, test-case instructions,
-  repository files, and the public tool interface;
-- each subagent validates one focused test case whenever practical.
-
-KPI:
-
-- each subagent validation of one test case must complete within 3 minutes;
-- the ideal path is: understand the user need, infer the intent, call the tool,
-  and pass validation once;
-- if a focused test case routinely exceeds 3 minutes, the tool interface,
-  diagnostics, performance, or test design should be improved.
+The KPI applies to all module configuration flows: an independent validator
+should be able to understand a focused test case, use the public tool
+interface, and complete validation within 3 minutes. Repeated KPI failures mean
+the interface, diagnostics, performance, or test design must be improved.
 
 ## Suggested Project Structure
 
@@ -436,11 +350,20 @@ rtd_config/
   diagnostics.py
   intent.py
   plan.py
-  mex/
-    document.py
-    index.py
-    edit.py
-    writer.py
+  backends/
+    base.py
+    s32_mex/
+      document.py
+      index.py
+      edit.py
+      writer.py
+      validation.py
+    eb_tresos/
+      document.py
+      index.py
+      edit.py
+      writer.py
+      validation.py
   modules/
     base.py
     mcu.py
@@ -453,49 +376,34 @@ rtd_config/
   resources/
     pins.py
     schema.py
-    validation.py
+    constraints.py
   checks/
     static.py
 data/
-  s32k3/
 fixtures/
-  projects/
 tests/
-  unit/
-  integration/
 docs/
   superpowers/
     specs/
+    references/
+    tests/
+    roadmaps/
 ```
-
-## Implementation Sequence
-
-1. Establish package, CLI, JSON diagnostics, configuration loading, and
-   validation command construction.
-2. Add MEX document parsing, indexing, and localized edit helpers.
-3. Add real `fixtures/projects/s32k344_uart/` project and inspect/check support.
-4. Add S32K344 pin mapping JSON and generic Port provider.
-5. Implement minimal LPUART Uart path with Mcu, Platform, and Port dependencies.
-6. Add no-window S32DS headless validation to `configure`.
-7. Add FlexIO foundation in Mcl and FlexIO Uart in Uart.
-8. Add BaseNXP broad set support and Dio generic channel support.
-9. Add seven module shortcut command groups.
-10. Complete the full test matrix and independent subagent validation pass.
 
 ## Success Criteria
 
-Phase 1 is successful when:
+The project is successful when:
 
 - core CLI commands return stable JSON;
 - shortcut commands normalize to the same intent pipeline;
-- existing S32K344 UART fixture can be modified in place;
-- LPUART Uart interrupt and polling configurations pass S32DS validation;
-- FlexIO Uart interrupt and polling configurations pass S32DS validation;
-- Port pin configuration is generic and uses committed pin mapping JSON;
-- Uart does not directly write Port, Mcu, Platform, or Mcl configuration;
-- Mcl FlexIO configuration is owned by Mcl provider;
-- all seven modules expose basic set functionality;
-- static and validation diagnostics are actionable;
-- runtime commands avoid Excel, RTD scanning, and avoidable repeated parsing;
-- test coverage spans all phase-1 functions;
-- independent subagent validation meets the 3-minute KPI for focused test cases.
+- backend document cores can configure vendor projects through structured,
+  localized edits;
+- module providers preserve ownership boundaries;
+- dependencies between modules are explicit in plans;
+- constraints come from prepared runtime data assets;
+- runtime commands avoid development-only source files and vendor-directory
+  scans;
+- static and vendor validation diagnostics are actionable;
+- module capability tables, references, tests, and roadmaps remain maintainable;
+- required test cases pass;
+- focused validation meets the 3-minute KPI.
