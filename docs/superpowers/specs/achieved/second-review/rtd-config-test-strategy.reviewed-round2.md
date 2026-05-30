@@ -1,9 +1,11 @@
 # RTD Configuration Test Strategy
 
-Version: 0.1.1
-Date: 2026-05-30
-Author: autoMBD <tkung.lqk@foxmali.com>
-Authoring note: AI-assisted archived second-round reviewed test strategy draft; preserved for traceability.
+| Field | Value |
+| --- | --- |
+| Version | 0.1.2 |
+| Date | 2026-05-30 |
+| Author | autoMBD <tkung.lqk@foxmali.com> (AI-assisted) |
+| Description | Archives the second reviewed test-strategy draft with inline comments preserved. |
 
 ## Purpose
 
@@ -130,5 +132,8 @@ A module or feature is accepted when:
 
 ## Changelog
 
-- 2026-05-30 v0.1.1: Standardized archive metadata and added changelog.
-- 2026-05-30 v0.1.0: Archived second-round reviewed test strategy draft.
+| Date | Version | Description |
+| --- | --- | --- |
+| 2026-05-30 | 0.1.2 | Formatted document metadata and changelog as tables. |
+| 2026-05-30 | 0.1.1 | Standardized archive metadata and added changelog. |
+| 2026-05-30 | 0.1.0 | Archived second-round reviewed test strategy draft. |

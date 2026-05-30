@@ -1,9 +1,11 @@
 # RTD Configuration Module Capabilities
 
-Version: 0.1.1
-Date: 2026-05-30
-Author: autoMBD <tkung.lqk@foxmali.com>
-Authoring note: AI-assisted capability table prepared through human review.
+| Field | Value |
+| --- | --- |
+| Version | 0.1.2 |
+| Date | 2026-05-30 |
+| Author | autoMBD <tkung.lqk@foxmali.com> (AI-assisted) |
+| Description | Maintains module ownership, dependencies, runtime data, and validation coverage. |
 
 ## Purpose
 
@@ -44,5 +46,8 @@ be expressed as dependency requests and applied by the owning provider.
 
 ## Changelog
 
-- 2026-05-30 v0.1.1: Standardized document metadata and added changelog.
-- 2026-05-30 v0.1.0: Created maintainable module capability table.
+| Date | Version | Description |
+| --- | --- | --- |
+| 2026-05-30 | 0.1.2 | Formatted document metadata and changelog as tables. |
+| 2026-05-30 | 0.1.1 | Standardized document metadata and added changelog. |
+| 2026-05-30 | 0.1.0 | Created maintainable module capability table. |

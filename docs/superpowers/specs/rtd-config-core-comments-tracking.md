@@ -1,9 +1,11 @@
 # RTD Config Core Spec Comments Tracking
 
-Version: 0.2.0
-Date: 2026-05-30
-Author: autoMBD <tkung.lqk@foxmali.com>
-Authoring note: AI-assisted review tracking document prepared through human review.
+| Field | Value |
+| --- | --- |
+| Version | 0.2.2 |
+| Date | 2026-05-30 |
+| Author | autoMBD <tkung.lqk@foxmali.com> (AI-assisted) |
+| Description | Tracks how review comments were resolved across design document revisions. |
 
 This file tracks how the user's inline `REVIEW` comments were resolved. The
 reviewed draft with comments preserved in context is archived at:
@@ -65,6 +67,9 @@ workflow as that process becomes concrete.
 
 ## Changelog
 
-- 2026-05-30 v0.2.1: Removed dates from documentation filenames and updated tracking.
-- 2026-05-30 v0.2.0: Added second-round review tracking records.
-- 2026-05-30 v0.1.0: Created review comment tracking table.
+| Date | Version | Description |
+| --- | --- | --- |
+| 2026-05-30 | 0.2.2 | Formatted document metadata and changelog as tables. |
+| 2026-05-30 | 0.2.1 | Removed dates from documentation filenames and updated tracking. |
+| 2026-05-30 | 0.2.0 | Added second-round review tracking records. |
+| 2026-05-30 | 0.1.0 | Created review comment tracking table. |

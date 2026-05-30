@@ -1,9 +1,11 @@
 # RTD Configuration Test Strategy
 
-Version: 0.2.0
-Date: 2026-05-30
-Author: autoMBD <tkung.lqk@foxmali.com>
-Authoring note: AI-assisted test strategy prepared through human review.
+| Field | Value |
+| --- | --- |
+| Version | 0.2.1 |
+| Date | 2026-05-30 |
+| Author | autoMBD <tkung.lqk@foxmali.com> (AI-assisted) |
+| Description | Defines testing layers, fixture validation, subagent validation, and KPI rules. |
 
 ## Purpose
 
@@ -136,5 +138,8 @@ A module or feature is accepted when:
 
 ## Changelog
 
-- 2026-05-30 v0.2.0: Clarified independent subagent validation scope.
-- 2026-05-30 v0.1.0: Created RTD configuration test strategy.
+| Date | Version | Description |
+| --- | --- | --- |
+| 2026-05-30 | 0.2.1 | Formatted document metadata and changelog as tables. |
+| 2026-05-30 | 0.2.0 | Clarified independent subagent validation scope. |
+| 2026-05-30 | 0.1.0 | Created RTD configuration test strategy. |

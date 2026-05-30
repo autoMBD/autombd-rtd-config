@@ -1,9 +1,11 @@
 # RTD Configuration Tool Core Design
 
-Version: 0.2.1
-Date: 2026-05-30
-Author: autoMBD <tkung.lqk@foxmali.com>
-Authoring note: AI-assisted design document prepared through human review.
+| Field | Value |
+| --- | --- |
+| Version | 0.2.3 |
+| Date | 2026-05-30 |
+| Author | autoMBD <tkung.lqk@foxmali.com> (AI-assisted) |
+| Description | Defines the long-term RTD configuration tool architecture and success criteria. |
 
 ## Overview
 
@@ -463,7 +465,10 @@ The project is successful when:
 
 ## Changelog
 
-- 2026-05-30 v0.2.2: Renamed design document to remove date from filename.
-- 2026-05-30 v0.2.1: Standardized document metadata and added changelog.
-- 2026-05-30 v0.2.0: Integrated second-round review updates and Agent Skills architecture.
-- 2026-05-30 v0.1.0: Created initial RTD configuration core design.
+| Date | Version | Description |
+| --- | --- | --- |
+| 2026-05-30 | 0.2.3 | Formatted document metadata and changelog as tables. |
+| 2026-05-30 | 0.2.2 | Renamed design document to remove date from filename. |
+| 2026-05-30 | 0.2.1 | Standardized document metadata and added changelog. |
+| 2026-05-30 | 0.2.0 | Integrated second-round review updates and Agent Skills architecture. |
+| 2026-05-30 | 0.1.0 | Created initial RTD configuration core design. |
