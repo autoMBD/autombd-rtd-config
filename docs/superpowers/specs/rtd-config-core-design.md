@@ -2,8 +2,8 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.2.3 |
-| Date | 2026-05-30 |
+| Version | 0.2.4 |
+| Date | 2026-06-02 |
 | Author | autoMBD <tkung.lqk@foxmali.com> (AI-assisted) |
 | Description | Defines the long-term RTD configuration tool architecture and success criteria. |
 
@@ -19,6 +19,7 @@ interpret diagnostics without reading implementation code.
 
 ## Contents
 
+- [Terminology](#terminology)
 - [Purpose](#purpose)
 - [Goals](#goals)
 - [Supported Configuration Backends](#supported-configuration-backends)
@@ -35,6 +36,30 @@ interpret diagnostics without reading implementation code.
 - [Tests And Acceptance](#tests-and-acceptance)
 - [Suggested Project Structure](#suggested-project-structure)
 - [Success Criteria](#success-criteria)
+
+## Terminology
+
+| Term | Meaning |
+| --- | --- |
+| RTD Configuration Tool | The CLI-first tool being built in this project. It converts structured requests into deterministic RTD configuration edits and validation results. |
+| Runtime tool | The executable tool and committed runtime assets used in a target environment. It must not depend on development-only source files such as Excel workbooks or raw RTD package descriptors. |
+| Development-time source material | Reference material used to build runtime data assets, such as pin mux workbooks, RTD `.xdm` descriptors, vendor examples, and local investigation notes. |
+| Runtime asset | Prepared, versioned repository data loaded by the runtime tool, such as pin mapping JSON, schema/constraint cache, module manifests, and validation profiles. |
+| Backend | A supported configuration technology, such as S32 ConfigTools `.mex` or EB tresos project files. Each backend owns its document model, writer, and validation integration. |
+| Backend document core | Backend-specific code that parses, indexes, edits, and writes project configuration files while keeping edits localized and diagnosable. |
+| Module provider | Code that owns planning and applying configuration for one RTD module or module family. A provider may only write its owned configuration regions. |
+| Shared resource service | Cross-module service for resources and constraints, such as pin mapping, schema cache, diagnostics, validation command construction, and performance timing. |
+| Intent | A structured request that describes the desired configuration change. JSON intent is the core request format. |
+| Shortcut command | A convenience CLI command for common workflows. It must normalize to intent and use the same plan/apply/check/validate pipeline. |
+| Plan | The deterministic dry-run result describing intended edits, dependencies, diagnostics, and blockers before writes. |
+| Apply | The tool step that performs planned, owned configuration edits in backend project files. |
+| Static check | Tool-owned checks that do not launch vendor tools, such as XML well-formedness, ownership boundaries, missing references, invalid resources, or duplicate IDs. |
+| Runtime validation | Tool behavior after `.mex`, `.xdm`, or another backend configuration file is modified. It invokes or models the backend/vendor validator and reports structured validation results. |
+| Development testing | The implementation acceptance process. Test cases prove tool features, diagnostics, runtime validation behavior, and agent workflows before a feature is accepted. |
+| Fixture | A real or focused test project used by development tests. Real vendor project fixtures are the preferred source for integration and validation tests. |
+| Independent subagent validation | Black-box development validation performed by an isolated subagent using only public deliverables, test input, repository-visible instructions, companion skills, and the public CLI. |
+| Agent Skill | Repository skill documentation that teaches AI agents how to use the tool, prepare intents, run commands, validate results, and react to diagnostics without relying on private implementation details. |
+| KPI | A measurable acceptance target. The current focused validation KPI is that an independent subagent can complete one focused configuration validation case within 3 minutes. |
 
 ## Purpose
 
@@ -467,6 +492,7 @@ The project is successful when:
 
 | Date | Version | Description |
 | --- | --- | --- |
+| 2026-06-02 | 0.2.4 | Added terminology table to align project concepts. |
 | 2026-05-30 | 0.2.3 | Formatted document metadata and changelog as tables. |
 | 2026-05-30 | 0.2.2 | Renamed design document to remove date from filename. |
 | 2026-05-30 | 0.2.1 | Standardized document metadata and added changelog. |
