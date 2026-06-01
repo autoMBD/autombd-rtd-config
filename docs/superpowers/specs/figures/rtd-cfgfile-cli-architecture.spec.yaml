@@ -1,0 +1,92 @@
+meta:
+  profile: engineering-review
+  theme: tech-blue
+  layout: horizontal
+  title: "RTD CfgFile CLI Architecture"
+  description: "Architecture overview for AI-agent-driven RTD configuration file editing and runtime verification."
+
+modules:
+  - id: agent
+    label: Agent Interface
+  - id: cli
+    label: Public Tool Contract
+  - id: core
+    label: Configuration Core
+  - id: backend
+    label: Backend And Verification
+
+nodes:
+  - id: user_requirements
+    label: "User Requirements"
+    type: document
+    module: agent
+  - id: agent_skills
+    label: "Companion Agent Skills"
+    type: service
+    module: agent
+  - id: rtd_cfgfile_cli
+    label: "RTD CfgFile CLI"
+    type: service
+    module: cli
+  - id: intent_plan
+    label: "Intent And Plan"
+    type: service
+    module: core
+  - id: module_providers
+    label: "Module Providers"
+    type: service
+    module: core
+  - id: runtime_assets
+    label: "Runtime Assets"
+    type: database
+    module: core
+  - id: document_core
+    label: "Backend Document Core"
+    type: service
+    module: backend
+  - id: project_files
+    label: ".mex / .xdm Project Files"
+    type: document
+    module: backend
+  - id: runtime_verification
+    label: "Runtime Verification"
+    type: service
+    module: backend
+
+edges:
+  - from: user_requirements
+    to: agent_skills
+    type: primary
+    label: "analyze"
+  - from: agent_skills
+    to: rtd_cfgfile_cli
+    type: primary
+    label: "intent / shortcut"
+  - from: rtd_cfgfile_cli
+    to: intent_plan
+    type: primary
+    label: "normalize"
+  - from: intent_plan
+    to: module_providers
+    type: primary
+    label: "resolve"
+  - from: module_providers
+    to: runtime_assets
+    type: data
+    label: "constraints"
+  - from: module_providers
+    to: document_core
+    type: primary
+    label: "owned edits"
+  - from: document_core
+    to: project_files
+    type: primary
+    label: "write"
+  - from: project_files
+    to: runtime_verification
+    type: primary
+    label: "check / validate"
+  - from: runtime_verification
+    to: rtd_cfgfile_cli
+    type: data
+    label: "JSON diagnostics"

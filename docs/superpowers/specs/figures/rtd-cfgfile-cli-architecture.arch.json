@@ -1,0 +1,27 @@
+{
+  "title": "RTD CfgFile CLI Architecture",
+  "profile": "engineering-review",
+  "figureType": "architecture",
+  "nodes": [
+    "user_requirements",
+    "agent_skills",
+    "rtd_cfgfile_cli",
+    "intent_plan",
+    "module_providers",
+    "runtime_assets",
+    "document_core",
+    "project_files",
+    "runtime_verification"
+  ],
+  "edges": [
+    ["user_requirements", "agent_skills", "analyze"],
+    ["agent_skills", "rtd_cfgfile_cli", "intent / shortcut"],
+    ["rtd_cfgfile_cli", "intent_plan", "normalize"],
+    ["intent_plan", "module_providers", "resolve"],
+    ["module_providers", "runtime_assets", "constraints"],
+    ["module_providers", "document_core", "owned edits"],
+    ["document_core", "project_files", "write"],
+    ["project_files", "runtime_verification", "check / validate"],
+    ["runtime_verification", "rtd_cfgfile_cli", "JSON diagnostics"]
+  ]
+}

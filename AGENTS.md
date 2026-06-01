@@ -25,8 +25,19 @@ When responding:
 
 - Development testing is the agent delivery gate: test cases used during
   implementation and review to prove the tool feature is complete.
-- Runtime validation is tool behavior: validation run by the tool after it
-  modifies a project configuration file such as `.mex` or `.xdm`.
-- A feature is not accepted merely because runtime validation exists; the
+- Runtime verification is tool behavior after it modifies a project
+  configuration file such as `.mex` or `.xdm`. It includes fast static checks
+  and backend/vendor validation when configured.
+- A feature is not accepted merely because runtime verification exists; the
   development test cases must pass, including cases that exercise runtime
-  validation behavior.
+  verification behavior.
+
+## Development Release Boundary
+
+- Development source material such as Excel workbooks, raw RTD package
+  descriptors, local investigation notes, and installed RTD directory scans may
+  be used to build runtime assets, but must not become runtime dependencies of
+  the released RTD CfgFile CLI.
+- Runtime behavior must use committed, versioned assets such as JSON/cache
+  files, module manifests, pin mappings, schema constraints, and validation
+  profiles.

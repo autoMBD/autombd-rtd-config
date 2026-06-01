@@ -2,8 +2,8 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.2.0 |
-| Date | 2026-06-02 |
+| Version | 0.1.2 |
+| Date | 2026-05-30 |
 | Author | autoMBD <tkung.lqk@foxmali.com> (AI-assisted) |
 | Description | Records staged delivery order and milestone boundaries for the RTD configuration tool. |
 
@@ -13,15 +13,7 @@ This roadmap records delivery order and staged limits. It intentionally lives
 outside the spec so the spec can remain a stable description of the project
 goal and architecture.
 
-## Roadmap Overview
-
-| Milestone | Focus | Primary deliverable | Major exclusions carried forward |
-| --- | --- | --- | --- |
-| 1 | S32K3 RTD 7.0.1 `.mex` core | Existing-project configuration for `Mcu`, `BaseNXP`, `Platform`, `Port`, `Dio`, `Mcl`, and `Uart` on S32K344, with static checks and no-window S32DS headless validation. | DMA, from-scratch `.mex` creation, partial-project completion, EB tresos, K1/K5 validation. |
-| 2 | DMA and creation support | Uart DMA paths, Mcl/Dma dependencies, safe missing-module completion, and prepared-template `.mex` creation. | Broad new module expansion and EB tresos backend. |
-| 3 | More modules and full set coverage | Additional RTD modules and richer set features until common and then complete RTD configuration needs are covered. | New chip families and backend families unless explicitly prioritized. |
-| 4 | More devices, families, and RTD releases | Runtime data and fixtures for more S32K3 devices/packages, S32K1/S32K5, and newer RTD releases. | EB tresos unless milestone 5 has started. |
-| 5 | EB tresos backend | `.xdm` document core, EB validation integration, shared intent/resource/module model reuse, and EB-specific fixtures. | Non-EB backend families. |
+<!-- REVIEW: 先给一个overview的roadmap表格，再分章节描述。 -->
 
 ## Milestone 1: S32K3 RTD 7.0.1 MEX Core
 
@@ -106,7 +98,6 @@ Expected additions:
 
 | Date | Version | Description |
 | --- | --- | --- |
-| 2026-06-02 | 0.2.0 | Added roadmap overview table before detailed milestone sections. |
 | 2026-05-30 | 0.1.2 | Formatted document metadata and changelog as tables. |
 | 2026-05-30 | 0.1.1 | Standardized document metadata and added changelog. |
 | 2026-05-30 | 0.1.0 | Created staged RTD configuration tool roadmap. |

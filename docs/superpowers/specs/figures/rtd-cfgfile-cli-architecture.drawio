@@ -1,0 +1,76 @@
+<mxfile host="app.diagrams.net" modified="2026-06-02T00:00:00.000Z" agent="Codex" version="24.7.17" type="device">
+  <diagram id="rtd-cfgfile-cli-architecture" name="RTD CfgFile CLI Architecture">
+    <mxGraphModel dx="1500" dy="900" grid="1" gridSize="8" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1280" pageHeight="720" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="agent" value="Agent Interface" style="swimlane;html=1;rounded=0;startSize=28;fillColor=#eaf2ff;strokeColor=#5b7db1;fontColor=#1f2a44;" vertex="1" parent="1">
+          <mxGeometry x="40" y="80" width="240" height="440" as="geometry" />
+        </mxCell>
+        <mxCell id="cli" value="Public Tool Contract" style="swimlane;html=1;rounded=0;startSize=28;fillColor=#eef8f3;strokeColor=#5b9f75;fontColor=#1f2a44;" vertex="1" parent="1">
+          <mxGeometry x="320" y="80" width="200" height="440" as="geometry" />
+        </mxCell>
+        <mxCell id="core" value="Configuration Core" style="swimlane;html=1;rounded=0;startSize=28;fillColor=#fff7e8;strokeColor=#c78f2f;fontColor=#1f2a44;" vertex="1" parent="1">
+          <mxGeometry x="560" y="80" width="360" height="440" as="geometry" />
+        </mxCell>
+        <mxCell id="backend" value="Backend And Verification" style="swimlane;html=1;rounded=0;startSize=28;fillColor=#f4edf9;strokeColor=#8b65ad;fontColor=#1f2a44;" vertex="1" parent="1">
+          <mxGeometry x="960" y="80" width="280" height="440" as="geometry" />
+        </mxCell>
+        <mxCell id="user_requirements" value="User Requirements&lt;br&gt;config sheets / pin layout / module intent" style="shape=document;whiteSpace=wrap;html=1;rounded=1;arcSize=6;fillColor=#ffffff;strokeColor=#5b7db1;fontColor=#1f2a44;" vertex="1" parent="agent">
+          <mxGeometry x="40" y="70" width="160" height="72" as="geometry" />
+        </mxCell>
+        <mxCell id="agent_skills" value="Companion Agent Skills&lt;br&gt;analysis and decomposition" style="rounded=1;whiteSpace=wrap;html=1;arcSize=6;fillColor=#ffffff;strokeColor=#5b7db1;fontColor=#1f2a44;" vertex="1" parent="agent">
+          <mxGeometry x="40" y="230" width="160" height="72" as="geometry" />
+        </mxCell>
+        <mxCell id="rtd_cfgfile_cli" value="RTD CfgFile CLI&lt;br&gt;stable CLI and JSON contract" style="rounded=1;whiteSpace=wrap;html=1;arcSize=6;fillColor=#ffffff;strokeColor=#5b9f75;fontColor=#1f2a44;" vertex="1" parent="cli">
+          <mxGeometry x="30" y="170" width="140" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="intent_plan" value="Intent And Plan&lt;br&gt;normalize / resolve / diagnose" style="rounded=1;whiteSpace=wrap;html=1;arcSize=6;fillColor=#ffffff;strokeColor=#c78f2f;fontColor=#1f2a44;" vertex="1" parent="core">
+          <mxGeometry x="32" y="80" width="144" height="72" as="geometry" />
+        </mxCell>
+        <mxCell id="module_providers" value="Module Providers&lt;br&gt;Mcu / BaseNXP / Platform / Port / Dio / Mcl / Uart" style="rounded=1;whiteSpace=wrap;html=1;arcSize=6;fillColor=#ffffff;strokeColor=#c78f2f;fontColor=#1f2a44;" vertex="1" parent="core">
+          <mxGeometry x="184" y="180" width="144" height="88" as="geometry" />
+        </mxCell>
+        <mxCell id="runtime_assets" value="Runtime Assets&lt;br&gt;pins / schema / constraints / validation profiles" style="shape=cylinder3d;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#ffffff;strokeColor=#c78f2f;fontColor=#1f2a44;" vertex="1" parent="core">
+          <mxGeometry x="32" y="300" width="144" height="88" as="geometry" />
+        </mxCell>
+        <mxCell id="document_core" value="Backend Document Core&lt;br&gt;parse / index / edit / write" style="rounded=1;whiteSpace=wrap;html=1;arcSize=6;fillColor=#ffffff;strokeColor=#8b65ad;fontColor=#1f2a44;" vertex="1" parent="backend">
+          <mxGeometry x="40" y="80" width="160" height="72" as="geometry" />
+        </mxCell>
+        <mxCell id="project_files" value=".mex / .xdm&lt;br&gt;Project Files" style="shape=document;whiteSpace=wrap;html=1;rounded=1;arcSize=6;fillColor=#ffffff;strokeColor=#8b65ad;fontColor=#1f2a44;" vertex="1" parent="backend">
+          <mxGeometry x="40" y="200" width="160" height="72" as="geometry" />
+        </mxCell>
+        <mxCell id="runtime_verification" value="Runtime Verification&lt;br&gt;static check + backend validation" style="rounded=1;whiteSpace=wrap;html=1;arcSize=6;fillColor=#ffffff;strokeColor=#8b65ad;fontColor=#1f2a44;" vertex="1" parent="backend">
+          <mxGeometry x="40" y="320" width="160" height="72" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_user_skills" value="analyze" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#395f9c;fontColor=#1f2a44;endArrow=block;endFill=1;" edge="1" parent="agent" source="user_requirements" target="agent_skills">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_skills_cli" value="intent / shortcut" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#395f9c;fontColor=#1f2a44;endArrow=block;endFill=1;" edge="1" parent="1" source="agent_skills" target="rtd_cfgfile_cli">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_cli_intent" value="normalize" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#3b7a54;fontColor=#1f2a44;endArrow=block;endFill=1;" edge="1" parent="1" source="rtd_cfgfile_cli" target="intent_plan">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_intent_providers" value="resolve" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#9b6d1f;fontColor=#1f2a44;endArrow=block;endFill=1;" edge="1" parent="core" source="intent_plan" target="module_providers">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_assets_providers" value="constraints" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#9b6d1f;fontColor=#1f2a44;dashed=1;endArrow=block;endFill=1;" edge="1" parent="core" source="runtime_assets" target="module_providers">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_providers_document" value="owned edits" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#9b6d1f;fontColor=#1f2a44;endArrow=block;endFill=1;" edge="1" parent="1" source="module_providers" target="document_core">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_document_project" value="write" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#6e4a8f;fontColor=#1f2a44;endArrow=block;endFill=1;" edge="1" parent="backend" source="document_core" target="project_files">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_project_verify" value="check / validate" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#6e4a8f;fontColor=#1f2a44;endArrow=block;endFill=1;" edge="1" parent="backend" source="project_files" target="runtime_verification">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_verify_cli" value="JSON diagnostics" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#6e4a8f;fontColor=#1f2a44;dashed=1;endArrow=block;endFill=1;" edge="1" parent="1" source="runtime_verification" target="rtd_cfgfile_cli">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

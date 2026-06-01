@@ -2,8 +2,8 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.2.2 |
-| Date | 2026-05-30 |
+| Version | 0.3.0 |
+| Date | 2026-06-02 |
 | Author | autoMBD <tkung.lqk@foxmali.com> (AI-assisted) |
 | Description | Tracks how review comments were resolved across design document revisions. |
 
@@ -11,6 +11,14 @@ This file tracks how the user's inline `REVIEW` comments were resolved. The
 reviewed draft with comments preserved in context is archived at:
 
 `docs/superpowers/specs/achieved/rtd-config-core-design.reviewed.md`
+
+Second-round reviewed drafts are archived under:
+
+`docs/superpowers/specs/achieved/second-review/`
+
+Third-round reviewed drafts are archived under:
+
+`docs/superpowers/specs/achieved/third-review/`
 
 ## Tracking Table
 
@@ -57,6 +65,21 @@ reviewed draft with comments preserved in context is archived at:
 | C39 | Reference locations | Reference document should state where source materials are located. | Added concrete known development reference locations for IOMUX workbook, RTD `.xdm` pattern, Uart `.xdm` example, and fixture projects. | Source materials reference |
 | C40 | Second-review traceability | Preserve second-round comments with their document context. | Backed up the second-round reviewed docs under `specs/achieved/second-review/`. | Achieved second-review backups |
 | C41 | File naming | Do not put dates in filenames because changelogs already carry date information. | Renamed dated documentation files to semantic names and updated internal links. | Documentation filenames; this tracking file |
+| C42 | Third-review traceability | Preserve the third-round inline comments with original document context before removing comments from active docs. | Backed up the reviewed core design, test strategy, and roadmap docs under `specs/achieved/third-review/`. | Achieved third-review backups |
+| C43 | Tool naming | Standardize the tool name as RTD CfgFile CLI and define that it edits RTD config files according to vendor rules so code generation is correct. | Renamed the core design title/overview/terminology to RTD CfgFile CLI and clarified the vendor-rule/code-generation contract. | Core design spec, Overview and Terminology |
+| C44 | Static check vs runtime verification | Align static check with runtime verification and decide whether they should merge. | Defined runtime verification as the umbrella process. Static check remains the fast tool-owned stage, while backend validation remains the vendor-backed stage; both share the result model but stay separate execution steps. | Core design spec, Terminology and Runtime Verification Pipeline; AGENTS.md |
+| C45 | Goal wording | Avoid saying the tool replaces hand-editing XML; RTD is normally configured through S32 ConfigTools or EB tresos. | Rewrote the purpose and goals to state that agents use RTD CfgFile CLI instead of directly operating vendor GUI configuration workflows. | Core design spec, Purpose and Goals |
+| C46 | Agent reasoning goal | Add a goal for AI agents to decompose complex requirements such as communication configuration sheets and Port pin layouts before using the CLI. | Added goal G03 and expanded the Agent Skills description to cover analysis, decomposition, dependency reasoning, and validation feedback handling. | Core design spec, Goals and Architecture |
+| C47 | Development/runtime boundary | Do not treat separation of development source material and runtime assets as a project goal; make it a development rule. | Removed that item from the goals table and added a Development Release Boundary section to `AGENTS.md`. | Core design spec, Goals; AGENTS.md |
+| C48 | Spec maintainability wording | Do not list spec/table maintainability as a project goal. | Removed maintainability as a goal and kept maintainable docs as document structure rather than product objective. | Core design spec, Goals |
+| C49 | Purpose and goals format | Simplify Purpose and express Goals as a table. | Compressed the Purpose section and replaced the goals bullet list with a goal table containing IDs and success signals. | Core design spec, Purpose and Goals |
+| C50 | Architecture diagram | Add an architecture diagram if Markdown can render it, otherwise provide a Draw.io file and reference it. | Added an inline Mermaid architecture diagram and an editable Draw.io source file under `docs/superpowers/specs/figures/`. | Core design spec, Architecture; architecture Draw.io file |
+| C51 | Module capability text | Remove process-oriented capability-table maintenance wording from the spec. | Removed the paragraph that told maintainers to update the table on every feature addition, while keeping the structural requirements for the table. | Core design spec, Module Capability Model |
+| C52 | CLI command explanation | Explain `pin-options` and convert core commands into a table. | Replaced core command code block with a table explaining purpose, write behavior, and vendor-tool launch behavior; documented `pin-options` as a runtime pin-mapping query. | Core design spec, Intent And Commands |
+| C53 | Shortcut command explanation | Convert shortcut commands into a table. | Replaced shortcut command examples with a module-group table explaining each shortcut's role and intent-normalization behavior. | Core design spec, Intent And Commands |
+| C54 | Test case catalog | Use retired RTD module skills to define first-milestone test cases for the seven modules, with IDs in a table. | Added a Milestone 1 S32K3 MEX test case catalog with IDs covering Mcu, BaseNXP, Platform, Port, Dio, Mcl, Uart, cross-module Uart flows, and deferred-feature diagnostics. | Test strategy |
+| C55 | Test failure loop | State that failed tests must return to code development and iterate until the development-test loop closes. | Added a Failure Iteration Loop section requiring root-cause analysis, code/runtime-data/fixture/test fixes, and reruns before acceptance. | Test strategy |
+| C56 | Roadmap overview | Add an overview roadmap table before milestone detail sections. | Added a Roadmap Overview table with focus, primary deliverable, and carried-forward exclusions for each milestone. | Roadmap |
 
 ## Open Follow-Up
 
@@ -69,6 +92,7 @@ workflow as that process becomes concrete.
 
 | Date | Version | Description |
 | --- | --- | --- |
+| 2026-06-02 | 0.3.0 | Added third-round review tracking records and archive location. |
 | 2026-05-30 | 0.2.2 | Formatted document metadata and changelog as tables. |
 | 2026-05-30 | 0.2.1 | Removed dates from documentation filenames and updated tracking. |
 | 2026-05-30 | 0.2.0 | Added second-round review tracking records. |

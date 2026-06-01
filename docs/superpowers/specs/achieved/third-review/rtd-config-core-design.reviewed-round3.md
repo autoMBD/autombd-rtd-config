@@ -1,22 +1,21 @@
-# RTD CfgFile CLI Core Design
+# RTD Configuration Tool Core Design
 
 | Field | Value |
 | --- | --- |
-| Version | 0.3.0 |
+| Version | 0.2.4 |
 | Date | 2026-06-02 |
 | Author | autoMBD <tkung.lqk@foxmali.com> (AI-assisted) |
-| Description | Defines the long-term RTD CfgFile CLI architecture and success criteria. |
+| Description | Defines the long-term RTD configuration tool architecture and success criteria. |
 
 ## Overview
 
-RTD CfgFile CLI is a CLI-first configuration system for RTD projects. It edits
-RTD configuration files according to vendor configuration-tool rules, accepts
-structured configuration requests, produces deterministic project changes, and
-verifies that the modified project can pass the configured code-generation and
-validation flow. Companion Agent Skills are part of the deliverable so AI
-agents can analyze user requirements, decompose them into intents or shortcut
-commands, run verification, and interpret diagnostics without reading
-implementation code.
+The RTD Configuration Tool is a CLI-first configuration system for RTD projects.
+It prepares deterministic runtime data, accepts structured configuration
+requests, edits vendor project files through backend-specific document cores,
+and verifies results through static checks and vendor validation. Companion
+Agent Skills are part of the deliverable so AI agents can discover the tool,
+translate user requests into intents or shortcut commands, run validation, and
+interpret diagnostics without reading implementation code.
 
 ## Contents
 
@@ -31,7 +30,7 @@ implementation code.
 - [Intent And Commands](#intent-and-commands)
 - [Runtime Configuration](#runtime-configuration)
 - [Diagnostics](#diagnostics)
-- [Runtime Verification Pipeline](#runtime-verification-pipeline)
+- [Validation Pipeline](#validation-pipeline)
 - [Performance Requirements](#performance-requirements)
 - [Fixtures](#fixtures)
 - [Tests And Acceptance](#tests-and-acceptance)
@@ -42,7 +41,8 @@ implementation code.
 
 | Term | Meaning |
 | --- | --- |
-| RTD CfgFile CLI | The official tool name. It edits RTD configuration files according to the rules of vendor configuration tools such as S32 ConfigTools and EB tresos, then supports correct code generation and verification through the configured backend flow. |
+| RTD Configuration Tool | The CLI-first tool being built in this project. It converts structured requests into deterministic RTD configuration edits and validation results. |
+<!-- REVIEW: 我们统一一下工具的名称：RTD CfgFile CLI。这个工具就是用来编辑 RTD 配置文件的，并且复合 RTD 配置工具的规则，能够正确生成配置代码。 -->
 | Runtime tool | The executable tool and committed runtime assets used in a target environment. It must not depend on development-only source files such as Excel workbooks or raw RTD package descriptors. |
 | Development-time source material | Reference material used to build runtime data assets, such as pin mux workbooks, RTD `.xdm` descriptors, vendor examples, and local investigation notes. |
 | Runtime asset | Prepared, versioned repository data loaded by the runtime tool, such as pin mapping JSON, schema/constraint cache, module manifests, and validation profiles. |
@@ -54,10 +54,11 @@ implementation code.
 | Shortcut command | A convenience CLI command for common workflows. It must normalize to intent and use the same plan/apply/check/validate pipeline. |
 | Plan | The deterministic dry-run result describing intended edits, dependencies, diagnostics, and blockers before writes. |
 | Apply | The tool step that performs planned, owned configuration edits in backend project files. |
-| Static check | The fast, tool-owned part of runtime verification. It does not launch vendor tools and checks items such as XML well-formedness, ownership boundaries, missing references, invalid resources, and duplicate IDs. |
-| Backend validation | The vendor-backed part of runtime verification. It invokes or models the configured backend validator or code-generation flow, such as S32 ConfigTools headless validation for `.mex` projects. |
-| Runtime verification | The tool behavior after `.mex`, `.xdm`, or another backend configuration file is modified. It is the umbrella process that includes static check first and backend validation when configured. These stages share one result model but remain separate execution steps for performance, diagnostics, and vendor-authority reasons. |
-| Development testing | The implementation acceptance process. Test cases prove tool features, diagnostics, runtime verification behavior, and agent workflows before a feature is accepted. |
+| Static check | Tool-owned checks that do not launch vendor tools, such as XML well-formedness, ownership boundaries, missing references, invalid resources, or duplicate IDs. |
+<!-- REVIEW: 对齐一下，这里的Static check是不是就是我说的runtime verification？ -->
+| Runtime validation | Tool behavior after `.mex`, `.xdm`, or another backend configuration file is modified. It invokes or models the backend/vendor validator and reports structured validation results. |
+<!-- REVIEW: 对齐一下，Static check 和 runtime verification 是否可以合并成一项检查？ -->
+| Development testing | The implementation acceptance process. Test cases prove tool features, diagnostics, runtime validation behavior, and agent workflows before a feature is accepted. |
 | Fixture | A real or focused test project used by development tests. Real vendor project fixtures are the preferred source for integration and validation tests. |
 | Independent subagent validation | Black-box development validation performed by an isolated subagent using only public deliverables, test input, repository-visible instructions, companion skills, and the public CLI. |
 | Agent Skill | Repository skill documentation that teaches AI agents how to use the tool, prepare intents, run commands, validate results, and react to diagnostics without relying on private implementation details. |
@@ -65,31 +66,50 @@ implementation code.
 
 ## Purpose
 
-This project builds RTD CfgFile CLI so AI agents can configure low-level driver
-software through a deterministic public CLI instead of operating vendor GUI
-tools directly. The long-term target is the full RTD configuration surface:
-driver modules, official RTD RTOS integration, stacks, supported external
-peripheral driver configuration, S32 ConfigTools `.mex`, EB tresos project
-files, multiple S32K families, multiple RTD releases, and modules added over
-time.
+This project builds a deterministic RTD configuration tool that AI agents can
+use directly to configure low-level driver software quickly, efficiently,
+accurately, and reliably.
 
-The stable external contract is the CLI and its JSON input/output. Internal
-Python modules should be clear and testable, but the CLI/JSON contract is the
-first compatibility boundary.
+The tool's long-term target is to support the full RTD configuration surface:
+driver modules, official RTD RTOS integration, stacks, and supported external
+peripheral driver configuration. It must support S32 ConfigTools `.mex`
+projects and be extensible to EB tresos configuration projects. It must also be
+extensible across S32K families such as K3, K1, and K5, across RTD releases,
+and across new modules added over time.
+
+The stable external contract is a CLI that accepts structured requests and
+emits stable JSON. Internal Python modules should be clear and testable, but
+the CLI/JSON contract is the first compatibility boundary.
+
+This document describes the project and architecture. Milestone order, staged
+feature limits, and delivery sequencing belong in the roadmap and
+implementation plan. Development workflow and agent validation discipline belong
+in the testing and development-process documents.
 
 ## Goals
 
-| ID | Goal | Success signal |
-| --- | --- | --- |
-| G01 | Provide a deterministic CLI for RTD configuration file edits. | The same project, runtime data, tool version, and request produce the same plan, edits, diagnostics, and verification result. |
-| G02 | Let AI agents configure RTD projects without directly driving S32 ConfigTools or EB tresos GUI workflows. | Agents can transform user requirements into JSON intents or shortcut commands and complete configuration through RTD CfgFile CLI. |
-| G03 | Support AI-agent requirement decomposition through companion skills. | Skills guide agents to analyze multi-signal requirements, communication configuration sheets, Port pin layouts, dependencies, and validation feedback before calling the CLI. |
-| G04 | Preserve module ownership boundaries and explicit dependencies. | New modules and set features can be added without entangling provider write ownership or hidden dependency edits. |
-| G05 | Support backend extensibility. | S32 ConfigTools `.mex` is implemented first, and EB tresos can reuse the same intent, diagnostics, resources, module capability, and test concepts with a backend-specific document core. |
-| G06 | Support device, family, module, and RTD release growth. | Runtime assets and capability metadata can expand from S32K344/S32K3 RTD 7.0.1 to more S32K devices, K1/K5 families, RTD releases, and modules. |
-| G07 | Support complete and partially missing configurations through planned capabilities. | When planned for a backend, the tool can safely complete missing module configuration or create configuration files from prepared runtime templates. |
-| G08 | Keep routine commands efficient enough for autonomous use. | Inspect, plan, check, resource queries, and focused configuration flows are fast enough for repeated agent use and expose timing data for bottleneck analysis. |
-| G09 | Treat vendor-backed validation as the final authority after tool edits. | Runtime verification combines fast static checks with backend validation, and acceptance requires the configured vendor validation path when available. |
+- Enable AI agents to configure RTD projects without hand-editing vendor XML.
+<!-- REVIEW: 不是hand-editing，我们不会手动编辑配置文件，配置RTD使用的是专有工具，比如S32 ConfigTools、EB Tresos。 -->
+- Keep configuration deterministic and repeatable for a given project, data
+  cache, tool version, and request.
+  <!-- REVIEW: 我们要利用AI Agent的分析、推理能力，拆解复杂需求，例如用户可能多个通讯的配置单和Port Pin layout，AI Agent分析推理，然后拆解需求，然后利用RTD CfgFile CLI配置RTD并正确生成代码。这个在工具配套的Skill中要有相应的实现。这个可以单独写一个Goal。  -->
+- Make routine commands fast enough for repeated autonomous use.
+- Keep runtime dependencies minimal and predictable.
+- Separate development-time source material from runtime assets.
+<!-- REVIEW: 这个不是项目的Goal，这是开发时要注意的点：不要把开发资料带到release工具中去。对于这些开发注意事项，可以写到AGENTS.md中 -->
+- Preserve module ownership boundaries so new modules and set features can be
+  added without entangling existing providers.
+- Support completion of missing configuration and creation of new configuration
+  files through prepared runtime templates when those capabilities are planned
+  for the relevant backend.
+- Provide companion Agent Skills that explain how agents should use the tool,
+  prepare intents, run commands, validate results, and react to diagnostics.
+- Treat vendor validation as the authority after tool edits.
+- Keep specs, module capability tables, references, test cases, and roadmaps
+  maintainable and updateable.
+  <!-- REVIEW: 这个不是项目的Goal，这是写spec的基本要求。 -->
+
+<!-- REVIEW: 这里Purpose和Goals感觉有的啰嗦，简化一下purpose，用表格描述Goals -->
 
 ## Supported Configuration Backends
 
@@ -110,34 +130,6 @@ model and writer.
 ## Architecture
 
 Use a modular configuration core with a CLI shell.
-
-The architecture diagram is maintained in two forms:
-
-- inline Mermaid below for Markdown rendering;
-- editable Draw.io source at
-  `docs/superpowers/specs/figures/rtd-cfgfile-cli-architecture.drawio`.
-
-```mermaid
-flowchart LR
-  UserReq["User requirements<br/>config sheets / pin layout / module intent"]
-  Skill["Companion Agent Skills<br/>analysis and decomposition"]
-  CLI["RTD CfgFile CLI<br/>stable CLI and JSON contract"]
-  Intent["Intent and plan layer<br/>normalize / resolve / diagnose"]
-  Core["Backend document core<br/>parse / index / edit / write"]
-  Providers["Module providers<br/>Mcu / BaseNXP / Platform / Port / Dio / Mcl / Uart"]
-  Resources["Shared runtime assets<br/>pins / schema / constraints / validation profiles"]
-  Project["Vendor project files<br/>.mex now / .xdm later"]
-  Verify["Runtime verification<br/>static check + backend validation"]
-
-  UserReq --> Skill --> CLI --> Intent
-  CLI --> Resources
-  Intent --> Providers
-  Providers --> Resources
-  Providers --> Core
-  Core --> Project
-  Project --> Verify
-  Verify --> CLI
-```
 
 The architecture has these layers:
 
@@ -171,6 +163,8 @@ The architecture has these layers:
    Provide pin mapping, schema/cache access, references, constraints,
    diagnostics, validation command construction, runtime configuration loading,
    and performance instrumentation.
+
+<!-- REVIEW: Drawio是否可以在markdown中被渲染，如果可以，在这里添加drawio架构图，如果不可以，单独出一个drawio文件，并在这里引用它。 -->
 
 Two architecture rules are mandatory:
 
@@ -209,6 +203,11 @@ Module responsibilities are maintained in a separate capability table rather
 than embedded only in this spec. The active table is:
 
 `docs/superpowers/specs/rtd-config-module-capabilities.md`
+
+The table is the maintainable index for module ownership, dependencies,
+supported actions, constraints, runtime data, shortcut mappings, and test
+coverage. It must be updated whenever a new RTD module or set feature is added.
+<!-- REVIEW: 这段描述不应该出现在Spec中，删掉。 -->
 
 The capability table must support:
 
@@ -276,27 +275,30 @@ wrappers that normalize into the same intent model.
 
 Core commands:
 
-| Command | Purpose | Writes project files | Launches vendor tool |
-| --- | --- | --- | --- |
-| `rtd-config inspect --project <project> --json` | Detect backend, device, RTD version, enabled modules, existing owned resources, and validation profile. | No | No |
-| `rtd-config plan --project <project> --intent intent.json --json` | Normalize intent, resolve dependencies, check constraints, and return planned edits and blockers before writing. | No | No |
-| `rtd-config configure --project <project> --intent intent.json --json` | Apply planned owned edits, then run runtime verification according to configuration. | Yes | Configurable |
-| `rtd-config check --project <project> --json` | Run static checks only. This is the fast tool-owned stage of runtime verification. | No | No |
-| `rtd-config validate --project <project> --json` | Run backend validation only, such as S32 ConfigTools headless validation for `.mex` projects. | No | Yes |
-| `rtd-config pin-options --device <device> --package <package> --peripheral <peripheral> --json` | Query prepared runtime pin-mapping data to list valid pins, mux modes, directions, and conflicts for a peripheral signal before planning Port edits. | No | No |
+```powershell
+rtd-config inspect --project <project> --json
+rtd-config plan --project <project> --intent intent.json --json
+rtd-config configure --project <project> --intent intent.json --json
+rtd-config check --project <project> --json
+rtd-config validate --project <project> --json
+rtd-config pin-options --device <device> --package <package> --peripheral <peripheral> --json
+```
+<!-- REVIEW: pin-options命令是做什么的？--->
+<!--把commands做成表格，添加解释说明它的功能和作用。 -->
 
-Shortcut commands follow module groupings and normalize to the same intent
-model:
+Shortcut commands follow module groupings:
 
-| Shortcut group | Example command | Purpose |
-| --- | --- | --- |
-| `uart` | `rtd-config uart set ...` | Configure Uart logical channels, including LPUART or FlexIO-backed channels, baud/format, polling or interrupt method, callback options, and declared dependencies. |
-| `port` | `rtd-config port set-pin ...` | Configure generic pin mux, GPIO direction, electrical settings, untouched resources, and runtime API switches without binding Port logic to one consumer module. |
-| `dio` | `rtd-config dio set-channel ...` | Configure Dio ports, channels, channel groups, optional APIs, and partition-related references. |
-| `mcu` | `rtd-config mcu set-clock ...` | Configure Mcu clocks, peripheral clock gates, modes, RAM sections, reset behavior, and notifications. |
-| `platform` | `rtd-config platform set-irq ...` | Configure Platform-owned interrupt controller entries, priorities, handlers, and other Platform resources such as MPU/MCM/INTM when requested. |
-| `basenxp` | `rtd-config basenxp set ...` | Configure BaseNXP/OsIf features such as bare-metal defaults, DET, system/custom timer, OS mode, multicore, user mode, and software semaphore. |
-| `mcl` | `rtd-config mcl set-flexio ...` | Configure Mcl-owned shared resources such as FlexIO logic channels for first milestone Uart use, with later expansion for DMA, eMIOS, TRGMUX, LCU, and cache features. |
+```powershell
+rtd-config uart set ...
+rtd-config port set-pin ...
+rtd-config dio set-channel ...
+rtd-config mcu set-clock ...
+rtd-config platform set-irq ...
+rtd-config basenxp set ...
+rtd-config mcl set-flexio ...
+```
+
+<!-- REVIEW: 同上，做表格。 -->
 
 The CLI must remain non-interactive for automation. Users who need review
 should run `plan` before `configure`.
@@ -343,7 +345,7 @@ All commands return stable JSON diagnostics:
 Diagnostics must be actionable. They should identify the module, invalid or
 missing resource, constraint that failed, and useful details for correction.
 
-## Runtime Verification Pipeline
+## Validation Pipeline
 
 `configure` runs the same high-level pipeline for every backend:
 
@@ -353,7 +355,7 @@ missing resource, constraint that failed, and useful details for correction.
 4. resolve dependencies and constraints;
 5. plan;
 6. apply owned edits;
-7. run static checks as the fast tool-owned runtime verification stage;
+7. run static checks;
 8. run backend vendor validation when configured;
 9. return changed modules, diagnostics, validation logs, and status.
 
@@ -506,7 +508,6 @@ The project is successful when:
 
 | Date | Version | Description |
 | --- | --- | --- |
-| 2026-06-02 | 0.3.0 | Resolved third-round review comments on tool naming, goals, runtime verification, architecture diagram, and CLI command tables. |
 | 2026-06-02 | 0.2.4 | Added terminology table to align project concepts. |
 | 2026-05-30 | 0.2.3 | Formatted document metadata and changelog as tables. |
 | 2026-05-30 | 0.2.2 | Renamed design document to remove date from filename. |
