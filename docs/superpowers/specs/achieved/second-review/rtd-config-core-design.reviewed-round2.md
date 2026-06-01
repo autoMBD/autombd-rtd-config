@@ -1,5 +1,10 @@
 # RTD Configuration Tool Core Design
 
+> Archive status: unavailable for requirements. This reviewed draft is kept
+> only for comment traceability. Do not read or use it to infer current
+> behavior, terminology, scope, architecture, test requirements, or acceptance
+> criteria. Use only active documents outside `docs/superpowers/specs/achieved/`.
+
 | Field | Value |
 | --- | --- |
 | Version | 0.1.3 |

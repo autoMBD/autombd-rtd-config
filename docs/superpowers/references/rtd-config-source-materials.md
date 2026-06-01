@@ -1,14 +1,14 @@
-# RTD Configuration Source Materials
+# RTD CfgFile CLI Source Materials
 
 | Field | Value |
 | --- | --- |
-| Version | 0.2.1 |
-| Date | 2026-05-30 |
+| Version | 0.3.0 |
+| Date | 2026-06-02 |
 | Author | autoMBD <tkung.lqk@foxmali.com> (AI-assisted) |
-| Description | Records development source materials and runtime data boundaries. |
+| Description | Records RTD CfgFile CLI development source materials, vendor tool environment assumptions, and runtime data boundaries. |
 
 This document records the types of source material used to build runtime data
-assets for the RTD configuration tool. Source material is for development and
+assets for RTD CfgFile CLI. Source material is for development and
 data preparation only. Runtime commands must not depend on these files being
 present.
 
@@ -22,6 +22,13 @@ Runtime commands may load:
 - committed pin mapping JSON;
 - target project files;
 - configured vendor validation tools.
+
+The current development computer is configured with the required vendor tool
+environment for S32DS/S32 ConfigTools validation. The configured vendor
+validation tool may use its own installed environment internally, including RTD
+packages and metadata. This does not relax the RTD CfgFile CLI runtime boundary:
+the CLI itself must not directly read development-only source material during
+normal operation.
 
 Runtime commands must not load:
 
@@ -67,6 +74,7 @@ project, and configured vendor validation tools.
 
 | Date | Version | Description |
 | --- | --- | --- |
+| 2026-06-02 | 0.3.0 | Renamed document for RTD CfgFile CLI and clarified allowed vendor validation tool environment dependencies. |
 | 2026-05-30 | 0.2.1 | Formatted document metadata and changelog as tables. |
 | 2026-05-30 | 0.2.0 | Added concrete development source material locations. |
 | 2026-05-30 | 0.1.0 | Created runtime/source-material boundary reference. |

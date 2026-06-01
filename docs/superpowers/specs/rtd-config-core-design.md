@@ -2,7 +2,7 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.3.0 |
+| Version | 0.4.0 |
 | Date | 2026-06-02 |
 | Author | autoMBD <tkung.lqk@foxmali.com> (AI-assisted) |
 | Description | Defines the long-term RTD CfgFile CLI architecture and success criteria. |
@@ -58,10 +58,15 @@ implementation code.
 | Backend validation | The vendor-backed part of runtime verification. It invokes or models the configured backend validator or code-generation flow, such as S32 ConfigTools headless validation for `.mex` projects. |
 | Runtime verification | The tool behavior after `.mex`, `.xdm`, or another backend configuration file is modified. It is the umbrella process that includes static check first and backend validation when configured. These stages share one result model but remain separate execution steps for performance, diagnostics, and vendor-authority reasons. |
 | Development testing | The implementation acceptance process. Test cases prove tool features, diagnostics, runtime verification behavior, and agent workflows before a feature is accepted. |
+| Mandatory minimum test | A development test that must pass for the current milestone to be accepted. Milestone 1 defaults to the mandatory minimum test set only. |
+| Advanced test | A current-milestone test that is available for additional coverage but is executed only when the user explicitly requests it. |
+| Reserved future test | A known future test case that is outside the current milestone. Its execution plan is decided when the corresponding milestone is planned. |
 | Fixture | A real or focused test project used by development tests. Real vendor project fixtures are the preferred source for integration and validation tests. |
 | Independent subagent validation | Black-box development validation performed by an isolated subagent using only public deliverables, test input, repository-visible instructions, companion skills, and the public CLI. |
+| Subagent user prompt | The simulated user configuration request given to an independent subagent. It must contain only the user-facing configuration demand. |
+| Vendor tool environment | The installed S32DS, S32 ConfigTools, EB tresos, RTD packages, and related vendor runtime dependencies used by backend validation. RTD CfgFile CLI must not directly read development source material at runtime, but the vendor validation tool may use its own installed environment internally. |
 | Agent Skill | Repository skill documentation that teaches AI agents how to use the tool, prepare intents, run commands, validate results, and react to diagnostics without relying on private implementation details. |
-| KPI | A measurable acceptance target. The current focused validation KPI is that an independent subagent can complete one focused configuration validation case within 3 minutes. |
+| KPI | A measurable acceptance target. Focused subagent validation should converge within 3 minutes, E2E subagent validation should converge within 5 minutes, and any subagent run longer than 10 minutes requires main-agent intervention and issue collection. |
 
 ## Purpose
 
@@ -149,9 +154,9 @@ The architecture has these layers:
 2. Agent Skills layer
    Provides repository skills that teach AI agents how to select workflows,
    convert user requests into intents or shortcut commands, call the CLI, run
-   validation, and interpret JSON diagnostics. Skills are documentation and
-   workflow adapters over the public CLI; they must not bypass the CLI contract
-   or depend on private implementation details.
+   runtime verification, and interpret JSON diagnostics. Skills are
+   documentation and workflow adapters over the public CLI; they must not
+   bypass the CLI contract or depend on private implementation details.
 
 3. Intent and plan layer
    Loads JSON intent or shortcut command arguments, normalizes requests, checks
@@ -354,7 +359,7 @@ missing resource, constraint that failed, and useful details for correction.
 5. plan;
 6. apply owned edits;
 7. run static checks as the fast tool-owned runtime verification stage;
-8. run backend vendor validation when configured;
+8. run backend validation when configured;
 9. return changed modules, diagnostics, validation logs, and status.
 
 S32 ConfigTools validation requirements:
@@ -364,6 +369,12 @@ S32 ConfigTools validation requirements:
 - stdout/stderr/log capture;
 - JSON result with command, resolved paths, exit code, and log paths;
 - clear failure diagnostics.
+
+The vendor validation tool may use its own configured installation environment
+internally, including installed S32DS, ConfigTools, RTD packages, and related
+metadata. The runtime boundary means RTD CfgFile CLI itself must not directly
+load development-only source material such as Excel workbooks or raw RTD
+descriptor files during normal operation.
 
 EB tresos validation should follow equivalent principles once that backend is
 introduced.
@@ -420,13 +431,16 @@ to complete the assigned validation target.
 
 Acceptance is based on two criteria:
 
-- the required test cases pass;
+- the required mandatory minimum test cases for the current milestone pass;
 - the KPI for focused module configuration validation is met.
 
 The KPI applies to all module configuration flows: an independent validator
 should be able to understand a focused test case, use the public tool
-interface, and complete validation within 3 minutes. Repeated KPI failures mean
-the interface, diagnostics, performance, or test design must be improved.
+interface, and converge within 3 minutes. E2E validation is allowed a 5-minute
+KPI. A subagent run may continue up to 10 minutes to expose useful problem
+evidence; after 10 minutes, the main agent intervenes. Repeated KPI failures
+mean the interface, diagnostics, performance, companion skills, or test design
+must be improved.
 
 ## Suggested Project Structure
 
@@ -506,6 +520,7 @@ The project is successful when:
 
 | Date | Version | Description |
 | --- | --- | --- |
+| 2026-06-02 | 0.4.0 | Clarified mandatory, advanced, and reserved tests; updated subagent prompt, KPI, and vendor tool environment terminology. |
 | 2026-06-02 | 0.3.0 | Resolved third-round review comments on tool naming, goals, runtime verification, architecture diagram, and CLI command tables. |
 | 2026-06-02 | 0.2.4 | Added terminology table to align project concepts. |
 | 2026-05-30 | 0.2.3 | Formatted document metadata and changelog as tables. |

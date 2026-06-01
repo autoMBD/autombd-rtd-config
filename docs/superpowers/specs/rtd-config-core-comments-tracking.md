@@ -2,7 +2,7 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.3.0 |
+| Version | 0.4.0 |
 | Date | 2026-06-02 |
 | Author | autoMBD <tkung.lqk@foxmali.com> (AI-assisted) |
 | Description | Tracks how review comments were resolved across design document revisions. |
@@ -80,6 +80,14 @@ Third-round reviewed drafts are archived under:
 | C54 | Test case catalog | Use retired RTD module skills to define first-milestone test cases for the seven modules, with IDs in a table. | Added a Milestone 1 S32K3 MEX test case catalog with IDs covering Mcu, BaseNXP, Platform, Port, Dio, Mcl, Uart, cross-module Uart flows, and deferred-feature diagnostics. | Test strategy |
 | C55 | Test failure loop | State that failed tests must return to code development and iterate until the development-test loop closes. | Added a Failure Iteration Loop section requiring root-cause analysis, code/runtime-data/fixture/test fixes, and reruns before acceptance. | Test strategy |
 | C56 | Roadmap overview | Add an overview roadmap table before milestone detail sections. | Added a Roadmap Overview table with focus, primary deliverable, and carried-forward exclusions for each milestone. | Roadmap |
+| C57 | Milestone 1 scope | Move tests outside Milestone 1 scope to later reserved cases; exact execution is decided during later milestone planning. | Split the test strategy into mandatory minimum, advanced, and reserved future case tables. Missing-module completion, `.mex` creation, DMA, low-power/RAM/reset, Platform MPU/MCM/INTM, partitioning, and non-Uart Mcl resources moved to reserved future cases. | Test strategy; roadmap |
+| C58 | Minimal testing | Mark only the minimal Milestone 1 tests as required; keep other current-surface tests as advanced and execute them only by explicit user instruction. | Added mandatory minimum and advanced test classes, made mandatory minimum the default Milestone 1 acceptance gate, and added roadmap language for default test scope. | Test strategy; roadmap |
+| C59 | Tool name consistency | Standardize all active documentation on the official tool name RTD CfgFile CLI. | Renamed active document titles/descriptions and replaced generic tool references in active docs. | Core design; module capabilities; source materials; test strategy; roadmap; AGENTS.md |
+| C60 | Definitions | Add explicit definitions to avoid conflicts between development testing, runtime verification, static check, backend validation, mandatory/advanced/reserved tests, and subagent prompts. | Added terminology in the core design and test strategy, and summarized operational rules in `AGENTS.md`. | Core design; test strategy; AGENTS.md |
+| C61 | Subagent prompts and KPI | Add subagent prompt content to every test case, keep prompts limited to simulated user configuration demands, use 3-minute focused KPI, 5-minute E2E KPI, and 10-minute maximum run before main-agent intervention. | Added `Subagent user prompt` to mandatory, advanced, and reserved case tables and clarified subagent validation/KPI rules. | Test strategy; core design; AGENTS.md |
+| C62 | Capability/test alignment | Align capability table and case catalog so module capability entries point to mandatory, advanced, and reserved test IDs. | Reworked the module capability table with M1 mandatory cases, M1 advanced cases, and reserved future cases per module. | Module capabilities; test strategy |
+| C63 | Vendor tool environment | Clarify that vendor validation tools may rely on their configured installation environment, and the current computer is configured for that flow. | Added vendor tool environment terminology and source-material boundary clarification. | Core design; source materials; AGENTS.md |
+| C64 | Review archives | Mark review backup files as unavailable and forbid using them as requirements sources. | Added archive warnings to all reviewed draft backups and added a documentation-boundary rule in `AGENTS.md`. | Achieved review archives; AGENTS.md |
 
 ## Open Follow-Up
 
@@ -92,6 +100,7 @@ workflow as that process becomes concrete.
 
 | Date | Version | Description |
 | --- | --- | --- |
+| 2026-06-02 | 0.4.0 | Tracked final consistency review updates for milestone test scope, tool naming, definitions, KPI, capability alignment, vendor environment, and archive boundaries. |
 | 2026-06-02 | 0.3.0 | Added third-round review tracking records and archive location. |
 | 2026-05-30 | 0.2.2 | Formatted document metadata and changelog as tables. |
 | 2026-05-30 | 0.2.1 | Removed dates from documentation filenames and updated tracking. |

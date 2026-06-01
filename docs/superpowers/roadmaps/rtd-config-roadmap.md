@@ -1,11 +1,11 @@
-# RTD Configuration Tool Roadmap
+# RTD CfgFile CLI Roadmap
 
 | Field | Value |
 | --- | --- |
-| Version | 0.2.0 |
+| Version | 0.3.0 |
 | Date | 2026-06-02 |
 | Author | autoMBD <tkung.lqk@foxmali.com> (AI-assisted) |
-| Description | Records staged delivery order and milestone boundaries for the RTD configuration tool. |
+| Description | Records staged delivery order and milestone boundaries for RTD CfgFile CLI. |
 
 ## Purpose
 
@@ -41,6 +41,9 @@ Scope:
 - command flow: JSON intent and seven module shortcut command groups;
 - write flow: existing project in-place modification, optional `--backup`;
 - validation: static checks plus no-window S32DS headless validation.
+- default testing: mandatory minimum tests only. Advanced tests are executed
+  only by explicit user instruction. Reserved future tests are not Milestone 1
+  acceptance gates.
 
 Out of scope:
 
@@ -64,6 +67,9 @@ Expected additions:
 - safe module completion for in-scope modules;
 - base `.mex` creation from prepared runtime templates;
 - expanded validation fixtures.
+
+Milestone 2 planning will decide which reserved future test cases become
+mandatory and which remain advanced.
 
 ## Milestone 3: More Modules And Full Set Coverage
 
@@ -106,7 +112,8 @@ Expected additions:
 
 | Date | Version | Description |
 | --- | --- | --- |
+| 2026-06-02 | 0.3.0 | Renamed roadmap for RTD CfgFile CLI and clarified mandatory, advanced, and reserved test scope by milestone. |
 | 2026-06-02 | 0.2.0 | Added roadmap overview table before detailed milestone sections. |
 | 2026-05-30 | 0.1.2 | Formatted document metadata and changelog as tables. |
 | 2026-05-30 | 0.1.1 | Standardized document metadata and added changelog. |
-| 2026-05-30 | 0.1.0 | Created staged RTD configuration tool roadmap. |
+| 2026-05-30 | 0.1.0 | Created staged RTD CfgFile CLI roadmap. |
