@@ -12,6 +12,7 @@ from .backends.s32_mex.locate import find_single_mex
 from .resources.pins import pin_options
 from .intent import Intent
 from .modules.uart import UartProvider
+from .checks.static import run_static_checks
 
 
 # Repo root, used to resolve committed runtime assets independently of cwd.
@@ -40,6 +41,10 @@ def build_parser() -> argparse.ArgumentParser:
     inspect_parser = subparsers.add_parser("inspect")
     inspect_parser.add_argument("--project", required=True)
     inspect_parser.add_argument("--json", action="store_true")
+
+    check_parser = subparsers.add_parser("check")
+    check_parser.add_argument("--project", required=True)
+    check_parser.add_argument("--json", action="store_true")
 
     uart_parser = subparsers.add_parser("uart")
     uart_actions = uart_parser.add_subparsers(dest="action")
@@ -119,6 +124,13 @@ def cmd_inspect(args: argparse.Namespace) -> int:
     })
 
 
+def cmd_check(args: argparse.Namespace) -> int:
+    config = RuntimeConfig.from_dict({"project": args.project})
+    mex = find_single_mex(config.project)
+    result = run_static_checks(mex)
+    return emit(result.to_dict())
+
+
 def cmd_uart_set(args: argparse.Namespace) -> int:
     intent = normalize_uart_intent(args)
     plan = UartProvider().plan(intent)
@@ -143,6 +155,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "inspect":
         return cmd_inspect(args)
+
+    if args.command == "check":
+        return cmd_check(args)
 
     if args.command == "uart" and getattr(args, "action", None) == "set":
         return cmd_uart_set(args)
