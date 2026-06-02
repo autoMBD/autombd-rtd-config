@@ -171,6 +171,8 @@ def _configure_uart(args: argparse.Namespace, intent: Intent, plan) -> int:
             "diagnostics": [d.to_dict() for d in apply_result.diagnostics],
         })
 
+    # Optional safety backup of the original .mex before writing. Default
+    # behaviour creates no backup.
     if args.backup:
         backup = mex.with_name(mex.name + ".bak")
         backup.write_bytes(mex.read_bytes())
