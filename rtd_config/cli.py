@@ -13,6 +13,7 @@ from .resources.pins import pin_options
 from .intent import Intent
 from .modules.uart import UartProvider
 from .checks.static import run_static_checks
+from .backends.s32_mex.apply import apply_uart_set
 
 
 # Repo root, used to resolve committed runtime assets independently of cwd.
@@ -131,18 +132,74 @@ def cmd_check(args: argparse.Namespace) -> int:
     return emit(result.to_dict())
 
 
+def _intent_dict(intent: Intent) -> dict:
+    return {
+        "module": intent.module,
+        "action": intent.action,
+        "payload": intent.payload,
+    }
+
+
 def cmd_uart_set(args: argparse.Namespace) -> int:
     intent = normalize_uart_intent(args)
     plan = UartProvider().plan(intent)
+
+    if not args.configure:
+        return emit({
+            "status": "passed",
+            "command": "plan",
+            "normalized_intent": _intent_dict(intent),
+            "plan": plan.to_dict(),
+        })
+
+    return _configure_uart(args, intent, plan)
+
+
+def _configure_uart(args: argparse.Namespace, intent: Intent, plan) -> int:
+    config = RuntimeConfig.from_dict({"project": args.project})
+    mex = find_single_mex(config.project)
+    doc = MexDocument.load(mex)
+
+    apply_result = apply_uart_set(doc, intent)
+    if apply_result.blocked:
+        return emit({
+            "status": "blocked",
+            "command": "configure",
+            "normalized_intent": _intent_dict(intent),
+            "plan": plan.to_dict(),
+            "changed_modules": apply_result.changed_modules,
+            "diagnostics": [d.to_dict() for d in apply_result.diagnostics],
+        })
+
+    if args.backup:
+        backup = mex.with_name(mex.name + ".bak")
+        backup.write_bytes(mex.read_bytes())
+
+    doc.write(mex)
+
+    # Runtime verification: static check runs first on the written file. We pass
+    # the in-memory document (now identical to disk) so the quick_selection
+    # conflict check can inspect the exact elements we modified, while
+    # well-formedness is still re-read from the written path.
+    static_result = run_static_checks(
+        mex,
+        doc=doc,
+        modified_elements=apply_result.modified_elements,
+        requested_callback=intent.payload.get("callback"),
+    )
+
+    diagnostics = apply_result.diagnostics + static_result.diagnostics
+    status = "passed" if static_result.status == "passed" else "blocked"
     return emit({
-        "status": "passed",
-        "command": "plan",
-        "normalized_intent": {
-            "module": intent.module,
-            "action": intent.action,
-            "payload": intent.payload,
-        },
+        "status": status,
+        "command": "configure",
+        "normalized_intent": _intent_dict(intent),
         "plan": plan.to_dict(),
+        "changed_modules": apply_result.changed_modules,
+        "diagnostics": [d.to_dict() for d in diagnostics],
+        "runtime_verification": {
+            "static_check": static_result.to_dict(),
+        },
     })
 
 
