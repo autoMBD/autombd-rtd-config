@@ -1,0 +1,35 @@
+{
+  "family": "s32k3",
+  "device": "s32k344",
+  "package": "default",
+  "signals": [
+    {
+      "peripheral": "LPUART_0",
+      "signal": "TX",
+      "pin": "PTA15",
+      "mux": "LPUART_0_TX",
+      "direction": "output"
+    },
+    {
+      "peripheral": "LPUART_0",
+      "signal": "RX",
+      "pin": "PTA16",
+      "mux": "LPUART_0_RX",
+      "direction": "input"
+    },
+    {
+      "peripheral": "FLEXIO_0",
+      "signal": "TX",
+      "pin": "PTB0",
+      "mux": "FLEXIO_0_D0",
+      "direction": "output"
+    },
+    {
+      "peripheral": "FLEXIO_0",
+      "signal": "RX",
+      "pin": "PTB1",
+      "mux": "FLEXIO_0_D1",
+      "direction": "input"
+    }
+  ]
+}
