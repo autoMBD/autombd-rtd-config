@@ -2,7 +2,7 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.4.0 |
+| Version | 0.4.1 |
 | Date | 2026-06-02 |
 | Author | autoMBD <tkung.lqk@foxmali.com> (AI-assisted) |
 | Description | Defines the long-term RTD CfgFile CLI architecture and success criteria. |
@@ -399,23 +399,25 @@ Commands must be efficient enough for autonomous agent use.
 
 ## Fixtures
 
-Fixtures use a generic structure. Each fixture is a real vendor project for a
-specific backend, device, RTD version, and module scenario.
+Fixtures use a generic structure. Each fixture is a real vendor project grouped
+by backend, family, device, and module. The `projects/` directory under each
+module contains one or more real vendor project directories.
 
 ```text
 fixtures/
-  projects/
-    <backend>/
-      <family>/
-        <device>/
-          <scenario>/
+  <backend>/
+    <family>/
+      <device>/
+        <module>/
+          projects/
+            <project>/
 ```
 
 Fixtures must include the files required for vendor validation and exclude
 build/debug/generated artifacts that do not belong in source control.
 
-Specific fixture scenarios are documented in the test strategy, not in this
-spec.
+Specific fixture projects and test scenarios are documented in the test
+strategy, not in this spec.
 
 ## Tests And Acceptance
 
@@ -520,6 +522,7 @@ The project is successful when:
 
 | Date | Version | Description |
 | --- | --- | --- |
+| 2026-06-02 | 0.4.1 | Aligned fixture directory structure with backend/family/device/module/projects/project layout. |
 | 2026-06-02 | 0.4.0 | Clarified mandatory, advanced, and reserved tests; updated subagent prompt, KPI, and vendor tool environment terminology. |
 | 2026-06-02 | 0.3.0 | Resolved third-round review comments on tool naming, goals, runtime verification, architecture diagram, and CLI command tables. |
 | 2026-06-02 | 0.2.4 | Added terminology table to align project concepts. |

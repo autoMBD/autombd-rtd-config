@@ -2,7 +2,7 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.4.0 |
+| Version | 0.4.1 |
 | Date | 2026-06-02 |
 | Author | autoMBD <tkung.lqk@foxmali.com> (AI-assisted) |
 | Description | Defines testing layers, case classes, subagent validation prompts, and KPI rules for RTD CfgFile CLI. |
@@ -52,20 +52,27 @@ KPI rules.
 
 ## Fixture Structure
 
-Fixtures use a backend/family/device/scenario structure:
+Fixtures use a backend/family/device/module/projects/project structure:
 
 ```text
 fixtures/
-  projects/
-    <backend>/
-      <family>/
-        <device>/
-          <scenario>/
+  <backend>/
+    <family>/
+      <device>/
+        <module>/
+          projects/
+            <project>/
 ```
 
 Each fixture must include files required for backend validation. Build outputs,
 debug folders, generated binaries, logs, and temporary artifacts must stay out
 of source control unless a test explicitly requires a small static fixture.
+
+For Milestone 1 Uart validation, the current real fixture project is:
+
+```text
+fixtures/mex/s32k3/s32k344/uart/projects/Uart_Example_S32K344/
+```
 
 ## Test Case Template
 
@@ -97,8 +104,9 @@ Subagent validation required:
 ## Milestone 1 Mandatory Minimum Tests
 
 Milestone 1 validates only the minimum Uart stack needed for S32K3 RTD 7.0.1
-`.mex` configuration on the S32K344 fixture. These cases are the default
-acceptance gate.
+`.mex` configuration on the S32K344 Uart fixture. These cases are the default
+acceptance gate. Unless a test case overrides it, the input fixture is
+`fixtures/mex/s32k3/s32k344/uart/projects/Uart_Example_S32K344/`.
 
 | ID | Module(s) | Scenario | Request surface | Subagent user prompt | Expected evidence | KPI |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -235,6 +243,7 @@ adds them to the required test set.
 
 | Date | Version | Description |
 | --- | --- | --- |
+| 2026-06-02 | 0.4.1 | Aligned fixture structure with backend/family/device/module/projects/project layout and recorded the Uart fixture path. |
 | 2026-06-02 | 0.4.0 | Split Milestone 1 tests into mandatory minimum, advanced, and reserved future sets; added subagent user prompts and KPI clarification. |
 | 2026-06-02 | 0.3.0 | Added first-milestone test case catalog from retired module use-case skills and documented the failure iteration loop. |
 | 2026-05-30 | 0.2.1 | Formatted document metadata and changelog as tables. |

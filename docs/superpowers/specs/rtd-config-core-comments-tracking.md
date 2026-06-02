@@ -2,7 +2,7 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.4.0 |
+| Version | 0.4.1 |
 | Date | 2026-06-02 |
 | Author | autoMBD <tkung.lqk@foxmali.com> (AI-assisted) |
 | Description | Tracks how review comments were resolved across design document revisions. |
@@ -40,7 +40,7 @@ Third-round reviewed drafts are archived under:
 | C14 | Port roadmap | State in roadmap that Port must implement complete generic pin configuration early. | Added Milestone 1 scope item for complete generic pin mapping/configuration for the validated device/package. | Roadmap, Milestone 1 |
 | C15 | References | Do not hard-code reference source files in spec; add a reference document. | Removed the hard-coded local Excel path and RTD path from active spec; added a source materials reference document. | Source materials reference |
 | C16 | MEX/XDM editing | MEX writing must consider efficiency; later `.xdm` editing can be summarized. | Added backend document-core efficiency requirements for `.mex` and a summarized EB tresos `.xdm` writer direction. | Core design spec, Backend Document Core |
-| C17 | Fixtures | Do not specify a specific fixture project in spec; describe generic fixture structure. | Replaced concrete fixture names with generic backend/family/device/scenario fixture layout. | Core design spec, Fixtures |
+| C17 | Fixtures | Do not specify a specific fixture project in spec; describe generic fixture structure. | Replaced concrete fixture names with generic backend/family/device/module/projects/project fixture layout. | Core design spec, Fixtures |
 | C18 | Validation scope | The validation method applies to all modules and future work, not only a milestone. | Moved reusable test layers and validation method into the test strategy. | Test strategy |
 | C19 | Test cases | Add a separate test document with detailed test cases; spec should require that document. | Added test strategy document with test layers, fixture structure, and test case template; spec now points to maintainable test docs. | Test strategy; core design spec |
 | C20 | Subagent validation | Move independent subagent validation details to the test document. | Moved subagent validation rules to test strategy. | Test strategy |
@@ -88,6 +88,7 @@ Third-round reviewed drafts are archived under:
 | C62 | Capability/test alignment | Align capability table and case catalog so module capability entries point to mandatory, advanced, and reserved test IDs. | Reworked the module capability table with M1 mandatory cases, M1 advanced cases, and reserved future cases per module. | Module capabilities; test strategy |
 | C63 | Vendor tool environment | Clarify that vendor validation tools may rely on their configured installation environment, and the current computer is configured for that flow. | Added vendor tool environment terminology and source-material boundary clarification. | Core design; source materials; AGENTS.md |
 | C64 | Review archives | Mark review backup files as unavailable and forbid using them as requirements sources. | Added archive warnings to all reviewed draft backups and added a documentation-boundary rule in `AGENTS.md`. | Achieved review archives; AGENTS.md |
+| C65 | Fixture layout | Align documentation and actual Uart fixture project with `fixtures/<backend>/<family>/<device>/<module>/projects/<project>/`. | Updated fixture structure in core design, test strategy, and source-materials reference; moved the Uart fixture project to `fixtures/mex/s32k3/s32k344/uart/projects/Uart_Example_S32K344/`. | Core design; test strategy; source materials; fixtures |
 
 ## Open Follow-Up
 
@@ -100,6 +101,7 @@ workflow as that process becomes concrete.
 
 | Date | Version | Description |
 | --- | --- | --- |
+| 2026-06-02 | 0.4.1 | Tracked fixture layout update for module-scoped projects directories. |
 | 2026-06-02 | 0.4.0 | Tracked final consistency review updates for milestone test scope, tool naming, definitions, KPI, capability alignment, vendor environment, and archive boundaries. |
 | 2026-06-02 | 0.3.0 | Added third-round review tracking records and archive location. |
 | 2026-05-30 | 0.2.2 | Formatted document metadata and changelog as tables. |
