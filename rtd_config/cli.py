@@ -6,6 +6,9 @@ import json
 from pathlib import Path
 
 from . import __version__
+from .config import RuntimeConfig
+from .backends.s32_mex.document import MexDocument
+from .backends.s32_mex.locate import find_single_mex
 from .resources.pins import pin_options
 
 
@@ -32,6 +35,10 @@ def build_parser() -> argparse.ArgumentParser:
     pin_options_parser.add_argument("--peripheral", required=True)
     pin_options_parser.add_argument("--json", action="store_true")
 
+    inspect_parser = subparsers.add_parser("inspect")
+    inspect_parser.add_argument("--project", required=True)
+    inspect_parser.add_argument("--json", action="store_true")
+
     return parser
 
 
@@ -49,12 +56,33 @@ def cmd_pin_options(args: argparse.Namespace) -> int:
     })
 
 
+def cmd_inspect(args: argparse.Namespace) -> int:
+    config = RuntimeConfig.from_dict({"project": args.project})
+    mex = find_single_mex(config.project)
+    doc = MexDocument.load(mex)
+    modules = sorted(doc.enabled_instance_names())
+    return emit({
+        "status": "passed",
+        "command": "inspect",
+        "backend": config.backend,
+        "family": config.family,
+        "device": config.device,
+        "rtd_version": config.rtd_version,
+        "mex_file": str(mex),
+        "modules": modules,
+        "validation_profile": f"{config.family}/{config.rtd_version}",
+    })
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
 
     if args.command == "pin-options":
         return cmd_pin_options(args)
+
+    if args.command == "inspect":
+        return cmd_inspect(args)
 
     if args.version:
         return emit({
