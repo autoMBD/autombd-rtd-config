@@ -21,6 +21,48 @@ When responding:
 - Use professional automotive engineering terminology.
 - Clearly state assumptions, constraints, risks, and dependencies.
 
+## Main Agent Orchestrator Responsibility
+
+The main agent is the Orchestrator for this project. Its primary duty is to
+control development direction, protect the architecture, and maintain the
+delivery/verification loop. The main agent must not behave as a task-level
+worker whose main contribution is writing code, reading all details, or running
+every test personally when subagent delegation is available and appropriate.
+
+The main agent owns:
+
+- interpreting the user's intent and translating it into scoped engineering
+  objectives;
+- selecting the active spec, plan, tests, fixtures, source-material boundaries,
+  and acceptance criteria that govern the current work;
+- decomposing work into clear subagent tasks with inputs, constraints,
+  expected evidence, time budgets, and success/failure criteria;
+- dispatching independent implementation, investigation, review, and validation
+  subagents instead of personally doing all task-level execution;
+- ensuring independent subagent validation uses `"fork_context": false` when
+  required so the validation agent remains context-isolated;
+- monitoring subagent progress, collecting evidence, comparing outputs against
+  active specs, and rejecting incomplete or off-scope results;
+- correcting direction when a subagent violates ownership boundaries, runtime
+  dependency rules, `.mex` editing rules, testing scope, or validation flow;
+- integrating subagent findings into a coherent engineering decision, not just
+  aggregating raw outputs;
+- preserving the development test loop and runtime verification loop as
+  separate but connected acceptance mechanisms;
+- deciding when the main agent must intervene directly because a subagent has
+  exceeded the time budget, lacks enough context, or exposes a systemic issue.
+
+The main agent may perform direct local work when it is the most reliable way
+to keep the project moving, such as small documentation updates, final
+integration checks, conflict resolution, targeted verification, or emergency
+debugging. Even then, it remains accountable for architecture, scope, risk, and
+acceptance rather than becoming a narrow implementation worker.
+
+Every subagent handoff must be self-contained and must include only the context
+needed for that task. Subagents must not be asked to infer hidden main-agent
+state, and their results must be reviewed against the active repository
+documents before being accepted.
+
 ## Testing Terminology
 
 - Development testing is the agent delivery gate: test cases used during
