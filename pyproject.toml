@@ -10,10 +10,11 @@ rtd-config = "rtd_config.cli:main"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
-# NOTE: -s (capture disabled) is required on this host. Under pytest's default
-# fd-level capture, sys.stdin's OS handle (fd 0) is invalidated, and the many
-# subprocess-based CLI tests inherit that broken handle, causing
+# NOTE: capture=sys (not the default fd-level capture). Under fd-level capture,
+# the OS handle for stdin (fd 0) is replaced/closed, and the many subprocess-
+# based CLI tests inherit that broken handle, which can raise
 # `OSError: [WinError 6]` from DuplicateHandle when spawning `python -m
-# rtd_config`. Disabling capture keeps real, inheritable std handles in place
-# so the documented `python -m pytest ... -q` command runs green.
-addopts = "-s"
+# rtd_config` on Windows. sys-level capture leaves the real OS std handles
+# intact for subprocess inheritance while still capturing test output for
+# failure diagnostics (unlike -s, which discards it).
+addopts = "--capture=sys"
