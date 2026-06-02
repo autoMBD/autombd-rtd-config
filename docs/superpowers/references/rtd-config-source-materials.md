@@ -2,7 +2,7 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.3.1 |
+| Version | 0.3.2 |
 | Date | 2026-06-02 |
 | Author | autoMBD <tkung.lqk@foxmali.com> (AI-assisted) |
 | Description | Records RTD CfgFile CLI development source materials, vendor tool environment assumptions, and runtime data boundaries. |
@@ -62,6 +62,7 @@ the path into runtime code.
 | S32K3 RTD module `.xdm` files | `C:\NXP\S32DS.3.6.7\S32DS\software\PlatformSDK_S32K3\RTD\<ModulePackage>\config\<Module>.xdm` | Build module schema and constraints | Development input only |
 | Uart RTD descriptor example | `C:\NXP\S32DS.3.6.7\S32DS\software\PlatformSDK_S32K3\RTD\Uart_TS_T40D34M70I1R0\config\Uart.xdm` | Build Uart schema and constraints | Development input only |
 | S32DS ConfigTools projects | `fixtures/<backend>/<family>/<device>/<module>/projects/<project>/` | Build and validate fixtures | Current Uart fixture: `fixtures/mex/s32k3/s32k344/uart/projects/Uart_Example_S32K344/`; keep generated/build artifacts out |
+| Deprecated rtd-config skills | `D:\WorkSpace\ExploreSpace\autombd-skills\skills\rtd-config` | Extract prior `.mex` editing experience for M1 implementation | Development input only; summarized into `docs/superpowers/specs/rtd-config-m1-legacy-skills-experience.md`; never load at runtime |
 
 ## Data Preparation Rule
 
@@ -74,6 +75,7 @@ project, and configured vendor validation tools.
 
 | Date | Version | Description |
 | --- | --- | --- |
+| 2026-06-02 | 0.3.2 | Added deprecated rtd-config skills as development-only source material and linked the M1 experience baseline. |
 | 2026-06-02 | 0.3.1 | Aligned fixture reference path with backend/family/device/module/projects/project layout and recorded the current Uart fixture. |
 | 2026-06-02 | 0.3.0 | Renamed document for RTD CfgFile CLI and clarified allowed vendor validation tool environment dependencies. |
 | 2026-05-30 | 0.2.1 | Formatted document metadata and changelog as tables. |

@@ -2,7 +2,7 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.4.1 |
+| Version | 0.4.2 |
 | Date | 2026-06-02 |
 | Author | autoMBD <tkung.lqk@foxmali.com> (AI-assisted) |
 | Description | Defines the long-term RTD CfgFile CLI architecture and success criteria. |
@@ -26,6 +26,7 @@ implementation code.
 - [Supported Configuration Backends](#supported-configuration-backends)
 - [Architecture](#architecture)
 - [Backend Document Core](#backend-document-core)
+- [Development Experience Baseline](#development-experience-baseline)
 - [Module Capability Model](#module-capability-model)
 - [Resource And Constraint Data](#resource-and-constraint-data)
 - [Intent And Commands](#intent-and-commands)
@@ -45,6 +46,7 @@ implementation code.
 | RTD CfgFile CLI | The official tool name. It edits RTD configuration files according to the rules of vendor configuration tools such as S32 ConfigTools and EB tresos, then supports correct code generation and verification through the configured backend flow. |
 | Runtime tool | The executable tool and committed runtime assets used in a target environment. It must not depend on development-only source files such as Excel workbooks or raw RTD package descriptors. |
 | Development-time source material | Reference material used to build runtime data assets, such as pin mux workbooks, RTD `.xdm` descriptors, vendor examples, and local investigation notes. |
+| Deprecated rtd-config skills experience | Development-time experience extracted from prior `.mex` editing skills under `D:\WorkSpace\ExploreSpace\autombd-skills\skills\rtd-config`. It is captured in the active M1 experience baseline and must guide development, but the external skills themselves are not runtime dependencies. |
 | Runtime asset | Prepared, versioned repository data loaded by the runtime tool, such as pin mapping JSON, schema/constraint cache, module manifests, and validation profiles. |
 | Backend | A supported configuration technology, such as S32 ConfigTools `.mex` or EB tresos project files. Each backend owns its document model, writer, and validation integration. |
 | Backend document core | Backend-specific code that parses, indexes, edits, and writes project configuration files while keeping edits localized and diagnosable. |
@@ -199,6 +201,7 @@ For `.mex` projects, the document core should:
 - avoid scanning unrelated large subtrees where a targeted index is sufficient;
 - allow the indexing strategy to evolve after measuring real project sizes;
 - provide setting/container lookup and upsert helpers;
+- remove conflicting `quick_selection` attributes from modified elements;
 - keep localized edits small enough for review;
 - avoid broad whole-file rewrites;
 - expose diagnostics instead of raw parser or Python tracebacks.
@@ -207,6 +210,32 @@ For EB tresos projects, the `.xdm` writer should follow the same concepts:
 structured parsing, targeted indexes, localized edits, explicit constraints,
 and stable diagnostics. EB-specific details belong in the EB backend design when
 that backend is planned.
+
+## Development Experience Baseline
+
+Milestone 1 `.mex` backend and provider development must use and comply with:
+
+`docs/superpowers/specs/rtd-config-m1-legacy-skills-experience.md`
+
+That document captures practical S32K3 RTD 7.0.1 `.mex` editing experience from
+deprecated rtd-config skills, including:
+
+- `quick_selection` handling for modified `config_set`, `struct`, and other
+  XML elements;
+- module ownership boundaries for Mcu, BaseNXP, Platform, Port, Dio, Mcl, and
+  Uart;
+- FlexIO-backed Uart dependency flow through Mcl FlexIO common resources;
+- known misleading ConfigTools validation symptoms caused by stale
+  quick-selection metadata;
+- S32DS/S32 ConfigTools headless validation requirements;
+- generated-file and `.cproject` metadata preservation rules.
+
+The external deprecated skills are development-time source material only. They
+must not be read by runtime commands and must not override the active specs,
+runtime assets, fixture evidence, or backend validation results. When the
+experience baseline identifies a concrete `.mex` pitfall, M1 implementation
+must convert it into tests, diagnostics, or provider rules before accepting the
+affected feature.
 
 ## Module Capability Model
 
@@ -508,6 +537,7 @@ The project is successful when:
 - shortcut commands normalize to the same intent pipeline;
 - backend document cores can configure vendor projects through structured,
   localized edits;
+- `.mex` backend behavior follows the M1 legacy-skills experience baseline;
 - module providers preserve ownership boundaries;
 - dependencies between modules are explicit in plans;
 - constraints come from prepared runtime data assets;
@@ -522,6 +552,7 @@ The project is successful when:
 
 | Date | Version | Description |
 | --- | --- | --- |
+| 2026-06-02 | 0.4.2 | Added M1 legacy-skills experience baseline requirement and quick-selection handling requirement for `.mex` edits. |
 | 2026-06-02 | 0.4.1 | Aligned fixture directory structure with backend/family/device/module/projects/project layout. |
 | 2026-06-02 | 0.4.0 | Clarified mandatory, advanced, and reserved tests; updated subagent prompt, KPI, and vendor tool environment terminology. |
 | 2026-06-02 | 0.3.0 | Resolved third-round review comments on tool naming, goals, runtime verification, architecture diagram, and CLI command tables. |

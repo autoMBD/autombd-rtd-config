@@ -10,7 +10,7 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.1.0 |
+| Version | 0.1.1 |
 | Date | 2026-06-02 |
 | Author | autoMBD <tkung.lqk@foxmali.com> (AI-assisted) |
 | Description | Executable Milestone 1 implementation plan for RTD CfgFile CLI. |
@@ -119,6 +119,8 @@ tests/
 - `inspect`, `plan`, `check`, and `pin-options` must not launch vendor tools.
 - `validate` may launch the configured vendor validation tool without a visible GUI window.
 - Advanced tests are not part of this plan unless the user explicitly adds them.
+- `.mex` document editing and M1 provider implementation must use and comply
+  with `docs/superpowers/specs/rtd-config-m1-legacy-skills-experience.md`.
 
 ---
 
@@ -559,6 +561,18 @@ def test_mex_document_write_preserves_xml_well_formedness(tmp_path):
     doc = MexDocument.load(mex)
     doc.write(mex)
     MexDocument.load(mex)
+
+
+def test_mex_document_removes_quick_selection_from_modified_element(tmp_path):
+    project = copy_uart_fixture(tmp_path)
+    mex = project / "Uart_Example.mex"
+    doc = MexDocument.load(mex)
+    element = doc.find_first_with_attribute("quick_selection")
+    assert element is not None
+
+    doc.mark_modified(element)
+
+    assert "quick_selection" not in element.attrib
 ```
 
 - [ ] **Step 2: Run tests and confirm failure**
@@ -583,6 +597,9 @@ from typing import Protocol
 
 class BackendDocument(Protocol):
     path: Path
+
+    def mark_modified(self, element: object) -> None:
+        ...
 
     def write(self, path: Path | None = None) -> None:
         ...
@@ -619,6 +636,15 @@ class MexDocument:
                     names.add(name)
         return names
 
+    def find_first_with_attribute(self, attribute: str) -> ET.Element | None:
+        for element in self.root.iter():
+            if attribute in element.attrib:
+                return element
+        return None
+
+    def mark_modified(self, element: ET.Element) -> None:
+        element.attrib.pop("quick_selection", None)
+
     def write(self, path: Path | None = None) -> None:
         target = path or self.path
         self.tree.write(target, encoding="utf-8", xml_declaration=True)
@@ -632,7 +658,7 @@ Run:
 pytest tests/unit/test_mex_document.py -q
 ```
 
-Expected: `2 passed`.
+Expected: all document tests pass, including quick-selection removal.
 
 - [ ] **Step 5: Commit**
 
@@ -1207,7 +1233,10 @@ Expected: FAIL because `check` is not implemented.
 
 - [ ] **Step 3: Implement static check**
 
-Implement XML well-formedness, single `.mex` detection, enabled module list, and duplicate enabled-instance-name warning.
+Implement XML well-formedness, single `.mex` detection, enabled module list,
+duplicate enabled-instance-name warning, quick-selection conflict detection for
+planned edits, stale FlexIO Uart `UartHwChannelRef` detection, missing Mcl
+FlexIO logic-channel detection, and M1 DMA rejection.
 
 - [ ] **Step 4: Run test and confirm pass**
 
@@ -1669,6 +1698,10 @@ Expected: all mandatory tests pass, including static check plus S32DS headless v
 
 - [ ] Run independent subagent validation for mandatory cases using `"fork_context": false`.
 
+- [ ] Confirm `.mex` quick-selection behavior from
+      `rtd-config-m1-legacy-skills-experience.md` is covered by unit or fixture
+      tests.
+
 Expected:
 
 - focused cases converge within 3 minutes;
@@ -1679,14 +1712,15 @@ Expected:
 
 | Check | Result |
 | --- | --- |
-| Spec coverage | Covers CLI/JSON contract, S32 `.mex` backend, runtime assets, seven M1 modules, fixture structure, runtime verification, mandatory tests, and companion skill. |
+| Spec coverage | Covers CLI/JSON contract, S32 `.mex` backend, runtime assets, seven M1 modules, fixture structure, runtime verification, mandatory tests, companion skill, and M1 legacy-skills experience baseline. |
 | Scope guard | DMA, `.mex` creation, missing-module completion, EB tresos, K1/K5, runtime Excel parsing, and RTD install scans are excluded from implementation tasks. |
 | Test alignment | Tasks map to `RTD-M1-MIN-001` through `RTD-M1-MIN-008`. |
-| Placeholder scan | No `TBD`, `TODO`, or open-ended "fill in later" steps are used. |
+| Placeholder scan | No placeholder markers or open-ended delayed-work steps are used. |
 | Execution handoff | Tasks are checkbox-based, include files, tests, commands, and commit points. |
 
 ## Changelog
 
 | Date | Version | Description |
 | --- | --- | --- |
+| 2026-06-02 | 0.1.1 | Added M1 legacy-skills experience baseline and quick-selection requirements to document core, static checks, and acceptance. |
 | 2026-06-02 | 0.1.0 | Created Milestone 1 implementation plan from active RTD CfgFile CLI specs, roadmap, fixture layout, and test strategy. |
