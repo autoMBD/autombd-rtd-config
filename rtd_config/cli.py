@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 
 from . import __version__
@@ -14,6 +15,7 @@ from .intent import Intent
 from .modules.uart import UartProvider
 from .checks.static import run_static_checks
 from .backends.s32_mex.apply import apply_uart_set
+from .backends.s32_mex.validation import run_validation, DEFAULT_WORKSPACE
 
 
 # Repo root, used to resolve committed runtime assets independently of cwd.
@@ -46,6 +48,13 @@ def build_parser() -> argparse.ArgumentParser:
     check_parser = subparsers.add_parser("check")
     check_parser.add_argument("--project", required=True)
     check_parser.add_argument("--json", action="store_true")
+
+    validate_parser = subparsers.add_parser("validate")
+    validate_parser.add_argument("--project", required=True)
+    validate_parser.add_argument("--s32ds-root")
+    validate_parser.add_argument("--workspace")
+    validate_parser.add_argument("--sdk-path")
+    validate_parser.add_argument("--json", action="store_true")
 
     uart_parser = subparsers.add_parser("uart")
     uart_actions = uart_parser.add_subparsers(dest="action")
@@ -140,6 +149,55 @@ def _intent_dict(intent: Intent) -> dict:
     }
 
 
+def cmd_validate(args: argparse.Namespace) -> int:
+    config = RuntimeConfig.from_dict({"project": args.project})
+    mex = find_single_mex(config.project)
+
+    # Static check always runs first; vendor validation never substitutes for it.
+    static_result = run_static_checks(mex)
+
+    s32ds_root = args.s32ds_root or os.environ.get("RTD_CONFIG_S32DS_ROOT")
+    if not s32ds_root:
+        return emit({
+            "status": "blocked",
+            "command": "validate",
+            "diagnostics": [
+                {
+                    "severity": "blocker",
+                    "code": "s32ds_root_not_configured",
+                    "module": "backend",
+                    "message": (
+                        "S32DS root is not configured; set --s32ds-root or "
+                        "RTD_CONFIG_S32DS_ROOT to run headless ConfigTools validation."
+                    ),
+                    "details": {},
+                }
+            ],
+            "runtime_verification": {"static_check": static_result.to_dict()},
+        })
+
+    workspace = Path(args.workspace) if args.workspace else DEFAULT_WORKSPACE
+    sdk_path = Path(args.sdk_path) if args.sdk_path else None
+    outcome = run_validation(
+        config.project,
+        Path(s32ds_root),
+        workspace=workspace,
+        sdk_path=sdk_path,
+        timeout_s=config.validation_timeout_s,
+    )
+    status = "passed" if outcome.exit_code == 0 and static_result.status == "passed" else "blocked"
+    return emit({
+        "status": status,
+        "command": "validate",
+        "runtime_verification": {"static_check": static_result.to_dict()},
+        "validation": {
+            "exit_code": outcome.exit_code,
+            "command": outcome.command,
+            "log_path": outcome.log_path,
+        },
+    })
+
+
 def cmd_uart_set(args: argparse.Namespace) -> int:
     intent = normalize_uart_intent(args)
     plan = UartProvider().plan(intent)
@@ -217,6 +275,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "check":
         return cmd_check(args)
+
+    if args.command == "validate":
+        return cmd_validate(args)
 
     if args.command == "uart" and getattr(args, "action", None) == "set":
         return cmd_uart_set(args)
