@@ -62,6 +62,10 @@ def test_rtd_m1_min_001_inspect_uart_fixture(tmp_path):
     assert result.returncode == 0
     assert payload["status"] == "passed"
     assert payload["backend"] == "mex"
+    # The MIN-001 user prompt explicitly asks for chip package (封装); inspect
+    # must surface the package dimension alongside device/RTD version.
+    assert payload["package"] == "default"
+    assert payload["device"] == "s32k344"
     assert "Uart" in payload["modules"]
 
 

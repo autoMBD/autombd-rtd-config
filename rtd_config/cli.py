@@ -127,6 +127,7 @@ def cmd_inspect(args: argparse.Namespace) -> int:
         "backend": config.backend,
         "family": config.family,
         "device": config.device,
+        "package": config.package,
         "rtd_version": config.rtd_version,
         "mex_file": str(mex),
         "modules": modules,
