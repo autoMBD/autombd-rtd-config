@@ -2,8 +2,8 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.1.0 |
-| Date | 2026-06-02 |
+| Version | 0.1.1 |
+| Date | 2026-06-03 |
 | Author | autoMBD <tkung.lqk@foxmali.com> (AI-assisted) |
 | Description | Captures development experience from deprecated S32K3 RTD configuration skills that must guide Milestone 1 `.mex` implementation. |
 
@@ -123,6 +123,29 @@ Shared validation experience from the deprecated skills must be preserved:
   ConfigTools reports workspace/container errors.
 - CDT headless build commands are not the authoritative `.mex` validation flow.
 - Build/compile should run only after ConfigTools validation succeeds.
+
+### Empirically observed on S32DS 3.6.7 (2026-06-03)
+
+Verified against the installed `C:\NXP\S32DS.3.6.7` ConfigTools during M1
+acceptance. These correct and augment the inherited notes above:
+
+- The console launcher `s32dsc.exe` ships **no** `s32dsc.ini`; pass
+  `--launcher.ini <eclipse>\s32ds.ini` (the shared GUI launcher config), or the
+  launcher aborts.
+- The application id `com.nxp.swtools.framework.application.HeadlessApplication`
+  is **not registered** in this S32DS (`Application "..." could not be found in
+  the registry`). The registered ConfigTools entry is
+  `com.nxp.swtools.framework.application`; with `-nosplash -import -project
+  -sdkPath` it loads the RTD 7.0.1 SDK and evaluates the `.mex`.
+- That framework application is GUI-oriented: it evaluates the project but does
+  not self-terminate headlessly (it waits on a `...CPerspective` UI perspective),
+  so an automated exit-code-`0` gate was not reproducible on this install, and no
+  dedicated ConfigTools headless-validate application is registered. Confirming a
+  self-terminating headless validate flow is an M2 vendor-integration item.
+- A benign `.mex` edit can be confirmed by **parity**: the tool-edited project
+  produced an error profile identical to the unmodified original NXP example
+  (same SEVERE and `Port_GetNumOfPinConfig` counts), proving those script errors
+  are environmental, not edit-induced.
 
 ## Module Experience Summary
 
@@ -258,3 +281,4 @@ The Milestone 1 execution plan must use these experience-derived checks:
 | Date | Version | Description |
 | --- | --- | --- |
 | 2026-06-02 | 0.1.0 | Created Milestone 1 development experience baseline from deprecated rtd-config skills. |
+| 2026-06-03 | 0.1.1 | Added empirically verified S32DS 3.6.7 validation findings: launcher `.ini`, ConfigTools application id, headless-exit limitation, and benign-edit parity check. |
