@@ -9,10 +9,10 @@
 | --- | --- |
 | Version | 0.1.3 |
 | Date | 2026-05-30 |
-| Author | autoMBD <tkung.lqk@foxmali.com> (AI-assisted) |
+| Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Archives the second reviewed design draft with inline comments preserved. |
 
-<!-- REVIEW: 添加版本、时间、作者（作者是autoMBD<tkung.lqk@foxmali.com>，可以添加说明有AI辅助）overview description -->
+<!-- REVIEW: 添加版本、时间、作者（作者是autoMBD<tkung.lqk@foxmail.com>，可以添加说明有AI辅助）overview description -->
 <!-- REVIEW: 添加目录 -->
 
 ## Purpose

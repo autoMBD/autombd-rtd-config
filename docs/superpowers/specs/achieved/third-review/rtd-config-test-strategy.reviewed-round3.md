@@ -9,7 +9,7 @@
 | --- | --- |
 | Version | 0.2.1 |
 | Date | 2026-05-30 |
-| Author | autoMBD <tkung.lqk@foxmali.com> (AI-assisted) |
+| Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Defines testing layers, fixture validation, subagent validation, and KPI rules. |
 
 ## Purpose

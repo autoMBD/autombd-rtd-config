@@ -4,7 +4,7 @@
 | --- | --- |
 | Version | 0.1.0 |
 | Date | 2026-06-03 |
-| Author | autoMBD <tkung.lqk@foxmali.com> (AI-assisted) |
+| Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Black-box subagent validation handoff for the Milestone 1 mandatory minimum cases. |
 
 ## Purpose

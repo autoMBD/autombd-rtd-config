@@ -4,7 +4,7 @@
 | --- | --- |
 | Version | 0.4.1 |
 | Date | 2026-06-02 |
-| Author | autoMBD <tkung.lqk@foxmali.com> (AI-assisted) |
+| Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Defines testing layers, case classes, subagent validation prompts, and KPI rules for RTD CfgFile CLI. |
 
 ## Purpose

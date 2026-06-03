@@ -4,7 +4,7 @@
 | --- | --- |
 | Version | 0.3.2 |
 | Date | 2026-06-02 |
-| Author | autoMBD <tkung.lqk@foxmali.com> (AI-assisted) |
+| Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Records RTD CfgFile CLI development source materials, vendor tool environment assumptions, and runtime data boundaries. |
 
 This document records the types of source material used to build runtime data

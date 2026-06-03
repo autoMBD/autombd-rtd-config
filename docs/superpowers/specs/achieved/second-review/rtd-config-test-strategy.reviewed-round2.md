@@ -9,7 +9,7 @@
 | --- | --- |
 | Version | 0.1.2 |
 | Date | 2026-05-30 |
-| Author | autoMBD <tkung.lqk@foxmali.com> (AI-assisted) |
+| Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Archives the second reviewed test-strategy draft with inline comments preserved. |
 
 ## Purpose

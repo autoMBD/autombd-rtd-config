@@ -4,7 +4,7 @@
 | --- | --- |
 | Version | 0.4.1 |
 | Date | 2026-06-02 |
-| Author | autoMBD <tkung.lqk@foxmali.com> (AI-assisted) |
+| Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Tracks how review comments were resolved across design document revisions. |
 
 This file tracks how the user's inline `REVIEW` comments were resolved. The

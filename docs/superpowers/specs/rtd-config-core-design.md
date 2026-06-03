@@ -4,7 +4,7 @@
 | --- | --- |
 | Version | 0.4.2 |
 | Date | 2026-06-02 |
-| Author | autoMBD <tkung.lqk@foxmali.com> (AI-assisted) |
+| Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Defines the long-term RTD CfgFile CLI architecture and success criteria. |
 
 ## Overview

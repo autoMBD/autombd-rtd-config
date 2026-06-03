@@ -9,7 +9,7 @@
 | --- | --- |
 | Version | 0.1.3 |
 | Date | 2026-05-30 |
-| Author | autoMBD <tkung.lqk@foxmali.com> (AI-assisted) |
+| Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Archives the first reviewed design draft with inline comments preserved. |
 
 This archived draft preserves the reviewed spec with the user's inline

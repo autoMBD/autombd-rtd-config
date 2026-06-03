@@ -4,7 +4,7 @@
 | --- | --- |
 | Version | 0.1.1 |
 | Date | 2026-06-03 |
-| Author | autoMBD <tkung.lqk@foxmali.com> (AI-assisted) |
+| Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Captures development experience from deprecated S32K3 RTD configuration skills that must guide Milestone 1 `.mex` implementation. |
 
 ## Purpose

@@ -4,7 +4,7 @@
 | --- | --- |
 | Version | 0.2.0 |
 | Date | 2026-06-02 |
-| Author | autoMBD <tkung.lqk@foxmali.com> (AI-assisted) |
+| Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Maintains module ownership, dependencies, runtime data, shortcut groups, and aligned test-case coverage for RTD CfgFile CLI. |
 
 ## Purpose

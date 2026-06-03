@@ -9,7 +9,7 @@
 | --- | --- |
 | Version | 0.2.4 |
 | Date | 2026-06-02 |
-| Author | autoMBD <tkung.lqk@foxmali.com> (AI-assisted) |
+| Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Defines the long-term RTD configuration tool architecture and success criteria. |
 
 ## Overview

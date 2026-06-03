@@ -4,7 +4,7 @@
 | --- | --- |
 | Version | 0.3.0 |
 | Date | 2026-06-02 |
-| Author | autoMBD <tkung.lqk@foxmali.com> (AI-assisted) |
+| Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Records staged delivery order and milestone boundaries for RTD CfgFile CLI. |
 
 ## Purpose

@@ -9,7 +9,7 @@
 | --- | --- |
 | Version | 0.1.2 |
 | Date | 2026-05-30 |
-| Author | autoMBD <tkung.lqk@foxmali.com> (AI-assisted) |
+| Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Archives the second reviewed source-materials draft with inline comments preserved. |
 
 This document records the types of source material used to build runtime data

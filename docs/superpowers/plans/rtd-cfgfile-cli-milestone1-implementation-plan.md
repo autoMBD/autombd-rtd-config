@@ -12,7 +12,7 @@
 | --- | --- |
 | Version | 0.1.1 |
 | Date | 2026-06-02 |
-| Author | autoMBD <tkung.lqk@foxmali.com> (AI-assisted) |
+| Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Executable Milestone 1 implementation plan for RTD CfgFile CLI. |
 
 ---

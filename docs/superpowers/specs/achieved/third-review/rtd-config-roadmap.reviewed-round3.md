@@ -9,7 +9,7 @@
 | --- | --- |
 | Version | 0.1.2 |
 | Date | 2026-05-30 |
-| Author | autoMBD <tkung.lqk@foxmali.com> (AI-assisted) |
+| Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Records staged delivery order and milestone boundaries for the RTD configuration tool. |
 
 ## Purpose
