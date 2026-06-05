@@ -324,7 +324,7 @@ model:
 
 | Shortcut group | Example command | Purpose |
 | --- | --- | --- |
-| `uart` | `rtd-config uart set ...` | Configure Uart logical channels, including LPUART or FlexIO-backed channels, baud/format, polling or interrupt method, callback options, and declared dependencies. |
+| `uart` | `rtd-config uart set ...` | Configure Uart logical channels, including LPUART or FlexIO-backed channels, baud/format, interrupt (IRQ) method, callback options, and declared dependencies. RTD 7.0.1 models the Uart asynchronous method as interrupt or DMA only (no polling value); M1 supports interrupt and DMA is reserved for a later milestone. |
 | `port` | `rtd-config port set-pin ...` | Configure generic pin mux, GPIO direction, electrical settings, untouched resources, and runtime API switches without binding Port logic to one consumer module. |
 | `dio` | `rtd-config dio set-channel ...` | Configure Dio ports, channels, channel groups, optional APIs, and partition-related references. |
 | `mcu` | `rtd-config mcu set-clock ...` | Configure Mcu clocks, peripheral clock gates, modes, RAM sections, reset behavior, and notifications. |

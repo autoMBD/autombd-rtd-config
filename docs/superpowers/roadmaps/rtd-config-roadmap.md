@@ -34,7 +34,7 @@ Scope:
 - validation target: S32K344 first;
 - modules: `Mcu`, `BaseNXP`, `Platform`, `Port`, `Dio`, `Mcl`, `Uart`;
 - Uart: LPUART and FlexIO Uart;
-- modes: interrupt and polling;
+- modes: interrupt (IRQ) only — RTD 7.0.1 has no polling async-method value; DMA deferred;
 - Port: complete generic pin mapping and generic pin configuration for the
   validated device/package;
 - Mcl: generic FlexIO foundation needed by FlexIO users;

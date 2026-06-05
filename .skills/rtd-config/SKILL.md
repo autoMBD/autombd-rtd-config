@@ -38,9 +38,9 @@ RTD `.xdm` descriptors, or local RTD installation scans to answer a request.
   LPUART_0 --json` — list prepared TX/RX pin options before assigning Uart
   pins. Query this before choosing `--tx` / `--rx`.
 - `rtd-config uart set --project <path> --hw <LPUART_0|FLEXIO_0> --mode
-  <polling|interrupt> --baud <rate> --tx <pin> --rx <pin> --json` — normalize a
-  Uart request into an intent and emit the plan (Mcu/Port/Platform/Mcl
-  dependencies). Plan-only; writes nothing.
+  interrupt --baud <rate> --tx <pin> --rx <pin> --json` — normalize a Uart
+  request into an intent and emit the plan (Mcu/Port/Platform/Mcl
+  dependencies). Plan-only; writes nothing. `interrupt` is the only M1 mode.
 - Add `--configure` to apply the plan: it makes a real localized Uart edit,
   strips stale `quick_selection`, writes the `.mex`, and runs static-check
   runtime verification. Add `--backup` to keep a `<file>.mex.bak` first.
@@ -49,8 +49,11 @@ RTD `.xdm` descriptors, or local RTD installation scans to answer a request.
   quick_selection conflicts, stale FlexIO refs, missing Mcl FlexIO channels,
   duplicate LPUART hardware, invalid callback, DMA rejection).
 - `rtd-config validate --project <path> --json` — run S32DS / S32 ConfigTools
-  headless validation when `--s32ds-root` or `RTD_CONFIG_S32DS_ROOT` is set.
-  The pass condition is ConfigTools exit code `0`.
+  headless validation when `--s32ds-root` or `RTD_CONFIG_S32DS_ROOT` is set. The
+  tool registers the project in the S32DS workspace, drives the `Peripherals`
+  headless tool with `-sdkPath` at the bundled PlatformSDK, and reports problems.
+  The pass condition is ConfigTools exit code `0` **and** no SEVERE `[TOOL]`
+  resource-configuration problem (exit `0` alone is not sufficient).
 
 ## JSON Intent Contract
 
@@ -77,8 +80,11 @@ Uart-side references and declares dependencies owned elsewhere:
 
 ## Milestone 1 Scope and DMA
 
-Milestone 1 supports LPUART and FlexIO-backed Uart in polling and interrupt
-modes on the S32K344 Uart fixture.
+Milestone 1 supports LPUART and FlexIO-backed Uart in **interrupt (IRQ) mode**
+on the S32K344 Uart fixture. RTD 7.0.1 models the Uart asynchronous method as
+interrupt or DMA only -- there is no polling value -- so "polling" is not a
+configurable `.mex` mode (blocking/polling is an application-level driver-call
+pattern). DMA is out of M1 scope.
 
 - **DMA is not in Milestone 1.** Reject or defer any DMA request; never
   partially configure DMA. If a project already has `UartDmaEnable=true` or

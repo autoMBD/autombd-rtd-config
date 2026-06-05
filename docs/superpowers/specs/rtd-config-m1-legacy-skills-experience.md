@@ -2,7 +2,7 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.1.1 |
+| Version | 0.1.2 |
 | Date | 2026-06-03 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Captures development experience from deprecated S32K3 RTD configuration skills that must guide Milestone 1 `.mex` implementation. |
@@ -124,28 +124,39 @@ Shared validation experience from the deprecated skills must be preserved:
 - CDT headless build commands are not the authoritative `.mex` validation flow.
 - Build/compile should run only after ConfigTools validation succeeds.
 
-### Empirically observed on S32DS 3.6.7 (2026-06-03)
+### Empirically verified on S32DS 3.6.7 (2026-06-03)
 
-Verified against the installed `C:\NXP\S32DS.3.6.7` ConfigTools during M1
-acceptance. These correct and augment the inherited notes above:
+Verified end-to-end against the installed `C:\NXP\S32DS.3.6.7` ConfigTools during
+M1 acceptance. The headless `.mex` validation flow that returns exit `0`:
 
-- The console launcher `s32dsc.exe` ships **no** `s32dsc.ini`; pass
-  `--launcher.ini <eclipse>\s32ds.ini` (the shared GUI launcher config), or the
-  launcher aborts.
-- The application id `com.nxp.swtools.framework.application.HeadlessApplication`
-  is **not registered** in this S32DS (`Application "..." could not be found in
-  the registry`). The registered ConfigTools entry is
-  `com.nxp.swtools.framework.application`; with `-nosplash -import -project
-  -sdkPath` it loads the RTD 7.0.1 SDK and evaluates the `.mex`.
-- That framework application is GUI-oriented: it evaluates the project but does
-  not self-terminate headlessly (it waits on a `...CPerspective` UI perspective),
-  so an automated exit-code-`0` gate was not reproducible on this install, and no
-  dedicated ConfigTools headless-validate application is registered. Confirming a
-  self-terminating headless validate flow is an M2 vendor-integration item.
-- A benign `.mex` edit can be confirmed by **parity**: the tool-edited project
-  produced an error profile identical to the unmodified original NXP example
-  (same SEVERE and `Port_GetNumOfPinConfig` counts), proving those script errors
-  are environmental, not edit-induced.
+- **Launcher:** the console launcher `s32dsc.exe` ships **no** `s32dsc.ini`; pass
+  `--launcher.ini <eclipse>\s32ds.ini` (the shared GUI launcher config) or it
+  aborts.
+- **Application id:** `com.nxp.swtools.framework.application.HeadlessApplication`
+  is **not registered**; use `com.nxp.swtools.framework.application`.
+- **`-HeadlessTool <tool>` is required** (e.g. `Peripherals`). Without it the
+  framework app starts a workbench (`...CPerspective`) and never terminates --
+  this was the earlier "hang".
+- **`-sdkPath`** must point at the bundled PlatformSDK that ships
+  `sdk_manifest.xml`: `<root>\S32DS\software\PlatformSDK_S32K3` (not a standalone
+  RTD package).
+- **Registered project:** the project must be a workspace member, else
+  ConfigTools logs `Cannot get container for IPath`. Register with the CDT
+  headless `-import` application first; if the project is outside the `-data`
+  workspace, stage a copy inside it (the RTD CfgFile CLI stages and cleans up
+  automatically).
+- **Load/generate** with `-Load <mex> -ProjectLink <project> -UpdateCode` and
+  surface problems via `-ShowProblems SEVERE`.
+- **Pass gate:** ConfigTools exit `0` **and** no SEVERE `[TOOL] ... has the
+  following error` resource problem. Exit `0` alone is NOT sufficient -- it
+  returns `0` even with SEVERE config errors. "Toolchain/IDE project"
+  driver-not-found SEVEREs are project-build-setup noise, not `.mex` validity.
+
+Confirmed exit `0` with zero SEVERE `[TOOL]` problems on the unmodified fixture
+and on the tool-edited LPUART and FlexIO **interrupt** configs. The flow also
+caught a real defect: a `polling` config wrote an invalid `UartInteruptDmaMethod`
+enum (RTD 7.0.1 has only INTERRUPTS / DMA), which ConfigTools rejected as
+`值不可用` -- the reason M1 is interrupt-only.
 
 ## Module Experience Summary
 
@@ -282,3 +293,4 @@ The Milestone 1 execution plan must use these experience-derived checks:
 | --- | --- | --- |
 | 2026-06-02 | 0.1.0 | Created Milestone 1 development experience baseline from deprecated rtd-config skills. |
 | 2026-06-03 | 0.1.1 | Added empirically verified S32DS 3.6.7 validation findings: launcher `.ini`, ConfigTools application id, headless-exit limitation, and benign-edit parity check. |
+| 2026-06-03 | 0.1.2 | Corrected the S32DS findings: the headless flow IS reproducible with `-HeadlessTool` + workspace registration (PlatformSDK `-sdkPath`); recorded the polling-enum defect and the interrupt-only M1 decision, and the exit-0-plus-no-SEVERE-`[TOOL]` pass gate. |

@@ -43,7 +43,10 @@ S32DS / S32 ConfigTools headless validation runs only when
 (`RTD_CONFIG_S32DS_ROOT` or `--s32ds-root`). Without that environment the
 subagent must still pass every non-vendor assertion: JSON status, owned changed
 modules, and the static-check result. The vendor pass condition is ConfigTools
-process exit code `0`.
+process exit code `0` **and** no SEVERE `[TOOL]` resource-configuration problem
+(exit `0` alone is not sufficient). The tool registers the project in the S32DS
+workspace and drives the `Peripherals` headless tool with `-sdkPath` at the
+bundled PlatformSDK.
 
 ## Mandatory Minimum Cases
 
@@ -60,15 +63,11 @@ the KPI.
   launch.
 - KPI: 3 minutes.
 
-### RTD-M1-MIN-002 — Configure one LPUART channel in polling mode
+### RTD-M1-MIN-002 — Reserved / removed (polling)
 
-- Request surface: JSON intent and `uart set`
-- Simulated user prompt: 我需要在 S32K344 RTD 7.0.1 工程中配置一个 LPUART Uart 通道，使用轮询模式、115200 baud、8N1，并配置对应 TX/RX 引脚。
-- Expected evidence: the plan owns Uart edits through the Uart provider, Port
-  pin edits through the Port provider, and the Mcu clock dependency through the
-  Mcu provider. Static check passes, and S32DS headless validation passes when
-  enabled.
-- KPI: 3 minutes.
+Removed from the M1 mandatory set: RTD 7.0.1 models the Uart asynchronous method
+as interrupt or DMA only, so "polling mode" is not a configurable `.mex`
+scenario. Interrupt coverage is RTD-M1-MIN-003.
 
 ### RTD-M1-MIN-003 — Configure one LPUART channel in interrupt mode
 
@@ -79,14 +78,11 @@ the KPI.
   S32DS headless validation passes when enabled.
 - KPI: 3 minutes.
 
-### RTD-M1-MIN-004 — Configure one FlexIO-backed Uart channel in polling mode
+### RTD-M1-MIN-004 — Reserved / removed (polling)
 
-- Request surface: JSON intent and `uart set`
-- Simulated user prompt: 我需要在 S32K344 RTD 7.0.1 工程中配置一个 FlexIO Uart 通道，使用轮询模式、115200 baud、8N1，并配置 FlexIO 逻辑通道和 TX/RX 引脚。
-- Expected evidence: the plan creates or updates Mcl-owned FlexIO common
-  resources, Port-owned pins, and Uart-owned FlexIO channel references. Static
-  check passes, and S32DS headless validation passes when enabled.
-- KPI: 3 minutes.
+Removed from the M1 mandatory set for the same reason as MIN-002: polling is not
+an RTD 7.0.1 `.mex` async-method value. FlexIO interrupt coverage is
+RTD-M1-MIN-005.
 
 ### RTD-M1-MIN-005 — Configure one FlexIO-backed Uart channel in interrupt mode
 
