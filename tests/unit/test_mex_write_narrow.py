@@ -60,11 +60,11 @@ from rtd_config.intent import Intent
 from tests.fixtures import copy_uart_fixture
 
 
-def _lpuart_polling_intent() -> Intent:
+def _lpuart_intent() -> Intent:
     return Intent.from_dict({
         "module": "uart",
         "action": "set",
-        "payload": {"hw": "LPUART_0", "mode": "polling", "baud": 115200},
+        "payload": {"hw": "LPUART_0", "mode": "interrupt", "baud": 115200},
     })
 
 
@@ -98,7 +98,7 @@ def test_owned_edit_touches_only_changed_lines(tmp_path):
     original = mex.read_bytes()
 
     doc = MexDocument.load(mex)
-    result = apply_uart_set(doc, _lpuart_polling_intent())
+    result = apply_uart_set(doc, _lpuart_intent())
     assert not result.blocked
     doc.write(mex)
 
@@ -108,8 +108,9 @@ def test_owned_edit_touches_only_changed_lines(tmp_path):
     assert len(changed) <= 8, f"unexpectedly broad diff: {len(changed)} lines"
 
     added = [line for line in changed if line.startswith("+")]
+    # interrupt-only M1: the owned change here is the hardware-channel value
+    # (the fixture's method is already INTERRUPTS, so it is not re-emitted).
     assert any('value="LPUART_0"' in line for line in added)
-    assert any("LPUART_UART_IP_USING_POLLING" in line for line in added)
 
     # The written file re-loads as well-formed XML.
     MexDocument.load(mex)
@@ -121,7 +122,7 @@ def test_xml_declaration_and_unrelated_lines_are_byte_preserved(tmp_path):
     original_lines = mex.read_bytes().decode("utf-8").splitlines()
 
     doc = MexDocument.load(mex)
-    apply_uart_set(doc, _lpuart_polling_intent())
+    apply_uart_set(doc, _lpuart_intent())
     doc.write(mex)
     after_lines = mex.read_bytes().decode("utf-8").splitlines()
 

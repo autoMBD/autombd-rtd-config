@@ -57,7 +57,7 @@ def _configure(project, *extra):
             "uart", "set",
             "--project", str(project),
             "--hw", "LPUART_0",
-            "--mode", "polling",
+            "--mode", "interrupt",
             "--baud", "115200",
             "--tx", "PTA15",
             "--rx", "PTA16",

@@ -66,13 +66,16 @@ from rtd_config.diagnostics import Diagnostic
 from rtd_config.intent import Intent
 
 
-# Mode -> driver-method enum, following the RTD 7.0.1 LPUART/FlexIO naming.
+# Uart "asynchronous method" enum. RTD 7.0.1 ConfigTools models this field with
+# exactly two values per IP -- INTERRUPTS or DMA -- and has NO polling value
+# (verified against Uart.xdm and the s32k344 .epd: a "USING_POLLING" enum does
+# not exist; ConfigTools rejects it as "value not available"). Milestone 1
+# supports interrupt (IRQ); DMA is out of M1 scope. "Polling/blocking" is an
+# application-level driver-call pattern, not a .mex async-method value.
 _LPUART_METHOD = {
-    "polling": "LPUART_UART_IP_USING_POLLING",
     "interrupt": "LPUART_UART_IP_USING_INTERRUPTS",
 }
 _FLEXIO_METHOD = {
-    "polling": "FLEXIO_UART_IP_DRIVER_TYPE_POLLING",
     "interrupt": "FLEXIO_UART_IP_DRIVER_TYPE_INTERRUPTS",
 }
 
@@ -121,11 +124,30 @@ def apply_uart_set(doc: MexDocument, intent: Intent) -> ApplyResult:
     """
     payload = intent.payload
     hw = payload.get("hw", "")
-    mode = payload.get("mode", "polling")
+    mode = payload.get("mode", "interrupt")
     baud = payload.get("baud")
     want_flexio = _is_flexio_request(hw)
 
     result = ApplyResult()
+
+    # RTD 7.0.1 has no polling async-method value; M1 supports interrupt only
+    # (DMA is out of scope). Reject any other mode with an actionable blocker
+    # rather than writing an enum ConfigTools marks "value not available".
+    method_map = _FLEXIO_METHOD if want_flexio else _LPUART_METHOD
+    if mode not in method_map:
+        result.diagnostics.append(Diagnostic(
+            severity="blocker",
+            code="unsupported_uart_mode",
+            module="uart",
+            message=(
+                f"Uart mode '{mode}' is not supported in Milestone 1. RTD 7.0.1 "
+                "models the Uart asynchronous method as interrupt (IRQ) or DMA "
+                "only -- there is no polling value -- and DMA is out of M1 scope. "
+                "Use mode 'interrupt'."
+            ),
+            details={"mode": mode, "supported": sorted(method_map)},
+        ))
+        return result
 
     uart_cfg = doc.find_config_set("Uart")
     if uart_cfg is None:

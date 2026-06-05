@@ -106,7 +106,9 @@ def build_parser() -> argparse.ArgumentParser:
     uart_set = uart_actions.add_parser("set")
     uart_set.add_argument("--project", required=True)
     uart_set.add_argument("--hw", required=True)
-    uart_set.add_argument("--mode", default="polling", choices=["polling", "interrupt"])
+    # RTD 7.0.1 has no polling async-method value; M1 supports interrupt only
+    # (DMA is reserved for a later milestone).
+    uart_set.add_argument("--mode", default="interrupt", choices=["interrupt"])
     uart_set.add_argument("--baud", type=int, default=115200)
     uart_set.add_argument("--tx")
     uart_set.add_argument("--rx")
@@ -231,13 +233,18 @@ def cmd_validate(args: argparse.Namespace) -> int:
         sdk_path=sdk_path,
         timeout_s=config.validation_timeout_s,
     )
-    status = "passed" if outcome.exit_code == 0 and static_result.status == "passed" else "blocked"
+    # Vendor pass requires ConfigTools exit 0 AND no SEVERE [TOOL] config
+    # problem; exit 0 alone is not sufficient. Static check must also pass.
+    status = "passed" if outcome.passed and static_result.status == "passed" else "blocked"
     return emit({
         "status": status,
         "command": "validate",
         "runtime_verification": {"static_check": static_result.to_dict()},
         "validation": {
             "exit_code": outcome.exit_code,
+            "passed": outcome.passed,
+            "registered": outcome.registered,
+            "severe_problems": outcome.severe_problems,
             "command": outcome.command,
             "log_path": outcome.log_path,
         },

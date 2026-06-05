@@ -52,11 +52,11 @@ def test_intent_loads_module_action_payload():
     intent = Intent.from_dict({
         "module": "uart",
         "action": "set",
-        "payload": {"hw": "LPUART_0", "mode": "polling"},
+        "payload": {"hw": "LPUART_0", "mode": "interrupt"},
     })
     assert intent.module == "uart"
     assert intent.action == "set"
-    assert intent.payload["mode"] == "polling"
+    assert intent.payload["mode"] == "interrupt"
 
 
 def test_plan_records_owned_changes():

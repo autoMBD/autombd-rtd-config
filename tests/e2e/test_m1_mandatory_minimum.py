@@ -97,7 +97,11 @@ def _maybe_validate(project):
     payload = json.loads(result.stdout)
     assert result.returncode == 0, payload
     assert payload["status"] == "passed", payload
+    # ConfigTools exit 0 alone is not sufficient; the pass gate also requires no
+    # SEVERE [TOOL] resource-configuration problems.
     assert payload["validation"]["exit_code"] == 0, payload
+    assert payload["validation"]["passed"] is True, payload
+    assert payload["validation"]["severe_problems"] == [], payload
 
 
 def test_rtd_m1_min_001_inspect_uart_fixture(tmp_path):
@@ -114,15 +118,8 @@ def test_rtd_m1_min_001_inspect_uart_fixture(tmp_path):
     assert "Uart" in payload["modules"]
 
 
-def test_rtd_m1_min_002_lpuart_polling(tmp_path):
-    project = copy_uart_fixture(tmp_path)
-    result = _configure(project, "LPUART_0", "polling", 115200, "PTA15", "PTA16")
-    payload = json.loads(result.stdout)
-    assert result.returncode == 0
-    assert payload["status"] == "passed"
-    assert "uart" in payload["changed_modules"]
-    assert payload["runtime_verification"]["static_check"]["status"] == "passed"
-    _maybe_validate(project)
+# RTD-M1-MIN-002 (LPUART polling) was removed: RTD 7.0.1 has no polling
+# async-method value, so M1 supports interrupt only (see test-strategy doc).
 
 
 def test_rtd_m1_min_003_lpuart_interrupt(tmp_path):
@@ -136,15 +133,8 @@ def test_rtd_m1_min_003_lpuart_interrupt(tmp_path):
     _maybe_validate(project)
 
 
-def test_rtd_m1_min_004_flexio_polling(tmp_path):
-    project = copy_uart_fixture(tmp_path)
-    result = _configure(project, "FLEXIO_0", "polling", 115200, "PTB0", "PTB1")
-    payload = json.loads(result.stdout)
-    assert result.returncode == 0
-    assert payload["status"] == "passed"
-    assert "uart" in payload["changed_modules"]
-    assert payload["runtime_verification"]["static_check"]["status"] == "passed"
-    _maybe_validate(project)
+# RTD-M1-MIN-004 (FlexIO polling) was removed for the same reason as MIN-002:
+# polling is not an RTD 7.0.1 .mex async-method value.
 
 
 def test_rtd_m1_min_005_flexio_interrupt(tmp_path):

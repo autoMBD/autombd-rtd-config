@@ -59,7 +59,7 @@ def _run_configure(project, *extra):
             "uart", "set",
             "--project", str(project),
             "--hw", "LPUART_0",
-            "--mode", "polling",
+            "--mode", "interrupt",
             "--baud", "115200",
             "--tx", "PTA15",
             "--rx", "PTA16",
@@ -74,7 +74,7 @@ def _run_configure(project, *extra):
     )
 
 
-def test_configure_lpuart_polling_changes_mex_and_checks(tmp_path):
+def test_configure_lpuart_interrupt_changes_mex_and_checks(tmp_path):
     project = copy_uart_fixture(tmp_path)
     result = _run_configure(project)
     payload = json.loads(result.stdout)

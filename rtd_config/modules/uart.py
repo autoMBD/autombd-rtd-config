@@ -60,7 +60,7 @@ def is_flexio(hw: str) -> bool:
 
 
 class UartProvider:
-    """User-facing Uart driver path (LPUART and FlexIO, polling/interrupt).
+    """User-facing Uart driver path (LPUART and FlexIO, interrupt mode).
 
     Uart owns channel settings and Uart-side references. It does not edit other
     modules directly; instead it declares explicit dependency PlannedChange
@@ -79,7 +79,7 @@ class UartProvider:
     def plan(self, intent: Intent) -> Plan:
         payload = intent.payload
         hw = payload.get("hw", "")
-        mode = payload.get("mode", "polling")
+        mode = payload.get("mode", "interrupt")
 
         # Uart-owned change: the channel settings themselves.
         changes = [

@@ -59,7 +59,7 @@ def test_uart_shortcut_normalizes_to_plan(tmp_path):
             "uart", "set",
             "--project", str(project),
             "--hw", "LPUART_0",
-            "--mode", "polling",
+            "--mode", "interrupt",
             "--baud", "115200",
             "--tx", "PTA15",
             "--rx", "PTA16",

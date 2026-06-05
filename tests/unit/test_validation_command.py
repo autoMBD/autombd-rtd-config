@@ -46,15 +46,65 @@
 
 from pathlib import Path
 
-from rtd_config.backends.s32_mex.validation import build_validation_command
+from rtd_config.backends.s32_mex.validation import (
+    ValidationOutcome,
+    build_register_command,
+    build_validation_command,
+    default_sdk_path,
+    find_severe_tool_problems,
+)
 
 
-def test_build_validation_command_is_headless():
-    command = build_validation_command(
+def _validate_cmd():
+    return build_validation_command(
+        s32ds_root=Path("C:/NXP/S32DS.3.6.7"),
+        project=Path("C:/tmp/Uart_Example_S32K344"),
+        mex_file=Path("C:/tmp/Uart_Example_S32K344/Uart_Example.mex"),
+    )
+
+
+def test_build_validation_command_is_headless_with_headless_tool():
+    command = _validate_cmd()
+    joined = " ".join(command)
+    assert "eclipse" in joined.lower()
+    assert "-nosplash" in command
+    # The framework app only runs headless when -HeadlessTool is supplied.
+    assert "-HeadlessTool" in command
+    assert any("framework.application" in item for item in command)
+    assert "-Load" in command
+    assert "-UpdateCode" in command
+    assert "-ShowProblems" in command
+
+
+def test_default_sdk_path_points_at_bundled_platform_sdk():
+    sdk = default_sdk_path(Path("C:/NXP/S32DS.3.6.7"))
+    assert sdk.parts[-3:] == ("S32DS", "software", "PlatformSDK_S32K3")
+
+
+def test_build_register_command_uses_cdt_import():
+    command = build_register_command(
         s32ds_root=Path("C:/NXP/S32DS.3.6.7"),
         project=Path("C:/tmp/Uart_Example_S32K344"),
     )
-    joined = " ".join(command)
-    assert "S32DS" in joined or "eclipse" in joined.lower()
-    assert "-nosplash" in command
-    assert any("application" in item.lower() for item in command)
+    assert "-import" in command
+    assert any("cdt.managedbuilder.core.headlessbuild" in item for item in command)
+
+
+def test_find_severe_tool_problems_filters_out_project_setup_noise():
+    text = "\n".join([
+        ' SEVERE: [TOOL] The resource "Uart" ... has the following error: 值不可用 [x]',
+        ' SEVERE: From Problems view: Validation problem issue: "...mcl 工程不会被编译", target: Toolchain/IDE project [y]',
+        ' SEVERE: [SDK/Data] Code generation failed for Peripherals: ... fnGroupName [z]',
+    ])
+    problems = find_severe_tool_problems(text)
+    assert len(problems) == 1
+    assert "has the following error" in problems[0]
+
+
+def test_validation_outcome_pass_gate():
+    base = dict(command=[], log_path="x")
+    assert ValidationOutcome(exit_code=0, severe_problems=[], **base).passed is True
+    # exit 0 but a SEVERE [TOOL] problem present -> not a pass.
+    assert ValidationOutcome(exit_code=0, severe_problems=["boom"], **base).passed is False
+    # non-zero exit -> not a pass.
+    assert ValidationOutcome(exit_code=2, severe_problems=[], **base).passed is False
