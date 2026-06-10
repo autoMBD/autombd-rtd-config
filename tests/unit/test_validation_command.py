@@ -48,7 +48,6 @@ from pathlib import Path
 
 from rtd_config.backends.s32_mex.validation import (
     ValidationOutcome,
-    build_register_command,
     build_validation_command,
     default_sdk_path,
     find_severe_tool_problems,
@@ -58,12 +57,20 @@ from rtd_config.backends.s32_mex.validation import (
 def _validate_cmd():
     return build_validation_command(
         s32ds_root=Path("C:/NXP/S32DS.3.6.7"),
-        project=Path("C:/tmp/Uart_Example_S32K344"),
         mex_file=Path("C:/tmp/Uart_Example_S32K344/Uart_Example.mex"),
+        workspace=Path("C:/tmp/_ws"),
+        export_dir=Path("C:/tmp/_export"),
     )
 
 
-def test_build_validation_command_is_headless_with_headless_tool():
+def test_build_validation_command_is_standalone_flow_b():
+    """Flow B: -Load + -ExportSrc, headless, no workspace registration.
+
+    The earlier project flow (-ProjectLink + -UpdateCode) required a registered
+    workspace project; its CDT -import step routinely timed out and produced a
+    spurious exit 2 with "Cannot get container for IPath". Flow B exports
+    generated code to a throwaway folder and needs no registration.
+    """
     command = _validate_cmd()
     joined = " ".join(command)
     assert "eclipse" in joined.lower()
@@ -72,8 +79,13 @@ def test_build_validation_command_is_headless_with_headless_tool():
     assert "-HeadlessTool" in command
     assert any("framework.application" in item for item in command)
     assert "-Load" in command
-    assert "-UpdateCode" in command
+    assert "-ExportSrc" in command
+    assert "-sdkPath" in command
     assert "-ShowProblems" in command
+    # Flow B must NOT use the registration-bound project flow.
+    assert "-ProjectLink" not in command
+    assert "-UpdateCode" not in command
+    assert "-import" not in command
 
 
 def test_default_sdk_path_points_at_bundled_platform_sdk():
@@ -81,30 +93,40 @@ def test_default_sdk_path_points_at_bundled_platform_sdk():
     assert sdk.parts[-3:] == ("S32DS", "software", "PlatformSDK_S32K3")
 
 
-def test_build_register_command_uses_cdt_import():
-    command = build_register_command(
-        s32ds_root=Path("C:/NXP/S32DS.3.6.7"),
-        project=Path("C:/tmp/Uart_Example_S32K344"),
-    )
-    assert "-import" in command
-    assert any("cdt.managedbuilder.core.headlessbuild" in item for item in command)
+def test_find_severe_tool_problems_filters_out_environment_noise():
+    """Only [TOOL] '... has the following error' resource problems gate.
 
-
-def test_find_severe_tool_problems_filters_out_project_setup_noise():
+    Everything else ConfigTools logs at SEVERE/严重 on a headless, unregistered
+    run -- "Cannot get container", SerDes "No script file", localized framework
+    NLS errors -- is environment noise, not .mex validity, and must be excluded.
+    """
     text = "\n".join([
-        ' SEVERE: [TOOL] The resource "Uart" ... has the following error: 值不可用 [x]',
-        ' SEVERE: From Problems view: Validation problem issue: "...mcl 工程不会被编译", target: Toolchain/IDE project [y]',
-        ' SEVERE: [SDK/Data] Code generation failed for Peripherals: ... fnGroupName [z]',
+        ' SEVERE: [TOOL] The resource "BaseNXP" ... has the following error: The number of OsIf Counters ... [x]',
+        ' SEVERE: From Problems view: ... target: Toolchain/IDE project [y]',
+        ' SEVERE: [TOOL] No script file found while trying to recompile ... SerDes Config Tool [z]',
+        '严重: Cannot get container for IPath C:/tmp/Uart_Example.mex',
     ])
     problems = find_severe_tool_problems(text)
     assert len(problems) == 1
     assert "has the following error" in problems[0]
+    assert "BaseNXP" in problems[0]
 
 
 def test_validation_outcome_pass_gate():
     base = dict(command=[], log_path="x")
-    assert ValidationOutcome(exit_code=0, severe_problems=[], **base).passed is True
+    # Pass = exit 0 AND code generated AND no SEVERE [TOOL] config error.
+    assert ValidationOutcome(
+        exit_code=0, severe_problems=[], generated_files=122, **base
+    ).passed is True
     # exit 0 but a SEVERE [TOOL] problem present -> not a pass.
-    assert ValidationOutcome(exit_code=0, severe_problems=["boom"], **base).passed is False
+    assert ValidationOutcome(
+        exit_code=0, severe_problems=["boom"], generated_files=122, **base
+    ).passed is False
+    # exit 0, no severe, but no code generated -> not a pass.
+    assert ValidationOutcome(
+        exit_code=0, severe_problems=[], generated_files=0, **base
+    ).passed is False
     # non-zero exit -> not a pass.
-    assert ValidationOutcome(exit_code=2, severe_problems=[], **base).passed is False
+    assert ValidationOutcome(
+        exit_code=2, severe_problems=[], generated_files=122, **base
+    ).passed is False

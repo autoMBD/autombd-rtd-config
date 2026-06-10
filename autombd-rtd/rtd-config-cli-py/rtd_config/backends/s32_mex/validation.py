@@ -46,25 +46,35 @@
 
 """S32DS / S32 ConfigTools headless validation command + runner.
 
-This encodes the *verified* S32DS 3.6.x ConfigTools headless flow (confirmed by
-running it against the installed toolchain during M1 acceptance):
+This encodes the *verified* S32DS 3.6.x ConfigTools **standalone** headless flow
+(domain-truth Flow B), confirmed by live runs on S32DS 3.6.7 against the
+``Uart_Example_S32K344`` fixture (known-good -> exit 0 with code generated;
+a deliberately invalid OsIf edit -> the SEVERE ``[TOOL]`` resource error below):
 
 - launch ``s32dsc.exe`` with ``--launcher.ini <eclipse>/s32ds.ini`` (the console
   launcher shares the GUI launcher ini; do not use ``s32ds.bat``);
 - drive the ConfigTools framework app ``com.nxp.swtools.framework.application``
-  with ``-nosplash -consoleLog`` and a ``-HeadlessTool`` (e.g. ``Peripherals``).
+  with ``-nosplash -consoleLog`` and a ``-HeadlessTool`` (``Peripherals``).
   WITHOUT ``-HeadlessTool`` the app starts a workbench and never terminates;
 - point ``-sdkPath`` at the S32DS PlatformSDK that ships ``sdk_manifest.xml``
   (``<root>/S32DS/software/PlatformSDK_S32K3``), not a standalone RTD package;
-- the target project must be a REGISTERED workspace project, otherwise
-  ConfigTools reports ``Cannot get container for IPath``; register it first with
-  the CDT headless ``-import`` application;
-- load + generate with ``-Load <mex> -ProjectLink <project> -UpdateCode`` and
-  surface problems with ``-ShowProblems SEVERE``.
+- load + generate WITHOUT workspace registration using
+  ``-Load <mex> -sdkPath <sdk> -ExportSrc <tmp> -ShowProblems SEVERE``.
+  ``-ExportSrc`` writes generated code to a throwaway folder, so -- unlike the
+  superseded ``-ProjectLink/-UpdateCode`` project flow -- it needs no registered
+  workspace project and never hits ``Cannot get container for IPath``. That old
+  flow required a CDT ``-import`` registration step which routinely exceeded the
+  timeout and produced a spurious exit 2.
 
-Pass condition: ConfigTools exits ``0`` AND reports no SEVERE ``[TOOL]`` resource
-validation problem. Exit ``0`` alone is NOT sufficient -- ConfigTools returns
-``0`` even when it logs SEVERE configuration errors.
+Pass condition: ConfigTools exits ``0``, generates at least one source file, AND
+reports no SEVERE ``[TOOL] ... has the following error`` resource problem. Exit
+``0`` alone is NOT sufficient -- ConfigTools returns ``0`` even when it logs a
+SEVERE configuration error (verified: an invalid OsIf edit returned exit 0 while
+logging ``[TOOL] The resource "BaseNXP" ... has the following error: The number
+of OsIf Counters must be exactly one ...``). Conversely, framework noise logged
+at ``严重:``/SEVERE (``Cannot get container``, SerDes ``No script file``, Port
+expression errors, SLF4J/NLS) is not a .mex validity problem and is excluded by
+the ``has the following error`` marker.
 
 Commands are built as data so they are unit-testable without launching a vendor
 tool. Execution is gated by the caller and the ``RTD_CONFIG_RUN_S32DS_VALIDATION``
@@ -75,6 +85,7 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -86,20 +97,15 @@ from rtd_config.backends.s32_mex.locate import find_single_mex
 # runs headless when a -HeadlessTool is supplied as well.
 CONFIGTOOLS_APPLICATION = "com.nxp.swtools.framework.application"
 
-# CDT headless application used to register (import) a project into the workspace
-# so ConfigTools can resolve its container.
-CDT_HEADLESS_APPLICATION = "org.eclipse.cdt.managedbuilder.core.headlessbuild"
-
-# Documented default S32DS Eclipse workspace on the development computer.
-DEFAULT_WORKSPACE = Path(r"D:\WorkSpace\DSpace\3.6")
-
 # ConfigTools headless tool that drives RTD peripheral (.mex) configuration.
 DEFAULT_HEADLESS_TOOL = "Peripherals"
 
 # ConfigTools logs real module-configuration errors as SEVERE
-# "[TOOL] The resource ... has the following error"; "Toolchain/IDE project"
-# driver-not-found problems are project-build-setup noise (not .mex validity) and
-# are deliberately excluded from the pass gate.
+# "[TOOL] The resource ... has the following error" (emitted in English even on a
+# localized install). Everything else logged at SEVERE/严重 on a headless,
+# unregistered run -- "Cannot get container for IPath", SerDes "No script file",
+# Port expression errors, Toolchain/IDE driver-not-found, SLF4J/NLS noise -- is
+# environment noise, not .mex validity, and is deliberately excluded.
 _SEVERE_TOOL_MARKER = "has the following error"
 
 
@@ -136,42 +142,23 @@ def _launcher_prefix(s32ds_root: Path) -> list[str]:
     return command
 
 
-def build_register_command(
-    s32ds_root: Path,
-    project: Path,
-    *,
-    workspace: Path | None = None,
-) -> list[str]:
-    """Build the CDT headless command that registers a project in the workspace.
-
-    ConfigTools cannot resolve a project's container ("Cannot get container for
-    IPath") unless the project is a workspace member; importing it first fixes
-    that. Re-importing an already-present project is harmless.
-    """
-    workspace = workspace or DEFAULT_WORKSPACE
-    return _launcher_prefix(s32ds_root) + [
-        "-nosplash",
-        "-consoleLog",
-        "-application", CDT_HEADLESS_APPLICATION,
-        "-data", str(workspace),
-        "-import", str(project),
-    ]
-
-
 def build_validation_command(
     s32ds_root: Path,
-    project: Path,
+    mex_file: Path,
     *,
-    workspace: Path | None = None,
+    workspace: Path,
+    export_dir: Path,
     sdk_path: Path | None = None,
     headless_tool: str = DEFAULT_HEADLESS_TOOL,
-    mex_file: Path | None = None,
 ) -> list[str]:
-    """Build the headless S32 ConfigTools load/validate command for a project."""
-    workspace = workspace or DEFAULT_WORKSPACE
+    """Build the standalone (Flow B) headless ConfigTools validate command.
+
+    Loads ``mex_file`` and exports generated code to ``export_dir`` with no
+    workspace registration. ``workspace`` is only the Eclipse ``-data`` directory
+    (a throwaway); the project is never registered into it, so there is no
+    ``Cannot get container for IPath`` and no slow CDT ``-import`` step.
+    """
     sdk_path = sdk_path or default_sdk_path(s32ds_root)
-    if mex_file is None:
-        mex_file = find_single_mex(project)
     return _launcher_prefix(s32ds_root) + [
         "-consoleLog",
         "-nosplash",
@@ -179,9 +166,8 @@ def build_validation_command(
         "-data", str(workspace),
         "-HeadlessTool", headless_tool,
         "-Load", str(mex_file),
-        "-ProjectLink", str(project),
         "-sdkPath", str(sdk_path),
-        "-UpdateCode",
+        "-ExportSrc", str(export_dir),
         "-ShowProblems", "SEVERE",
     ]
 
@@ -210,12 +196,22 @@ class ValidationOutcome:
     stdout: str = ""
     stderr: str = ""
     severe_problems: list[str] = field(default_factory=list)
-    registered: bool = False
+    generated_files: int = 0
 
     @property
     def passed(self) -> bool:
-        """Pass = ConfigTools exit 0 AND no SEVERE [TOOL] config problem."""
-        return self.exit_code == 0 and not self.severe_problems
+        """Pass = exit 0 AND code generated AND no SEVERE [TOOL] config error.
+
+        Exit 0 alone is insufficient: ConfigTools returns 0 even when it logs a
+        SEVERE ``[TOOL] ... has the following error`` resource problem, so the
+        severe list must be empty. A pass must also have produced at least one
+        generated source file (the ``-ExportSrc`` evidence that codegen ran).
+        """
+        return (
+            self.exit_code == 0
+            and self.generated_files > 0
+            and not self.severe_problems
+        )
 
 
 def validation_log_path(project: Path) -> Path:
@@ -248,22 +244,6 @@ def _run(command: list[str], timeout_s: int) -> tuple[int, str, str]:
         return 127, "", f"Could not launch the S32DS executable: {exc}"
 
 
-def _workspace_project_meta(workspace: Path, name: str) -> Path:
-    return (
-        workspace / ".metadata" / ".plugins"
-        / "org.eclipse.core.resources" / ".projects" / name
-    )
-
-
-def _unstage(workspace: Path, name: str, staged: Path | None) -> None:
-    """Remove a staged in-workspace copy and its workspace metadata entry."""
-    if staged is not None:
-        shutil.rmtree(staged, ignore_errors=True)
-    meta = _workspace_project_meta(workspace, name)
-    if meta.exists():
-        shutil.rmtree(meta, ignore_errors=True)
-
-
 def run_validation(
     project: Path,
     s32ds_root: Path,
@@ -272,63 +252,53 @@ def run_validation(
     sdk_path: Path | None = None,
     headless_tool: str = DEFAULT_HEADLESS_TOOL,
     mex_file: Path | None = None,
-    register: bool = True,
     timeout_s: int = 180,
 ) -> ValidationOutcome:
-    """Register (best effort) then headlessly validate a project's .mex.
+    """Headlessly validate a project's .mex with the standalone Flow B.
 
-    ConfigTools can only resolve a project's container when the project is a
-    member of the ``-data`` workspace. If the project lives outside the
-    workspace, a transient copy is staged inside it, validated, and removed; the
-    caller's project is never modified. Execution is intended only when the
-    vendor environment is available. The pass decision is the returned outcome's
-    ``passed`` property (exit 0 AND no SEVERE [TOOL] problem).
+    A throwaway copy of the project is validated so the caller's files are never
+    touched, and generated code is exported to a temporary folder. No workspace
+    registration is performed; the Eclipse ``-data`` workspace and the
+    ``-ExportSrc`` target are temporary directories removed afterwards. The pass
+    decision is the returned outcome's ``passed`` property (exit 0 AND code
+    generated AND no SEVERE ``[TOOL]`` resource problem).
     """
-    workspace = workspace or DEFAULT_WORKSPACE
     project = Path(project)
+    s32ds_root = Path(s32ds_root)
     sdk_path = sdk_path or default_sdk_path(s32ds_root)
 
-    # Log under the caller's real project even when validation runs on a stage.
+    # Log under the caller's real project even though validation runs on a copy.
     log_path = validation_log_path(project)
     log_path.parent.mkdir(parents=True, exist_ok=True)
 
-    staged: Path | None = None
-    if workspace.resolve() not in project.resolve().parents:
-        staged = workspace / project.name
-        _unstage(workspace, project.name, staged)
-        shutil.copytree(project, staged)
-        target = staged
-    else:
-        target = project
-
-    sections: list[str] = []
+    stage = Path(tempfile.mkdtemp(prefix="rtd-validate-"))
     try:
-        target_mex = mex_file if (mex_file is not None and staged is None) else find_single_mex(target)
-        if register:
-            reg_cmd = build_register_command(s32ds_root, target, workspace=workspace)
-            reg_code, reg_out, reg_err = _run(reg_cmd, timeout_s)
-            sections.append(
-                f"$ {' '.join(reg_cmd)}\n[register exit {reg_code}]\n{reg_out}\n{reg_err}\n"
-            )
+        target = stage / project.name
+        shutil.copytree(project, target)
+        target_mex = find_single_mex(target) if mex_file is None else target / Path(mex_file).name
+        export_dir = stage / "_export"
+        export_dir.mkdir()
+        data_ws = Path(workspace) if workspace is not None else stage / "_ws"
+        data_ws.mkdir(parents=True, exist_ok=True)
 
         val_cmd = build_validation_command(
-            s32ds_root, target,
-            workspace=workspace, sdk_path=sdk_path,
-            headless_tool=headless_tool, mex_file=target_mex,
+            s32ds_root, target_mex,
+            workspace=data_ws, export_dir=export_dir,
+            sdk_path=sdk_path, headless_tool=headless_tool,
         )
         exit_code, stdout, stderr = _run(val_cmd, timeout_s)
         severe = find_severe_tool_problems(stdout + "\n" + stderr)
+        generated_files = sum(1 for p in export_dir.rglob("*") if p.is_file())
 
-        sections.append(
+        log_path.write_text(
             f"$ {' '.join(val_cmd)}\n[validate exit {exit_code}]\n"
+            f"[generated_files {generated_files}]\n"
             f"[stdout]\n{stdout}\n[stderr]\n{stderr}\n"
-            "[severe_tool_problems]\n" + "\n".join(severe) + "\n"
+            "[severe_tool_problems]\n" + "\n".join(severe) + "\n",
+            encoding="utf-8",
         )
     finally:
-        if staged is not None:
-            _unstage(workspace, project.name, staged)
-
-    log_path.write_text("".join(sections), encoding="utf-8")
+        shutil.rmtree(stage, ignore_errors=True)
 
     return ValidationOutcome(
         exit_code=exit_code,
@@ -337,5 +307,5 @@ def run_validation(
         stdout=stdout,
         stderr=stderr,
         severe_problems=severe,
-        registered=register,
+        generated_files=generated_files,
     )

@@ -2,8 +2,8 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.3.0 |
-| Date | 2026-06-10 |
+| Version | 0.4.0 |
+| Date | 2026-06-11 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Holds only CROSS-CUTTING truth (the S32DS headless validation flow + gate, and fixture role/usage) and the SOURCING RULE for per-module truth. Per-module valid values, constraints, and dependencies are NOT listed here — they come from each module's `.xdm` and live in that module's provider. |
 
@@ -133,18 +133,25 @@ Source: the `com.nxp.swtools.doc.uct` plugin jar
   SLF4J/NLS noise are project-build artifacts, not `.mex` validity.
 
 ### Flows
-- **(A) Project mode (current tool flow, full):** project must be a workspace
-  member, else `Cannot get container for IPath`. Register first
-  (`-application org.eclipse.cdt.managedbuilder.core.headlessbuild -import <project>`),
-  then `-HeadlessTool Peripherals -importProject <project> -sdkPath <sdk>
-  -ShowProblems SEVERE`. The CLI stages an out-of-workspace project in and cleans
-  up.
-- **(B) Standalone `.mex` mode (candidate to simplify; documented, not yet
-  verified here):** `-HeadlessTool Peripherals -Load <mex> -sdkPath <sdk>
-  -ExportSrc <tmp> -ShowProblems SEVERE` — exports generated code to a folder, so
-  it should not need workspace registration. The Tester must confirm it returns
-  clean on a known-good `.mex` and exit 2 / SEVERE on a known-bad one before it
-  replaces flow (A).
+- **(B) Standalone `.mex` mode — VERIFIED, the adopted tool flow:**
+  `-HeadlessTool Peripherals -Load <mex> -sdkPath <sdk> -ExportSrc <tmp>
+  -ShowProblems SEVERE` (with a throwaway `-data <tmp-ws>`; **no** `-ProjectLink`,
+  **no** `-UpdateCode`, **no** registration). `-ExportSrc` writes generated code
+  to a throwaway folder, so the project need not be a workspace member and the
+  run never hits `Cannot get container for IPath`. Confirmed on S32DS 3.6.7
+  against `Uart_Example_S32K344`: known-good → exit `0`, 120 generated files, no
+  `[TOOL] … has the following error`; a known-bad probe (`OsIfUseSystemTimer=true`
+  with an empty `OsIfCounterConfig`) → exit `0` **but** the gate-tripping
+  `SEVERE: [TOOL] The resource "BaseNXP" … has the following error: The number of
+  OsIf Counters must be exactly one …`. This empirically confirms exit `0` alone
+  is insufficient. The CLI validates a throwaway copy so the caller's project is
+  never modified.
+- **(A) Project mode (SUPERSEDED):** registered the project via the CDT headless
+  `-import` application, then `-Load <mex> -ProjectLink <project> -UpdateCode`.
+  The `-import` step routinely exceeded the timeout (exit `124`); the project was
+  then not a workspace member, so `-UpdateCode` failed with repeated
+  `Cannot get container for IPath` and a spurious exit `2` on a pristine fixture.
+  Replaced by (B). Kept here only as the rejected approach.
 - Evidence flags: `-ExportHTML` (report), `-ExportMEX` (tool-normalized `.mex` to
   diff against the input).
 
@@ -155,3 +162,4 @@ Source: the `com.nxp.swtools.doc.uct` plugin jar
 | 2026-06-03 | 0.1.0 | Initial anchor (attempted to register per-module enum facts). |
 | 2026-06-03 | 0.2.0 | Reframed: per-module values/constraints/dependencies are sourced from each `<Module>.xdm` and owned by the provider (not catalogued here); this doc keeps only the cross-cutting S32DS validation flow/gate, fixture facts, and the sourcing rule. |
 | 2026-06-10 | 0.3.0 | Fourth-round review resolution: recorded the exact pin-mux workbook path as the pins.json source (development input only); reframed §2 as fixture role/usage (fixtures grow with module support; Uart_Example_S32K344 kept as the worked example); asset paths updated to `autombd-rtd/assets/`. |
+| 2026-06-11 | 0.4.0 | Verified S32DS **Flow B** (standalone `-Load`/`-ExportSrc`, no registration) on S32DS 3.6.7 and adopted it as the validation flow; marked the registration-based **Flow A** superseded. Flow A's CDT `-import` step timed out (exit 124), so every run failed with `Cannot get container for IPath` and a spurious exit 2 even on a pristine fixture. Recorded the known-good/known-bad evidence and the empirical confirmation that exit 0 alone is insufficient (an invalid OsIf edit returns exit 0 while logging a SEVERE `[TOOL] … has the following error`). |

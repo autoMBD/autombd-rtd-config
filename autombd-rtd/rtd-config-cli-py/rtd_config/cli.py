@@ -60,7 +60,7 @@ from .intent import Intent
 from .modules.uart import UartProvider
 from .checks.static import run_static_checks
 from .backends.s32_mex.apply import apply_uart_set
-from .backends.s32_mex.validation import run_validation, DEFAULT_WORKSPACE
+from .backends.s32_mex.validation import run_validation
 
 
 # Skill root, used to resolve committed runtime assets independently of cwd.
@@ -226,7 +226,8 @@ def cmd_validate(args: argparse.Namespace) -> int:
             "runtime_verification": {"static_check": static_result.to_dict()},
         })
 
-    workspace = Path(args.workspace) if args.workspace else DEFAULT_WORKSPACE
+    # Flow B uses a throwaway -data workspace; only honour an explicit override.
+    workspace = Path(args.workspace) if args.workspace else None
     sdk_path = Path(args.sdk_path) if args.sdk_path else None
     outcome = run_validation(
         config.project,
@@ -245,7 +246,7 @@ def cmd_validate(args: argparse.Namespace) -> int:
         "validation": {
             "exit_code": outcome.exit_code,
             "passed": outcome.passed,
-            "registered": outcome.registered,
+            "generated_files": outcome.generated_files,
             "severe_problems": outcome.severe_problems,
             "command": outcome.command,
             "log_path": outcome.log_path,
