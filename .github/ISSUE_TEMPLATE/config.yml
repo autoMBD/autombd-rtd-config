@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: autoMBD technical sharing
+    url: https://github.com/autoMBD
+    about: Use repository issues for actionable RTD CfgFile CLI work only.

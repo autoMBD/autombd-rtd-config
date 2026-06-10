@@ -1,0 +1,99 @@
+name: RTD CfgFile CLI task
+description: Track a scoped RTD CfgFile CLI feature, module, or workflow task.
+title: "[RTD CfgFile CLI] "
+labels:
+  - rtd-cfgfile-cli
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form for actionable RTD CfgFile CLI development work. Keep domain facts grounded in `docs/specs/rtd-config-domain-truth.md`.
+  - type: input
+    id: objective
+    attributes:
+      label: Engineering objective
+      description: State the user-visible capability or repository outcome.
+      placeholder: Enable Port configuration planning for S32K3 `.mex` projects.
+    validations:
+      required: true
+  - type: dropdown
+    id: target-platform
+    attributes:
+      label: Target platform
+      options:
+        - NXP S32K3
+        - NXP S32K1
+        - Cross-platform
+        - Documentation/tooling only
+    validations:
+      required: true
+  - type: checkboxes
+    id: modules
+    attributes:
+      label: Affected modules
+      description: Select every module in scope.
+      options:
+        - label: Mcu
+        - label: BaseNXP
+        - label: Platform
+        - label: Port
+        - label: Dio
+        - label: Mcl
+        - label: Uart
+        - label: Validation/backend tooling
+        - label: Documentation or GitHub management
+  - type: textarea
+    id: source-truth
+    attributes:
+      label: Source of truth
+      description: List the exact spec, domain-truth entry, fixture, `.xdm`, vendor export, or investigation result that constrains this work.
+      placeholder: |
+        - `docs/specs/rtd-config-domain-truth.md`: ...
+        - Fixture/project: ...
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Define the observable conditions required to close this issue.
+      placeholder: |
+        - Deterministic tests cover ...
+        - Runtime verification reports ...
+        - S32DS validation exits 0 with no SEVERE `[TOOL]` resource problem.
+    validations:
+      required: true
+  - type: textarea
+    id: e2e-test-case
+    attributes:
+      label: E2E test case
+      description: Provide at least one end-to-end acceptance case that proves the feature from user prompt through generated configuration and verification evidence.
+      placeholder: |
+        - Given:
+        - When:
+        - Then:
+        - Fixture/project:
+        - Expected verification evidence:
+    validations:
+      required: true
+  - type: textarea
+    id: boundaries
+    attributes:
+      label: Boundaries and risks
+      description: Note ownership boundaries, `.mex` byte-faithful edit constraints, runtime dependency restrictions, or safety/security risks.
+      placeholder: Runtime behavior must use committed assets, not local RTD directory scans.
+    validations:
+      required: true
+  - type: checkboxes
+    id: readiness
+    attributes:
+      label: Readiness checklist
+      options:
+        - label: The scope is testable with repository fixtures or a documented validation fixture.
+          required: true
+        - label: At least one E2E acceptance case is specified above.
+          required: true
+        - label: Domain enum, pin, and ID values are not invented.
+          required: true
+        - label: Development tests and runtime verification expectations are separated.
+          required: true
