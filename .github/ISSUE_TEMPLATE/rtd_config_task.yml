@@ -64,6 +64,19 @@ body:
     validations:
       required: true
   - type: textarea
+    id: e2e-test-case
+    attributes:
+      label: E2E test case
+      description: Provide at least one end-to-end acceptance case that proves the feature from user prompt through generated configuration and verification evidence.
+      placeholder: |
+        - Given:
+        - When:
+        - Then:
+        - Fixture/project:
+        - Expected verification evidence:
+    validations:
+      required: true
+  - type: textarea
     id: boundaries
     attributes:
       label: Boundaries and risks
@@ -77,6 +90,8 @@ body:
       label: Readiness checklist
       options:
         - label: The scope is testable with repository fixtures or a documented validation fixture.
+          required: true
+        - label: At least one E2E acceptance case is specified above.
           required: true
         - label: Domain enum, pin, and ID values are not invented.
           required: true

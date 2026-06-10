@@ -37,6 +37,20 @@ body:
     validations:
       required: true
   - type: textarea
+    id: e2e-regression-case
+    attributes:
+      label: E2E regression test case
+      description: Provide at least one end-to-end case that should fail before the fix and pass after the fix.
+      placeholder: |
+        - Given:
+        - When:
+        - Then:
+        - Fixture/project:
+        - Expected failing evidence before fix:
+        - Expected passing evidence after fix:
+    validations:
+      required: true
+  - type: textarea
     id: evidence
     attributes:
       label: Evidence
@@ -64,4 +78,6 @@ body:
         - label: I checked existing open issues for the same failure.
           required: true
         - label: I included enough fixture or project detail to reproduce the defect.
+          required: true
+        - label: I included at least one E2E regression case above.
           required: true
