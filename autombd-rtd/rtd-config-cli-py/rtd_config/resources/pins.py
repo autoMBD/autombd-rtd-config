@@ -37,33 +37,31 @@
 # 何权利主张、损害赔偿或其他责任承担责任。
 # =================================================================================
 # Project:     RTD CfgFile CLI <https://github.com/autoMBD/autombd-rtd-config>
-# File:        conftest.py
+# File:        pins.py
 # Author:      autoMBD <tkung.lqk@foxmail.com>
 # Date:        2026-06-03
 # Version:     0.1.0
-# Description: Pytest configuration and shared path setup.
+# Description: Pin-options query over committed runtime pin-mapping assets.
 # =================================================================================
 
 from __future__ import annotations
 
-import os
-import sys
 from pathlib import Path
+from .runtime import load_json
 
-# ---------------------------------------------------------------------------
-# Source-layout wiring. The importable `rtd_config` package lives at
-# autombd-rtd/rtd-config-cli-py/rtd_config/ (src-layout). Put that source
-# root on:
-#   * sys.path   -> in-process imports (`from rtd_config... import ...`);
-#   * PYTHONPATH -> subprocess CLI tests that spawn `python -m rtd_config` with
-#                   no explicit cwd/env and inherit this process environment.
-# Computed from __file__, so it is independent of the test invocation directory.
-# ---------------------------------------------------------------------------
-_SRC_ROOT = str(
-    Path(__file__).resolve().parents[1] / "autombd-rtd" / "rtd-config-cli-py"
-)
-if _SRC_ROOT not in sys.path:
-    sys.path.insert(0, _SRC_ROOT)
-_PYTHONPATH = os.environ.get("PYTHONPATH", "")
-if _SRC_ROOT not in _PYTHONPATH.split(os.pathsep):
-    os.environ["PYTHONPATH"] = os.pathsep.join(p for p in (_SRC_ROOT, _PYTHONPATH) if p)
+
+def pin_options(
+    data_root: Path,
+    device: str,
+    package: str,
+    peripheral: str,
+    family: str = "s32k3",
+) -> list[dict]:
+    # Committed asset layout: assets/<vendor>/<family>/<module>/. Pin mapping is
+    # owned by the Port module and is family-scoped (one file covers the family's
+    # devices/packages). `device`/`package` are accepted for CLI/API compatibility
+    # and become in-file filters once pins.json is rebuilt complete from the
+    # pin-mux source (the current file is a stub -- see domain-truth).
+    path = data_root / "nxp" / family / "port" / "pins.json"
+    data = load_json(path)
+    return [item for item in data["signals"] if item["peripheral"] == peripheral]

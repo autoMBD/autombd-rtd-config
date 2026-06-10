@@ -4,12 +4,17 @@ name = "rtd-cfgfile-cli"
 version = "0.1.0"
 requires-python = ">=3.11"
 
-[project.scripts]
-rtd-config = "rtd_config.cli:main"
+# Note: no console-script / packaging entry is declared. The CLI is run from the
+# bundled skill (`python autombd-rtd <command>` launcher, or `python -m
+# rtd_config` with the source root on PYTHONPATH) — stdlib-only, no install.
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["."]
+# The importable `rtd_config` package lives under the Python implementation
+# source root (src-layout): autombd-rtd/rtd-config-cli-py/rtd_config/.
+# Put that source root on sys.path so in-process test imports resolve. The
+# subprocess CLI tests are wired separately via PYTHONPATH in tests/conftest.py.
+pythonpath = ["autombd-rtd/rtd-config-cli-py"]
 # NOTE: capture=sys (not the default fd-level capture). Under fd-level capture,
 # the OS handle for stdin (fd 0) is replaced/closed, and the many subprocess-
 # based CLI tests inherit that broken handle, which can raise

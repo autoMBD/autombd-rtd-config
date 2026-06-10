@@ -51,7 +51,11 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-UART_FIXTURE = REPO_ROOT / "fixtures" / "mex" / "s32k3" / "s32k344" / "uart" / "projects" / "Uart_Example_S32K344"
+# Restructured fixture layout: tests/fixtures/<vendor>/<backend: ds|eb>/<family>/<project>.
+# ds = S32 Design Studio (ConfigTools .mex); eb = EB tresos (later).
+UART_FIXTURE = (
+    REPO_ROOT / "tests" / "fixtures" / "nxp" / "ds" / "s32k3" / "Uart_Example_S32K344"
+)
 
 
 def copy_uart_fixture(tmp_path: Path) -> Path:

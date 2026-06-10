@@ -1,0 +1,119 @@
+# RTD CfgFile CLI Test Strategy
+
+| Field | Value |
+| --- | --- |
+| Version | 0.7.0 |
+| Date | 2026-06-10 |
+| Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
+| Description | The convergence contract for the RTD CfgFile CLI agent development workflow. Tests — deterministic, static, vendor validation, and isolated E2E acceptance — are the SOLE criterion for "done". Defines the test layers, the vendor gate, the acceptance rule, and the subagent roles; the concrete E2E cases live in `rtd-config-test-cases.md`. |
+
+## 1. Principle: tests are the only convergence signal
+
+This project is built by an autonomous agent workflow. The workflow stops only
+when the gate is green on **real evidence**. Therefore tests must be complete
+(every mandatory requirement has a test), rigorous (they exercise real behavior
+and real assets — never a stub or a fabricated value), and authoritative (a
+passing gate is sufficient to accept; a failing gate blocks).
+
+Per-module facts a test asserts against (valid values, constraints, dependencies)
+come from that module's `<Module>.xdm` and live in its provider; cross-cutting
+facts (fixture usage, the vendor command/gate) live in
+`rtd-config-domain-truth.md`. This document references both rather than
+restating them. General engineering practice (TDD, stdlib, commit-per-task,
+"diagnostics not tracebacks") is assumed of every agent and is not respecified
+here.
+
+## 2. Test layers
+
+1. **Deterministic development tests** — `python -m pytest -q`. Fast, hermetic,
+   run on every change. Cover the CLI/JSON contract, providers, document core,
+   static checks, and `.mex` write fidelity (unit + integration).
+2. **Static runtime checks** — the tool's own vendor-free checks, run after
+   every config-file edit (well-formedness, ownership, reference coherence,
+   conflicting carriers, invalid requests rejected with actionable blockers).
+3. **Vendor validation** — mandatory. For `.mex`: S32DS ConfigTools headless per
+   domain-truth §3. **Pass gate = exit code `0` AND no SEVERE `[TOOL]` resource
+   problem.** Exit 0 alone is not a pass.
+4. **Isolated E2E acceptance cases** — the cases in `rtd-config-test-cases.md`,
+   executed by a **fully isolated** subagent that sees nothing of this
+   repository: only the released `autombd-rtd` skill (with its bundled CLI and
+   assets), the case's prompt, and the staged fixture, inside a dedicated
+   temporary directory. Pass requires the case's criteria, the vendor gate, and
+   successful code generation.
+
+## 3. Acceptance rule
+
+A module or feature is **accepted** only when ALL hold:
+- its mandatory deterministic tests pass;
+- its static checks pass (or correctly block an invalid request with an
+  actionable diagnostic);
+- its vendor validation passes the §2.3 gate;
+- **its E2E case(s) pass under the §2.4 isolation protocol.**
+
+All supported modules are **equal priority** and reach the same validated bar.
+The minimal system (the first seven modules) is accepted only when every one of
+them reaches this bar; delivery staging is recorded in the roadmap, not here.
+
+## 4. Subagent roles in the convergence loop
+
+`main agent → Explorer → Worker → Tester → main agent` is one iteration (roles
+defined in `.claude/agents/`):
+
+1. **Explorer** sources the per-module truth a case needs from the module's
+   `<Module>.xdm` (valid values, constraints, dependencies) into its committed
+   provider asset, and confirms fixture state and the exact vendor command.
+2. **Worker** implements the capability TDD-first against that grounded truth,
+   never inventing values.
+3. **Tester** runs the gate: the deterministic suite, vendor validation, and the
+   E2E acceptance cases — reporting per-module PASS/FAIL with exit code +
+   SEVERE count. **E2E execution is context-isolated** (§2.4); the isolation
+   mechanism is whatever the agent platform provides (a fresh, non-inherited
+   context) — context isolation is the requirement, not any specific parameter.
+
+The main agent routes on the Tester's result: **fail → next iteration (back to
+Explorer); pass → the Reviewer** for non-test acceptance — domain values vs the
+`<Module>.xdm`, uniform header / missed skill triggers, ownership/boundaries,
+test adequacy, diff hygiene — after which the Reviewer appends a lessons-learned
+entry (`rtd-config-lessons-learned.md`). The Reviewer reads the repository (it
+reviews the diff); it runs only after the gate is green and does not re-run the
+gate.
+
+KPIs: a focused case converges within 3 min; an end-to-end case within 5 min; any
+run exceeding 10 min triggers orchestrator intervention and issue capture. E2E
+subagent prompts live in the case table (`rtd-config-test-cases.md`); the
+executed Uart-reference black-box round is recorded in
+`rtd-config-subagent-validation.md`.
+
+## 5. Test cases (separate document)
+
+The concrete E2E acceptance cases this strategy gates are maintained in
+[`rtd-config-test-cases.md`](rtd-config-test-cases.md) — format
+`ID | Module | Scenario | Subagent Prompt | Test fixture | Pass criteria`,
+scheme `RTD-MEX-<MODULE>-<NNN>` — so cases can grow and iterate without
+churning the strategy. New modules add their cases there; staging lives in the
+roadmap.
+
+## 6. Test hygiene (enforced by the Reviewer)
+
+- Every mandatory "must" in the specs maps to at least one deterministic test.
+- No test asserts against a stub or fabricated value; if the underlying asset is
+  unverified (e.g. current `pins.json`), the capability is gated until the asset
+  is rebuilt from source (domain-truth §1).
+- A test failure blocks; a green gate accepts. Do not relax a test to pass — fix
+  the production gap.
+- Vendor results are recorded with the exact exit code and SEVERE `[TOOL]`
+  count, never summarized as "passed" without that evidence.
+
+## Changelog
+
+| Date | Version | Description |
+| --- | --- | --- |
+| 2026-06-10 | 0.7.0 | Fourth-round review resolution: added the isolated-E2E layer (§2.4) and made it part of the acceptance rule; the Tester owns context-isolated E2E execution (isolation generic, no platform-specific parameter); the Reviewer is repo-reading and not isolation-bound; case pointer renamed to `rtd-config-test-cases.md` (`RTD-MEX-*`); removed milestone-specific acceptance wording (staging lives in the roadmap); restored the itemized changelog. |
+| 2026-06-06 | 0.6.0 | Split the concrete M1 case matrix, scope guards, and out-of-scope list into the test-cases document; this document now defines only the test method/strategy (layers, gate, acceptance rule, roles, hygiene). |
+| 2026-06-03 | 0.5.0 | Restructured to seven-module parity with a mandatory S32DS gate (exit 0 + no SEVERE [TOOL]); made tests the sole convergence criterion; assigned Explorer/Worker/Tester/Reviewer roles; moved domain facts to domain-truth and advanced/reserved to the roadmap; withdrew the polling cases. |
+| 2026-06-02 | 0.4.1 | Aligned fixture structure with backend/family/device/module/projects/project layout and recorded the Uart fixture path. |
+| 2026-06-02 | 0.4.0 | Split Milestone 1 tests into mandatory minimum, advanced, and reserved future sets; added subagent user prompts and KPI clarification. |
+| 2026-06-02 | 0.3.0 | Added first-milestone test case catalog from retired module use-case skills and documented the failure iteration loop. |
+| 2026-05-30 | 0.2.1 | Formatted document metadata and changelog as tables. |
+| 2026-05-30 | 0.2.0 | Clarified independent subagent validation scope. |
+| 2026-05-30 | 0.1.0 | Created RTD CfgFile CLI test strategy. |

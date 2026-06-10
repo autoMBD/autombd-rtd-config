@@ -37,33 +37,35 @@
 # 何权利主张、损害赔偿或其他责任承担责任。
 # =================================================================================
 # Project:     RTD CfgFile CLI <https://github.com/autoMBD/autombd-rtd-config>
-# File:        conftest.py
+# File:        config.py
 # Author:      autoMBD <tkung.lqk@foxmail.com>
 # Date:        2026-06-03
 # Version:     0.1.0
-# Description: Pytest configuration and shared path setup.
+# Description: Runtime configuration model for the RTD CfgFile CLI.
 # =================================================================================
 
 from __future__ import annotations
 
-import os
-import sys
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
-# ---------------------------------------------------------------------------
-# Source-layout wiring. The importable `rtd_config` package lives at
-# autombd-rtd/rtd-config-cli-py/rtd_config/ (src-layout). Put that source
-# root on:
-#   * sys.path   -> in-process imports (`from rtd_config... import ...`);
-#   * PYTHONPATH -> subprocess CLI tests that spawn `python -m rtd_config` with
-#                   no explicit cwd/env and inherit this process environment.
-# Computed from __file__, so it is independent of the test invocation directory.
-# ---------------------------------------------------------------------------
-_SRC_ROOT = str(
-    Path(__file__).resolve().parents[1] / "autombd-rtd" / "rtd-config-cli-py"
-)
-if _SRC_ROOT not in sys.path:
-    sys.path.insert(0, _SRC_ROOT)
-_PYTHONPATH = os.environ.get("PYTHONPATH", "")
-if _SRC_ROOT not in _PYTHONPATH.split(os.pathsep):
-    os.environ["PYTHONPATH"] = os.pathsep.join(p for p in (_SRC_ROOT, _PYTHONPATH) if p)
+
+@dataclass(frozen=True)
+class RuntimeConfig:
+    project: Path
+    backend: str = "mex"
+    family: str = "s32k3"
+    device: str = "s32k344"
+    package: str = "default"
+    rtd_version: str = "7_0_1"
+    data_root: Path = Path("assets")
+    validation_timeout_s: int = 180
+
+    @classmethod
+    def from_dict(cls, raw: dict[str, Any]) -> "RuntimeConfig":
+        values = dict(raw)
+        values["project"] = Path(values["project"])
+        if "data_root" in values:
+            values["data_root"] = Path(values["data_root"])
+        return cls(**values)

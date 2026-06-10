@@ -39,8 +39,10 @@ The main agent owns:
   expected evidence, time budgets, and success/failure criteria;
 - dispatching independent implementation, investigation, review, and validation
   subagents instead of personally doing all task-level execution;
-- ensuring independent subagent validation uses `"fork_context": false` when
-  required so the validation agent remains context-isolated;
+- ensuring independent subagent validation (E2E execution) remains
+  **context-isolated** — the validation agent inherits no prior conversation
+  state and sees only the released skill, the case prompt, and the staged
+  fixture; the isolation mechanism is whatever the agent platform provides;
 - monitoring subagent progress, collecting evidence, comparing outputs against
   active specs, and rejecting incomplete or off-scope results;
 - correcting direction when a subagent violates ownership boundaries, runtime
@@ -63,6 +65,43 @@ needed for that task. Subagents must not be asked to infer hidden main-agent
 state, and their results must be reviewed against the active repository
 documents before being accepted.
 
+## Subagent Roles and Collaboration
+
+The orchestrator dispatches four specialized subagents defined in
+`.claude/agents/`. Every handoff is self-contained and grounds domain facts in
+`docs/specs/rtd-config-domain-truth.md` (never invent enum/pin/ID
+values).
+
+- **Explorer** (read-only): establishes non-inferable ground truth — RTD enum
+  domains, pin-mux data, fixture state, exact S32DS commands — and records it in
+  domain-truth. Never edits files.
+- **Worker**: implements one scoped capability TDD-first, within module-ownership
+  and narrow / byte-faithful `.mex` edit rules.
+- **Tester**: owns the convergence gate — runs the deterministic suite, S32DS
+  validation (pass gate: exit 0 AND no SEVERE `[TOOL]`), and the E2E acceptance
+  cases (`docs/tests/rtd-config-test-cases.md`). **E2E execution is
+  context-isolated**: the executing agent sees only the released skill, the
+  case prompt, and the staged fixture — never this repository. Edits tests
+  only; reports production gaps instead of weakening a test.
+- **Reviewer** (read-only): runs **only after the Tester's gate is green**, and
+  reviews every development requirement the gate cannot catch — domain values
+  vs each `<Module>.xdm`, uniform file header and other missed skill triggers,
+  code standards, ownership/boundaries, test adequacy (coverage, not
+  execution), and diff hygiene. It reads the repository (it reviews the diff)
+  and appends a **lessons-learned** entry to
+  `docs/common/rtd-config-lessons-learned.md`.
+
+**Iteration loop:** `main agent → Explorer → Worker → Tester → main agent` is one
+iteration. The main agent reads the Tester's result and routes:
+
+- **tests fail →** start the next iteration (back to the Explorer);
+- **tests pass →** dispatch the **Reviewer** for non-test acceptance review.
+
+Tests are the convergence signal, owned by the Tester; the Reviewer is the
+non-test acceptance gate and the keeper of lessons learned. The orchestrator
+integrates evidence, protects scope, and intervenes when a role exceeds its time
+budget or exposes a systemic issue.
+
 ## Testing Terminology
 
 - Development testing is the agent delivery gate: test cases used during
@@ -73,9 +112,13 @@ documents before being accepted.
 - A feature is not accepted merely because runtime verification exists; the
   development test cases must pass, including cases that exercise runtime
   verification behavior.
-- Milestone 1 uses only mandatory minimum tests by default. Advanced tests are
-  executed only when the user explicitly asks for them. Reserved future tests
-  are planning inputs for later milestones.
+- Tests are the sole convergence signal for the agent development workflow.
+  A module is accepted only when its deterministic tests, static checks, the
+  S32DS gate (exit code 0 AND no SEVERE `[TOOL]` resource problem), and its
+  E2E acceptance cases (`docs/tests/rtd-config-test-cases.md`, fully isolated
+  protocol) all pass. The minimal system's seven modules (Mcu, BaseNXP,
+  Platform, Port, Dio, Mcl, Uart) are equal priority and land together;
+  delivery staging lives only in `docs/roadmaps/rtd-config-roadmap.md`.
 - Focused independent subagent validation should converge within 3 minutes.
   E2E subagent validation should converge within 5 minutes. A subagent run may
   continue up to 10 minutes to expose useful problem evidence; after 10
@@ -97,6 +140,14 @@ documents before being accepted.
 ## Documentation Boundary
 
 - The official tool name in active documentation is RTD CfgFile CLI.
-- Files under `docs/superpowers/specs/achieved/` are review archives only.
+- **Specs stay at the architecture altitude.** Documents under `docs/specs/`
+  (including their diagrams and goal tables) must not reference a specific
+  milestone, stage, schedule, or time-plan wording such as "first/later/M1".
+  Delivery staging lives only in `docs/roadmaps/rtd-config-roadmap.md`; the
+  execution framework lives in the implementation plan. This rule exists
+  because milestone wording repeatedly leaked into specs across review rounds.
+- Changelogs are append-only history: never merge, collapse, or summarize
+  existing changelog rows.
+- Files under `docs/OBSOLETE_NEVER_TOUCH!!!/` are review archives only.
   They are unavailable as requirements sources and must not be read to infer
   current behavior, scope, terminology, or acceptance criteria.

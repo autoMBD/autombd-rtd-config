@@ -1,0 +1,134 @@
+# RTD Config Core Spec Comments Tracking
+
+| Field | Value |
+| --- | --- |
+| Version | 0.5.0 |
+| Date | 2026-06-10 |
+| Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
+| Description | Tracks how review comments were resolved across design document revisions. |
+
+This file tracks how the user's inline `REVIEW` comments were resolved. The
+reviewed draft with comments preserved in context is archived at:
+
+`docs/OBSOLETE_NEVER_TOUCH!!!/rtd-config-core-design.reviewed.md`
+
+Second-round reviewed drafts are archived under:
+
+`docs/OBSOLETE_NEVER_TOUCH!!!/second-review/`
+
+Third-round reviewed drafts are archived under:
+
+`docs/OBSOLETE_NEVER_TOUCH!!!/third-review/`
+
+Fourth-round reviewed drafts (8 documents, comments C66–C84) are archived under:
+
+`docs/OBSOLETE_NEVER_TOUCH!!!/fourth-review/`
+
+## Tracking Table
+
+| ID | Original area | Comment intent | Resolution | Target document |
+| --- | --- | --- | --- | --- |
+| C01 | Purpose | Clarify that human-agent collaboration is the development mode, not the tool's purpose. | Rewrote purpose to state that the tool is for AI agents to directly and autonomously configure RTD quickly, efficiently, accurately, and reliably. | Core design spec, Purpose |
+| C02 | Purpose | Do not put milestone limits in the spec purpose. | Removed staged wording from the spec and moved milestone limits to the roadmap. | Core design spec; roadmap |
+| C03 | Purpose | State the complete long-term target: all RTD modules, RTD RTOS, stacks, external peripheral drivers, `.mex`, EB tresos, more chips, and RTD versions. | Expanded the purpose and backend sections to describe full RTD surface, S32 ConfigTools, EB tresos, S32K3/K1/K5, RTD releases, and future modules. | Core design spec, Purpose and Supported Configuration Backends |
+| C04 | Purpose | Avoid first-phase language in the spec. | Removed first-phase framing from the spec; milestone-specific scope now lives in the roadmap. | Core design spec; roadmap |
+| C05 | Development mode | Agent closed-loop development/testing workflow is important but should not be project spec content. | Removed AI workflow-platform wording from the spec and moved validation discipline into the test strategy. Future development-process details can live in a separate process document. | Core design spec; test strategy |
+| C06 | Scope | Put staged plan and limits in implementation plan/roadmap. | Replaced the spec scope section with project goals and moved staged limits into `Milestone 1`. | Roadmap |
+| C07 | MEX document core | `.mex` files may be large; runtime parsing/indexing must consider efficiency and may need validation before final strategy. | Added targeted indexing, measured strategy evolution, and fallback to targeted indexes/prepared summaries if broad indexing is too slow. | Core design spec, Backend Document Core and Performance Requirements |
+| C08 | Module providers | Providers must model dependencies such as FlexIO Uart -> Mcl and interrupt mode -> Platform. | Added explicit cross-module dependency planning and capability-table dependency fields. | Core design spec, Architecture and Module Capability Model |
+| C09 | Module providers | Providers must model chip/module constraints from RTD descriptors such as `.xdm`. | Added constraint/resource cache requirements and stated constraints must come from prepared runtime cache data. | Core design spec, Module Capability Model and Resource And Constraint Data |
+| C10 | Runtime boundary | Development source materials must not appear in code or runtime dependencies. | Added a runtime boundary: runtime loads only committed JSON/cache assets and configured validation tools, not Excel, RTD scans, or development notes. | Core design spec; source materials reference |
+| C11 | Spec tone | Spec should describe what to build, not PoC problems. | Removed PoC-problem wording from active spec. The original comment remains in the archived reviewed draft. | Core design spec; achieved reviewed draft |
+| C12 | Module responsibilities | Module responsibilities should be a maintainable table, extensible for new modules. | Replaced prose-only module responsibilities with a module capability model table and required metadata fields. | Core design spec, Module Capability Model |
+| C13 | Data assets | Do not mention phase-specific validation in spec. | Removed phase-specific wording from data assets and moved S32K344-first validation to roadmap. | Core design spec; roadmap |
+| C14 | Port roadmap | State in roadmap that Port must implement complete generic pin configuration early. | Added Milestone 1 scope item for complete generic pin mapping/configuration for the validated device/package. | Roadmap, Milestone 1 |
+| C15 | References | Do not hard-code reference source files in spec; add a reference document. | Removed the hard-coded local Excel path and RTD path from active spec; added a source materials reference document. | Source materials reference |
+| C16 | MEX/XDM editing | MEX writing must consider efficiency; later `.xdm` editing can be summarized. | Added backend document-core efficiency requirements for `.mex` and a summarized EB tresos `.xdm` writer direction. | Core design spec, Backend Document Core |
+| C17 | Fixtures | Do not specify a specific fixture project in spec; describe generic fixture structure. | Replaced concrete fixture names with generic backend/family/device/module/projects/project fixture layout. | Core design spec, Fixtures |
+| C18 | Validation scope | The validation method applies to all modules and future work, not only a milestone. | Moved reusable test layers and validation method into the test strategy. | Test strategy |
+| C19 | Test cases | Add a separate test document with detailed test cases; spec should require that document. | Added test strategy document with test layers, fixture structure, and test case template; spec now points to maintainable test docs. | Test strategy; core design spec |
+| C20 | Subagent validation | Move independent subagent validation details to the test document. | Moved subagent validation rules to test strategy. | Test strategy |
+| C21 | KPI | KPI applies to all module configuration and needs a separate summary. | Added KPI section in test strategy and summarized acceptance/KPI in the spec. | Test strategy; core design spec |
+| C22 | Success criteria | Do not say Phase 1 in spec success criteria. | Rewrote success criteria as project-level criteria. | Core design spec, Success Criteria |
+| C23 | Acceptance | Acceptance should be based on two things: KPI and test case pass results. | Rewrote acceptance section around required test cases passing and KPI being met. | Core design spec, Tests And Acceptance |
+| C24 | Test document evolution | Test documents need staged, maintainable, updateable coverage. | Test strategy defines reusable template and allows backend/milestone-specific test documents. | Test strategy |
+| C25 | Summary | Spec should be complete and maintainable; staged limited development belongs in plan/roadmap. | Reorganized spec as long-term design and roadmap as staged delivery. | Core design spec; roadmap |
+| C26 | Supporting docs | Add reference and test files for maintainability. | Added source materials reference, test strategy, roadmap, and comments tracking. | References; tests; roadmap; this tracking file |
+| C27 | Development mode vs spec | Separate development mode from project spec. | Removed development-mode content from spec; retained validation discipline in test strategy. A future process document can cover the broader development mode. | Core design spec; test strategy |
+| C28 | Runtime assets | Distinguish development-time resource references from runtime dependencies. | Added runtime boundary to source materials reference and resource/cache rules to spec. | Source materials reference; core design spec |
+| C29 | Reviewed draft traceability | Comments need their original content context. | Archived a reviewed draft with inline comments preserved in context under `specs/OBSOLETE_NEVER_TOUCH!!!/`. | Achieved reviewed draft |
+| C30 | Comments resolution visibility | Need a tracking record showing how comments were resolved. | Added this comments tracking file with per-comment resolution and target document. | This tracking file |
+| C31 | Remove low-value isolated archive | Standalone comments without context are not enough. | Removed the standalone comments archive and replaced it with contextual reviewed draft plus tracking. | Achieved reviewed draft; this tracking file |
+| C32 | Spec header | Add version, date, author, AI-assisted note, overview description, and table of contents. | Added metadata, overview, and contents section to the active spec. | Core design spec |
+| C33 | Purpose and architecture | Agent Skills are required because the tool targets AI agents. | Added Agent Skills to goals, architecture, project structure, and success criteria. | Core design spec |
+| C34 | Goals | Configuration completion and from-scratch configuration file creation are also long-term goals. | Added these as long-term goals while leaving staged delivery in the roadmap. | Core design spec; roadmap |
+| C35 | Architecture | Companion Agent Skills must be explicit in the architecture. | Added an Agent Skills layer that adapts public CLI workflows without bypassing the CLI contract. | Core design spec, Architecture |
+| C36 | Module capability table | Move the module table to a separate file for maintainability and point the spec to it. | Added `docs/specs/rtd-config-module-capabilities.md` and replaced the inline table with a pointer and table requirements. | Module capabilities; core design spec |
+| C37 | Subagent independence | Spec should briefly state subagent validation is black-box and receives no main-agent context or development text. | Added concise black-box subagent validation wording to the spec and detailed rules in test strategy. | Core design spec; test strategy |
+| C38 | Test layers | Independent subagent validates fixture integration and vendor headless validation; main agent may run fast deterministic tests. | Updated test strategy to assign fast deterministic tests to development and subagent validation to integration/vendor layers. | Test strategy |
+| C39 | Reference locations | Reference document should state where source materials are located. | Added concrete known development reference locations for IOMUX workbook, RTD `.xdm` pattern, Uart `.xdm` example, and fixture projects. | Source materials reference |
+| C40 | Second-review traceability | Preserve second-round comments with their document context. | Backed up the second-round reviewed docs under `specs/OBSOLETE_NEVER_TOUCH!!!/second-review/`. | Achieved second-review backups |
+| C41 | File naming | Do not put dates in filenames because changelogs already carry date information. | Renamed dated documentation files to semantic names and updated internal links. | Documentation filenames; this tracking file |
+| C42 | Third-review traceability | Preserve the third-round inline comments with original document context before removing comments from active docs. | Backed up the reviewed core design, test strategy, and roadmap docs under `specs/OBSOLETE_NEVER_TOUCH!!!/third-review/`. | Achieved third-review backups |
+| C43 | Tool naming | Standardize the tool name as RTD CfgFile CLI and define that it edits RTD config files according to vendor rules so code generation is correct. | Renamed the core design title/overview/terminology to RTD CfgFile CLI and clarified the vendor-rule/code-generation contract. | Core design spec, Overview and Terminology |
+| C44 | Static check vs runtime verification | Align static check with runtime verification and decide whether they should merge. | Defined runtime verification as the umbrella process. Static check remains the fast tool-owned stage, while backend validation remains the vendor-backed stage; both share the result model but stay separate execution steps. | Core design spec, Terminology and Runtime Verification Pipeline; AGENTS.md |
+| C45 | Goal wording | Avoid saying the tool replaces hand-editing XML; RTD is normally configured through S32 ConfigTools or EB tresos. | Rewrote the purpose and goals to state that agents use RTD CfgFile CLI instead of directly operating vendor GUI configuration workflows. | Core design spec, Purpose and Goals |
+| C46 | Agent reasoning goal | Add a goal for AI agents to decompose complex requirements such as communication configuration sheets and Port pin layouts before using the CLI. | Added goal G03 and expanded the Agent Skills description to cover analysis, decomposition, dependency reasoning, and validation feedback handling. | Core design spec, Goals and Architecture |
+| C47 | Development/runtime boundary | Do not treat separation of development source material and runtime assets as a project goal; make it a development rule. | Removed that item from the goals table and added a Development Release Boundary section to `AGENTS.md`. | Core design spec, Goals; AGENTS.md |
+| C48 | Spec maintainability wording | Do not list spec/table maintainability as a project goal. | Removed maintainability as a goal and kept maintainable docs as document structure rather than product objective. | Core design spec, Goals |
+| C49 | Purpose and goals format | Simplify Purpose and express Goals as a table. | Compressed the Purpose section and replaced the goals bullet list with a goal table containing IDs and success signals. | Core design spec, Purpose and Goals |
+| C50 | Architecture diagram | Add an architecture diagram if Markdown can render it, otherwise provide a Draw.io file and reference it. | Added an inline Mermaid architecture diagram and an editable Draw.io source file under `docs/common/figures/`. | Core design spec, Architecture; architecture Draw.io file |
+| C51 | Module capability text | Remove process-oriented capability-table maintenance wording from the spec. | Removed the paragraph that told maintainers to update the table on every feature addition, while keeping the structural requirements for the table. | Core design spec, Module Capability Model |
+| C52 | CLI command explanation | Explain `pin-options` and convert core commands into a table. | Replaced core command code block with a table explaining purpose, write behavior, and vendor-tool launch behavior; documented `pin-options` as a runtime pin-mapping query. | Core design spec, Intent And Commands |
+| C53 | Shortcut command explanation | Convert shortcut commands into a table. | Replaced shortcut command examples with a module-group table explaining each shortcut's role and intent-normalization behavior. | Core design spec, Intent And Commands |
+| C54 | Test case catalog | Use retired RTD module skills to define first-milestone test cases for the seven modules, with IDs in a table. | Added a Milestone 1 S32K3 MEX test case catalog with IDs covering Mcu, BaseNXP, Platform, Port, Dio, Mcl, Uart, cross-module Uart flows, and deferred-feature diagnostics. | Test strategy |
+| C55 | Test failure loop | State that failed tests must return to code development and iterate until the development-test loop closes. | Added a Failure Iteration Loop section requiring root-cause analysis, code/runtime-data/fixture/test fixes, and reruns before acceptance. | Test strategy |
+| C56 | Roadmap overview | Add an overview roadmap table before milestone detail sections. | Added a Roadmap Overview table with focus, primary deliverable, and carried-forward exclusions for each milestone. | Roadmap |
+| C57 | Milestone 1 scope | Move tests outside Milestone 1 scope to later reserved cases; exact execution is decided during later milestone planning. | Split the test strategy into mandatory minimum, advanced, and reserved future case tables. Missing-module completion, `.mex` creation, DMA, low-power/RAM/reset, Platform MPU/MCM/INTM, partitioning, and non-Uart Mcl resources moved to reserved future cases. | Test strategy; roadmap |
+| C58 | Minimal testing | Mark only the minimal Milestone 1 tests as required; keep other current-surface tests as advanced and execute them only by explicit user instruction. | Added mandatory minimum and advanced test classes, made mandatory minimum the default Milestone 1 acceptance gate, and added roadmap language for default test scope. | Test strategy; roadmap |
+| C59 | Tool name consistency | Standardize all active documentation on the official tool name RTD CfgFile CLI. | Renamed active document titles/descriptions and replaced generic tool references in active docs. | Core design; module capabilities; source materials; test strategy; roadmap; AGENTS.md |
+| C60 | Definitions | Add explicit definitions to avoid conflicts between development testing, runtime verification, static check, backend validation, mandatory/advanced/reserved tests, and subagent prompts. | Added terminology in the core design and test strategy, and summarized operational rules in `AGENTS.md`. | Core design; test strategy; AGENTS.md |
+| C61 | Subagent prompts and KPI | Add subagent prompt content to every test case, keep prompts limited to simulated user configuration demands, use 3-minute focused KPI, 5-minute E2E KPI, and 10-minute maximum run before main-agent intervention. | Added `Subagent user prompt` to mandatory, advanced, and reserved case tables and clarified subagent validation/KPI rules. | Test strategy; core design; AGENTS.md |
+| C62 | Capability/test alignment | Align capability table and case catalog so module capability entries point to mandatory, advanced, and reserved test IDs. | Reworked the module capability table with M1 mandatory cases, M1 advanced cases, and reserved future cases per module. | Module capabilities; test strategy |
+| C63 | Vendor tool environment | Clarify that vendor validation tools may rely on their configured installation environment, and the current computer is configured for that flow. | Added vendor tool environment terminology and source-material boundary clarification. | Core design; source materials; AGENTS.md |
+| C64 | Review archives | Mark review backup files as unavailable and forbid using them as requirements sources. | Added archive warnings to all reviewed draft backups and added a documentation-boundary rule in `AGENTS.md`. | Achieved review archives; AGENTS.md |
+| C65 | Fixture layout | Align documentation and actual Uart fixture project with `fixtures/<backend>/<family>/<device>/<module>/projects/<project>/`. | Updated fixture structure in core design, test strategy, and source-materials reference; moved the Uart fixture project to `tests/fixtures/nxp/ds/s32k3/Uart_Example_S32K344/`. | Core design; test strategy; source materials; fixtures |
+| C66 | Asset terminology | The committed runtime data lives under the skill's data folder; unify the term/location as "asset". | Renamed the directory to `autombd-rtd/assets/` (code constants, config default, and tests updated; gate green) and unified the documentation term to "asset(s)". | Core design; domain truth; SKILL.md; README; CLI code |
+| C67 | Goals altitude | G09 must not reference a specific milestone; the spec stays at high-level/architecture altitude; sync this rule to AGENTS.md. | Reworded G09 to all-modules parity with no milestone names; added the spec-altitude rule to `AGENTS.md` (Documentation Boundary). | Core design; AGENTS.md |
+| C68 | Per-backend vendor validation | State that for the `.xdm` backend vendor validation is EB tresos (not S32DS), with the same requirements as `.mex`. | Added a vendor-validation column to the backends table and a parity statement (same gate semantics, different vendor tool). | Core design |
+| C69 | Full-surface goal | Add a goal: the final RTD CfgFile CLI supports RTD Driver (all modules), RTD FreeRTOS, RTD Stacks, RTD CDDs, etc. | Added goal G10 (full RTD configuration surface through the same intent/provider/asset architecture). | Core design |
+| C70 | Diagram altitude | The architecture diagram must not carry milestone/plan/time information ("now/later"); sync the rule to AGENTS.md. | Removed now/later/first wording and the fixed module list from the mermaid diagram, backends table, and overview; rule recorded in `AGENTS.md` with C67. | Core design; AGENTS.md |
+| C71 | Asset tree example | The asset tree is an example — every module has such an asset. | Captioned the tree as an example pattern that every module instantiates. | Core design |
+| C72 | Source-materials link | Link the development-source paragraph to the source-materials reference. | Linked `rtd-config-source-materials.md` from the Assets section. | Core design |
+| C73 | Shortcut enumeration | The per-module shortcut/feature enumeration was capability-table content, not spec content. | Replaced the enumeration with the generic rule (one shortcut group per module; a group's surface is the module's `.xdm`-derived asset); detailed per-module listing removed together with the capabilities doc (C76). | Core design |
+| C74 | Context isolation | `fork_context:false` is a Codex-specific parameter — require generic context isolation (mechanism per agent platform); and the TESTER (E2E executor) must be context-isolated, not the Reviewer. | Replaced parameter-specific wording with generic context isolation everywhere; moved the isolation requirement to the Tester's E2E execution; the Reviewer is repo-reading (it reviews the diff). | Core design; test strategy; test cases; subagent validation; AGENTS.md; .claude/agents |
+| C75 | Changelog integrity | Never merge/collapse changelog rows. | Restored the itemized changelog rows from git history in core design and test strategy; recorded the append-only rule in `AGENTS.md`. | Core design; test strategy; AGENTS.md |
+| C76 | Capabilities doc removal | The capabilities table is meaningless: an editor of `.mex`/`.xdm` must support ALL legal edits/configurable items; the per-provider surface is defined by `<Module>.xdm`. Remove the file, state the goal in the spec, fix dependents. | Deleted `rtd-config-module-capabilities.md` (archived in fourth-review); core design states the all-legal-edits provider model with the `.xdm` as per-module authority; all references swept. | Core design; README; removed doc |
+| C77 | Documentation map | Add a relationship map of all documents (organization, dependencies, links) to the core design. | Added the "Documentation map" section (table + mermaid graph) to the core design. | Core design |
+| C78 | Legacy-skills location | `rtd-config-legacy-skills-experience.md` belongs under `docs/references/`. | Moved it to `docs/references/` (development-time reference); references swept; M1 dropped from its title. | References; core design; acceptance report; plan |
+| C79 | Pin-mux source path | Record the exact Excel workbook location for the pin mapping source. | Recorded `D:\WorkSpace\ExploreSpace\Copy of S32K344_S32K324_S32K314_IOMUX.xlsx` in domain-truth §1 (development input only, never read at runtime). | Domain truth |
+| C80 | Fixture section role | §2 should explain fixture purpose/usage generally; `Uart_Example_S32K344` is one example; the fixture set grows with module support. | Reframed domain-truth §2 as "Fixtures — role and usage" (copy-and-edit usage, vendor-validatable content, no hardcoded module lists) keeping the Uart project as the worked example. | Domain truth |
+| C81 | E2E-only test cases | Restructure the test-cases document: keep only E2E cases, in the format ID/Module/Scenario/Subagent Prompt/Test fixture/Pass criteria; seed with the reviewer-provided MCU clock and UART (modify/add/DMA) cases and extend to the seven modules; sync the strategy. | Rewrote as `rtd-config-test-cases.md` (scheme `RTD-MEX-*`, 9 cases covering all seven modules incl. the reviewer's 4 verbatim); the strategy now defines the E2E layer and points here; deterministic-suite coverage stays in the strategy. | Test cases; test strategy |
+| C82 | Fully-isolated E2E execution | E2E cases must run with a completely independent subagent that sees nothing of this project — only the autombd-rtd CLI/skill, the test prompt, and the test project, in a dedicated temporary directory. | Added the isolation protocol (temp-dir staging of the released skill + fixture; prompt-only input; evidence = pass criteria + vendor gate + code generation) to the test-cases doc, strategy §2.4, and the Tester role. | Test cases; test strategy; tester role; AGENTS.md |
+| C83 | Plan de-milestoned | Strip Milestone-1 framing from the plan; the plan is module-by-module under one framework (first seven = minimal system, together); later modules arrive on new user instructions; drop "m1" from ALL document names; stages live only in the roadmap. | Rewrote as `rtd-cfgfile-cli-implementation-plan.md` (framework + per-module checklist); renamed `rtd-config-test-cases.md`, `rtd-config-acceptance-report.md`, `rtd-config-subagent-validation.md`; historical M1 task recipes archived in fourth-review; references swept. | Plan; tests docs; roadmap; README |
+| C84 | Roadmap simplification | Restructure the roadmap: basic route only, no technical detail; stages = 1 minimal system (7 modules, S32K3, `.mex`), 2 remaining modules, 3 completion/creation, 4 EB tresos/`.xdm`, 5 long-term (FreeRTOS/Stacks/CDDs/more chips). | Rewrote the roadmap to exactly that five-stage route. | Roadmap |
+
+## Open Follow-Up
+
+The current documents separate project spec, roadmap, source references, and
+test strategy. A future development-process document should capture the
+human-assisted agent development loop, skill growth, and closed-loop validation
+workflow as that process becomes concrete.
+
+## Changelog
+
+| Date | Version | Description |
+| --- | --- | --- |
+| 2026-06-10 | 0.5.0 | Added fourth-round review tracking (C66–C84): asset unification, spec/diagram altitude rule, per-backend vendor validation, G10 full surface, capabilities-doc removal, doc map, legacy-skills move, E2E-only test cases with isolated execution, plan/roadmap rewrite, m1 dropped from doc names, changelog-integrity rule. Archives: `docs/OBSOLETE_NEVER_TOUCH!!!/fourth-review/`. |
+| 2026-06-02 | 0.4.1 | Tracked fixture layout update for module-scoped projects directories. |
+| 2026-06-02 | 0.4.0 | Tracked final consistency review updates for milestone test scope, tool naming, definitions, KPI, capability alignment, vendor environment, and archive boundaries. |
+| 2026-06-02 | 0.3.0 | Added third-round review tracking records and archive location. |
+| 2026-05-30 | 0.2.2 | Formatted document metadata and changelog as tables. |
+| 2026-05-30 | 0.2.1 | Removed dates from documentation filenames and updated tracking. |
+| 2026-05-30 | 0.2.0 | Added second-round review tracking records. |
+| 2026-05-30 | 0.1.0 | Created review comment tracking table. |
