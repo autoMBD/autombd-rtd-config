@@ -58,8 +58,9 @@ from .backends.s32_mex.locate import find_single_mex
 from .resources.pins import pin_options
 from .intent import Intent
 from .modules.uart import UartProvider
+from .modules.platform import PlatformProvider
 from .checks.static import run_static_checks
-from .backends.s32_mex.apply import apply_uart_set
+from .backends.s32_mex.apply import apply_uart_set, apply_platform_set
 from .backends.s32_mex.validation import run_validation
 
 
@@ -120,6 +121,18 @@ def build_parser() -> argparse.ArgumentParser:
     uart_set.add_argument("--configure", action="store_true")
     uart_set.add_argument("--backup", action="store_true")
     uart_set.add_argument("--json", action="store_true")
+
+    platform_parser = subparsers.add_parser("platform")
+    platform_actions = platform_parser.add_subparsers(dest="action")
+    platform_set = platform_actions.add_parser("set")
+    platform_set.add_argument("--project", required=True)
+    # Target an existing interrupt by peripheral (e.g. LPUART_3) or exact IsrName.
+    platform_set.add_argument("--peripheral")
+    platform_set.add_argument("--isr-name")
+    platform_set.add_argument("--priority", type=int)
+    platform_set.add_argument("--configure", action="store_true")
+    platform_set.add_argument("--backup", action="store_true")
+    platform_set.add_argument("--json", action="store_true")
 
     return parser
 
@@ -266,15 +279,21 @@ def cmd_uart_set(args: argparse.Namespace) -> int:
             "plan": plan.to_dict(),
         })
 
-    return _configure_uart(args, intent, plan)
+    return _configure_module(args, intent, plan, apply_uart_set)
 
 
-def _configure_uart(args: argparse.Namespace, intent: Intent, plan) -> int:
+def _configure_module(args: argparse.Namespace, intent: Intent, plan, apply_fn) -> int:
+    """Shared configure pipeline: apply an owned edit, write, then static-check.
+
+    ``apply_fn(doc, intent) -> ApplyResult`` is the module's localized backend
+    edit. The pipeline is module-agnostic; per-module specifics live in the
+    intent payload and the apply function.
+    """
     config = RuntimeConfig.from_dict({"project": args.project})
     mex = find_single_mex(config.project)
     doc = MexDocument.load(mex)
 
-    apply_result = apply_uart_set(doc, intent)
+    apply_result = apply_fn(doc, intent)
     if apply_result.blocked:
         return emit({
             "status": "blocked",
@@ -319,6 +338,33 @@ def _configure_uart(args: argparse.Namespace, intent: Intent, plan) -> int:
     })
 
 
+def normalize_platform_intent(args: argparse.Namespace) -> Intent:
+    """Normalize `platform set` CLI arguments into the JSON intent contract."""
+    payload: dict = {}
+    if args.peripheral:
+        payload["peripheral"] = args.peripheral
+    if args.isr_name:
+        payload["isr_name"] = args.isr_name
+    if args.priority is not None:
+        payload["priority"] = args.priority
+    return Intent.from_dict({"module": "platform", "action": "set", "payload": payload})
+
+
+def cmd_platform_set(args: argparse.Namespace) -> int:
+    intent = normalize_platform_intent(args)
+    plan = PlatformProvider().plan(intent)
+
+    if not args.configure:
+        return emit({
+            "status": "passed",
+            "command": "plan",
+            "normalized_intent": _intent_dict(intent),
+            "plan": plan.to_dict(),
+        })
+
+    return _configure_module(args, intent, plan, apply_platform_set)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -337,6 +383,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "uart" and getattr(args, "action", None) == "set":
         return cmd_uart_set(args)
+
+    if args.command == "platform" and getattr(args, "action", None) == "set":
+        return cmd_platform_set(args)
 
     if args.version:
         return emit({

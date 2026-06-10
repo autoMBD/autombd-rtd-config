@@ -41,7 +41,7 @@
 # Author:      autoMBD <tkung.lqk@foxmail.com>
 # Date:        2026-06-03
 # Version:     0.1.0
-# Description: Localized, owned Uart channel edits to an S32 ConfigTools .mex.
+# Description: Localized, owned per-module edits to an S32 ConfigTools .mex.
 # =================================================================================
 
 """Localized, owned edits to an S32 ConfigTools .mex Uart configuration.
@@ -58,6 +58,7 @@ is removed (the highest-risk lesson from the legacy-skills experience).
 """
 from __future__ import annotations
 
+import re
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 
@@ -222,3 +223,139 @@ def _find_struct(parent: ET.Element, name: str) -> ET.Element | None:
         if struct.tag.endswith("struct") and struct.attrib.get("name") == name:
             return struct
     return None
+
+
+def _derive_isr_name(peripheral: str) -> str | None:
+    """Map a peripheral to its PlatformIsrConfig IsrName (asset patterns).
+
+    Grounded in the Platform asset / fixture: ``LPUART_<n>`` -> ``LPUART<n>_IRQn``
+    and any ``FLEXIO*`` -> the single shared ``FLEXIO_IRQn``. Returns None when
+    the peripheral does not match a known pattern; the caller still verifies the
+    derived name exists in the project before editing, so this never invents an
+    interrupt entry.
+    """
+    text = peripheral.strip().upper()
+    match = re.fullmatch(r"LPUART_?(\d+)", text)
+    if match is not None:
+        return f"LPUART{match.group(1)}_IRQn"
+    if text.startswith("FLEXIO"):
+        return "FLEXIO_IRQn"
+    return None
+
+
+def _find_isr_entry(
+    doc: MexDocument,
+    platform_cfg: ET.Element,
+    *,
+    isr_name: str | None,
+) -> ET.Element | None:
+    """Return the PlatformIsrConfig <struct> whose IsrName equals ``isr_name``."""
+    if isr_name is None:
+        return None
+    for array in platform_cfg.iter():
+        if not (array.tag.endswith("array") and array.attrib.get("name") == "PlatformIsrConfig"):
+            continue
+        for entry in array:
+            if not entry.tag.endswith("struct"):
+                continue
+            name_setting = doc.find_child_setting(entry, "IsrName")
+            if name_setting is not None and name_setting.attrib.get("value") == isr_name:
+                return entry
+    return None
+
+
+def _available_isr_names(doc: MexDocument, platform_cfg: ET.Element) -> list[str]:
+    names: list[str] = []
+    for array in platform_cfg.iter():
+        if not (array.tag.endswith("array") and array.attrib.get("name") == "PlatformIsrConfig"):
+            continue
+        for entry in array:
+            if not entry.tag.endswith("struct"):
+                continue
+            name_setting = doc.find_child_setting(entry, "IsrName")
+            if name_setting is not None and name_setting.attrib.get("value"):
+                names.append(name_setting.attrib["value"])
+    return names
+
+
+def apply_platform_set(doc: MexDocument, intent: Intent) -> ApplyResult:
+    """Apply an owned Platform interrupt edit (priority / enable) in place.
+
+    Edits an EXISTING ``PlatformIsrConfig`` entry only; it never creates an
+    interrupt. The entry is located by explicit ``isr_name`` or by deriving the
+    IsrName from ``peripheral`` (then verifying it exists). ``IsrPriority`` is set
+    and the entry is ensured enabled; the device-specific upper priority bound is
+    enforced by the vendor gate (Platform.xdm ``irqMaxPrio``), so the provider
+    only rejects a negative priority here.
+    """
+    payload = intent.payload
+    result = ApplyResult()
+
+    isr_name = payload.get("isr_name")
+    peripheral = payload.get("peripheral")
+    if isr_name is None and peripheral is not None:
+        isr_name = _derive_isr_name(peripheral)
+
+    priority = payload.get("priority")
+    if priority is not None and priority < 0:
+        result.diagnostics.append(Diagnostic(
+            severity="blocker",
+            code="platform_priority_out_of_range",
+            module="platform",
+            message=(
+                f"Interrupt priority {priority} is invalid; IsrPriority must be "
+                ">= 0 (and <= the device's Platform.irqMaxPrio, enforced by "
+                "S32DS validation)."
+            ),
+            details={"priority": priority},
+        ))
+        return result
+
+    platform_cfg = doc.find_config_set("Platform")
+    if platform_cfg is None:
+        result.diagnostics.append(Diagnostic(
+            severity="blocker",
+            code="platform_config_set_not_found",
+            module="platform",
+            message="No enabled Platform <config_set> found; M1 edits existing instances only.",
+            details={},
+        ))
+        return result
+
+    entry = _find_isr_entry(doc, platform_cfg, isr_name=isr_name)
+    if entry is None:
+        result.diagnostics.append(Diagnostic(
+            severity="blocker",
+            code="platform_isr_not_found",
+            module="platform",
+            message=(
+                "No existing PlatformIsrConfig entry matches the requested "
+                "interrupt; M1 does not create interrupt entries."
+            ),
+            details={
+                "requested_isr_name": isr_name,
+                "peripheral": peripheral,
+                "available": _available_isr_names(doc, platform_cfg),
+            },
+        ))
+        return result
+
+    if priority is not None:
+        prio_setting = doc.find_child_setting(entry, "IsrPriority")
+        if prio_setting is not None:
+            prio_setting.set("value", str(priority))
+
+    # The interrupt must be enabled and its ISR registered for the case to pass;
+    # ensure enabled (the handler is already registered on an existing entry).
+    enabled_setting = doc.find_child_setting(entry, "IsrEnabled")
+    if enabled_setting is not None:
+        enabled_setting.set("value", "true")
+
+    doc.mark_modified(entry)
+    carrier = doc.find_nearest_quick_selection_ancestor(entry)
+    if carrier is not None:
+        doc.mark_modified(carrier)
+
+    result.changed_modules.append("platform")
+    result.modified_elements.append(entry)
+    return result

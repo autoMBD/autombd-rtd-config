@@ -2,8 +2,8 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.1.0 |
-| Date | 2026-06-03 |
+| Version | 0.1.2 |
+| Date | 2026-06-11 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Running log of lessons captured during the agent development loop. The **Reviewer** appends one entry per accepted iteration (after the Tester's gate is green) so recurring failure modes become permanent guards. This is distinct from the legacy-skills baseline (which captures pre-project `.mex` experience). |
 
@@ -22,6 +22,7 @@
 
 | ID | Lesson | Root cause | Durable guard |
 | --- | --- | --- | --- |
+| LL-009 | The vendor gate silently failed on *every* input — even a pristine, vendor-authored fixture returned exit 2 — so "44 passed" never proved any `.mex` was vendor-valid. | Validation used the registration-based Flow A whose CDT `-import` step timed out (exit 124); the project was then unregistered, so `-UpdateCode` failed with `Cannot get container for IPath`. It went unnoticed because vendor validation is gated behind an off-by-default env flag and was never re-run on a known-good baseline. | Adopted the verified standalone **Flow B** (`-Load`/`-ExportSrc`, no registration; domain-truth §3). Pass gate now also requires code generation (`generated_files > 0`). The gate's own acceptance evidence is a known-good baseline (pristine fixture → pass) **and** a known-bad probe (invalid OsIf → SEVERE `[TOOL] … has the following error`), confirming exit 0 alone is insufficient. |
 | LL-008 | Milestone/schedule wording repeatedly leaked into specs and diagrams ("M1", "first/later") across four review rounds, and changelog history was once collapsed during a doc slim-down. | Authors optimized docs locally without altitude rules: specs absorbed plan/stage detail; history was treated as compressible content. | `AGENTS.md` Documentation Boundary now mandates: specs/diagrams carry no milestone/stage/time wording (stages live only in the roadmap), and changelogs are append-only (never merged). Reviewer checks both per iteration. |
 | LL-007 | Spec internal-consistency is not vendor-truth: three review rounds never caught the wrong polling/validation facts. | Reviews checked self-consistency, not the vendor source. | Reviewer cross-checks every domain value against the module `<Module>.xdm`; vendor S32DS gate is an early, mandatory step, not a late one. |
 | LL-006 | `.mex` writer reserialized the whole file (~3000-line churn) yet passed well-formedness tests. | Mandatory "narrow edits" rule had no test guard. | Byte-faithful narrow-writer + regression tests (no-edit write is byte-identical; owned edit touches only changed lines). Every spec "must" maps to a test. |
@@ -37,3 +38,4 @@
 | --- | --- | --- |
 | 2026-06-03 | 0.1.0 | Created the lessons-learned log and seeded LL-001..007 from the M1 Uart-reference work. |
 | 2026-06-10 | 0.1.1 | Added LL-008 (spec altitude + changelog integrity) from the fourth review round. |
+| 2026-06-11 | 0.1.2 | Added LL-009 (the vendor gate silently failed on every input; Flow A registration timeout) while landing the Flow B fix and the first accepted case (PLATFORM-001). |

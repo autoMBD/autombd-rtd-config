@@ -2,7 +2,7 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.1.0 |
+| Version | 0.2.0 |
 | Date | 2026-06-11 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Current pass/fail evidence for the E2E acceptance cases defined in `rtd-config-test-cases.md`. This document is the living status record the catalog points to; the catalog defines the target, this records where the tool actually stands. |
@@ -42,7 +42,7 @@ on an unbuilt asset).
 | --- | --- | --- | --- |
 | RTD-MEX-MCU-001 | MCU | FAIL | No MCU apply path. Needs clock-tree edits (CORE_CLK/AIPS_PLAT/AIPS_SLOW from 16 MHz FXOSC) **and** creating every Clock Reference Point (element insertion). |
 | RTD-MEX-BASENXP-001 | BaseNXP | FAIL | Provider is plan-only. Enabling `OsIfUseSystemTimer` requires **creating one `OsIfCounterConfig`** with `OsIfSystemTimerClockRef`/`…Freq` (baremetal) — element insertion (`BaseNXP.xdm` INVALID rule, confirmed by the known-bad probe). |
-| RTD-MEX-PLATFORM-001 | Platform | FAIL | No Platform apply path. Needs to enable the LPUART_3 interrupt, set priority 2, and register the ISR. (LPUART_3 channel already present in the fixture.) |
+| RTD-MEX-PLATFORM-001 | Platform | **PASS** | `platform set --peripheral LPUART_3 --priority 2`: `IsrPriority` 0→2 on the existing `LPUART3_IRQn` entry, kept enabled with its ISR (`LPUART_UART_IP_3_IRQHandler`) registered, FLEXIO entry untouched. Vendor gate green (exit 0, 120 generated files, no severe). |
 | RTD-MEX-PORT-001 | Port | BLOCKED | `pins.json` is a 4-signal stub; must be rebuilt complete from the IOMUX workbook before `pin-options`/pin application are trustworthy. Then needs a Port apply path. |
 | RTD-MEX-DIO-001 | Dio | BLOCKED | Needs Dio channel **creation** + Port direction config; depends on `pins.json` and the element-insertion writer. |
 | RTD-MEX-MCL-001 | Mcl | FAIL | Needs FlexIO-common enable (already true in fixture) + **creating** a FlexIO logic channel (element insertion) with a consistent name/reference. |
@@ -50,8 +50,9 @@ on an unbuilt asset).
 | RTD-MEX-UART-002 | UART | FAIL | Needs FlexIO Uart channel **creation** + MCL logic-channel reference + Platform ISR (LPUART & FlexIO) — creation + orchestration both missing. |
 | RTD-MEX-UART-003 | UART | FAIL | DMA is rejected (`unsupported_uart_mode`); needs Uart DMA method + MCL DMA channel/instance + Platform ISR. |
 
-**Summary: 0 / 9 cases PASS.** The acceptance gate is now operational; no
-per-module write capability yet produces a vendor-valid result for its case.
+**Summary: 1 / 9 cases PASS** (PLATFORM-001). The acceptance gate is operational
+and the first per-module capability is proven end-to-end against it; the
+remaining eight follow the same loop.
 
 ## 3. Cross-cutting blockers (critical path)
 
@@ -84,7 +85,7 @@ Reviewer), proven against the now-operational gate.
 | 0 | ✅ Repair the vendor acceptance gate (Flow B) | every case |
 | 1 | Byte-faithful element insertion in the writer | all creation cases |
 | 2 | BASENXP-001: OsIf counter creation + asset + CLI | BASENXP-001 |
-| 3 | PLATFORM-001: interrupt enable/priority/ISR apply | PLATFORM-001, UART-* |
+| 3 | ✅ PLATFORM-001: interrupt enable/priority/ISR apply | PLATFORM-001, UART-* |
 | 4 | MCU-001: clock-tree edit + reference-point creation | MCU-001, UART-* |
 | 5 | Rebuild `pins.json`; Port apply | PORT-001, DIO-001 |
 | 6 | DIO-001: channel creation + Port direction | DIO-001 |
@@ -98,3 +99,4 @@ Reviewer), proven against the now-operational gate.
 | Date | Version | Description |
 | --- | --- | --- |
 | 2026-06-11 | 0.1.0 | Created the acceptance report (the catalog's pass/fail record). Recorded the repaired vendor gate (Flow B, operational + error-detecting + project-safe), the honest 0/9 per-case baseline with each gap, the cross-cutting critical-path blockers, and the sequenced execution plan. |
+| 2026-06-11 | 0.2.0 | RTD-MEX-PLATFORM-001 **PASS** (1/9): `platform set` edits an existing `PlatformIsrConfig` priority/enable on the LPUART3 interrupt; verified end-to-end against the real S32DS gate (exit 0, 120 generated files, no severe). Marked plan step 3 done. |
