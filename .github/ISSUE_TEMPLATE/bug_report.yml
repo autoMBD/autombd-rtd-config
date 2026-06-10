@@ -1,0 +1,67 @@
+name: Bug report
+description: Report a reproducible RTD CfgFile CLI defect or validation mismatch.
+title: "[Bug] "
+labels:
+  - bug
+body:
+  - type: textarea
+    id: symptom
+    attributes:
+      label: Symptom
+      description: What failed, and what did you expect instead?
+      placeholder: The configure command changes unrelated `.mex` sections when enabling Uart.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction steps
+      description: Provide the exact command, fixture, branch, and input files.
+      placeholder: |
+        1. Checkout ...
+        2. Run ...
+        3. Observe ...
+    validations:
+      required: true
+  - type: dropdown
+    id: impact
+    attributes:
+      label: Impact area
+      options:
+        - CLI command behavior
+        - "`.mex` parsing or writing"
+        - Static/runtime validation
+        - Module provider logic
+        - Runtime asset data
+        - Documentation or GitHub management
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: Paste concise logs, diff snippets, diagnostics, or validation output.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Include OS, Python version, S32DS/RTD versions when relevant, and whether vendor validation was configured.
+      placeholder: |
+        - OS:
+        - Python:
+        - S32DS:
+        - RTD:
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Reporter checks
+      options:
+        - label: I checked existing open issues for the same failure.
+          required: true
+        - label: I included enough fixture or project detail to reproduce the defect.
+          required: true
