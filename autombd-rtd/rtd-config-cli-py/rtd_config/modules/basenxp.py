@@ -53,19 +53,36 @@ from rtd_config.plan import Plan, PlannedChange
 class BaseNxpProvider:
     """Owns BaseNXP/OsIf shared infrastructure.
 
-    OsIf timer choices affect Uart timeout behaviour. For Milestone 1 the
-    provider only preserves/asserts the existing BaseNXP/OsIf region needed by
-    the complete fixture; it does not invent timer or DET behaviour.
+    OsIf timer choices affect Uart timeout behaviour. The provider owns the
+    OsIfGeneral region including the system-timer flag and counter configuration.
+    Values are grounded in the committed osif.json asset (derived from BaseNXP.xdm).
     """
 
     name = "basenxp"
 
     def plan(self, intent: Intent) -> Plan:
-        return Plan([
-            PlannedChange(
+        changes = []
+        if intent.payload.get("enable_system_timer", False):
+            changes.append(PlannedChange(
+                module="basenxp",
+                owner="basenxp",
+                path="/BaseNXP/BaseNXP/OsIfGeneral/OsIfUseSystemTimer",
+                description="Enable OsIf system timer (OsIfUseSystemTimer=true)",
+            ))
+            changes.append(PlannedChange(
+                module="basenxp",
+                owner="basenxp",
+                path="/BaseNXP/BaseNXP/OsIfGeneral/OsIfCounterConfig",
+                description=(
+                    "Insert OsIfCounterConfig_0 with OsIfSystemTimerClockFreq=48000000 "
+                    "(grounded in BaseNXP.xdm default; no core-clock ref in this project)"
+                ),
+            ))
+        else:
+            changes.append(PlannedChange(
                 module="basenxp",
                 owner="basenxp",
                 path="/BaseNXP/BaseNXP/OsIfGeneral",
                 description="Preserve OsIf configuration used by Uart timeout",
-            )
-        ])
+            ))
+        return Plan(changes)

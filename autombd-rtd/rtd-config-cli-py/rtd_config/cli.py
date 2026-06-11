@@ -59,8 +59,9 @@ from .resources.pins import pin_options
 from .intent import Intent
 from .modules.uart import UartProvider
 from .modules.platform import PlatformProvider
+from .modules.basenxp import BaseNxpProvider
 from .checks.static import run_static_checks
-from .backends.s32_mex.apply import apply_uart_set, apply_platform_set
+from .backends.s32_mex.apply import apply_uart_set, apply_platform_set, apply_basenxp_set
 from .backends.s32_mex.validation import run_validation
 
 
@@ -133,6 +134,19 @@ def build_parser() -> argparse.ArgumentParser:
     platform_set.add_argument("--configure", action="store_true")
     platform_set.add_argument("--backup", action="store_true")
     platform_set.add_argument("--json", action="store_true")
+
+    basenxp_parser = subparsers.add_parser("basenxp")
+    basenxp_actions = basenxp_parser.add_subparsers(dest="action")
+    basenxp_set = basenxp_actions.add_parser("set")
+    basenxp_set.add_argument("--project", required=True)
+    basenxp_set.add_argument(
+        "--enable-system-timer",
+        action="store_true",
+        help="Enable OsIf system timer and insert one OsIfCounterConfig_0 counter.",
+    )
+    basenxp_set.add_argument("--configure", action="store_true")
+    basenxp_set.add_argument("--backup", action="store_true")
+    basenxp_set.add_argument("--json", action="store_true")
 
     return parser
 
@@ -365,6 +379,29 @@ def cmd_platform_set(args: argparse.Namespace) -> int:
     return _configure_module(args, intent, plan, apply_platform_set)
 
 
+def normalize_basenxp_intent(args: argparse.Namespace) -> Intent:
+    """Normalize `basenxp set` CLI arguments into the JSON intent contract."""
+    payload: dict = {}
+    if args.enable_system_timer:
+        payload["enable_system_timer"] = True
+    return Intent.from_dict({"module": "basenxp", "action": "set", "payload": payload})
+
+
+def cmd_basenxp_set(args: argparse.Namespace) -> int:
+    intent = normalize_basenxp_intent(args)
+    plan = BaseNxpProvider().plan(intent)
+
+    if not args.configure:
+        return emit({
+            "status": "passed",
+            "command": "plan",
+            "normalized_intent": _intent_dict(intent),
+            "plan": plan.to_dict(),
+        })
+
+    return _configure_module(args, intent, plan, apply_basenxp_set)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -386,6 +423,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "platform" and getattr(args, "action", None) == "set":
         return cmd_platform_set(args)
+
+    if args.command == "basenxp" and getattr(args, "action", None) == "set":
+        return cmd_basenxp_set(args)
 
     if args.version:
         return emit({

@@ -1,0 +1,29 @@
+{
+  "_source": "BaseNXP.xdm (RTD 7.0.1, OsIfGeneral / OsIfCounterConfig)",
+  "OsIfCounterConfig": {
+    "constraint": "When OsIfUseSystemTimer=true and OsIfMulticoreSupport=false, OsIfCounterConfig must have EXACTLY ONE counter struct.",
+    "source_ref": "BaseNXP.xdm:OsIfGeneral/OsIfCounterConfig invalidation rule",
+    "counter_struct": {
+      "index": "0",
+      "Name": "OsIfCounterConfig_0",
+      "children_order": [
+        "Name",
+        "OsIfCounterEcucPartitionRef",
+        "OsIfSystemTimerClockRef",
+        "OsIfSystemTimerClockFreq",
+        "OsIfOsCounterRef"
+      ],
+      "OsIfSystemTimerClockFreq": {
+        "default": 48000000,
+        "unit": "Hz",
+        "source_ref": "BaseNXP.xdm:OsIfCounterConfig/OsIfSystemTimerClockFreq default"
+      },
+      "OsIfSystemTimerClockRef": {
+        "description": "McuClockReferencePoint reference; leave empty array when no core-clock ref exists in project.",
+        "source_ref": "BaseNXP.xdm:OsIfCounterConfig/OsIfSystemTimerClockRef"
+      },
+      "mutual_exclusion": "In baremetal, use EITHER OsIfSystemTimerClockRef OR OsIfSystemTimerClockFreq (not both).",
+      "source_ref": "BaseNXP.xdm:OsIfCounterConfig mutual-exclusion rule"
+    }
+  }
+}

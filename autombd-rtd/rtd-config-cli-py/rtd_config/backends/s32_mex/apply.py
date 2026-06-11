@@ -44,27 +44,37 @@
 # Description: Localized, owned per-module edits to an S32 ConfigTools .mex.
 # =================================================================================
 
-"""Localized, owned edits to an S32 ConfigTools .mex Uart configuration.
+"""Localized, owned edits to an S32 ConfigTools .mex configuration.
 
 Milestone 1 only edits EXISTING module instances; it never creates missing
-modules or a .mex from scratch (reserved for M2). The Uart provider owns the
-channel settings; cross-module concerns (Mcu clock, Port pins, Platform IRQ,
-Mcl FlexIO) are declared as dependencies in the plan, not edited here.
+modules or a .mex from scratch (reserved for M2). Each provider owns its
+module's settings; cross-module concerns are declared as dependencies in the
+plan, not edited here.
 
-The edit is narrow: it locates the existing Uart channel that matches the
-requested hardware path and updates its owned fields in place, then marks the
-modified element so any stale quick_selection on the nearest carrying ancestor
-is removed (the highest-risk lesson from the legacy-skills experience).
+Edits are narrow: they locate the existing element and update its owned fields
+in place (attribute edit) or replace a self-closed empty array with a populated
+one (element-insertion via replace_element_region), then mark the modified
+element so any stale quick_selection on the nearest carrying ancestor is
+removed (the highest-risk lesson from the legacy-skills experience).
 """
 from __future__ import annotations
 
+import json
 import re
+from pathlib import Path
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 
 from rtd_config.backends.s32_mex.document import MexDocument
 from rtd_config.diagnostics import Diagnostic
 from rtd_config.intent import Intent
+
+
+# BaseNXP OsIf asset path (committed, versioned; never read .xdm at runtime).
+_BASENXP_ASSET = (
+    Path(__file__).resolve().parents[4]
+    / "assets" / "nxp" / "s32k3" / "basenxp" / "osif.json"
+)
 
 
 # Uart "asynchronous method" enum. RTD 7.0.1 ConfigTools models this field with
@@ -359,3 +369,128 @@ def apply_platform_set(doc: MexDocument, intent: Intent) -> ApplyResult:
     result.changed_modules.append("platform")
     result.modified_elements.append(entry)
     return result
+
+
+def _detect_line_ending(raw: bytes) -> bytes:
+    """Return the file's dominant line ending as bytes (b'\\r\\n' or b'\\n')."""
+    crlf = raw.count(b"\r\n")
+    lf = raw.count(b"\n") - crlf
+    return b"\r\n" if crlf >= lf else b"\n"
+
+
+def _build_counter_array_bytes(indent: int, line_ending: bytes) -> bytes:
+    """Build the populated OsIfCounterConfig array block as raw bytes.
+
+    The returned bytes replace the self-closed ``<array name="OsIfCounterConfig"/>``
+    tag verbatim in the raw file. Because ``replace_element_region`` splices
+    starting exactly at the ``<`` character, the leading ``indent`` spaces are
+    already present in the raw before the splice point and must NOT be repeated
+    in the first line. Inner lines do carry their full indentation.
+
+    Values are grounded in the BaseNXP osif.json asset:
+    - counter Name: OsIfCounterConfig_0
+    - OsIfSystemTimerClockFreq default: 48000000
+    - OsIfSystemTimerClockRef: empty array (no core-clock ref in this project)
+    - Children order: Name, OsIfCounterEcucPartitionRef, OsIfSystemTimerClockRef,
+      OsIfSystemTimerClockFreq, OsIfOsCounterRef
+    """
+    le = line_ending.decode("latin-1")
+    sp1 = " " * (indent + 3)  # 30 spaces for <struct>
+    sp2 = " " * (indent + 6)  # 33 spaces for children
+    sp = " " * indent          # 27 spaces for closing </array>
+
+    # First line: no leading spaces (they come from raw before src.start)
+    lines = [
+        '<array name="OsIfCounterConfig">',
+        f'{sp1}<struct name="0">',
+        f'{sp2}<setting name="Name" value="OsIfCounterConfig_0"/>',
+        f'{sp2}<array name="OsIfCounterEcucPartitionRef"/>',
+        f'{sp2}<array name="OsIfSystemTimerClockRef"/>',
+        f'{sp2}<setting name="OsIfSystemTimerClockFreq" value="48000000"/>',
+        f'{sp2}<array name="OsIfOsCounterRef"/>',
+        f'{sp1}</struct>',
+        f'{sp}</array>',
+    ]
+    return le.join(lines).encode("utf-8")
+
+
+def apply_basenxp_set(doc: MexDocument, intent: Intent) -> ApplyResult:
+    """Apply owned BaseNXP/OsIf edits: enable system timer and insert one counter.
+
+    Edits are grounded in the BaseNXP osif.json asset (derived from BaseNXP.xdm).
+    Two changes are made:
+    1. Set OsIfUseSystemTimer from false -> true (attribute edit on existing element).
+    2. If OsIfCounterConfig is an empty self-closed array, replace it with a
+       populated array containing exactly one counter struct (element insertion via
+       replace_element_region).
+
+    Idempotent: if a counter already exists, a second counter is NOT added.
+    Returns a blocker Diagnostic if the BaseNXP config set is not found.
+    """
+    result = ApplyResult()
+
+    if not intent.payload.get("enable_system_timer", False):
+        # Nothing requested; return empty result (no-op).
+        return result
+
+    basenxp_cfg = doc.find_config_set("BaseNXP")
+    if basenxp_cfg is None:
+        result.diagnostics.append(Diagnostic(
+            severity="blocker",
+            code="basenxp_config_set_not_found",
+            module="basenxp",
+            message="No enabled BaseNXP <config_set> found; cannot enable OsIf system timer.",
+            details={},
+        ))
+        return result
+
+    # ---- Step 1: Populate OsIfCounterConfig if currently empty ----
+    # Do this BEFORE the timer attribute edit so that replace_element_region
+    # (which reloads the tree) does not discard the timer_setting mutation.
+    counter_array = _find_osif_counter_array(doc, basenxp_cfg)
+    if counter_array is not None:
+        existing_structs = [c for c in counter_array if c.tag.endswith("struct")]
+        if len(existing_structs) == 0:
+            # Self-closed empty array -> replace with populated version.
+            line_ending = _detect_line_ending(doc._raw)
+            new_bytes = _build_counter_array_bytes(indent=27, line_ending=line_ending)
+            doc.replace_element_region(counter_array, new_bytes)
+
+            # After replace_element_region the tree is reloaded; re-find everything.
+            basenxp_cfg = doc.find_config_set("BaseNXP")
+            if basenxp_cfg is not None:
+                counter_array = _find_osif_counter_array(doc, basenxp_cfg)
+        # else: already has counters -- idempotent, do not add a second
+
+    # ---- Step 2: Set OsIfUseSystemTimer = true (attribute edit on fresh ref) ----
+    timer_setting = doc.find_child_setting(basenxp_cfg, "OsIfUseSystemTimer") \
+        if basenxp_cfg is not None else None
+    if timer_setting is not None:
+        timer_setting.set("value", "true")
+
+    # Mark modified elements and strip stale quick_selection from nearest ancestor.
+    modified: list[ET.Element] = []
+    if timer_setting is not None:
+        doc.mark_modified(timer_setting)
+        carrier = doc.find_nearest_quick_selection_ancestor(timer_setting)
+        if carrier is not None:
+            doc.mark_modified(carrier)
+        modified.append(timer_setting)
+
+    if counter_array is not None:
+        doc.mark_modified(counter_array)
+        carrier = doc.find_nearest_quick_selection_ancestor(counter_array)
+        if carrier is not None:
+            doc.mark_modified(carrier)
+        modified.append(counter_array)
+
+    result.changed_modules.append("basenxp")
+    result.modified_elements.extend(modified)
+    return result
+
+
+def _find_osif_counter_array(doc: MexDocument, basenxp_cfg: ET.Element) -> ET.Element | None:
+    for el in basenxp_cfg.iter():
+        if el.tag.endswith("array") and el.attrib.get("name") == "OsIfCounterConfig":
+            return el
+    return None

@@ -46,6 +46,7 @@
 
 from __future__ import annotations
 
+import io
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -181,8 +182,10 @@ class MexDocument:
 
         expat fires StartElementHandler in document (preorder) order, exactly
         like ElementTree's root.iter(); the i-th start tag therefore matches the
-        i-th element. We only edit attributes (never add/remove elements) in M1,
-        so this 1:1 correspondence holds through write().
+        i-th element. This 1:1 correspondence holds through write() as long as
+        no elements are added/removed between _capture_sources() and write().
+        replace_element_region() splices the raw bytes and then calls
+        _capture_sources() again to re-establish the correspondence.
         """
         starts: list[int] = []
         parser = expat.ParserCreate()
@@ -228,6 +231,103 @@ class MexDocument:
                 quote = c
             elif c == 0x3E:  # >
                 return i
+            i += 1
+        return None
+
+    def replace_element_region(self, element: ET.Element, new_bytes: bytes) -> None:
+        """Splice the raw bytes of ``element``'s original byte span with ``new_bytes``.
+
+        This is the byte-faithful element-insertion path: it locates the
+        element's start-byte offset in ``_raw``, identifies the end of its
+        serialized representation in the raw source, replaces exactly that
+        region, then rebuilds the ElementTree and re-captures expat spans so
+        that the normal attribute-edit write path works for any subsequent
+        attribute changes.
+
+        For a self-closed element (``<tag .../>``), the serialized span is
+        ``raw[src.start : src.tag_end + 1]`` — the ``>`` of ``/>`` is the last
+        byte. For elements with child content (open tag + children + close tag),
+        the span ends at the ``>`` of the ``</tag>`` close tag.
+
+        The caller must not use any previously obtained ``ET.Element`` references
+        after this call; re-find required elements from the reloaded tree.
+        """
+        elements = list(self.root.iter())
+        src_index = next(
+            (i for i, e in enumerate(elements) if e is element),
+            None,
+        )
+        if src_index is None or not self._aligned:
+            # Cannot locate; mark as not aligned so write() falls back.
+            self._aligned = False
+            return
+
+        src = self._sources[src_index]
+        span_end = self._find_element_region_end(src, element)
+        if span_end is None:
+            self._aligned = False
+            return
+
+        new_raw = self._raw[: src.start] + new_bytes + self._raw[span_end + 1 :]
+        # Reload from the spliced bytes so tree element count and expat spans
+        # stay in sync. Parse in-memory; the file on disk is not touched.
+        self._raw = new_raw
+        self.tree = ET.parse(io.BytesIO(new_raw))
+        self._capture_sources()
+
+    def _find_element_region_end(self, src: "_ElementSource", element: ET.Element) -> int | None:
+        """Return the byte index of the last byte in the element's raw region.
+
+        For a self-closed element (no children), the region ends at ``src.tag_end``
+        (the ``>`` of ``/>``). For an element with children, we scan forward past
+        the end of the last child's close tag.
+
+        The detection strategy: if the raw byte just before ``src.tag_end`` is
+        ``/``, the element is self-closed and its region ends at ``src.tag_end``.
+        Otherwise we count open/close tags from ``src.start`` to find the matching
+        close-tag ``>``.
+        """
+        raw = self._raw
+        # Self-closed detection: the character before the closing '>' is '/'.
+        if raw[src.tag_end - 1 : src.tag_end] == b"/":
+            return src.tag_end
+
+        # Open element: scan forward to find the matching end tag.
+        # Strategy: track nesting depth using '<' starts; stop at depth 0.
+        # We need to know the tag name to match the close tag.
+        tag_bytes = raw[src.start : src.tag_end + 1]
+        tag_text = tag_bytes.decode("utf-8", errors="replace")
+        # Extract tag name: first word after '<'
+        m = re.match(r"<([A-Za-z0-9_:.\-]+)", tag_text)
+        if m is None:
+            return None
+        tag_name = m.group(1)
+        close_tag = f"</{tag_name}>".encode("utf-8")
+
+        # Scan for the matching close tag, accounting for nesting.
+        depth = 1
+        i = src.tag_end + 1
+        n = len(raw)
+        while i < n and depth > 0:
+            if raw[i : i + 1] != b"<":
+                i += 1
+                continue
+            # Check for close tag
+            if raw[i : i + len(close_tag)] == close_tag:
+                depth -= 1
+                if depth == 0:
+                    return i + len(close_tag) - 1
+                i += len(close_tag)
+                continue
+            # Check for open tag with same name (self-closed ones don't increase depth)
+            open_prefix = f"<{tag_name}".encode("utf-8")
+            if raw[i : i + len(open_prefix)] == open_prefix:
+                # Find the end of this start tag
+                end = self._scan_start_tag_end(i)
+                if end is not None and raw[end - 1 : end] != b"/":
+                    depth += 1
+                    i = end + 1
+                    continue
             i += 1
         return None
 
