@@ -59,22 +59,13 @@ removed (the highest-risk lesson from the legacy-skills experience).
 """
 from __future__ import annotations
 
-import json
 import re
-from pathlib import Path
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 
 from rtd_config.backends.s32_mex.document import MexDocument
 from rtd_config.diagnostics import Diagnostic
 from rtd_config.intent import Intent
-
-
-# BaseNXP OsIf asset path (committed, versioned; never read .xdm at runtime).
-_BASENXP_ASSET = (
-    Path(__file__).resolve().parents[4]
-    / "assets" / "nxp" / "s32k3" / "basenxp" / "osif.json"
-)
 
 
 # Uart "asynchronous method" enum. RTD 7.0.1 ConfigTools models this field with
@@ -378,7 +369,89 @@ def _detect_line_ending(raw: bytes) -> bytes:
     return b"\r\n" if crlf >= lf else b"\n"
 
 
-def _build_counter_array_bytes(indent: int, line_ending: bytes) -> bytes:
+def _find_mcu_clock_ref_path(
+    doc: MexDocument,
+    mcu_cfg: ET.Element,
+) -> "tuple[str, None] | tuple[None, Diagnostic]":
+    """Discover the McuClockReferencePoint path to use for OsIfSystemTimerClockRef.
+
+    Searches the Mcu config_set's ``McuClockSettingConfig*`` container for a
+    ``McuClockReferencePoint`` array, then picks the reference point whose
+    ``McuClockFrequencySelect`` equals ``CORE_CLK`` (preferred); if none has
+    ``CORE_CLK``, picks the first reference point. Returns a tuple of
+    ``(ref_path, None)`` on success, or ``(None, Diagnostic)`` when no reference
+    points are found at all (caller must propagate the blocker).
+
+    Path format: ``/Mcu/Mcu/McuModuleConfiguration/<ClockSettingName>/<PointName>``
+    where ``<ClockSettingName>`` is the ``Name`` setting of the
+    ``McuClockSettingConfig`` struct (e.g. ``McuClockSettingConfig_0``) and
+    ``<PointName>`` is the ``Name`` setting of the chosen
+    ``McuClockReferencePoint`` struct (e.g. ``FLEXIO_CLK``).
+
+    Grounded in the fixture: McuClockSettingConfig_0 has LPUART3_CLK
+    (AIPS_SLOW_CLK) and FLEXIO_CLK (CORE_CLK); CORE_CLK preferred -> FLEXIO_CLK.
+    """
+    for el in mcu_cfg.iter():
+        if not (el.tag.endswith("array") and el.attrib.get("name") == "McuClockSettingConfig"):
+            continue
+        for clock_struct in el:
+            if not clock_struct.tag.endswith("struct"):
+                continue
+            # Resolve the struct's Name setting (e.g. "McuClockSettingConfig_0")
+            name_setting = doc.find_child_setting(clock_struct, "Name")
+            clock_setting_name = (
+                name_setting.attrib.get("value", "") if name_setting is not None else ""
+            )
+            # Find the McuClockReferencePoint array inside this clock setting struct
+            for child in clock_struct.iter():
+                if not (
+                    child.tag.endswith("array")
+                    and child.attrib.get("name") == "McuClockReferencePoint"
+                ):
+                    continue
+                ref_structs = [c for c in child if c.tag.endswith("struct")]
+                if not ref_structs:
+                    break  # empty array in this clock setting; keep searching
+
+                # Prefer the ref point with McuClockFrequencySelect == CORE_CLK
+                chosen = None
+                for rs in ref_structs:
+                    freq_sel = doc.find_child_setting(rs, "McuClockFrequencySelect")
+                    if freq_sel is not None and freq_sel.attrib.get("value") == "CORE_CLK":
+                        chosen = rs
+                        break
+                if chosen is None:
+                    chosen = ref_structs[0]
+
+                point_name_setting = doc.find_child_setting(chosen, "Name")
+                point_name = (
+                    point_name_setting.attrib.get("value", "") if point_name_setting is not None else ""
+                )
+                ref_path = (
+                    f"/Mcu/Mcu/McuModuleConfiguration/{clock_setting_name}/{point_name}"
+                )
+                return ref_path, None
+
+    # No McuClockReferencePoint found in any clock setting config
+    return None, Diagnostic(
+        severity="blocker",
+        code="basenxp_no_clock_reference_point",
+        module="basenxp",
+        message=(
+            "No McuClockReferencePoint found in the Mcu config set. "
+            "OsIfSystemTimerClockRef requires an existing Mcu clock reference point. "
+            "Add at least one McuClockReferencePoint to the Mcu McuClockSettingConfig "
+            "before enabling the BaseNXP OsIf system timer."
+        ),
+        details={},
+    )
+
+
+def _build_counter_array_bytes(
+    indent: int,
+    line_ending: bytes,
+    clock_ref_path: str,
+) -> bytes:
     """Build the populated OsIfCounterConfig array block as raw bytes.
 
     The returned bytes replace the self-closed ``<array name="OsIfCounterConfig"/>``
@@ -387,16 +460,19 @@ def _build_counter_array_bytes(indent: int, line_ending: bytes) -> bytes:
     already present in the raw before the splice point and must NOT be repeated
     in the first line. Inner lines do carry their full indentation.
 
-    Values are grounded in the BaseNXP osif.json asset:
+    Grounded in the BaseNXP osif.json asset (verified against vendor .mex examples):
     - counter Name: OsIfCounterConfig_0
-    - OsIfSystemTimerClockFreq default: 48000000
-    - OsIfSystemTimerClockRef: empty array (no core-clock ref in this project)
+    - OsIfSystemTimerClockRef: populated array referencing an existing Mcu
+      McuClockReferencePoint (CORE_CLK preferred, else first available).
+    - OsIfSystemTimerClockFreq: empty array (ConfigTools type: ArraySetting; a
+      scalar <setting> is silently rejected by ConfigTools, causing SEVERE).
     - Children order: Name, OsIfCounterEcucPartitionRef, OsIfSystemTimerClockRef,
       OsIfSystemTimerClockFreq, OsIfOsCounterRef
     """
     le = line_ending.decode("latin-1")
     sp1 = " " * (indent + 3)  # 30 spaces for <struct>
     sp2 = " " * (indent + 6)  # 33 spaces for children
+    sp3 = " " * (indent + 9)  # 36 spaces for array child
     sp = " " * indent          # 27 spaces for closing </array>
 
     # First line: no leading spaces (they come from raw before src.start)
@@ -405,8 +481,10 @@ def _build_counter_array_bytes(indent: int, line_ending: bytes) -> bytes:
         f'{sp1}<struct name="0">',
         f'{sp2}<setting name="Name" value="OsIfCounterConfig_0"/>',
         f'{sp2}<array name="OsIfCounterEcucPartitionRef"/>',
-        f'{sp2}<array name="OsIfSystemTimerClockRef"/>',
-        f'{sp2}<setting name="OsIfSystemTimerClockFreq" value="48000000"/>',
+        f'{sp2}<array name="OsIfSystemTimerClockRef">',
+        f'{sp3}<setting name="0" value="{clock_ref_path}"/>',
+        f'{sp2}</array>',
+        f'{sp2}<array name="OsIfSystemTimerClockFreq"/>',
         f'{sp2}<array name="OsIfOsCounterRef"/>',
         f'{sp1}</struct>',
         f'{sp}</array>',
@@ -417,15 +495,18 @@ def _build_counter_array_bytes(indent: int, line_ending: bytes) -> bytes:
 def apply_basenxp_set(doc: MexDocument, intent: Intent) -> ApplyResult:
     """Apply owned BaseNXP/OsIf edits: enable system timer and insert one counter.
 
-    Edits are grounded in the BaseNXP osif.json asset (derived from BaseNXP.xdm).
+    Edits are grounded in the BaseNXP osif.json asset (derived from BaseNXP.xdm)
+    and the Mcu config set (for OsIfSystemTimerClockRef path discovery).
     Two changes are made:
     1. Set OsIfUseSystemTimer from false -> true (attribute edit on existing element).
     2. If OsIfCounterConfig is an empty self-closed array, replace it with a
        populated array containing exactly one counter struct (element insertion via
-       replace_element_region).
+       replace_element_region). The counter's OsIfSystemTimerClockRef is populated
+       with a dynamically-discovered McuClockReferencePoint path (CORE_CLK preferred).
 
     Idempotent: if a counter already exists, a second counter is NOT added.
-    Returns a blocker Diagnostic if the BaseNXP config set is not found.
+    Returns a blocker Diagnostic if the BaseNXP config set is not found or if no
+    McuClockReferencePoint exists in the Mcu config set.
     """
     result = ApplyResult()
 
@@ -451,9 +532,33 @@ def apply_basenxp_set(doc: MexDocument, intent: Intent) -> ApplyResult:
     if counter_array is not None:
         existing_structs = [c for c in counter_array if c.tag.endswith("struct")]
         if len(existing_structs) == 0:
+            # Discover the Mcu clock reference path before splicing.
+            mcu_cfg = doc.find_config_set("Mcu")
+            if mcu_cfg is None:
+                result.diagnostics.append(Diagnostic(
+                    severity="blocker",
+                    code="basenxp_no_clock_reference_point",
+                    module="basenxp",
+                    message=(
+                        "No Mcu <config_set> found; cannot discover a "
+                        "McuClockReferencePoint for OsIfSystemTimerClockRef."
+                    ),
+                    details={},
+                ))
+                return result
+
+            clock_ref_path, diag = _find_mcu_clock_ref_path(doc, mcu_cfg)
+            if diag is not None:
+                result.diagnostics.append(diag)
+                return result
+
             # Self-closed empty array -> replace with populated version.
             line_ending = _detect_line_ending(doc._raw)
-            new_bytes = _build_counter_array_bytes(indent=27, line_ending=line_ending)
+            new_bytes = _build_counter_array_bytes(
+                indent=27,
+                line_ending=line_ending,
+                clock_ref_path=clock_ref_path,
+            )
             doc.replace_element_region(counter_array, new_bytes)
 
             # After replace_element_region the tree is reloaded; re-find everything.

@@ -13,17 +13,18 @@
         "OsIfSystemTimerClockFreq",
         "OsIfOsCounterRef"
       ],
-      "OsIfSystemTimerClockFreq": {
-        "default": 48000000,
-        "unit": "Hz",
-        "source_ref": "BaseNXP.xdm:OsIfCounterConfig/OsIfSystemTimerClockFreq default"
-      },
       "OsIfSystemTimerClockRef": {
-        "description": "McuClockReferencePoint reference; leave empty array when no core-clock ref exists in project.",
-        "source_ref": "BaseNXP.xdm:OsIfCounterConfig/OsIfSystemTimerClockRef"
+        "description": "Populated array referencing an existing Mcu McuClockReferencePoint. ConfigTools uses this ArraySetting to resolve the system timer clock source. Discovery prefers the reference point whose McuClockFrequencySelect==CORE_CLK; if none has CORE_CLK, the first reference point is used. Path format: /Mcu/Mcu/McuModuleConfiguration/<ClockSettingName>/<PointName>.",
+        "source_ref": "BaseNXP.xdm:OsIfCounterConfig/OsIfSystemTimerClockRef; verified in vendor .mex examples",
+        "serialization": "Non-self-closed <array name=\"OsIfSystemTimerClockRef\"> with one child <setting name=\"0\" value=\"<REF_PATH>\"/>"
       },
-      "mutual_exclusion": "In baremetal, use EITHER OsIfSystemTimerClockRef OR OsIfSystemTimerClockFreq (not both).",
-      "source_ref": "BaseNXP.xdm:OsIfCounterConfig mutual-exclusion rule"
+      "OsIfSystemTimerClockFreq": {
+        "description": "ConfigTools component type is ArraySetting (not ScalarSetting). When OsIfSystemTimerClockRef is populated, this field must be an EMPTY array. Writing it as a scalar <setting name=\"OsIfSystemTimerClockFreq\" value=\"...\"/> is silently rejected by ConfigTools and causes SEVERE: Either OsIfSystemTimerClockRef or OsIfSystemTimerClockFreq must be enabled in baremetal mode.",
+        "source_ref": "BaseNXP.xdm:OsIfCounterConfig/OsIfSystemTimerClockFreq; verified via ConfigTools [SDK/DATA] type log and vendor .mex examples",
+        "serialization": "Self-closed empty array <array name=\"OsIfSystemTimerClockFreq\"/>"
+      },
+      "mutual_exclusion": "In baremetal, OsIfSystemTimerClockRef (populated) satisfies the constraint; OsIfSystemTimerClockFreq stays an empty array. Both are serialized as arrays — never as scalar <setting> elements.",
+      "source_ref": "BaseNXP.xdm:OsIfCounterConfig mutual-exclusion rule; vendor .mex verification"
     }
   }
 }

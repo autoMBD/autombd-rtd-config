@@ -50,9 +50,14 @@
 The Uart_Example_S32K344 fixture has:
   OsIfUseSystemTimer="false" and an empty <array name="OsIfCounterConfig"/>
 
+The fixture Mcu config (McuClockSettingConfig_0) has two McuClockReferencePoints:
+  - LPUART3_CLK (McuClockFrequencySelect=AIPS_SLOW_CLK)
+  - FLEXIO_CLK  (McuClockFrequencySelect=CORE_CLK)
+
 The case enables the system timer, inserts exactly one counter struct with
-OsIfSystemTimerClockFreq=48000000 (no ClockRef in baremetal/no-Mcu-ref
-scenario), and verifies byte-narrowness and idempotency.
+OsIfSystemTimerClockRef pointing to the CORE_CLK reference point (FLEXIO_CLK),
+OsIfSystemTimerClockFreq as an empty array (ConfigTools ArraySetting type),
+and verifies byte-narrowness and idempotency.
 """
 import difflib
 import json
@@ -145,37 +150,72 @@ def test_apply_inserts_exactly_one_counter(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# Test 3: counter has OsIfSystemTimerClockFreq=48000000
+# Test 3: OsIfSystemTimerClockFreq must be an empty array (not a scalar setting).
+#
+# ConfigTools types OsIfSystemTimerClockFreq as ArraySetting. When a Mcu
+# McuClockReferencePoint exists (as in this fixture), the correct pattern is
+# OsIfSystemTimerClockRef populated + OsIfSystemTimerClockFreq as empty array.
 # ---------------------------------------------------------------------------
 def test_counter_has_correct_clock_freq(tmp_path):
     project = copy_uart_fixture(tmp_path)
-    doc = MexDocument.load(project / "Uart_Example.mex")
+    mex = project / "Uart_Example.mex"
+    doc = MexDocument.load(mex)
 
     apply_basenxp_set(doc, _intent(enable_system_timer=True))
+    doc.write(mex)
 
-    counter = _counter_structs(doc)[0]
-    freq = _child_setting_value(doc, counter, "OsIfSystemTimerClockFreq")
-    assert freq == "48000000", f"Expected 48000000, got {freq}"
+    raw = mex.read_bytes().decode("utf-8")
+
+    # OsIfSystemTimerClockFreq must be an empty array (never a scalar setting)
+    assert '<array name="OsIfSystemTimerClockFreq"/>' in raw, (
+        "OsIfSystemTimerClockFreq must be an empty array (ConfigTools type: "
+        "ArraySetting); scalar <setting> causes vendor gate SEVERE"
+    )
+    assert '<setting name="OsIfSystemTimerClockFreq"' not in raw, (
+        "OsIfSystemTimerClockFreq must NOT be a scalar <setting>"
+    )
 
 
 # ---------------------------------------------------------------------------
-# Test 4: counter has Name=OsIfCounterConfig_0 and empty Ref arrays
+# Test 4: counter has Name=OsIfCounterConfig_0 and all required children.
+#
+# OsIfSystemTimerClockRef must be POPULATED (carries the Mcu ref path) when
+# a McuClockReferencePoint exists in the project.  OsIfCounterEcucPartitionRef
+# and OsIfOsCounterRef remain empty arrays.  OsIfSystemTimerClockFreq is an
+# empty array (not a scalar).
 # ---------------------------------------------------------------------------
 def test_counter_has_required_children(tmp_path):
     project = copy_uart_fixture(tmp_path)
-    doc = MexDocument.load(project / "Uart_Example.mex")
+    mex = project / "Uart_Example.mex"
+    doc = MexDocument.load(mex)
 
     apply_basenxp_set(doc, _intent(enable_system_timer=True))
+    doc.write(mex)
 
-    counter = _counter_structs(doc)[0]
-    name_val = _child_setting_value(doc, counter, "Name")
+    raw = mex.read_bytes().decode("utf-8")
+    doc2 = MexDocument.load(mex)
+    counter = _counter_structs(doc2)[0]
+
+    name_val = _child_setting_value(doc2, counter, "Name")
     assert name_val == "OsIfCounterConfig_0", f"Got: {name_val}"
 
-    # Empty reference arrays must be present (self-closed)
+    # All required array children must be present
     arr_names = {el.attrib.get("name") for el in counter if el.tag.endswith("array")}
-    assert "OsIfCounterEcucPartitionRef" in arr_names
-    assert "OsIfSystemTimerClockRef" in arr_names
-    assert "OsIfOsCounterRef" in arr_names
+    assert "OsIfCounterEcucPartitionRef" in arr_names, f"Missing OsIfCounterEcucPartitionRef; got {arr_names}"
+    assert "OsIfSystemTimerClockRef" in arr_names, f"Missing OsIfSystemTimerClockRef; got {arr_names}"
+    assert "OsIfSystemTimerClockFreq" in arr_names, f"Missing OsIfSystemTimerClockFreq array; got {arr_names}"
+    assert "OsIfOsCounterRef" in arr_names, f"Missing OsIfOsCounterRef; got {arr_names}"
+
+    # OsIfSystemTimerClockRef must be POPULATED (non-empty: has a child setting)
+    assert '<array name="OsIfSystemTimerClockRef">' in raw, (
+        "OsIfSystemTimerClockRef must be a populated (open/close) array, "
+        "not self-closed, when a McuClockReferencePoint exists"
+    )
+
+    # OsIfSystemTimerClockFreq must be empty (self-closed)
+    assert '<array name="OsIfSystemTimerClockFreq"/>' in raw, (
+        "OsIfSystemTimerClockFreq must be an empty self-closed array"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -219,7 +259,10 @@ def test_edit_is_byte_narrow(tmp_path):
     assert any('OsIfUseSystemTimer' in line and 'value="true"' in line for line in added), \
         "Missing OsIfUseSystemTimer=true in diff"
 
-    # The counter struct's ClockFreq must appear
+    # OsIfSystemTimerClockRef (populated) and OsIfSystemTimerClockFreq (empty array)
+    # must both appear in the added diff lines
+    assert any('OsIfSystemTimerClockRef' in line for line in added), \
+        "Missing OsIfSystemTimerClockRef in diff"
     assert any('OsIfSystemTimerClockFreq' in line for line in added), \
         "Missing OsIfSystemTimerClockFreq in diff"
 
@@ -248,6 +291,121 @@ def test_idempotent_apply_does_not_add_second_counter(tmp_path):
     doc3 = MexDocument.load(mex)
     structs = _counter_structs(doc3)
     assert len(structs) == 1, f"Idempotency failed: {len(structs)} counter structs after two applies"
+
+
+# ---------------------------------------------------------------------------
+# Test 9: OsIfSystemTimerClockFreq must NOT appear as a scalar <setting>;
+#         OsIfSystemTimerClockRef must carry the dynamically-discovered Mcu path.
+#
+# ConfigTools defines OsIfSystemTimerClockFreq as an ArraySetting (log line:
+#   "[SDK/DATA] ... type from the component definition: ArraySetting").
+# All vendor examples store it as an empty <array name="OsIfSystemTimerClockFreq"/>
+# when a Mcu clock reference is provided via OsIfSystemTimerClockRef.
+# Writing it as <setting name="OsIfSystemTimerClockFreq" value="..."/> causes
+# ConfigTools to ignore the value and still fire the SEVERE constraint:
+#   "Either OsIfSystemTimerClockRef or OsIfSystemTimerClockFreq must be enabled".
+#
+# The Uart_Example_S32K344 fixture has two McuClockReferencePoints in
+# McuClockSettingConfig_0:
+#   - struct 0: LPUART3_CLK, McuClockFrequencySelect=AIPS_SLOW_CLK
+#   - struct 1: FLEXIO_CLK,  McuClockFrequencySelect=CORE_CLK
+# The dynamic ref discovery must prefer CORE_CLK -> FLEXIO_CLK.
+# Expected ref path: /Mcu/Mcu/McuModuleConfiguration/McuClockSettingConfig_0/FLEXIO_CLK
+#
+# Production gap: apply.py _build_counter_array_bytes() emits
+#   <setting name="OsIfSystemTimerClockFreq" value="48000000"/>
+# which is the wrong XML element type.  This test must fail on the current
+# production code and pass only when the fix is in.
+# ---------------------------------------------------------------------------
+def test_counter_clock_config_uses_clock_ref_not_scalar_freq(tmp_path):
+    """After apply, OsIfSystemTimerClockRef must carry the Mcu reference path
+    (dynamically discovered, preferring CORE_CLK) and OsIfSystemTimerClockFreq
+    must be an empty array — never a scalar setting.
+
+    The Uart_Example_S32K344 fixture has FLEXIO_CLK with CORE_CLK as the
+    preferred reference point; the expected ref path is:
+    /Mcu/Mcu/McuModuleConfiguration/McuClockSettingConfig_0/FLEXIO_CLK
+    """
+    project = copy_uart_fixture(tmp_path)
+    mex = project / "Uart_Example.mex"
+    doc = MexDocument.load(mex)
+
+    apply_basenxp_set(doc, _intent(enable_system_timer=True))
+    doc.write(mex)
+
+    # Re-read raw bytes and check serialization
+    raw = mex.read_bytes().decode("utf-8")
+
+    # OsIfSystemTimerClockFreq must appear as an empty array, not as a scalar setting
+    assert '<array name="OsIfSystemTimerClockFreq"/>' in raw, (
+        "OsIfSystemTimerClockFreq must be serialized as an empty array "
+        "<array name=\"OsIfSystemTimerClockFreq\"/> (ConfigTools component definition "
+        "type is ArraySetting; a scalar <setting> is silently rejected causing "
+        "SEVERE: Either OsIfSystemTimerClockRef or OsIfSystemTimerClockFreq must "
+        "be enabled in baremetal mode)"
+    )
+
+    # OsIfSystemTimerClockFreq must NOT appear as a scalar <setting>
+    assert '<setting name="OsIfSystemTimerClockFreq"' not in raw, (
+        "OsIfSystemTimerClockFreq must NOT be a scalar <setting>; "
+        "ConfigTools rejects it as 'StoragePeriphsScalarSetting' vs expected 'ArraySetting'"
+    )
+
+    # OsIfSystemTimerClockRef must be an array carrying the Mcu path
+    assert '<array name="OsIfSystemTimerClockRef">' in raw, (
+        "OsIfSystemTimerClockRef must be a non-empty array carrying the Mcu "
+        "McuClockReferencePoint path (as in every vendor example)"
+    )
+
+    # Dynamic ref discovery must prefer CORE_CLK -> FLEXIO_CLK in this fixture
+    expected_ref = "/Mcu/Mcu/McuModuleConfiguration/McuClockSettingConfig_0/FLEXIO_CLK"
+    assert expected_ref in raw, (
+        f"OsIfSystemTimerClockRef must reference '{expected_ref}' "
+        "(CORE_CLK reference point preferred; fixture has FLEXIO_CLK=CORE_CLK). "
+        f"Actual file snippet around ClockRef: "
+        f"{raw[max(0,raw.find('OsIfSystemTimerClockRef')-20):raw.find('OsIfSystemTimerClockRef')+200]}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Test 10: blocker when no McuClockReferencePoint exists in the loaded document.
+#
+# The dynamic ref discovery helper is exercised directly by temporarily removing
+# the Mcu config set from the tree.  The result must carry a blocker diagnostic
+# with code 'basenxp_no_clock_reference_point' and NOT modify the file.
+# ---------------------------------------------------------------------------
+def test_no_clock_reference_point_returns_blocker(tmp_path):
+    """apply_basenxp_set must return a blocker diagnostic when no
+    McuClockReferencePoint can be found in the Mcu config set.
+    """
+    import xml.etree.ElementTree as ET
+    from rtd_config.backends.s32_mex.apply import _find_mcu_clock_ref_path
+
+    project = copy_uart_fixture(tmp_path)
+    mex = project / "Uart_Example.mex"
+    doc = MexDocument.load(mex)
+
+    # Helper must return a tuple (path, None) or (None, Diagnostic)
+    # When there are no McuClockReferencePoint structs, it returns (None, Diagnostic).
+    # We can test _find_mcu_clock_ref_path directly with a stub config set that has
+    # no McuClockReferencePoint array at all.
+    #
+    # Build a minimal stub Mcu config set with no clock ref points:
+    stub = ET.fromstring(
+        '<config_set name="Mcu">'
+        '<array name="McuClockSettingConfig">'
+        '<struct name="0">'
+        '<setting name="Name" value="McuClockSettingConfig_0"/>'
+        '<array name="McuClockReferencePoint"/>'  # empty — no children
+        '</struct>'
+        '</array>'
+        '</config_set>'
+    )
+    path, diag = _find_mcu_clock_ref_path(doc, stub)
+    assert path is None, f"Expected None path when no ref points exist; got {path}"
+    assert diag is not None, "Expected a Diagnostic when no ref points exist"
+    assert diag.code == "basenxp_no_clock_reference_point", f"Got code: {diag.code}"
+    assert diag.severity == "blocker"
 
 
 # ---------------------------------------------------------------------------
