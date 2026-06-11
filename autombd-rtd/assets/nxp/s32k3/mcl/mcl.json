@@ -1,5 +1,5 @@
 {
-  "_source": "Mcl.xdm (RTD 7.0.1, FlexioCommon / FlexioMclLogicChannels) + s32k344.epd enum validation",
+  "_source": "Mcl.xdm (RTD 7.0.1, FlexioCommon / FlexioMclLogicChannels) + per-package EPD enum validation (RTD/Mcl_TS_T40D34M70I1R0/autosar/Mcl_s32k344_lqfp100.epd / Mcl_s32k344_hdqfp172.epd / Mcl_s32k344_mapbga257.epd)",
   "FlexioMclLogicChannel": {
     "description": "One FlexIO logic-channel entry under Mcl/MclConfig/FlexioCommon[n]/FlexioMclLogicChannels. Each channel consumes one FlexIO timer/shifter pair identified by a unique channel+pin id pair within the array.",
     "source_ref": "Mcl.xdm:MclConfig/FlexioCommon/FlexioMclLogicChannels",
@@ -26,7 +26,7 @@
           "CHANNEL_0", "CHANNEL_1", "CHANNEL_2", "CHANNEL_3",
           "CHANNEL_4", "CHANNEL_5", "CHANNEL_6", "CHANNEL_7"
         ],
-        "source_ref": "Mcl.xdm:FlexioMclLogicChannels/FlexioMclChannelId; s32k344.epd confirms CHANNEL_0..7 for FLEXIO_0"
+        "source_ref": "Mcl.xdm:FlexioMclLogicChannels/FlexioMclChannelId; Mcl_s32k344_<package>.epd confirms CHANNEL_0..7 for FLEXIO_0"
       },
       "FlexioMclPinId": {
         "type": "enum",
@@ -37,7 +37,7 @@
           "PIN_16", "PIN_17", "PIN_18", "PIN_19", "PIN_20", "PIN_21", "PIN_22", "PIN_23",
           "PIN_24", "PIN_25", "PIN_26", "PIN_27", "PIN_28", "PIN_29", "PIN_30", "PIN_31"
         ],
-        "source_ref": "Mcl.xdm:FlexioMclLogicChannels/FlexioMclPinId; s32k344.epd confirms PIN_0..31 for FLEXIO_0"
+        "source_ref": "Mcl.xdm:FlexioMclLogicChannels/FlexioMclPinId; Mcl_s32k344_<package>.epd confirms PIN_0..31 for FLEXIO_0"
       },
       "FlexioMclAddPinEnable": {
         "type": "bool",
@@ -48,7 +48,7 @@
       "FlexioMclAddPinId": {
         "type": "enum",
         "default": "PIN_0",
-        "description": "Additional pin id (used when FlexioMclAddPinEnable=true). Defaults to PIN_0.",
+        "description": "Additional pin id (used when FlexioMclAddPinEnable=true). Defaults to PIN_0. NOTE: PIN_0 shown here is the disabled-state serialization value written when FlexioMclAddPinEnable=false; the true Mcl.xdm DEFAULT is index-relative and applies only when FlexioMclAddPinEnable is true.",
         "enum_ref": "same as FlexioMclPinId",
         "source_ref": "Mcl.xdm:FlexioMclLogicChannels/FlexioMclAddPinId"
       },
@@ -61,7 +61,7 @@
       "FlexioMclAddChannelId": {
         "type": "enum",
         "default": "CHANNEL_0",
-        "description": "Additional channel id (used when FlexioMclAddChannelEnable=true). Defaults to CHANNEL_0.",
+        "description": "Additional channel id (used when FlexioMclAddChannelEnable=true). Defaults to CHANNEL_0. NOTE: CHANNEL_0 shown here is the disabled-state serialization value written when FlexioMclAddChannelEnable=false; the true Mcl.xdm DEFAULT is index-relative and applies only when FlexioMclAddChannelEnable is true.",
         "enum_ref": "same as FlexioMclChannelId",
         "source_ref": "Mcl.xdm:FlexioMclLogicChannels/FlexioMclAddChannelId"
       }

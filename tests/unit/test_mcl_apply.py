@@ -63,7 +63,11 @@ import sys
 import xml.etree.ElementTree as ET
 
 from rtd_config.backends.s32_mex.document import MexDocument
-from rtd_config.backends.s32_mex.apply import apply_mcl_set
+from rtd_config.backends.s32_mex.apply import (
+    apply_mcl_set,
+    _extract_channel_index,
+    _extract_pin_index,
+)
 from rtd_config.intent import Intent
 from rtd_config.modules.mcl import MclProvider
 from tests.fixtures import copy_uart_fixture
@@ -354,3 +358,148 @@ def test_cli_mcl_set_configure(tmp_path):
     assert payload["status"] == "passed", payload
     assert "mcl" in payload["changed_modules"]
     assert payload["runtime_verification"]["static_check"]["status"] == "passed"
+
+
+# ---------------------------------------------------------------------------
+# Test 11: "next-id is computed, not hardcoded" -- sequential-application proof
+#
+# A hardcoded-index implementation would always produce CHANNEL_2/PIN_2.
+# This test perturbs the fixture by adding a first channel (lands at index 2),
+# then applies a DISTINCT channel name and asserts the second lands at index 3.
+# ---------------------------------------------------------------------------
+def test_sequential_ids_prove_dynamic_computation(tmp_path):
+    """Second add lands at struct name='3', CHANNEL_3, PIN_3 (not a constant)."""
+    project = copy_uart_fixture(tmp_path)
+    mex = project / "Uart_Example.mex"
+
+    # First add: FLEXIO_UART_CH0 -> struct "2", CHANNEL_2, PIN_2
+    doc1 = MexDocument.load(mex)
+    r1 = apply_mcl_set(doc1, _intent(add_flexio_logic_channel="FLEXIO_UART_CH0"))
+    assert not r1.blocked, [d.to_dict() for d in r1.diagnostics]
+    doc1.write(mex)
+
+    # Second add: FLEXIO_UART_CH1 (different name) -> struct "3", CHANNEL_3, PIN_3
+    doc2 = MexDocument.load(mex)
+    r2 = apply_mcl_set(doc2, _intent(add_flexio_logic_channel="FLEXIO_UART_CH1"))
+    assert not r2.blocked, [d.to_dict() for d in r2.diagnostics]
+    assert "mcl" in r2.changed_modules
+    doc2.write(mex)
+
+    # Verify final state
+    doc3 = MexDocument.load(mex)
+    structs = _channel_structs(doc3)
+    assert len(structs) == 4, f"Expected 4 structs total, got {len(structs)}"
+
+    # The third (index 2) channel is FLEXIO_UART_CH0 at struct "2"
+    ch0 = structs[2]
+    assert ch0.attrib.get("name") == "2"
+    assert _setting_value(doc3, ch0, "Name") == "FLEXIO_UART_CH0"
+    assert _setting_value(doc3, ch0, "FlexioMclChannelId") == "CHANNEL_2"
+    assert _setting_value(doc3, ch0, "FlexioMclPinId") == "PIN_2"
+
+    # The fourth (index 3) channel is FLEXIO_UART_CH1 at struct "3"
+    ch1 = structs[3]
+    assert ch1.attrib.get("name") == "3", (
+        f"Second added channel must be struct name='3', got '{ch1.attrib.get('name')}' "
+        "(a hardcoded implementation would fail here)"
+    )
+    assert _setting_value(doc3, ch1, "Name") == "FLEXIO_UART_CH1"
+    assert _setting_value(doc3, ch1, "FlexioMclChannelId") == "CHANNEL_3", (
+        "Second channel must be CHANNEL_3 (max+1), not a constant"
+    )
+    assert _setting_value(doc3, ch1, "FlexioMclPinId") == "PIN_3", (
+        "Second channel must be PIN_3 (max+1), not a constant"
+    )
+
+    # All four ChannelIds and PinIds must be unique across the array
+    channel_ids = [_setting_value(doc3, s, "FlexioMclChannelId") for s in structs]
+    pin_ids = [_setting_value(doc3, s, "FlexioMclPinId") for s in structs]
+    assert len(set(channel_ids)) == 4, f"ChannelIds not unique: {channel_ids}"
+    assert len(set(pin_ids)) == 4, f"PinIds not unique: {pin_ids}"
+
+
+# ---------------------------------------------------------------------------
+# Test 12: _extract_channel_index returns None for malformed enum strings
+# ---------------------------------------------------------------------------
+def test_extract_channel_index_none_on_malformed():
+    """Helper must return None -- not raise -- on strings that are not CHANNEL_<int>."""
+    assert _extract_channel_index("CHANNEL_X") is None, "Non-integer suffix must yield None"
+    assert _extract_channel_index("PIN_") is None, "Wrong prefix must yield None"
+    assert _extract_channel_index("FOO") is None, "Unrecognised string must yield None"
+    assert _extract_channel_index("CHANNEL_") is None, "Empty integer part must yield None"
+    # Sanity: a valid value still works
+    assert _extract_channel_index("CHANNEL_0") == 0
+    assert _extract_channel_index("CHANNEL_7") == 7
+
+
+# ---------------------------------------------------------------------------
+# Test 13: _extract_pin_index returns None for malformed enum strings
+# ---------------------------------------------------------------------------
+def test_extract_pin_index_none_on_malformed():
+    """Helper must return None -- not raise -- on strings that are not PIN_<int>."""
+    assert _extract_pin_index("CHANNEL_X") is None, "Wrong prefix must yield None"
+    assert _extract_pin_index("PIN_") is None, "Empty integer part must yield None"
+    assert _extract_pin_index("FOO") is None, "Unrecognised string must yield None"
+    assert _extract_pin_index("PIN_Z") is None, "Non-integer suffix must yield None"
+    # Sanity: valid values still work
+    assert _extract_pin_index("PIN_0") == 0
+    assert _extract_pin_index("PIN_31") == 31
+
+
+# ---------------------------------------------------------------------------
+# Test 14: empty FlexioMclLogicChannels array -- first channel lands at index 0
+#
+# Exercises the else-branch in apply_mcl_set that handles an empty (self-closed)
+# FlexioMclLogicChannels array. Builds a minimal stub doc rather than relying on
+# the standard fixture so this branch is genuinely exercised.
+# ---------------------------------------------------------------------------
+_EMPTY_CHANNELS_STUB = b"""<?xml version="1.0" encoding= "UTF-8" ?>
+<mex:mex_configuration xmlns:mex="http://mcuxpresso.nxp.com/XSD/mex_configuration_18">
+  <mex:instance name="Mcl" enabled="true">
+    <mex:config_set name="Mcl">
+      <mex:setting name="MclEnableFlexioCommon" value="true"/>
+      <mex:array name="MclConfig">
+        <mex:struct name="0">
+          <mex:setting name="Name" value="MclConfig_0"/>
+          <mex:array name="FlexioCommon">
+            <mex:struct name="0">
+              <mex:setting name="Name" value="FlexioCommon_0"/>
+              <mex:array name="FlexioMclLogicChannels"/>
+            </mex:struct>
+          </mex:array>
+        </mex:struct>
+      </mex:array>
+    </mex:config_set>
+  </mex:instance>
+</mex:mex_configuration>
+"""
+
+
+def test_empty_channels_array_inserts_first_channel_at_index_zero(tmp_path):
+    """apply_mcl_set on an empty FlexioMclLogicChannels populates CHANNEL_0/PIN_0."""
+    mex = tmp_path / "stub.mex"
+    mex.write_bytes(_EMPTY_CHANNELS_STUB)
+
+    doc = MexDocument.load(mex)
+    result = apply_mcl_set(doc, _intent(add_flexio_logic_channel="FLEXIO_UART_CH0"))
+
+    assert not result.blocked, [d.to_dict() for d in result.diagnostics]
+    assert "mcl" in result.changed_modules
+
+    # Write and reload to confirm the file is well-formed after the empty-array splice
+    doc.write(mex)
+    reloaded = MexDocument.load(mex)
+
+    structs = _channel_structs(reloaded)
+    assert len(structs) == 1, f"Expected exactly 1 struct after first insert, got {len(structs)}"
+    s = structs[0]
+    assert s.attrib.get("name") == "0", (
+        f"First channel struct name must be '0' (empty list -> index 0), got '{s.attrib.get('name')}'"
+    )
+    assert _setting_value(reloaded, s, "Name") == "FLEXIO_UART_CH0"
+    assert _setting_value(reloaded, s, "FlexioMclChannelId") == "CHANNEL_0", (
+        "Empty list -> max channel index is -1 -> new id is CHANNEL_0"
+    )
+    assert _setting_value(reloaded, s, "FlexioMclPinId") == "PIN_0", (
+        "Empty list -> max pin index is -1 -> new id is PIN_0"
+    )

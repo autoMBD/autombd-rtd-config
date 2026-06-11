@@ -2,7 +2,7 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.4.0 |
+| Version | 0.4.1 |
 | Date | 2026-06-11 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Holds only CROSS-CUTTING truth (the S32DS headless validation flow + gate, and fixture role/usage) and the SOURCING RULE for per-module truth. Per-module valid values, constraints, and dependencies are NOT listed here — they come from each module's `.xdm` and live in that module's provider. |
@@ -102,10 +102,12 @@ docs.
 Worked example — `Uart_Example_S32K344`
 (`tests/fixtures/nxp/ds/s32k3/Uart_Example_S32K344/`): full S32DS project
 (`.project` name `Uart_Example_S32K344` + `.cproject`). Default XML namespace
-`http://mcuxpresso.nxp.com/XSD/mex_configuration_18`; CRLF endings;
-non-canonical XML declaration `<?xml version="1.0" encoding= "UTF-8" ?>` —
-preserve byte-for-byte. Recompute the nearest `quick_selection` carrier at edit
-time.
+`http://mcuxpresso.nxp.com/XSD/mex_configuration_18`; LF (Unix) endings (CRLF
+count 0, LF 2467 — byte-verified); the byte-faithful writer auto-detects the
+file's line ending so insertions derive it from the file and never hardcode a
+line-ending style; non-canonical XML declaration
+`<?xml version="1.0" encoding= "UTF-8" ?>` — preserve byte-for-byte.
+Recompute the nearest `quick_selection` carrier at edit time.
 
 ## 3. S32 ConfigTools headless validation (cross-cutting; verified)
 
@@ -163,3 +165,4 @@ Source: the `com.nxp.swtools.doc.uct` plugin jar
 | 2026-06-03 | 0.2.0 | Reframed: per-module values/constraints/dependencies are sourced from each `<Module>.xdm` and owned by the provider (not catalogued here); this doc keeps only the cross-cutting S32DS validation flow/gate, fixture facts, and the sourcing rule. |
 | 2026-06-10 | 0.3.0 | Fourth-round review resolution: recorded the exact pin-mux workbook path as the pins.json source (development input only); reframed §2 as fixture role/usage (fixtures grow with module support; Uart_Example_S32K344 kept as the worked example); asset paths updated to `autombd-rtd/assets/`. |
 | 2026-06-11 | 0.4.0 | Verified S32DS **Flow B** (standalone `-Load`/`-ExportSrc`, no registration) on S32DS 3.6.7 and adopted it as the validation flow; marked the registration-based **Flow A** superseded. Flow A's CDT `-import` step timed out (exit 124), so every run failed with `Cannot get container for IPath` and a spurious exit 2 even on a pristine fixture. Recorded the known-good/known-bad evidence and the empirical confirmation that exit 0 alone is insufficient (an invalid OsIf edit returns exit 0 while logging a SEVERE `[TOOL] … has the following error`). |
+| 2026-06-11 | 0.4.1 | Corrected the `Uart_Example_S32K344` fixture line-ending fact: the file has LF (Unix) endings (CRLF count 0, LF 2467 — byte-verified), not CRLF. Added the auto-detect rule: the byte-faithful writer derives line endings from the file and never hardcodes a style. |
