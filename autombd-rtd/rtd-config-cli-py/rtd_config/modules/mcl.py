@@ -63,9 +63,27 @@ class MclProvider:
     name = "mcl"
 
     def plan(self, intent: Intent) -> Plan:
-        return Plan([self.flexio_dependency(intent.payload.get("hw", ""))])
+        changes = []
+        channel_name = intent.payload.get("add_flexio_logic_channel")
+        if channel_name:
+            changes.append(PlannedChange(
+                module="mcl",
+                owner="mcl",
+                path="/Mcl/Mcl/MclConfig/FlexioCommon_0/FlexioMclLogicChannels",
+                description=(
+                    f"Append FlexIO logic channel '{channel_name}' to "
+                    "FlexioMclLogicChannels with next-available CHANNEL_N and PIN_N ids "
+                    "(uniqueness enforced per Mcl.xdm constraint)"
+                ),
+            ))
+        else:
+            # Legacy plan path: used when called without add_flexio_logic_channel
+            # (e.g., by the Uart provider's cross-module dependency declaration).
+            hw = intent.payload.get("hw", "")
+            changes.append(self._flexio_dependency(hw))
+        return Plan(changes)
 
-    def flexio_dependency(self, hw: str) -> PlannedChange:
+    def _flexio_dependency(self, hw: str) -> PlannedChange:
         """Return the Mcl-owned FlexIO logic-channel dependency Uart requires."""
         return PlannedChange(
             module="mcl",
@@ -73,3 +91,7 @@ class MclProvider:
             path="/Mcl/Mcl/MclConfig/FlexioCommon_0/FlexioMclLogicChannels",
             description=f"Ensure FlexIO logic channel for {hw}",
         )
+
+    # Keep the legacy public name for any existing callers.
+    def flexio_dependency(self, hw: str) -> PlannedChange:
+        return self._flexio_dependency(hw)

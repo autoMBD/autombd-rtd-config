@@ -599,3 +599,271 @@ def _find_osif_counter_array(doc: MexDocument, basenxp_cfg: ET.Element) -> ET.El
         if el.tag.endswith("array") and el.attrib.get("name") == "OsIfCounterConfig":
             return el
     return None
+
+
+# ---------------------------------------------------------------------------
+# Mcl: FlexIO logic-channel insertion
+# ---------------------------------------------------------------------------
+
+def _find_flexio_channels_array(
+    doc: MexDocument,
+    mcl_cfg: ET.Element,
+) -> "ET.Element | None":
+    """Return the FlexioMclLogicChannels array inside the first FlexioCommon struct."""
+    for el in mcl_cfg.iter():
+        if el.tag.endswith("array") and el.attrib.get("name") == "FlexioMclLogicChannels":
+            return el
+    return None
+
+
+def _extract_channel_index(value: str) -> int | None:
+    """Parse a CHANNEL_N enum value to its integer index N. Returns None on failure."""
+    if value.startswith("CHANNEL_"):
+        try:
+            return int(value[len("CHANNEL_"):])
+        except ValueError:
+            pass
+    return None
+
+
+def _extract_pin_index(value: str) -> int | None:
+    """Parse a PIN_N enum value to its integer index N. Returns None on failure."""
+    if value.startswith("PIN_"):
+        try:
+            return int(value[len("PIN_"):])
+        except ValueError:
+            pass
+    return None
+
+
+def _build_flexio_channel_struct_bytes(
+    struct_index: int,
+    channel_id: str,
+    pin_id: str,
+    channel_name: str,
+    indent: int,
+    line_ending: bytes,
+) -> bytes:
+    """Build the raw bytes for one new FlexioMclLogicChannels <struct>.
+
+    The returned bytes represent the complete struct (open tag + settings +
+    close tag). They will be appended after the last existing struct's bytes,
+    separated by a line ending.
+
+    ``indent`` is the number of leading spaces before the ``<struct>`` tag;
+    settings are indented by ``indent + 3`` spaces.
+
+    Children order from Mcl.xdm (verified in mcl.json asset):
+      Name, FlexioMclChannelId, FlexioMclPinId,
+      FlexioMclAddPinEnable, FlexioMclAddPinId,
+      FlexioMclAddChannelEnable, FlexioMclAddChannelId
+    """
+    le = line_ending.decode("latin-1")
+    sp_struct = " " * indent
+    sp_child = " " * (indent + 3)
+    lines = [
+        f'{sp_struct}<struct name="{struct_index}">',
+        f'{sp_child}<setting name="Name" value="{channel_name}"/>',
+        f'{sp_child}<setting name="FlexioMclChannelId" value="{channel_id}"/>',
+        f'{sp_child}<setting name="FlexioMclPinId" value="{pin_id}"/>',
+        f'{sp_child}<setting name="FlexioMclAddPinEnable" value="false"/>',
+        f'{sp_child}<setting name="FlexioMclAddPinId" value="PIN_0"/>',
+        f'{sp_child}<setting name="FlexioMclAddChannelEnable" value="false"/>',
+        f'{sp_child}<setting name="FlexioMclAddChannelId" value="CHANNEL_0"/>',
+        f'{sp_struct}</struct>',
+    ]
+    return le.join(lines).encode("utf-8")
+
+
+def _detect_struct_indent(doc: MexDocument, struct: ET.Element) -> int:
+    """Detect the number of leading spaces before ``struct``'s start tag in the raw bytes.
+
+    Uses the expat-captured source span: walks backward from src.start to find
+    the previous newline, then counts spaces from newline+1 to src.start.
+    """
+    elements = list(doc.root.iter())
+    src_index = next((i for i, e in enumerate(elements) if e is struct), None)
+    if src_index is None or not doc._aligned:
+        return 36  # sane fallback (matches fixture indent level)
+    src = doc._sources[src_index]
+    raw = doc._raw
+    # Walk backward from src.start to find the start of the line
+    i = src.start - 1
+    while i >= 0 and raw[i:i + 1] not in (b"\n", b"\r"):
+        i -= 1
+    line_start = i + 1
+    spaces = 0
+    while line_start + spaces < src.start and raw[line_start + spaces:line_start + spaces + 1] == b" ":
+        spaces += 1
+    return spaces
+
+
+def apply_mcl_set(doc: MexDocument, intent: Intent) -> ApplyResult:
+    """Apply an owned Mcl edit: append one FlexIO logic channel to FlexioMclLogicChannels.
+
+    Intent payload must carry ``add_flexio_logic_channel`` (string: the new
+    channel's Name). The next-available struct index, FlexioMclChannelId, and
+    FlexioMclPinId are computed dynamically from the existing entries to satisfy
+    the Mcl.xdm uniqueness constraint (no hardcoded indices).
+
+    Idempotent: if a channel with the same Name already exists, returns without
+    modifying the document (no-op, no error).
+
+    Returns a blocker Diagnostic if:
+    - No Mcl <config_set> is found.
+    - No FlexioCommon container (and thus no FlexioMclLogicChannels array) exists.
+    """
+    result = ApplyResult()
+    channel_name = intent.payload.get("add_flexio_logic_channel")
+    if not channel_name:
+        return result  # nothing requested -- no-op
+
+    mcl_cfg = doc.find_config_set("Mcl")
+    if mcl_cfg is None:
+        result.diagnostics.append(Diagnostic(
+            severity="blocker",
+            code="mcl_config_set_not_found",
+            module="mcl",
+            message="No enabled Mcl <config_set> found; cannot add FlexIO logic channel.",
+            details={},
+        ))
+        return result
+
+    channels_array = _find_flexio_channels_array(doc, mcl_cfg)
+    if channels_array is None:
+        result.diagnostics.append(Diagnostic(
+            severity="blocker",
+            code="mcl_flexio_common_not_found",
+            module="mcl",
+            message=(
+                "No FlexioMclLogicChannels array found under a FlexioCommon struct in "
+                "the Mcl config set; cannot add FlexIO logic channel. Ensure "
+                "MclEnableFlexioCommon is true and a FlexioCommon entry exists."
+            ),
+            details={},
+        ))
+        return result
+
+    existing_structs = [c for c in channels_array if c.tag.endswith("struct")]
+
+    # Idempotency: do not add a duplicate if the name already exists.
+    for struct in existing_structs:
+        name_setting = doc.find_child_setting(struct, "Name")
+        if name_setting is not None and name_setting.attrib.get("value") == channel_name:
+            return result  # already present -- silent no-op
+
+    # Compute next-available indices dynamically.
+    # struct name = count of existing structs (sequential 0-based).
+    new_struct_index = len(existing_structs)
+
+    # FlexioMclChannelId: max existing channel index + 1
+    max_channel = -1
+    for struct in existing_structs:
+        ch_setting = doc.find_child_setting(struct, "FlexioMclChannelId")
+        if ch_setting is not None:
+            idx = _extract_channel_index(ch_setting.attrib.get("value", ""))
+            if idx is not None and idx > max_channel:
+                max_channel = idx
+    new_channel_id = f"CHANNEL_{max_channel + 1}"
+
+    # FlexioMclPinId: max existing pin index + 1
+    max_pin = -1
+    for struct in existing_structs:
+        pin_setting = doc.find_child_setting(struct, "FlexioMclPinId")
+        if pin_setting is not None:
+            idx = _extract_pin_index(pin_setting.attrib.get("value", ""))
+            if idx is not None and idx > max_pin:
+                max_pin = idx
+    new_pin_id = f"PIN_{max_pin + 1}"
+
+    # Detect indentation from the last existing struct to match sibling formatting.
+    last_struct = existing_structs[-1] if existing_structs else None
+    if last_struct is not None:
+        struct_indent = _detect_struct_indent(doc, last_struct)
+    else:
+        struct_indent = 36  # fallback: fixture level
+
+    line_ending = _detect_line_ending(doc._raw)
+
+    new_struct_bytes = _build_flexio_channel_struct_bytes(
+        struct_index=new_struct_index,
+        channel_id=new_channel_id,
+        pin_id=new_pin_id,
+        channel_name=channel_name,
+        indent=struct_indent,
+        line_ending=line_ending,
+    )
+
+    if last_struct is not None:
+        # Insertion strategy (a): replace the last existing struct's region with
+        # [itself] + line_ending + [new struct bytes].
+        # First capture the last struct's raw bytes via its element region.
+        elements = list(doc.root.iter())
+        last_src_index = next(
+            (i for i, e in enumerate(elements) if e is last_struct), None
+        )
+        if last_src_index is None or not doc._aligned:
+            result.diagnostics.append(Diagnostic(
+                severity="blocker",
+                code="mcl_struct_not_aligned",
+                module="mcl",
+                message="Could not locate last FlexioMclLogicChannels struct in raw bytes.",
+                details={},
+            ))
+            return result
+
+        last_src = doc._sources[last_src_index]
+        # Find the end of the last struct's region in the raw bytes.
+        # We need to call the document's internal helper via replace_element_region's
+        # own logic -- but we want the original bytes, not to trigger a replace.
+        # Use the document's _find_element_region_end to get span_end.
+        span_end = doc._find_element_region_end(last_src, last_struct)
+        if span_end is None:
+            result.diagnostics.append(Diagnostic(
+                severity="blocker",
+                code="mcl_struct_region_end_not_found",
+                module="mcl",
+                message="Could not determine byte region of last FlexioMclLogicChannels struct.",
+                details={},
+            ))
+            return result
+
+        # Extract the original last-struct bytes verbatim from raw.
+        last_struct_raw = doc._raw[last_src.start: span_end + 1]
+
+        # Build replacement: original last struct + line_ending + new struct bytes
+        combined = last_struct_raw + line_ending + new_struct_bytes
+
+        # replace_element_region splices starting at last_src.start and ending at span_end.
+        # We need to pass the live element reference (last_struct) -- but after
+        # _capture_sources(), the element reference is still valid before the splice.
+        doc.replace_element_region(last_struct, combined)
+    else:
+        # Empty array case: replace the self-closed array with a populated one.
+        # (should not occur given the fixture, but handles empty FlexioMclLogicChannels)
+        le = line_ending.decode("latin-1")
+        array_indent = struct_indent - 3  # array is one level above struct
+        sp_array = " " * array_indent
+        array_bytes = (
+            f'<array name="FlexioMclLogicChannels">{le}'
+            f'{new_struct_bytes.decode("utf-8")}{le}'
+            f'{sp_array}</array>'
+        ).encode("utf-8")
+        doc.replace_element_region(channels_array, array_bytes)
+
+    # After replace_element_region the tree is reloaded; re-find the Mcl config.
+    mcl_cfg = doc.find_config_set("Mcl")
+    channels_array = _find_flexio_channels_array(doc, mcl_cfg) if mcl_cfg is not None else None
+
+    # Mark modified: the channels array and its nearest quick_selection ancestor.
+    modified: list[ET.Element] = []
+    if channels_array is not None:
+        doc.mark_modified(channels_array)
+        carrier = doc.find_nearest_quick_selection_ancestor(channels_array)
+        if carrier is not None:
+            doc.mark_modified(carrier)
+        modified.append(channels_array)
+
+    result.changed_modules.append("mcl")
+    result.modified_elements.extend(modified)
+    return result

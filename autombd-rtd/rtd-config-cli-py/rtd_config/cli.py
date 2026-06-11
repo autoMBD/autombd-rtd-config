@@ -60,8 +60,9 @@ from .intent import Intent
 from .modules.uart import UartProvider
 from .modules.platform import PlatformProvider
 from .modules.basenxp import BaseNxpProvider
+from .modules.mcl import MclProvider
 from .checks.static import run_static_checks
-from .backends.s32_mex.apply import apply_uart_set, apply_platform_set, apply_basenxp_set
+from .backends.s32_mex.apply import apply_uart_set, apply_platform_set, apply_basenxp_set, apply_mcl_set
 from .backends.s32_mex.validation import run_validation
 
 
@@ -147,6 +148,23 @@ def build_parser() -> argparse.ArgumentParser:
     basenxp_set.add_argument("--configure", action="store_true")
     basenxp_set.add_argument("--backup", action="store_true")
     basenxp_set.add_argument("--json", action="store_true")
+
+    mcl_parser = subparsers.add_parser("mcl")
+    mcl_actions = mcl_parser.add_subparsers(dest="action")
+    mcl_set = mcl_actions.add_parser("set")
+    mcl_set.add_argument("--project", required=True)
+    mcl_set.add_argument(
+        "--add-flexio-logic-channel",
+        metavar="NAME",
+        help=(
+            "Append a new FlexIO logic channel with the given name to "
+            "FlexioMclLogicChannels. Next-available CHANNEL_N and PIN_N ids "
+            "are computed dynamically (uniqueness enforced per Mcl.xdm)."
+        ),
+    )
+    mcl_set.add_argument("--configure", action="store_true")
+    mcl_set.add_argument("--backup", action="store_true")
+    mcl_set.add_argument("--json", action="store_true")
 
     return parser
 
@@ -402,6 +420,30 @@ def cmd_basenxp_set(args: argparse.Namespace) -> int:
     return _configure_module(args, intent, plan, apply_basenxp_set)
 
 
+def normalize_mcl_intent(args: argparse.Namespace) -> Intent:
+    """Normalize `mcl set` CLI arguments into the JSON intent contract."""
+    payload: dict = {}
+    channel = getattr(args, "add_flexio_logic_channel", None)
+    if channel:
+        payload["add_flexio_logic_channel"] = channel
+    return Intent.from_dict({"module": "mcl", "action": "set", "payload": payload})
+
+
+def cmd_mcl_set(args: argparse.Namespace) -> int:
+    intent = normalize_mcl_intent(args)
+    plan = MclProvider().plan(intent)
+
+    if not args.configure:
+        return emit({
+            "status": "passed",
+            "command": "plan",
+            "normalized_intent": _intent_dict(intent),
+            "plan": plan.to_dict(),
+        })
+
+    return _configure_module(args, intent, plan, apply_mcl_set)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -426,6 +468,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "basenxp" and getattr(args, "action", None) == "set":
         return cmd_basenxp_set(args)
+
+    if args.command == "mcl" and getattr(args, "action", None) == "set":
+        return cmd_mcl_set(args)
 
     if args.version:
         return emit({
