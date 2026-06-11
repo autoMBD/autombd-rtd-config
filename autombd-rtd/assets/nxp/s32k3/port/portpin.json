@@ -1,0 +1,150 @@
+{
+  "_source": "Port.xdm (RTD 7.0.1, PortConfigSet/PortContainer/PortPin) + Uart_Example_S32K344 fixture + pins.json (pin_mapbga257 package pin numbers)",
+  "_note": "pins.json is the legality source for peripheral+signal->pin mapping. This asset defines the PortPin struct template and <pin> header format for the Port config section.",
+
+  "pin_header": {
+    "description": "Format of a <pin> entry inside the Pins tool <function><pins> section. This is the mux identity declaration that links a physical pin to a peripheral signal.",
+    "source_ref": "Port.xdm ConfigTools Pins tool <pin> element; Uart_Example_S32K344 fixture lines 45-60",
+    "signal_attr_rule": "signal attribute = peripheral.lower() + '_' + signal.lower(), e.g. LPUART0 TX -> lpuart0_tx; LPUART0 RX -> lpuart0_rx",
+    "pin_num_source": "pin_mapbga257 field from pins.json for the mapbga257 package (S32K344_257BGA detected from <package> element in .mex common section)",
+    "tx_template": "<pin peripheral=\"{PERIPHERAL_ID}\" signal=\"{signal_attr}\" pin_num=\"{pin_num}\" pin_signal=\"{pin_signal}\">\n   <pin_features>\n      <pin_feature name=\"direction\" value=\"OUTPUT\"/>\n   </pin_features>\n</pin>",
+    "rx_template": "<pin peripheral=\"{PERIPHERAL_ID}\" signal=\"{signal_attr}\" pin_num=\"{pin_num}\" pin_signal=\"{pin_signal}\"/>",
+    "note_tx": "TX gets direction=OUTPUT pin_feature (open element with children)",
+    "note_rx": "RX is input-only: self-closed element with no direction feature"
+  },
+
+  "portpin_struct": {
+    "description": "PortPin struct under Port/PortConfigSet/PortContainer[n]/PortPin. Electrical-only configuration; mux identity lives in the <pin> header above. Field set and order derived from Port.xdm and the Uart_Example_S32K344 fixture Lpuart3_Tx/Lpuart3_Rx structs.",
+    "source_ref": "Port.xdm:PortConfigSet/PortContainer/PortPin; Uart_Example_S32K344 fixture lines 1056-1097",
+    "children_order": [
+      "Name",
+      "PortPinPue",
+      "PortPinPus",
+      "PortPinSafeMode",
+      "PortPinDse",
+      "PortPinWithReadBack",
+      "PortPinPke",
+      "PortPinIfe",
+      "PortPinDirectionChangeable",
+      "PortPinModeChangeable",
+      "PortPinInvertControl",
+      "PortPinSiul2Instance",
+      "PortPinId",
+      "PortPinInitialMode",
+      "OBEGroupSelect",
+      "MscrPdacSlot",
+      "ImcrPdacSlot",
+      "IGFSettings",
+      "PortPinEcucPartitionRef"
+    ],
+    "fields": {
+      "Name": {
+        "type": "string",
+        "description": "Symbolic name. Convention: {PeripheralPascalCase}_{SignalTitle}, e.g. LPUART0 TX -> Lpuart0_Tx, LPUART0 RX -> Lpuart0_Rx.",
+        "source_ref": "Port.xdm:PortPin/Name; fixture Lpuart3_Tx/Lpuart3_Rx pattern"
+      },
+      "PortPinPue": {
+        "type": "bool",
+        "default": "false",
+        "source_ref": "Port.xdm:PortPin/PortPinPue"
+      },
+      "PortPinPus": {
+        "type": "bool",
+        "default": "false",
+        "source_ref": "Port.xdm:PortPin/PortPinPus"
+      },
+      "PortPinSafeMode": {
+        "type": "bool",
+        "default": "false",
+        "source_ref": "Port.xdm:PortPin/PortPinSafeMode"
+      },
+      "PortPinDse": {
+        "type": "bool",
+        "default": "false",
+        "source_ref": "Port.xdm:PortPin/PortPinDse"
+      },
+      "PortPinWithReadBack": {
+        "type": "bool",
+        "default": "false",
+        "source_ref": "Port.xdm:PortPin/PortPinWithReadBack"
+      },
+      "PortPinPke": {
+        "type": "bool",
+        "default": "false",
+        "source_ref": "Port.xdm:PortPin/PortPinPke"
+      },
+      "PortPinIfe": {
+        "type": "bool",
+        "default": "false",
+        "source_ref": "Port.xdm:PortPin/PortPinIfe"
+      },
+      "PortPinDirectionChangeable": {
+        "type": "bool",
+        "default": "true",
+        "source_ref": "Port.xdm:PortPin/PortPinDirectionChangeable"
+      },
+      "PortPinModeChangeable": {
+        "type": "bool",
+        "default": "true",
+        "source_ref": "Port.xdm:PortPin/PortPinModeChangeable"
+      },
+      "PortPinInvertControl": {
+        "type": "bool",
+        "default": "false",
+        "source_ref": "Port.xdm:PortPin/PortPinInvertControl"
+      },
+      "PortPinSiul2Instance": {
+        "type": "enum",
+        "default": "SIUL2_0",
+        "description": "SIUL2 hardware instance. SIUL2_0 is the primary instance for S32K344.",
+        "source_ref": "Port.xdm:PortPin/PortPinSiul2Instance; fixture default"
+      },
+      "PortPinId": {
+        "type": "uint16",
+        "description": "Unique pin id within the PortConfigSet. Computed dynamically as max(existing PortPinId values) + 1. TX gets max+1, RX gets max+2.",
+        "source_ref": "Port.xdm:PortPin/PortPinId; uniqueness enforced by ConfigTools"
+      },
+      "PortPinInitialMode": {
+        "type": "enum",
+        "default": "PORT_GPIO_MODE",
+        "source_ref": "Port.xdm:PortPin/PortPinInitialMode"
+      },
+      "OBEGroupSelect": {
+        "type": "enum",
+        "default": "NO_OBE_GROUP",
+        "source_ref": "Port.xdm:PortPin/OBEGroupSelect"
+      },
+      "MscrPdacSlot": {
+        "type": "enum",
+        "default": "VIRTUAL_WRAPPER_PDAC0",
+        "source_ref": "Port.xdm:PortPin/MscrPdacSlot"
+      },
+      "ImcrPdacSlot": {
+        "type": "enum",
+        "default": "VIRTUAL_WRAPPER_PDAC0",
+        "source_ref": "Port.xdm:PortPin/ImcrPdacSlot"
+      },
+      "IGFSettings": {
+        "type": "array",
+        "default": "empty",
+        "source_ref": "Port.xdm:PortPin/IGFSettings"
+      },
+      "PortPinEcucPartitionRef": {
+        "type": "array",
+        "default": "empty",
+        "source_ref": "Port.xdm:PortPin/PortPinEcucPartitionRef"
+      }
+    },
+    "next_id_algorithm": "Scan all existing PortPin structs in the target PortContainer; new TX struct index = count of existing structs; TX PortPinId = max(existing PortPinId values) + 1; RX struct index = TX index + 1; RX PortPinId = TX PortPinId + 1."
+  },
+
+  "package_detection": {
+    "description": "The .mex <common><package> element identifies the package variant. Map to the pins.json field for the package pin number.",
+    "source_ref": "Uart_Example_S32K344 fixture line 5: <package>S32K344_257BGA</package>",
+    "mappings": {
+      "S32K344_257BGA": "pin_mapbga257",
+      "S32K344_172HDQFP": "pin_hdqfp172"
+    },
+    "default": "pin_mapbga257"
+  }
+}

@@ -61,8 +61,9 @@ from .modules.uart import UartProvider
 from .modules.platform import PlatformProvider
 from .modules.basenxp import BaseNxpProvider
 from .modules.mcl import MclProvider
+from .modules.port import PortProvider
 from .checks.static import run_static_checks
-from .backends.s32_mex.apply import apply_uart_set, apply_platform_set, apply_basenxp_set, apply_mcl_set
+from .backends.s32_mex.apply import apply_uart_set, apply_platform_set, apply_basenxp_set, apply_mcl_set, apply_port_set
 from .backends.s32_mex.validation import run_validation
 
 
@@ -165,6 +166,21 @@ def build_parser() -> argparse.ArgumentParser:
     mcl_set.add_argument("--configure", action="store_true")
     mcl_set.add_argument("--backup", action="store_true")
     mcl_set.add_argument("--json", action="store_true")
+
+    port_parser = subparsers.add_parser("port")
+    port_actions = port_parser.add_subparsers(dest="action")
+    port_set = port_actions.add_parser("set")
+    port_set.add_argument("--project", required=True)
+    port_set.add_argument(
+        "--peripheral",
+        required=True,
+        help="Peripheral whose TX/RX pins to configure, e.g. LPUART_0.",
+    )
+    port_set.add_argument("--tx", metavar="PIN", help="TX pin signal name, e.g. PTA27.")
+    port_set.add_argument("--rx", metavar="PIN", help="RX pin signal name, e.g. PTA28.")
+    port_set.add_argument("--configure", action="store_true")
+    port_set.add_argument("--backup", action="store_true")
+    port_set.add_argument("--json", action="store_true")
 
     return parser
 
@@ -444,6 +460,36 @@ def cmd_mcl_set(args: argparse.Namespace) -> int:
     return _configure_module(args, intent, plan, apply_mcl_set)
 
 
+def normalize_port_intent(args: argparse.Namespace) -> Intent:
+    """Normalize `port set` CLI arguments into the JSON intent contract."""
+    payload: dict = {}
+    if args.peripheral:
+        payload["peripheral"] = args.peripheral
+    pins: dict = {}
+    if args.tx:
+        pins["tx"] = args.tx
+    if args.rx:
+        pins["rx"] = args.rx
+    if pins:
+        payload["pins"] = pins
+    return Intent.from_dict({"module": "port", "action": "set", "payload": payload})
+
+
+def cmd_port_set(args: argparse.Namespace) -> int:
+    intent = normalize_port_intent(args)
+    plan = PortProvider().plan(intent)
+
+    if not args.configure:
+        return emit({
+            "status": "passed",
+            "command": "plan",
+            "normalized_intent": _intent_dict(intent),
+            "plan": plan.to_dict(),
+        })
+
+    return _configure_module(args, intent, plan, apply_port_set)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -471,6 +517,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "mcl" and getattr(args, "action", None) == "set":
         return cmd_mcl_set(args)
+
+    if args.command == "port" and getattr(args, "action", None) == "set":
+        return cmd_port_set(args)
 
     if args.version:
         return emit({

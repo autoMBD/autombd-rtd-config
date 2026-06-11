@@ -61,11 +61,46 @@ class PortProvider:
     name = "port"
 
     def plan(self, intent: Intent) -> Plan:
+        """Return owned PlannedChanges for pin routing.
+
+        Produces one PlannedChange per signal direction (TX/RX), each
+        describing the <pin> header insertion and PortPin struct append.
+        Owner is always 'port'; no cross-module edits.
+        """
         pins = intent.payload.get("pins") or {}
-        return Plan([self.pin_dependency(pins)])
+        peripheral = intent.payload.get("peripheral", "")
+        tx = pins.get("tx")
+        rx = pins.get("rx")
+        changes: list[PlannedChange] = []
+        if tx:
+            changes.append(PlannedChange(
+                module="port",
+                owner="port",
+                path="/Port/Port/PortConfigSet/PortContainer/PortPin",
+                description=(
+                    f"Insert <pin> header + PortPin struct for {peripheral} TX={tx}: "
+                    f"signal={peripheral.lower().replace('_', '')}_tx, "
+                    f"port section PortContainer_0_VS_0"
+                ),
+            ))
+        if rx:
+            changes.append(PlannedChange(
+                module="port",
+                owner="port",
+                path="/Port/Port/PortConfigSet/PortContainer/PortPin",
+                description=(
+                    f"Insert <pin> header + PortPin struct for {peripheral} RX={rx}: "
+                    f"signal={peripheral.lower().replace('_', '')}_rx, "
+                    f"port section PortContainer_0_VS_0"
+                ),
+            ))
+        if not changes:
+            # Fallback: general pin-mux dependency for cross-module consumers
+            changes.append(self.pin_dependency(pins))
+        return Plan(changes)
 
     def pin_dependency(self, pins: dict) -> PlannedChange:
-        """Return the Port-owned pin-mux dependency a consumer requires."""
+        """Return a generic Port-owned pin-mux dependency (used by cross-module callers)."""
         tx = pins.get("tx")
         rx = pins.get("rx")
         return PlannedChange(

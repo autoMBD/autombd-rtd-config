@@ -59,13 +59,22 @@ removed (the highest-risk lesson from the legacy-skills experience).
 """
 from __future__ import annotations
 
+import json
 import re
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from rtd_config.backends.s32_mex.document import MexDocument
 from rtd_config.diagnostics import Diagnostic
 from rtd_config.intent import Intent
+
+# Skill root: this file lives at
+#   autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py
+# parents[4] is autombd-rtd/
+_APPLY_FILE = Path(__file__).resolve()
+_SKILL_ROOT = _APPLY_FILE.parents[4]
+_ASSET_ROOT = _SKILL_ROOT / "assets"
 
 
 # Uart "asynchronous method" enum. RTD 7.0.1 ConfigTools models this field with
@@ -865,5 +874,657 @@ def apply_mcl_set(doc: MexDocument, intent: Intent) -> ApplyResult:
         modified.append(channels_array)
 
     result.changed_modules.append("mcl")
+    result.modified_elements.extend(modified)
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Port: LPUART TX/RX pin-routing insertion
+# ---------------------------------------------------------------------------
+
+# Package element text -> pins.json field mapping (grounded in portpin.json asset)
+_PACKAGE_PIN_FIELD: dict[str, str] = {
+    "S32K344_257BGA": "pin_mapbga257",
+    "S32K344_172HDQFP": "pin_hdqfp172",
+}
+_DEFAULT_PIN_FIELD = "pin_mapbga257"
+
+
+def _load_pins_data() -> list[dict]:
+    """Load committed pins.json asset. Never reads .xdm at runtime."""
+    pins_path = _ASSET_ROOT / "nxp" / "s32k3" / "port" / "pins.json"
+    data = json.loads(pins_path.read_text(encoding="utf-8"))
+    return data["signals"]
+
+
+def _normalize_peripheral_id(peripheral: str) -> str:
+    """LPUART_0 -> LPUART0 (asset-internal form)."""
+    return re.sub(r"_(\d+)$", r"\1", peripheral.strip().upper())
+
+
+def _detect_package_pin_field(doc: MexDocument) -> str:
+    """Read <common><package> from the .mex and return the pins.json field name."""
+    for el in doc.root.iter():
+        if el.tag.endswith("package") and el.text:
+            pkg = el.text.strip()
+            return _PACKAGE_PIN_FIELD.get(pkg, _DEFAULT_PIN_FIELD)
+    return _DEFAULT_PIN_FIELD
+
+
+def _legal_pins_for_signal(
+    signals: list[dict],
+    peripheral_id: str,
+    signal_suffix: str,
+) -> list[dict]:
+    """Return all pins.json records where peripheral==peripheral_id and signal==signal_suffix.
+
+    ``signal_suffix`` is the short signal name from the asset, e.g. 'TX', 'RX'.
+    Matching is case-insensitive.
+    """
+    target_signal = signal_suffix.upper()
+    return [
+        s for s in signals
+        if s.get("peripheral", "").upper() == peripheral_id
+        and s.get("signal", "").upper() == target_signal
+    ]
+
+
+def _find_pin_record(
+    signals: list[dict],
+    peripheral_id: str,
+    signal_suffix: str,
+    pin_signal: str,
+) -> dict | None:
+    """Return the pins.json record for a specific peripheral+signal+pin combination."""
+    target_signal = signal_suffix.upper()
+    target_pin = pin_signal.upper()
+    for s in signals:
+        if (
+            s.get("peripheral", "").upper() == peripheral_id
+            and s.get("signal", "").upper() == target_signal
+            and s.get("pin", "").upper() == target_pin
+        ):
+            return s
+    return None
+
+
+def _find_port_function_pins_el(doc: MexDocument) -> ET.Element | None:
+    """Return the <pins> element inside the PortContainer_0_VS_0 function."""
+    for el in doc.root.iter():
+        if (
+            el.tag.endswith("function")
+            and el.attrib.get("name") == "PortContainer_0_VS_0"
+        ):
+            for child in el:
+                if child.tag.endswith("pins"):
+                    return child
+    return None
+
+
+def _is_pin_already_configured(
+    pins_el: ET.Element,
+    peripheral_id: str,
+    signal_attr: str,
+) -> bool:
+    """Return True if a <pin> with the given peripheral and signal already exists."""
+    for child in pins_el:
+        if (
+            child.tag.endswith("pin")
+            and child.attrib.get("peripheral") == peripheral_id
+            and child.attrib.get("signal") == signal_attr
+        ):
+            return True
+    return False
+
+
+def _is_portpin_struct_already_configured(
+    portpin_array: ET.Element,
+    doc: MexDocument,
+    name: str,
+) -> bool:
+    """Return True if a PortPin struct with the given Name already exists."""
+    for child in portpin_array:
+        if child.tag.endswith("struct"):
+            name_setting = doc.find_child_setting(child, "Name")
+            if name_setting is not None and name_setting.attrib.get("value") == name:
+                return True
+    return False
+
+
+def _build_pin_header_tx_bytes(
+    peripheral_id: str,
+    signal_attr: str,
+    pin_num: str,
+    pin_signal: str,
+    indent: int,
+    line_ending: bytes,
+) -> bytes:
+    """Build bytes for a TX <pin> entry with direction=OUTPUT feature.
+
+    Grounded in portpin.json and fixture lines 46-50 (LPUART3 TX pattern).
+    """
+    le = line_ending.decode("latin-1")
+    sp = " " * indent
+    sp2 = " " * (indent + 3)
+    sp3 = " " * (indent + 6)
+    lines = [
+        f'{sp}<pin peripheral="{peripheral_id}" signal="{signal_attr}" pin_num="{pin_num}" pin_signal="{pin_signal}">',
+        f'{sp2}<pin_features>',
+        f'{sp3}<pin_feature name="direction" value="OUTPUT"/>',
+        f'{sp2}</pin_features>',
+        f'{sp}</pin>',
+    ]
+    return le.join(lines).encode("utf-8")
+
+
+def _build_pin_header_rx_bytes(
+    peripheral_id: str,
+    signal_attr: str,
+    pin_num: str,
+    pin_signal: str,
+    indent: int,
+) -> bytes:
+    """Build bytes for an RX <pin> self-closed entry (input-only, no direction).
+
+    Grounded in portpin.json and fixture line 45 (LPUART3 RX pattern).
+    """
+    sp = " " * indent
+    return (
+        f'{sp}<pin peripheral="{peripheral_id}" signal="{signal_attr}"'
+        f' pin_num="{pin_num}" pin_signal="{pin_signal}"/>'
+    ).encode("utf-8")
+
+
+def _build_portpin_struct_bytes(
+    struct_index: int,
+    portpin_name: str,
+    portpin_id: int,
+    indent: int,
+    line_ending: bytes,
+) -> bytes:
+    """Build the raw bytes for one new PortPin <struct>.
+
+    Field set and order grounded in portpin.json (derived from Port.xdm and the
+    Uart_Example_S32K344 fixture Lpuart3_Tx/Lpuart3_Rx structs).
+    All settings use safe defaults from the asset.
+    """
+    le = line_ending.decode("latin-1")
+    sp_struct = " " * indent
+    sp_child = " " * (indent + 3)
+    lines = [
+        f'{sp_struct}<struct name="{struct_index}">',
+        f'{sp_child}<setting name="Name" value="{portpin_name}"/>',
+        f'{sp_child}<setting name="PortPinPue" value="false"/>',
+        f'{sp_child}<setting name="PortPinPus" value="false"/>',
+        f'{sp_child}<setting name="PortPinSafeMode" value="false"/>',
+        f'{sp_child}<setting name="PortPinDse" value="false"/>',
+        f'{sp_child}<setting name="PortPinWithReadBack" value="false"/>',
+        f'{sp_child}<setting name="PortPinPke" value="false"/>',
+        f'{sp_child}<setting name="PortPinIfe" value="false"/>',
+        f'{sp_child}<setting name="PortPinDirectionChangeable" value="true"/>',
+        f'{sp_child}<setting name="PortPinModeChangeable" value="true"/>',
+        f'{sp_child}<setting name="PortPinInvertControl" value="false"/>',
+        f'{sp_child}<setting name="PortPinSiul2Instance" value="SIUL2_0"/>',
+        f'{sp_child}<setting name="PortPinId" value="{portpin_id}"/>',
+        f'{sp_child}<setting name="PortPinInitialMode" value="PORT_GPIO_MODE"/>',
+        f'{sp_child}<setting name="OBEGroupSelect" value="NO_OBE_GROUP"/>',
+        f'{sp_child}<setting name="MscrPdacSlot" value="VIRTUAL_WRAPPER_PDAC0"/>',
+        f'{sp_child}<setting name="ImcrPdacSlot" value="VIRTUAL_WRAPPER_PDAC0"/>',
+        f'{sp_child}<array name="IGFSettings"/>',
+        f'{sp_child}<array name="PortPinEcucPartitionRef"/>',
+        f'{sp_struct}</struct>',
+    ]
+    return le.join(lines).encode("utf-8")
+
+
+def _pin_name_for_signal(peripheral: str, signal: str) -> str:
+    """Build the PortPin struct Name following the convention in portpin.json.
+
+    Convention (grounded in fixture and portpin.json):
+      LPUART0 TX -> Lpuart0_Tx
+      LPUART0 RX -> Lpuart0_Rx
+    Rule: PascalCase peripheral_id (Lpuart0) + underscore + TitleCase signal (Tx/Rx).
+    peripheral here is the raw CLI peripheral like 'LPUART_0' or 'LPUART0'.
+    signal is 'TX' or 'RX'.
+    """
+    # Build PascalCase from the peripheral ID (LPUART0 -> Lpuart0)
+    periph_id = _normalize_peripheral_id(peripheral)  # e.g. LPUART0
+    # PascalCase: capitalize first char, then lower except digits
+    # Pattern: first letter upper, rest of word lower, digits preserved
+    # LPUART0 -> L + puart + 0 -> Lpuart0
+    if periph_id:
+        pascal = periph_id[0].upper() + periph_id[1:].lower()
+    else:
+        pascal = periph_id
+    # TitleCase signal: TX -> Tx, RX -> Rx
+    sig_title = signal.upper()[0] + signal.upper()[1:].lower()
+    return f"{pascal}_{sig_title}"
+
+
+def _append_after_last_element(
+    doc: MexDocument,
+    last_el: ET.Element,
+    new_bytes: bytes,
+    line_ending: bytes,
+) -> bool:
+    """Append ``new_bytes`` after ``last_el``'s byte region.
+
+    Uses the same splice-and-append pattern as apply_mcl_set. Returns True on
+    success; False if the element cannot be located (aligned mismatch).
+    """
+    elements = list(doc.root.iter())
+    src_index = next((i for i, e in enumerate(elements) if e is last_el), None)
+    if src_index is None or not doc._aligned:
+        return False
+
+    last_src = doc._sources[src_index]
+    span_end = doc._find_element_region_end(last_src, last_el)
+    if span_end is None:
+        return False
+
+    last_el_raw = doc._raw[last_src.start: span_end + 1]
+    combined = last_el_raw + line_ending + new_bytes
+    doc.replace_element_region(last_el, combined)
+    return True
+
+
+def _insert_into_parent_before_close(
+    doc: MexDocument,
+    parent_el: ET.Element,
+    new_bytes: bytes,
+    line_ending: bytes,
+) -> bool:
+    """Insert ``new_bytes`` just before the parent element's close tag LINE.
+
+    Strategy: locate the parent element's byte span via expat source data,
+    extract the raw region, find the last ``</tag_name>`` within it, then
+    walk backward to the start of that close-tag's line (preserving the
+    original indentation of the close tag). New bytes are inserted before
+    the close-tag line so the indentation is preserved exactly.
+
+    Returns True on success, False if the parent cannot be located or its
+    close tag cannot be found in the raw bytes.
+
+    This approach avoids depth-counting on children whose tag name shares a
+    prefix with the parent (e.g. ``<pin>`` with ``<pin_features>`` children),
+    which confuses the generic ``_find_element_region_end`` scanner.
+    """
+    elements = list(doc.root.iter())
+    src_index = next((i for i, e in enumerate(elements) if e is parent_el), None)
+    if src_index is None or not doc._aligned:
+        return False
+
+    parent_src = doc._sources[src_index]
+    span_end = doc._find_element_region_end(parent_src, parent_el)
+    if span_end is None:
+        return False
+
+    parent_raw = doc._raw[parent_src.start: span_end + 1]
+
+    # Extract tag name from the raw start tag to build the close tag bytes.
+    start_tag_text = parent_raw[:parent_src.tag_end - parent_src.start + 1].decode("utf-8", errors="replace")
+    m = re.match(r"<([A-Za-z0-9_:.\-]+)", start_tag_text)
+    if m is None:
+        return False
+    close_tag = f"</{m.group(1)}>".encode("utf-8")
+
+    # Find the LAST occurrence of close_tag in the parent's raw bytes.
+    close_pos = parent_raw.rfind(close_tag)
+    if close_pos < 0:
+        return False
+
+    # Walk backward from close_pos to find the start of the close-tag's line.
+    # The line starts after the last \n before close_pos. This preserves the
+    # indentation whitespace as part of the close-tag line.
+    line_start = close_pos
+    while line_start > 0 and parent_raw[line_start - 1:line_start] not in (b"\n", b"\r"):
+        line_start -= 1
+
+    # Build the replacement:
+    #   everything before the close-tag line start
+    #   + new_bytes + line_ending
+    #   + close-tag line (indentation + close tag)
+    new_parent_raw = (
+        parent_raw[:line_start]
+        + new_bytes
+        + line_ending
+        + parent_raw[line_start:]
+    )
+    doc.replace_element_region(parent_el, new_parent_raw)
+    return True
+
+
+def apply_port_set(doc: MexDocument, intent: Intent) -> ApplyResult:
+    """Apply Port pin-routing insertion for a peripheral's TX/RX pins.
+
+    Validates that the requested pins are legal options for the peripheral
+    and signal from the committed pins.json asset. Rejects illegal pins with
+    a blocker ``port_illegal_pin`` diagnostic listing legal alternatives.
+
+    On success, inserts TWO representations (byte-faithful, pure insertion):
+      (A) ``<pin>`` header entries in the Pins tool
+          ``<function name="PortContainer_0_VS_0"><pins>`` section.
+      (B) ``PortPin`` struct entries appended to
+          ``config_set[Port] > PortConfigSet > PortContainer[0] > PortPin``.
+
+    Idempotent: skips a pin already configured (detected by peripheral+signal
+    for A and by Name for B). Returns ``changed_modules=["port"]`` only when
+    at least one representation was actually inserted.
+
+    Grounded in:
+    - pins.json (legality: legal peripheral+signal->pin options)
+    - portpin.json (PortPin field template, <pin> header format, package mapping)
+    - Port.xdm (field order, enum values)
+    - Uart_Example_S32K344 fixture (reference for exact indentation/structure)
+    """
+    result = ApplyResult()
+    payload = intent.payload
+    peripheral = payload.get("peripheral", "")
+    pins = payload.get("pins") or {}
+    tx_pin = pins.get("tx")
+    rx_pin = pins.get("rx")
+
+    if not peripheral or (not tx_pin and not rx_pin):
+        # Nothing actionable
+        return result
+
+    peripheral_id = _normalize_peripheral_id(peripheral)  # e.g. LPUART0
+
+    # Load committed pins.json asset (legality source)
+    signals_data = _load_pins_data()
+
+    # Validate TX pin legality
+    if tx_pin:
+        legal_tx = _legal_pins_for_signal(signals_data, peripheral_id, "TX")
+        legal_tx_pin_names = [s["pin"].upper() for s in legal_tx]
+        if tx_pin.upper() not in legal_tx_pin_names:
+            result.diagnostics.append(Diagnostic(
+                severity="blocker",
+                code="port_illegal_pin",
+                module="port",
+                message=(
+                    f"Pin '{tx_pin}' is not a legal TX option for {peripheral} "
+                    f"(asset: {peripheral_id} TX). "
+                    f"Legal TX pins from pins.json: {sorted(set(legal_tx_pin_names))}."
+                ),
+                details={
+                    "peripheral": peripheral,
+                    "signal": "TX",
+                    "requested_pin": tx_pin,
+                    "legal_pins": sorted(set(legal_tx_pin_names)),
+                },
+            ))
+
+    # Validate RX pin legality
+    if rx_pin:
+        legal_rx = _legal_pins_for_signal(signals_data, peripheral_id, "RX")
+        legal_rx_pin_names = [s["pin"].upper() for s in legal_rx]
+        if rx_pin.upper() not in legal_rx_pin_names:
+            result.diagnostics.append(Diagnostic(
+                severity="blocker",
+                code="port_illegal_pin",
+                module="port",
+                message=(
+                    f"Pin '{rx_pin}' is not a legal RX option for {peripheral} "
+                    f"(asset: {peripheral_id} RX). "
+                    f"Legal RX pins from pins.json: {sorted(set(legal_rx_pin_names))}."
+                ),
+                details={
+                    "peripheral": peripheral,
+                    "signal": "RX",
+                    "requested_pin": rx_pin,
+                    "legal_pins": sorted(set(legal_rx_pin_names)),
+                },
+            ))
+
+    if result.blocked:
+        return result
+
+    # Determine package -> pin_num field
+    pin_field = _detect_package_pin_field(doc)
+
+    line_ending = _detect_line_ending(doc._raw)
+
+    # ---- Part (A): Insert <pin> header entries ----
+    pins_el = _find_port_function_pins_el(doc)
+    if pins_el is None:
+        result.diagnostics.append(Diagnostic(
+            severity="blocker",
+            code="port_pins_function_not_found",
+            module="port",
+            message=(
+                "No <function name='PortContainer_0_VS_0'><pins> section found "
+                "in the .mex Pins tool; cannot insert pin header entries."
+            ),
+            details={},
+        ))
+        return result
+
+    pin_header_inserted = False
+
+    # Build all new <pin> bytes that need to be inserted (TX then RX, in order).
+    # We splice both into the <pins> parent with a single replace_element_region call
+    # to avoid repeated tree reloads and to sidestep the <pin>/<pin_features> depth-
+    # tracking issue in _find_element_region_end (which confuses <pin_features> with
+    # the <pin> open tag when scanning for the matching </pin> close tag).
+    new_pin_parts: list[bytes] = []
+
+    if tx_pin:
+        tx_signal_attr = f"{peripheral_id.lower()}_tx"
+        if not _is_pin_already_configured(pins_el, peripheral_id, tx_signal_attr):
+            tx_record = _find_pin_record(signals_data, peripheral_id, "TX", tx_pin)
+            tx_pin_num = tx_record[pin_field] if tx_record and tx_record.get(pin_field) else ""
+            tx_pin_bytes = _build_pin_header_tx_bytes(
+                peripheral_id=peripheral_id,
+                signal_attr=tx_signal_attr,
+                pin_num=tx_pin_num,
+                pin_signal=tx_pin,
+                indent=18,
+                line_ending=line_ending,
+            )
+            new_pin_parts.append(tx_pin_bytes)
+
+    if rx_pin:
+        rx_signal_attr = f"{peripheral_id.lower()}_rx"
+        if not _is_pin_already_configured(pins_el, peripheral_id, rx_signal_attr):
+            rx_record = _find_pin_record(signals_data, peripheral_id, "RX", rx_pin)
+            rx_pin_num = rx_record[pin_field] if rx_record and rx_record.get(pin_field) else ""
+            rx_pin_bytes = _build_pin_header_rx_bytes(
+                peripheral_id=peripheral_id,
+                signal_attr=rx_signal_attr,
+                pin_num=rx_pin_num,
+                pin_signal=rx_pin,
+                indent=18,
+            )
+            new_pin_parts.append(rx_pin_bytes)
+
+    if new_pin_parts:
+        # Join multiple new pins with line_ending separator
+        combined_new_pins = line_ending.join(new_pin_parts)
+        ok = _insert_into_parent_before_close(
+            doc, pins_el, combined_new_pins, line_ending
+        )
+        if not ok:
+            result.diagnostics.append(Diagnostic(
+                severity="blocker",
+                code="port_pin_insertion_failed",
+                module="port",
+                message="Could not splice new <pin> entries into <pins> section.",
+                details={"tx_pin": tx_pin, "rx_pin": rx_pin},
+            ))
+            return result
+
+        # Re-find pins_el after tree reload
+        pins_el = _find_port_function_pins_el(doc)
+        if pins_el is None:
+            result.diagnostics.append(Diagnostic(
+                severity="blocker",
+                code="port_pins_function_not_found",
+                module="port",
+                message="<pins> section lost after pin insertion.",
+                details={},
+            ))
+            return result
+        pin_header_inserted = True
+
+    # ---- Part (B): Insert PortPin struct entries ----
+    port_cfg = doc.find_config_set("Port")
+    if port_cfg is None:
+        result.diagnostics.append(Diagnostic(
+            severity="blocker",
+            code="port_config_set_not_found",
+            module="port",
+            message="No enabled Port <config_set> found; cannot insert PortPin structs.",
+            details={},
+        ))
+        return result
+
+    portpin_array = None
+    for el in port_cfg.iter():
+        if el.tag.endswith("array") and el.attrib.get("name") == "PortPin":
+            portpin_array = el
+            break
+
+    if portpin_array is None:
+        result.diagnostics.append(Diagnostic(
+            severity="blocker",
+            code="port_portpin_array_not_found",
+            module="port",
+            message="No PortPin array found in Port PortContainer[0]; cannot insert structs.",
+            details={},
+        ))
+        return result
+
+    existing_structs = [c for c in portpin_array if c.tag.endswith("struct")]
+
+    # Compute max existing PortPinId
+    max_portpin_id = 0
+    for s in existing_structs:
+        pid_setting = doc.find_child_setting(s, "PortPinId")
+        if pid_setting is not None:
+            try:
+                pid = int(pid_setting.attrib.get("value", "0"))
+                if pid > max_portpin_id:
+                    max_portpin_id = pid
+            except ValueError:
+                pass
+
+    struct_indent = 36  # fixture indentation for PortPin <struct> elements
+    portpin_struct_inserted = False
+
+    # TX PortPin struct
+    if tx_pin:
+        tx_name = _pin_name_for_signal(peripheral, "TX")
+        if not _is_portpin_struct_already_configured(portpin_array, doc, tx_name):
+            # Re-query existing structs (may have changed from prior insertions)
+            existing_structs = [c for c in portpin_array if c.tag.endswith("struct")]
+            new_struct_index = len(existing_structs)
+            new_portpin_id = max_portpin_id + 1
+
+            tx_struct_bytes = _build_portpin_struct_bytes(
+                struct_index=new_struct_index,
+                portpin_name=tx_name,
+                portpin_id=new_portpin_id,
+                indent=struct_indent,
+                line_ending=line_ending,
+            )
+
+            last_struct = existing_structs[-1] if existing_structs else None
+            if last_struct is None:
+                result.diagnostics.append(Diagnostic(
+                    severity="blocker",
+                    code="port_portpin_array_empty",
+                    module="port",
+                    message="PortPin array is empty; cannot append TX struct.",
+                    details={},
+                ))
+                return result
+
+            ok = _append_after_last_element(doc, last_struct, tx_struct_bytes, line_ending)
+            if not ok:
+                result.diagnostics.append(Diagnostic(
+                    severity="blocker",
+                    code="port_portpin_struct_insertion_failed",
+                    module="port",
+                    message="Could not locate last PortPin struct for TX insertion.",
+                    details={"tx_name": tx_name},
+                ))
+                return result
+
+            # Re-find Port config after tree reload
+            port_cfg = doc.find_config_set("Port")
+            portpin_array = None
+            if port_cfg is not None:
+                for el in port_cfg.iter():
+                    if el.tag.endswith("array") and el.attrib.get("name") == "PortPin":
+                        portpin_array = el
+                        break
+
+            max_portpin_id = new_portpin_id
+            portpin_struct_inserted = True
+
+    # RX PortPin struct
+    if rx_pin:
+        rx_name = _pin_name_for_signal(peripheral, "RX")
+        if portpin_array is not None and not _is_portpin_struct_already_configured(portpin_array, doc, rx_name):
+            existing_structs = [c for c in portpin_array if c.tag.endswith("struct")]
+            new_struct_index = len(existing_structs)
+            new_portpin_id = max_portpin_id + 1
+
+            rx_struct_bytes = _build_portpin_struct_bytes(
+                struct_index=new_struct_index,
+                portpin_name=rx_name,
+                portpin_id=new_portpin_id,
+                indent=struct_indent,
+                line_ending=line_ending,
+            )
+
+            last_struct = existing_structs[-1] if existing_structs else None
+            if last_struct is None:
+                result.diagnostics.append(Diagnostic(
+                    severity="blocker",
+                    code="port_portpin_array_empty",
+                    module="port",
+                    message="PortPin array is empty; cannot append RX struct.",
+                    details={},
+                ))
+                return result
+
+            ok = _append_after_last_element(doc, last_struct, rx_struct_bytes, line_ending)
+            if not ok:
+                result.diagnostics.append(Diagnostic(
+                    severity="blocker",
+                    code="port_portpin_struct_insertion_failed",
+                    module="port",
+                    message="Could not locate last PortPin struct for RX insertion.",
+                    details={"rx_name": rx_name},
+                ))
+                return result
+
+            # Re-find Port config after tree reload
+            port_cfg = doc.find_config_set("Port")
+            portpin_array = None
+            if port_cfg is not None:
+                for el in port_cfg.iter():
+                    if el.tag.endswith("array") and el.attrib.get("name") == "PortPin":
+                        portpin_array = el
+                        break
+
+            portpin_struct_inserted = True
+
+    if not pin_header_inserted and not portpin_struct_inserted:
+        # Everything already configured -- idempotent no-op
+        return result
+
+    # Mark modified: portpin_array and its nearest quick_selection ancestor
+    modified: list[ET.Element] = []
+    if portpin_array is not None:
+        doc.mark_modified(portpin_array)
+        carrier = doc.find_nearest_quick_selection_ancestor(portpin_array)
+        if carrier is not None:
+            doc.mark_modified(carrier)
+        modified.append(portpin_array)
+
+    result.changed_modules.append("port")
     result.modified_elements.extend(modified)
     return result
