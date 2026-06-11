@@ -159,3 +159,112 @@ def test_quick_selection_removal_is_a_narrow_byte_edit(tmp_path):
             assert "quick_selection" not in line
 
     MexDocument.load(mex)  # still well-formed
+
+
+# ---------------------------------------------------------------------------
+# Keystone writer test: replace_element_region splices a self-closed empty
+# array with a populated open/close array block.
+# ---------------------------------------------------------------------------
+def test_replace_element_region_self_closed_to_populated_array(tmp_path):
+    """MexDocument.replace_element_region must:
+
+    (i)  produce a file that re-loads as well-formed XML;
+    (ii) have the inserted children present in the reloaded tree;
+    (iii) be byte-narrow — bytes outside the replaced element's region are unchanged.
+
+    Target element: the self-closed <array name="OsIfCounterConfig"/> in the
+    Uart_Example_S32K344 fixture (inside the BaseNXP config_set).
+    Replacement: a populated open/close array with one child struct whose
+    OsIfSystemTimerClockRef points to a stub Mcu path, and OsIfSystemTimerClockFreq
+    is an empty array.
+    """
+    import xml.etree.ElementTree as ET
+
+    project = copy_uart_fixture(tmp_path)
+    mex = project / "Uart_Example.mex"
+    original = mex.read_bytes()
+
+    doc = MexDocument.load(mex)
+    assert doc._aligned, "Document must load aligned for the narrow-write path"
+
+    # Locate the target: self-closed OsIfCounterConfig array
+    target_array = None
+    for el in doc.root.iter():
+        if el.tag.endswith("array") and el.attrib.get("name") == "OsIfCounterConfig":
+            target_array = el
+            break
+    assert target_array is not None, "OsIfCounterConfig array not found in fixture"
+
+    # Verify it is self-closed (no children) before the splice
+    child_structs = [c for c in target_array if c.tag.endswith("struct")]
+    assert len(child_structs) == 0, "Precondition: OsIfCounterConfig must be empty in fixture"
+
+    # Build replacement bytes: populated open/close array with one counter struct.
+    # The indent matches the fixture's 27-space indent for this element.
+    stub_ref = "/Mcu/Mcu/McuModuleConfiguration/McuClockSettingConfig_0/STUB_CLK"
+    new_bytes = (
+        b'<array name="OsIfCounterConfig">\r\n'
+        b'                              <struct name="0">\r\n'
+        b'                                 <setting name="Name" value="OsIfCounterConfig_0"/>\r\n'
+        b'                                 <array name="OsIfCounterEcucPartitionRef"/>\r\n'
+        b'                                 <array name="OsIfSystemTimerClockRef">\r\n'
+        b'                                    <setting name="0" value="' + stub_ref.encode() + b'"/>\r\n'
+        b'                                 </array>\r\n'
+        b'                                 <array name="OsIfSystemTimerClockFreq"/>\r\n'
+        b'                                 <array name="OsIfOsCounterRef"/>\r\n'
+        b'                              </struct>\r\n'
+        b'                           </array>'
+    )
+
+    doc.replace_element_region(target_array, new_bytes)
+    doc.write(mex)
+
+    written = mex.read_bytes()
+
+    # (i) Re-loads as well-formed XML
+    reloaded = MexDocument.load(mex)
+    assert reloaded._aligned, "Reloaded document must still be aligned"
+
+    # (ii) Inserted children are present in the reloaded tree
+    counter_arr = None
+    for el in reloaded.root.iter():
+        if el.tag.endswith("array") and el.attrib.get("name") == "OsIfCounterConfig":
+            counter_arr = el
+            break
+    assert counter_arr is not None, "OsIfCounterConfig not found after write"
+
+    structs = [c for c in counter_arr if c.tag.endswith("struct")]
+    assert len(structs) == 1, f"Expected 1 inserted struct, got {len(structs)}"
+    assert structs[0].attrib.get("name") == "0"
+
+    # OsIfSystemTimerClockRef must be a populated array (non-empty)
+    raw_written = written.decode("utf-8")
+    assert '<array name="OsIfSystemTimerClockRef">' in raw_written, (
+        "OsIfSystemTimerClockRef must be a populated open/close array in written file"
+    )
+    assert stub_ref in raw_written, (
+        f"Stub ref path '{stub_ref}' not found in written file"
+    )
+    # OsIfSystemTimerClockFreq must be a self-closed empty array
+    assert '<array name="OsIfSystemTimerClockFreq"/>' in raw_written, (
+        "OsIfSystemTimerClockFreq must be an empty self-closed array in written file"
+    )
+
+    # (iii) Byte-narrow: unrelated bytes are unchanged.
+    # The XML declaration and an unrelated element must survive verbatim.
+    orig_lines = original.decode("utf-8").splitlines()
+    after_lines = raw_written.splitlines()
+    assert after_lines[0] == orig_lines[0], (
+        f"XML declaration changed: {after_lines[0]!r}"
+    )
+    # An unrelated line (e.g. the generated-files board entry) must be untouched.
+    unrelated = next((l for l in orig_lines if 'path="board/Siul2_Port_Ip_Cfg.c"' in l), None)
+    assert unrelated is not None, "Fixture must contain the board entry line used as unrelated probe"
+    assert unrelated in after_lines, "Unrelated 'board/Siul2_Port_Ip_Cfg.c' line was altered"
+
+    # Diff line count must be narrow (far fewer than a full reserialization)
+    changed = _changed_lines(original, written)
+    assert len(changed) <= 30, (
+        f"replace_element_region produced a broad diff ({len(changed)} lines), "
+        "expected narrow splice"
+    )
