@@ -268,3 +268,104 @@ def test_replace_element_region_self_closed_to_populated_array(tmp_path):
         f"replace_element_region produced a broad diff ({len(changed)} lines), "
         "expected narrow splice"
     )
+
+
+# ---------------------------------------------------------------------------
+# Fix 1 regression: tag-prefix matching bug
+# The old code scanned for open-tag matches using a raw bytes prefix: for tag
+# name "pin" the prefix was b"<pin", which also matches "<pin_features>".  The
+# depth counter would never return to 0, _find_element_region_end would return
+# None, and replace_element_region would fall back to full reserialization.
+#
+# The fix requires a token-boundary check: the byte after "<tagname" must be
+# space (0x20), ">" (0x3E), or "/" (0x2F) -- i.e. a real XML token boundary.
+# ---------------------------------------------------------------------------
+def test_find_element_region_end_pin_with_pin_features(tmp_path):
+    """_find_element_region_end must find the region end for a <pin> element that
+    contains a <pin_features> child, WITHOUT being confused by the <pin_features>
+    open tag (which shares the 'pin' prefix).
+
+    Regression test for the tag-prefix matching bug: b'<pin' matches
+    b'<pin_features>' when there is no token-boundary guard.
+
+    Assertions:
+      (i)  _find_element_region_end returns a non-None value.
+      (ii) replace_element_region on the <pin> element succeeds (doc stays aligned).
+      (iii) the written file reloads as well-formed XML.
+      (iv)  the write is byte-narrow (no full reserialization).
+    """
+    # Build a minimal .mex-like XML that contains a <pin> with a <pin_features>
+    # child.  This is the exact structure in the Uart_Example_S32K344 fixture's
+    # <pins> section (lines 46-50) and the structure the Port apply path creates.
+    xml_bytes = (
+        b'<?xml version="1.0" encoding= "UTF-8" ?>\r\n'
+        b'<root>\r\n'
+        b'   <pins>\r\n'
+        b'      <pin peripheral="LPUART0" signal="lpuart0_tx" pin_num="M2" pin_signal="PTA27">\r\n'
+        b'         <pin_features>\r\n'
+        b'            <pin_feature name="direction" value="OUTPUT"/>\r\n'
+        b'         </pin_features>\r\n'
+        b'      </pin>\r\n'
+        b'      <pin peripheral="LPUART0" signal="lpuart0_rx" pin_num="N2" pin_signal="PTA28"/>\r\n'
+        b'   </pins>\r\n'
+        b'</root>\r\n'
+    )
+    mex = tmp_path / "test_pin.mex"
+    mex.write_bytes(xml_bytes)
+
+    doc = MexDocument.load(mex)
+    assert doc._aligned, "Document should load as aligned"
+
+    # Find the TX <pin> element (the one with <pin_features>)
+    tx_pin_el = None
+    for el in doc.root.iter():
+        if el.tag.endswith("pin") and el.attrib.get("signal") == "lpuart0_tx":
+            tx_pin_el = el
+            break
+    assert tx_pin_el is not None, "TX pin element not found in test XML"
+
+    # Verify it has a child (pin_features) so we're testing the open-element path
+    children = list(tx_pin_el)
+    assert len(children) > 0, "TX pin must have pin_features child for this test to exercise the bug"
+
+    # (i) _find_element_region_end must return a non-None value.
+    elements = list(doc.root.iter())
+    src_index = next((i for i, e in enumerate(elements) if e is tx_pin_el), None)
+    assert src_index is not None
+    src = doc._sources[src_index]
+    span_end = doc._find_element_region_end(src, tx_pin_el)
+    assert span_end is not None, (
+        "_find_element_region_end returned None for a <pin> with <pin_features> child; "
+        "this indicates the tag-prefix bug is present (b'<pin' matched b'<pin_features>')"
+    )
+
+    # (ii) replace_element_region must succeed and keep the doc aligned.
+    # Replace the TX pin with an updated version (changed pin_num value).
+    replacement = (
+        b'<pin peripheral="LPUART0" signal="lpuart0_tx" pin_num="M2_UPDATED" pin_signal="PTA27">\r\n'
+        b'         <pin_features>\r\n'
+        b'            <pin_feature name="direction" value="OUTPUT"/>\r\n'
+        b'         </pin_features>\r\n'
+        b'      </pin>'
+    )
+    doc.replace_element_region(tx_pin_el, replacement)
+    assert doc._aligned, (
+        "doc._aligned is False after replace_element_region; "
+        "the writer fell back to full reserialization because region-end was not found"
+    )
+
+    # (iii) Written file reloads as well-formed XML.
+    doc.write(mex)
+    reloaded = MexDocument.load(mex)
+    assert reloaded._aligned
+
+    # Check the updated pin_num is in the written file.
+    written_text = mex.read_bytes().decode("utf-8")
+    assert "M2_UPDATED" in written_text, "Updated pin_num not found in written file"
+
+    # (iv) Byte-narrow: diff must be small.
+    changed = _changed_lines(xml_bytes, mex.read_bytes())
+    assert len(changed) <= 4, (
+        f"replace_element_region on <pin>/<pin_features> produced a broad diff "
+        f"({len(changed)} lines); full reserialization triggered"
+    )

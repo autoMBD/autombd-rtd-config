@@ -617,3 +617,287 @@ def test_cli_port_set_plan_only(tmp_path):
     assert payload["command"] == "plan", payload
     # File must be unmodified
     assert mex.read_bytes() == original, "File was modified by plan-only run"
+
+
+# ---------------------------------------------------------------------------
+# Fix 2: portpin.json provenance lock --
+# Deterministic test that pins apply.py hardcoded values against portpin.json
+# so any divergence fails the gate.  apply.py hardcodes field defaults directly
+# in _build_portpin_struct_bytes; portpin.json defines the template.  These must
+# match or the gate fails (no silent drift).
+# ---------------------------------------------------------------------------
+def test_portpin_json_fields_match_apply_code_literals(tmp_path):
+    """apply.py _build_portpin_struct_bytes output must match portpin.json defaults.
+
+    Drives _build_portpin_struct_bytes with known inputs and checks the output
+    bytes for every field listed in portpin.json['portpin_struct']['fields'].
+    If apply.py's hardcoded literals drift from portpin.json, this test fails.
+
+    Also validates that portpin.json's PortPinInitialMode source_ref does NOT
+    claim Port.xdm:... for the value PORT_GPIO_MODE (which is not in Port.xdm
+    RANGE), and that the source_ref has been updated to acknowledge its
+    fixture/Pins-tool provenance.
+    """
+    from rtd_config.backends.s32_mex.apply import _build_portpin_struct_bytes
+
+    # Load portpin.json asset
+    import pathlib
+    asset_path = (
+        pathlib.Path(__file__).resolve().parents[2]
+        / "autombd-rtd" / "assets" / "nxp" / "s32k3" / "port" / "portpin.json"
+    )
+    asset = json.loads(asset_path.read_text(encoding="utf-8"))
+    fields = asset["portpin_struct"]["fields"]
+
+    # Build a struct bytes with known inputs
+    struct_bytes = _build_portpin_struct_bytes(
+        struct_index=0,
+        portpin_name="TestPin_Tx",
+        portpin_id=99,
+        indent=0,
+        line_ending=b"\r\n",
+    )
+    text = struct_bytes.decode("utf-8")
+
+    # Every bool field's default must appear in the output
+    bool_defaults = {
+        "PortPinPue": "false",
+        "PortPinPus": "false",
+        "PortPinSafeMode": "false",
+        "PortPinDse": "false",
+        "PortPinWithReadBack": "false",
+        "PortPinPke": "false",
+        "PortPinIfe": "false",
+        "PortPinDirectionChangeable": "true",
+        "PortPinModeChangeable": "true",
+        "PortPinInvertControl": "false",
+    }
+    for field_name, expected_default in bool_defaults.items():
+        assert fields[field_name]["default"] == expected_default, (
+            f"portpin.json default for {field_name} changed: "
+            f"expected '{expected_default}', got '{fields[field_name]['default']}'"
+        )
+        assert f'name="{field_name}" value="{expected_default}"' in text, (
+            f"apply.py does not emit portpin.json default for {field_name}={expected_default}"
+        )
+
+    # Enum field defaults
+    enum_defaults = {
+        "PortPinSiul2Instance": "SIUL2_0",
+        "PortPinInitialMode": "PORT_GPIO_MODE",
+        "OBEGroupSelect": "NO_OBE_GROUP",
+        "MscrPdacSlot": "VIRTUAL_WRAPPER_PDAC0",
+        "ImcrPdacSlot": "VIRTUAL_WRAPPER_PDAC0",
+    }
+    for field_name, expected_default in enum_defaults.items():
+        assert fields[field_name]["default"] == expected_default, (
+            f"portpin.json default for {field_name} changed: "
+            f"expected '{expected_default}', got '{fields[field_name]['default']}'"
+        )
+        assert f'name="{field_name}" value="{expected_default}"' in text, (
+            f"apply.py does not emit portpin.json default for {field_name}={expected_default}"
+        )
+
+    # Fix 2(a): PortPinInitialMode source_ref must NOT cite Port.xdm as the
+    # authority for PORT_GPIO_MODE, because PORT_GPIO_MODE is not in Port.xdm's
+    # RANGE for that field.  The source_ref must acknowledge the
+    # fixture/Pins-tool provenance (the value comes from the ConfigTools Pins
+    # tool, not from Port.xdm's ECUC RANGE).
+    mode_source_ref = fields["PortPinInitialMode"].get("source_ref", "")
+    assert "Port.xdm:PortPin/PortPinInitialMode" not in mode_source_ref, (
+        "portpin.json PortPinInitialMode source_ref must not cite Port.xdm:PortPin/PortPinInitialMode "
+        "as the authority for PORT_GPIO_MODE (that value is not in Port.xdm's RANGE; "
+        "its provenance is the ConfigTools Pins-tool / fixture). "
+        f"Current source_ref: '{mode_source_ref}'"
+    )
+    # It must reference fixture or Pins-tool provenance
+    assert any(kw in mode_source_ref.lower() for kw in ("fixture", "pins", "configtools")), (
+        f"portpin.json PortPinInitialMode source_ref must mention the fixture or Pins-tool "
+        f"as provenance for PORT_GPIO_MODE; got: '{mode_source_ref}'"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Fix 3: LL-011 next-id proof -- perturbed fixture
+# All existing PORT tests use the unmodified fixture (max PortPinId=4, count=4),
+# so a hardcoded id of 5 would pass.  This test perturbs the fixture so the
+# max id and struct count are non-trivial; a constant id would fail.
+# ---------------------------------------------------------------------------
+def test_portpin_id_and_index_non_trivial_with_perturbed_fixture(tmp_path):
+    """Perturb the fixture PortPinId values before applying, then assert that
+    the new TX/RX structs land at struct_index=existing_count and
+    PortPinId=max_existing_id+1 / max_existing_id+2.
+
+    The fixture has PortPinIds 1-4 (structs 0-3).  We mutate the last struct's
+    PortPinId to 17 (non-contiguous, non-trivial).  After that:
+      max_existing_id = 17
+      existing_count  = 4  (structs 0-3)
+
+    Expected new structs:
+      TX: struct name="4", PortPinId=18
+      RX: struct name="5", PortPinId=19
+
+    A hardcoded id of 5 would fail (expected 18).  This proves the dynamic
+    next-id computation is exercised.
+    """
+    project = copy_uart_fixture(tmp_path)
+    mex = project / "Uart_Example.mex"
+
+    # Step 1: mutate the last existing PortPin struct's PortPinId to 17.
+    doc_prep = MexDocument.load(mex)
+    port_cfg = doc_prep.find_config_set("Port")
+    portpin_arr = None
+    for el in port_cfg.iter():
+        if el.tag.endswith("array") and el.attrib.get("name") == "PortPin":
+            portpin_arr = el
+            break
+    assert portpin_arr is not None
+
+    existing = [c for c in portpin_arr if c.tag.endswith("struct")]
+    assert len(existing) == 4, f"Precondition: fixture must have 4 PortPin structs, got {len(existing)}"
+
+    # Mutate the last struct's PortPinId to 17 (non-trivial max)
+    last_struct = existing[-1]
+    pid_setting = doc_prep.find_child_setting(last_struct, "PortPinId")
+    assert pid_setting is not None
+    pid_setting.set("value", "17")
+    doc_prep.write(mex)
+
+    # Reload and verify mutation
+    doc_check = MexDocument.load(mex)
+    port_cfg2 = doc_check.find_config_set("Port")
+    arr2 = None
+    for el in port_cfg2.iter():
+        if el.tag.endswith("array") and el.attrib.get("name") == "PortPin":
+            arr2 = el
+            break
+    structs2 = [c for c in arr2 if c.tag.endswith("struct")]
+    max_id = max(
+        int(doc_check.find_child_setting(s, "PortPinId").attrib.get("value", "0"))
+        for s in structs2
+    )
+    assert max_id == 17, f"Perturbed fixture max PortPinId must be 17, got {max_id}"
+    assert len(structs2) == 4
+
+    # Step 2: apply the port set on the perturbed fixture.
+    doc_apply = MexDocument.load(mex)
+    result = apply_port_set(doc_apply, _standard_intent())
+    assert not result.blocked, [d.to_dict() for d in result.diagnostics]
+
+    structs_after = _portpin_structs(doc_apply)
+    assert len(structs_after) == 6, f"Expected 6 structs after insertion, got {len(structs_after)}"
+
+    # TX struct: index=4, PortPinId=18 (max+1)
+    tx_struct = structs_after[4]
+    assert tx_struct.attrib.get("name") == "4", (
+        f"TX struct name must be '4', got '{tx_struct.attrib.get('name')}'"
+    )
+    tx_id = _setting_value(doc_apply, tx_struct, "PortPinId")
+    assert tx_id == "18", (
+        f"TX PortPinId must be 18 (max=17+1), got {tx_id}. "
+        "If this is 5, the dynamic next-id computation is broken (hardcoded)."
+    )
+
+    # RX struct: index=5, PortPinId=19 (max+2)
+    rx_struct = structs_after[5]
+    assert rx_struct.attrib.get("name") == "5", (
+        f"RX struct name must be '5', got '{rx_struct.attrib.get('name')}'"
+    )
+    rx_id = _setting_value(doc_apply, rx_struct, "PortPinId")
+    assert rx_id == "19", (
+        f"RX PortPinId must be 19 (max=17+2), got {rx_id}."
+    )
+
+
+# ---------------------------------------------------------------------------
+# Fix 4a: canonical pin name casing
+# The apply code must use the canonical pin name from the pins.json record
+# (e.g. "PTA27") for pin_signal, not the raw CLI string.  So --tx pta27
+# (lowercase) must still write pin_signal="PTA27" (uppercase canonical).
+# ---------------------------------------------------------------------------
+def test_pin_signal_canonical_casing(tmp_path):
+    """--tx pta27 (lowercase) must write pin_signal='PTA27' (canonical from asset)."""
+    project = copy_uart_fixture(tmp_path)
+    mex = project / "Uart_Example.mex"
+
+    # Pass lowercase pin names to simulate a user providing lowercase CLI input
+    doc = MexDocument.load(mex)
+    intent = _intent(
+        peripheral="LPUART_0",
+        pins={"tx": "pta27", "rx": "pta28"},  # lowercase -- should canonicalize
+    )
+    result = apply_port_set(doc, intent)
+    assert not result.blocked, [d.to_dict() for d in result.diagnostics]
+
+    pins = _pin_entries(doc)
+    tx_pin = next(
+        (p for p in pins
+         if p.attrib.get("peripheral") == "LPUART0" and p.attrib.get("signal") == "lpuart0_tx"),
+        None,
+    )
+    assert tx_pin is not None, "TX pin header not found after lowercase input"
+    pin_signal_val = _pin_attr(tx_pin, "pin_signal")
+    assert pin_signal_val == "PTA27", (
+        f"pin_signal must be canonical 'PTA27' (from pins.json record), "
+        f"got '{pin_signal_val}' — raw CLI casing was written instead of asset casing"
+    )
+
+    rx_pin = next(
+        (p for p in pins
+         if p.attrib.get("peripheral") == "LPUART0" and p.attrib.get("signal") == "lpuart0_rx"),
+        None,
+    )
+    assert rx_pin is not None
+    rx_signal_val = _pin_attr(rx_pin, "pin_signal")
+    assert rx_signal_val == "PTA28", (
+        f"pin_signal must be canonical 'PTA28', got '{rx_signal_val}'"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Fix 4b: blocker when pin_num field is empty for the active package
+# When a requested pin is legal for the peripheral/signal but its pins.json
+# record has no value for the active package's pin_num field (null or empty),
+# apply_port_set must emit a blocker 'port_pin_no_package_num' diagnostic
+# instead of silently writing pin_num="".
+# ---------------------------------------------------------------------------
+def test_blocker_on_missing_package_pin_num(tmp_path, monkeypatch):
+    """apply_port_set emits port_pin_no_package_num when pin_num field is empty.
+
+    We monkeypatch _load_pins_data to return a synthetic signal record whose
+    pin_mapbga257 field is None (simulating a pin that is legal for the signal
+    but has no package pin number for the active package).
+    """
+    from rtd_config.backends.s32_mex import apply as apply_mod
+
+    # Build a synthetic pin record: LPUART0 TX PTA27, but pin_mapbga257 is None
+    synthetic_signals = [
+        {
+            "peripheral": "LPUART0",
+            "signal": "TX",
+            "pin": "PTA27",
+            "pin_mapbga257": None,   # simulates missing package pin num
+            "pin_hdqfp172": "28",
+        },
+        {
+            "peripheral": "LPUART0",
+            "signal": "RX",
+            "pin": "PTA28",
+            "pin_mapbga257": None,
+            "pin_hdqfp172": "30",
+        },
+    ]
+    monkeypatch.setattr(apply_mod, "_load_pins_data", lambda: synthetic_signals)
+
+    project = copy_uart_fixture(tmp_path)
+    doc = MexDocument.load(project / "Uart_Example.mex")
+    result = apply_port_set(doc, _standard_intent())
+
+    assert result.blocked, (
+        "Expected blocker port_pin_no_package_num when pin_num field is None, "
+        "but apply_port_set returned unblocked"
+    )
+    codes = [d.code for d in result.diagnostics]
+    assert any("port_pin_no_package_num" in c for c in codes), (
+        f"Expected port_pin_no_package_num diagnostic, got: {codes}"
+    )

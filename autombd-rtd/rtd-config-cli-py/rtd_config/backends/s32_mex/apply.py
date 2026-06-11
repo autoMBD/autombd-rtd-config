@@ -1313,12 +1313,27 @@ def apply_port_set(doc: MexDocument, intent: Intent) -> ApplyResult:
         tx_signal_attr = f"{peripheral_id.lower()}_tx"
         if not _is_pin_already_configured(pins_el, peripheral_id, tx_signal_attr):
             tx_record = _find_pin_record(signals_data, peripheral_id, "TX", tx_pin)
-            tx_pin_num = tx_record[pin_field] if tx_record and tx_record.get(pin_field) else ""
+            tx_pin_num_raw = tx_record.get(pin_field) if tx_record else None
+            if not tx_pin_num_raw:
+                result.diagnostics.append(Diagnostic(
+                    severity="blocker",
+                    code="port_pin_no_package_num",
+                    module="port",
+                    message=(
+                        f"Pin '{tx_pin}' is a legal TX option for {peripheral} but has no "
+                        f"pin number for the active package field '{pin_field}'. "
+                        "Cannot write an empty pin_num to the .mex file."
+                    ),
+                    details={"peripheral": peripheral, "signal": "TX", "pin": tx_pin, "package_field": pin_field},
+                ))
+                return result
+            # Use canonical pin name from asset record, not the raw CLI string
+            tx_canonical_pin = tx_record["pin"]
             tx_pin_bytes = _build_pin_header_tx_bytes(
                 peripheral_id=peripheral_id,
                 signal_attr=tx_signal_attr,
-                pin_num=tx_pin_num,
-                pin_signal=tx_pin,
+                pin_num=tx_pin_num_raw,
+                pin_signal=tx_canonical_pin,
                 indent=18,
                 line_ending=line_ending,
             )
@@ -1328,12 +1343,27 @@ def apply_port_set(doc: MexDocument, intent: Intent) -> ApplyResult:
         rx_signal_attr = f"{peripheral_id.lower()}_rx"
         if not _is_pin_already_configured(pins_el, peripheral_id, rx_signal_attr):
             rx_record = _find_pin_record(signals_data, peripheral_id, "RX", rx_pin)
-            rx_pin_num = rx_record[pin_field] if rx_record and rx_record.get(pin_field) else ""
+            rx_pin_num_raw = rx_record.get(pin_field) if rx_record else None
+            if not rx_pin_num_raw:
+                result.diagnostics.append(Diagnostic(
+                    severity="blocker",
+                    code="port_pin_no_package_num",
+                    module="port",
+                    message=(
+                        f"Pin '{rx_pin}' is a legal RX option for {peripheral} but has no "
+                        f"pin number for the active package field '{pin_field}'. "
+                        "Cannot write an empty pin_num to the .mex file."
+                    ),
+                    details={"peripheral": peripheral, "signal": "RX", "pin": rx_pin, "package_field": pin_field},
+                ))
+                return result
+            # Use canonical pin name from asset record, not the raw CLI string
+            rx_canonical_pin = rx_record["pin"]
             rx_pin_bytes = _build_pin_header_rx_bytes(
                 peripheral_id=peripheral_id,
                 signal_attr=rx_signal_attr,
-                pin_num=rx_pin_num,
-                pin_signal=rx_pin,
+                pin_num=rx_pin_num_raw,
+                pin_signal=rx_canonical_pin,
                 indent=18,
             )
             new_pin_parts.append(rx_pin_bytes)

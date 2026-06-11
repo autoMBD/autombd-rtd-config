@@ -319,15 +319,23 @@ class MexDocument:
                     return i + len(close_tag) - 1
                 i += len(close_tag)
                 continue
-            # Check for open tag with same name (self-closed ones don't increase depth)
+            # Check for open tag with same name (self-closed ones don't increase depth).
+            # IMPORTANT: require a token boundary after the tag name — the byte
+            # immediately following "<tagname" must be whitespace, '>' or '/' —
+            # otherwise a tag whose name is a prefix of another tag (e.g. "pin" and
+            # "pin_features") would be miscounted, depth would never return to 0, and
+            # the region end would never be found (the LL-006 full-reserialization trap).
             open_prefix = f"<{tag_name}".encode("utf-8")
             if raw[i : i + len(open_prefix)] == open_prefix:
-                # Find the end of this start tag
-                end = self._scan_start_tag_end(i)
-                if end is not None and raw[end - 1 : end] != b"/":
-                    depth += 1
-                    i = end + 1
-                    continue
+                # Check token boundary: next byte after prefix must be space, >, or /
+                next_byte_pos = i + len(open_prefix)
+                if next_byte_pos < n and raw[next_byte_pos : next_byte_pos + 1] in (b" ", b"\t", b"\r", b"\n", b">", b"/"):
+                    # Find the end of this start tag
+                    end = self._scan_start_tag_end(i)
+                    if end is not None and raw[end - 1 : end] != b"/":
+                        depth += 1
+                        i = end + 1
+                        continue
             i += 1
         return None
 

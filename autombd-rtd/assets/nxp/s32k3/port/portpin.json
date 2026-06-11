@@ -107,7 +107,8 @@
       "PortPinInitialMode": {
         "type": "enum",
         "default": "PORT_GPIO_MODE",
-        "source_ref": "Port.xdm:PortPin/PortPinInitialMode"
+        "source_ref": "Uart_Example_S32K344 fixture (ConfigTools Pins-tool derived value); NOTE: PORT_GPIO_MODE is NOT in Port.xdm ECUC RANGE for PortPinInitialMode (xdm RANGE uses PORT_PIN_MODE_ADC/_CAN/_DIO/...; xdm DEFAULT is PORT_PIN_MODE_DIO). This value originates from the ConfigTools Pins tool and the fixture, not from Port.xdm.",
+        "_xdm_note": "Port.xdm:PortPin/PortPinInitialMode RANGE does not include PORT_GPIO_MODE. The Pins-tool/fixture uses PORT_GPIO_MODE as the electrical default for GPIO-mode pins."
       },
       "OBEGroupSelect": {
         "type": "enum",
