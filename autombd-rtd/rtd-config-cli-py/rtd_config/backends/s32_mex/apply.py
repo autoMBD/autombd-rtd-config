@@ -1558,3 +1558,493 @@ def apply_port_set(doc: MexDocument, intent: Intent) -> ApplyResult:
     result.changed_modules.append("port")
     result.modified_elements.extend(modified)
     return result
+
+
+# ---------------------------------------------------------------------------
+# Dio: DIO output channel insertion (cross-module: Dio owns channel, Port owns pin)
+# ---------------------------------------------------------------------------
+
+def _load_dio_asset() -> dict:
+    """Load committed dio.json asset. Never reads .xdm at runtime."""
+    dio_path = _ASSET_ROOT / "nxp" / "s32k3" / "dio" / "dio.json"
+    return json.loads(dio_path.read_text(encoding="utf-8"))
+
+
+def _find_gpio_pin_record(signals: list[dict], pin_name: str) -> dict | None:
+    """Return the pins.json record where pin==pin_name and direction=='gpio'."""
+    target = pin_name.upper()
+    for s in signals:
+        if s.get("pin", "").upper() == target and s.get("direction", "") == "gpio":
+            return s
+    return None
+
+
+def _is_gpio_pin_already_in_port(
+    pins_el: ET.Element,
+    signal_attr: str,
+) -> bool:
+    """Return True if a SIUL2 <pin> entry with the given signal already exists."""
+    for child in pins_el:
+        if (
+            child.tag.endswith("pin")
+            and child.attrib.get("peripheral") == "SIUL2"
+            and child.attrib.get("signal") == signal_attr
+        ):
+            return True
+    return False
+
+
+def _build_gpio_pin_header_bytes(
+    signal_attr: str,
+    pin_num: str,
+    pin_signal: str,
+    indent: int,
+    line_ending: bytes,
+) -> bytes:
+    """Build bytes for a GPIO <pin> entry with peripheral=SIUL2 and direction=OUTPUT.
+
+    Signal format: 'gpio, <mscr>' (space after comma).
+    Grounded in the task spec (RTD-MEX-DIO-001) and the fixture GPIO pin format.
+    """
+    le = line_ending.decode("latin-1")
+    sp = " " * indent
+    sp2 = " " * (indent + 3)
+    sp3 = " " * (indent + 6)
+    lines = [
+        f'{sp}<pin peripheral="SIUL2" signal="{signal_attr}" pin_num="{pin_num}" pin_signal="{pin_signal}">',
+        f'{sp2}<pin_features>',
+        f'{sp3}<pin_feature name="direction" value="OUTPUT"/>',
+        f'{sp2}</pin_features>',
+        f'{sp}</pin>',
+    ]
+    return le.join(lines).encode("utf-8")
+
+
+def _build_gpio_portpin_struct_bytes(
+    struct_index: int,
+    portpin_name: str,
+    portpin_id: int,
+    indent: int,
+    line_ending: bytes,
+) -> bytes:
+    """Build the raw bytes for a GPIO output PortPin <struct>.
+
+    Key difference from the LPUART PortPin builder: GPIO output pins use
+    PortPinDirectionChangeable=false and PortPinModeChangeable=false
+    (per the RTD-MEX-DIO-001 task spec / vendor example_Dio.mex).
+    All other field defaults are the same as portpin.json.
+
+    Field order per portpin.json children_order:
+      Name, PortPinPue, PortPinPus, PortPinSafeMode, PortPinDse,
+      PortPinWithReadBack, PortPinPke, PortPinIfe, PortPinDirectionChangeable,
+      PortPinModeChangeable, PortPinInvertControl, PortPinSiul2Instance,
+      PortPinId, PortPinInitialMode, OBEGroupSelect, MscrPdacSlot,
+      ImcrPdacSlot, IGFSettings, PortPinEcucPartitionRef.
+    """
+    le = line_ending.decode("latin-1")
+    sp_struct = " " * indent
+    sp_child = " " * (indent + 3)
+    lines = [
+        f'{sp_struct}<struct name="{struct_index}">',
+        f'{sp_child}<setting name="Name" value="{portpin_name}"/>',
+        f'{sp_child}<setting name="PortPinPue" value="false"/>',
+        f'{sp_child}<setting name="PortPinPus" value="false"/>',
+        f'{sp_child}<setting name="PortPinSafeMode" value="false"/>',
+        f'{sp_child}<setting name="PortPinDse" value="false"/>',
+        f'{sp_child}<setting name="PortPinWithReadBack" value="false"/>',
+        f'{sp_child}<setting name="PortPinPke" value="false"/>',
+        f'{sp_child}<setting name="PortPinIfe" value="false"/>',
+        f'{sp_child}<setting name="PortPinDirectionChangeable" value="false"/>',
+        f'{sp_child}<setting name="PortPinModeChangeable" value="false"/>',
+        f'{sp_child}<setting name="PortPinInvertControl" value="false"/>',
+        f'{sp_child}<setting name="PortPinSiul2Instance" value="SIUL2_0"/>',
+        f'{sp_child}<setting name="PortPinId" value="{portpin_id}"/>',
+        f'{sp_child}<setting name="PortPinInitialMode" value="PORT_GPIO_MODE"/>',
+        f'{sp_child}<setting name="OBEGroupSelect" value="NO_OBE_GROUP"/>',
+        f'{sp_child}<setting name="MscrPdacSlot" value="VIRTUAL_WRAPPER_PDAC0"/>',
+        f'{sp_child}<setting name="ImcrPdacSlot" value="VIRTUAL_WRAPPER_PDAC0"/>',
+        f'{sp_child}<array name="IGFSettings"/>',
+        f'{sp_child}<array name="PortPinEcucPartitionRef"/>',
+        f'{sp_struct}</struct>',
+    ]
+    return le.join(lines).encode("utf-8")
+
+
+def _build_dio_channel_array_bytes(
+    channel_name: str,
+    channel_id: int,
+    indent: int,
+    line_ending: bytes,
+) -> bytes:
+    """Build bytes for a populated DioChannel array replacing a self-closed one.
+
+    The returned bytes include the opening <array name="DioChannel"> and the
+    single DioChannel struct. Field set and order from dio.json/Dio.xdm:
+      Name, DioChannelId, PDACSlot, DioChannelEcucPartitionRef.
+    ``indent`` is the leading spaces before the <array> open tag.
+    """
+    le = line_ending.decode("latin-1")
+    sp_array = " " * indent
+    sp_struct = " " * (indent + 3)
+    sp_child = " " * (indent + 6)
+    lines = [
+        f'<array name="DioChannel">',
+        f'{sp_struct}<struct name="0">',
+        f'{sp_child}<setting name="Name" value="{channel_name}"/>',
+        f'{sp_child}<setting name="DioChannelId" value="{channel_id}"/>',
+        f'{sp_child}<setting name="PDACSlot" value="VIRTUAL_WRAPPER_PDAC0"/>',
+        f'{sp_child}<array name="DioChannelEcucPartitionRef"/>',
+        f'{sp_struct}</struct>',
+        f'{sp_array}</array>',
+    ]
+    return le.join(lines).encode("utf-8")
+
+
+def _find_dio_port_by_id(
+    doc: MexDocument,
+    dio_cfg: ET.Element,
+    port_id: int,
+) -> ET.Element | None:
+    """Return the DioPort struct with DioPortId==port_id from the Dio config set."""
+    for el in dio_cfg.iter():
+        if el.tag.endswith("array") and el.attrib.get("name") == "DioPort":
+            for child in el:
+                if not child.tag.endswith("struct"):
+                    continue
+                id_setting = doc.find_child_setting(child, "DioPortId")
+                if id_setting is not None and id_setting.attrib.get("value") == str(port_id):
+                    return child
+    return None
+
+
+def _find_dio_channel_array(doc: MexDocument, dio_port: ET.Element) -> ET.Element | None:
+    """Return the DioChannel array inside a DioPort struct."""
+    for el in dio_port:
+        if el.tag.endswith("array") and el.attrib.get("name") == "DioChannel":
+            return el
+    return None
+
+
+def apply_dio_set(doc: MexDocument, intent: Intent) -> ApplyResult:
+    """Apply a Dio output channel insertion with cross-module Port GPIO pin routing.
+
+    Owns the Dio channel edit; orchestrates the Port-owned GPIO pin edits.
+    The two Port edits (GPIO <pin> header + PortPin struct) reuse the helpers
+    from apply_port_set / the GPIO-specific builders added here.
+
+    Intent payload:
+      add_channel (str): symbolic DioChannel Name, e.g. 'LED_CTRL'
+      pin (str): S32K3 pin signal name, e.g. 'PTA5'
+      direction (str): 'output' (default, only value supported in M1)
+
+    Validation:
+      - pin must have direction='gpio' in pins.json (no mux-only peripherals)
+      - pin must not already be configured as a <pin> header (idempotent guard)
+
+    Returns changed_modules=['dio', 'port'] when edits were made.
+    Idempotent: if the DioChannel name already exists, or the Port pin already
+    configured, each part is skipped independently.
+
+    Blocker codes:
+      dio_config_set_not_found   -- Dio <config_set> is absent
+      dio_port_not_found         -- DioPort for the computed DioPortId is absent
+      dio_pin_not_gpio           -- pin does not have direction='gpio' in pins.json
+      port_config_set_not_found  -- Port <config_set> is absent
+      port_pins_function_not_found -- <pins> section is absent
+      port_portpin_array_not_found -- PortPin array absent in PortContainer[0]
+    """
+    result = ApplyResult()
+    payload = intent.payload
+    channel_name = payload.get("add_channel", "")
+    pin_name = payload.get("pin", "")
+
+    if not channel_name or not pin_name:
+        return result  # nothing requested -- no-op
+
+    # ---- Load assets ----
+    signals_data = _load_pins_data()
+    pin_field = _detect_package_pin_field(doc)
+    line_ending = _detect_line_ending(doc._raw)
+
+    # ---- Validate pin: must be a GPIO pin in pins.json ----
+    gpio_record = _find_gpio_pin_record(signals_data, pin_name)
+    if gpio_record is None:
+        result.diagnostics.append(Diagnostic(
+            severity="blocker",
+            code="dio_pin_not_gpio",
+            module="dio",
+            message=(
+                f"Pin '{pin_name}' is not a free GPIO pin in pins.json "
+                f"(direction='gpio' record not found). "
+                "DIO channel insertion requires a GPIO-capable pin."
+            ),
+            details={"pin": pin_name},
+        ))
+        return result
+
+    mscr = gpio_record["mscr"]
+    dio_port_id = mscr // 16
+    dio_channel_id = mscr % 16
+    pin_num = gpio_record.get(pin_field, "")
+    pin_signal = gpio_record["pin"]  # canonical pin name from asset
+    gpio_signal_attr = f"gpio, {mscr}"  # e.g. "gpio, 5"
+
+    # ---- Locate Dio config set ----
+    dio_cfg = doc.find_config_set("Dio")
+    if dio_cfg is None:
+        result.diagnostics.append(Diagnostic(
+            severity="blocker",
+            code="dio_config_set_not_found",
+            module="dio",
+            message="No enabled Dio <config_set> found; cannot insert DioChannel.",
+            details={},
+        ))
+        return result
+
+    # ---- Locate DioPort for the computed DioPortId ----
+    dio_port = _find_dio_port_by_id(doc, dio_cfg, dio_port_id)
+    if dio_port is None:
+        result.diagnostics.append(Diagnostic(
+            severity="blocker",
+            code="dio_port_not_found",
+            module="dio",
+            message=(
+                f"No DioPort with DioPortId={dio_port_id} found in the Dio config set. "
+                f"Pin '{pin_name}' (mscr={mscr}) maps to DioPortId={dio_port_id}; "
+                "this DioPort must exist before a DioChannel can be inserted."
+            ),
+            details={"pin": pin_name, "mscr": mscr, "dio_port_id": dio_port_id},
+        ))
+        return result
+
+    # ---- Part A: Insert DioChannel into DioPort's DioChannel array ----
+    dio_channel_array = _find_dio_channel_array(doc, dio_port)
+    dio_channel_inserted = False
+
+    if dio_channel_array is not None:
+        existing_channels = [c for c in dio_channel_array if c.tag.endswith("struct")]
+
+        # Idempotency: skip if channel name already exists
+        channel_already_exists = any(
+            doc.find_child_setting(c, "Name") is not None
+            and doc.find_child_setting(c, "Name").attrib.get("value") == channel_name
+            for c in existing_channels
+        )
+
+        if not channel_already_exists:
+            # Self-closed or empty DioChannel array -> replace with populated one.
+            # The indent of the <array> tag itself is detected from the raw bytes.
+            elements = list(doc.root.iter())
+            src_index = next(
+                (i for i, e in enumerate(elements) if e is dio_channel_array), None
+            )
+            if src_index is not None and doc._aligned:
+                array_src = doc._sources[src_index]
+                raw = doc._raw
+                i = array_src.start - 1
+                while i >= 0 and raw[i:i + 1] not in (b"\n", b"\r"):
+                    i -= 1
+                line_start = i + 1
+                spaces = 0
+                while (
+                    line_start + spaces < array_src.start
+                    and raw[line_start + spaces: line_start + spaces + 1] == b" "
+                ):
+                    spaces += 1
+                array_indent = spaces
+            else:
+                array_indent = 33  # sane fallback matching the Dio fixture level
+
+            new_array_bytes = _build_dio_channel_array_bytes(
+                channel_name=channel_name,
+                channel_id=dio_channel_id,
+                indent=array_indent,
+                line_ending=line_ending,
+            )
+            doc.replace_element_region(dio_channel_array, new_array_bytes)
+            dio_channel_inserted = True
+
+            # After replace_element_region the tree is reloaded; re-find everything.
+            dio_cfg = doc.find_config_set("Dio")
+            if dio_cfg is not None:
+                dio_port = _find_dio_port_by_id(doc, dio_cfg, dio_port_id)
+                if dio_port is not None:
+                    dio_channel_array = _find_dio_channel_array(doc, dio_port)
+
+    # Mark Dio modified
+    if dio_channel_inserted and dio_channel_array is not None:
+        doc.mark_modified(dio_channel_array)
+        carrier = doc.find_nearest_quick_selection_ancestor(dio_channel_array)
+        if carrier is not None:
+            doc.mark_modified(carrier)
+        result.changed_modules.append("dio")
+        result.modified_elements.append(dio_channel_array)
+
+    # ---- Part B: Port <pin> header for the GPIO pad ----
+    pins_el = _find_port_function_pins_el(doc)
+    if pins_el is None:
+        result.diagnostics.append(Diagnostic(
+            severity="blocker",
+            code="port_pins_function_not_found",
+            module="port",
+            message=(
+                "No <function name='PortContainer_0_VS_0'><pins> section found; "
+                "cannot insert GPIO pin header."
+            ),
+            details={"pin": pin_name},
+        ))
+        return result
+
+    port_pin_header_inserted = False
+    if not _is_gpio_pin_already_in_port(pins_el, gpio_signal_attr):
+        if not pin_num:
+            result.diagnostics.append(Diagnostic(
+                severity="blocker",
+                code="port_pin_no_package_num",
+                module="port",
+                message=(
+                    f"Pin '{pin_name}' has no pin number for package field '{pin_field}'. "
+                    "Cannot write an empty pin_num to the .mex file."
+                ),
+                details={"pin": pin_name, "package_field": pin_field},
+            ))
+            return result
+
+        gpio_pin_bytes = _build_gpio_pin_header_bytes(
+            signal_attr=gpio_signal_attr,
+            pin_num=pin_num,
+            pin_signal=pin_signal,
+            indent=18,
+            line_ending=line_ending,
+        )
+        ok = _insert_into_parent_before_close(doc, pins_el, gpio_pin_bytes, line_ending)
+        if not ok:
+            result.diagnostics.append(Diagnostic(
+                severity="blocker",
+                code="port_pin_insertion_failed",
+                module="port",
+                message="Could not splice GPIO <pin> entry into <pins> section.",
+                details={"pin": pin_name},
+            ))
+            return result
+
+        pins_el = _find_port_function_pins_el(doc)
+        port_pin_header_inserted = True
+
+    # ---- Part C: Port PortPin struct for the GPIO pad ----
+    port_cfg = doc.find_config_set("Port")
+    if port_cfg is None:
+        result.diagnostics.append(Diagnostic(
+            severity="blocker",
+            code="port_config_set_not_found",
+            module="port",
+            message="No enabled Port <config_set> found; cannot insert PortPin struct.",
+            details={},
+        ))
+        return result
+
+    portpin_array = None
+    for el in port_cfg.iter():
+        if el.tag.endswith("array") and el.attrib.get("name") == "PortPin":
+            portpin_array = el
+            break
+
+    if portpin_array is None:
+        result.diagnostics.append(Diagnostic(
+            severity="blocker",
+            code="port_portpin_array_not_found",
+            module="port",
+            message="No PortPin array found in Port PortContainer[0]; cannot insert GPIO struct.",
+            details={},
+        ))
+        return result
+
+    # GPIO PortPin name convention: "Led_Ctrl" (PascalCase-like, from channel name)
+    # Rule: capitalize first letter of each word (using channel_name as base with underscores)
+    gpio_portpin_name = _portpin_name_for_gpio_channel(channel_name)
+
+    portpin_struct_inserted = False
+    existing_structs = [c for c in portpin_array if c.tag.endswith("struct")]
+
+    if not _is_portpin_struct_already_configured(portpin_array, doc, gpio_portpin_name):
+        # Compute next PortPinId
+        max_portpin_id = 0
+        for s in existing_structs:
+            pid_setting = doc.find_child_setting(s, "PortPinId")
+            if pid_setting is not None:
+                try:
+                    pid = int(pid_setting.attrib.get("value", "0"))
+                    if pid > max_portpin_id:
+                        max_portpin_id = pid
+                except ValueError:
+                    pass
+
+        new_struct_index = len(existing_structs)
+        new_portpin_id = max_portpin_id + 1
+
+        gpio_struct_bytes = _build_gpio_portpin_struct_bytes(
+            struct_index=new_struct_index,
+            portpin_name=gpio_portpin_name,
+            portpin_id=new_portpin_id,
+            indent=36,  # fixture indentation for PortPin <struct> elements
+            line_ending=line_ending,
+        )
+
+        last_struct = existing_structs[-1] if existing_structs else None
+        if last_struct is None:
+            result.diagnostics.append(Diagnostic(
+                severity="blocker",
+                code="port_portpin_array_empty",
+                module="port",
+                message="PortPin array is empty; cannot append GPIO struct.",
+                details={},
+            ))
+            return result
+
+        ok = _append_after_last_element(doc, last_struct, gpio_struct_bytes, line_ending)
+        if not ok:
+            result.diagnostics.append(Diagnostic(
+                severity="blocker",
+                code="port_portpin_struct_insertion_failed",
+                module="port",
+                message="Could not locate last PortPin struct for GPIO insertion.",
+                details={"portpin_name": gpio_portpin_name},
+            ))
+            return result
+
+        # Re-find Port config after tree reload
+        port_cfg = doc.find_config_set("Port")
+        portpin_array = None
+        if port_cfg is not None:
+            for el in port_cfg.iter():
+                if el.tag.endswith("array") and el.attrib.get("name") == "PortPin":
+                    portpin_array = el
+                    break
+
+        portpin_struct_inserted = True
+
+    if port_pin_header_inserted or portpin_struct_inserted:
+        if portpin_array is not None:
+            doc.mark_modified(portpin_array)
+            carrier = doc.find_nearest_quick_selection_ancestor(portpin_array)
+            if carrier is not None:
+                doc.mark_modified(carrier)
+            result.modified_elements.append(portpin_array)
+        if "port" not in result.changed_modules:
+            result.changed_modules.append("port")
+
+    return result
+
+
+def _portpin_name_for_gpio_channel(channel_name: str) -> str:
+    """Build the PortPin struct Name for a GPIO DIO channel.
+
+    Convention from the task spec: LED_CTRL -> Led_Ctrl
+    Rule: split on underscores, capitalize each word's first letter, lower the rest,
+    rejoin with underscores.
+    Examples:
+      LED_CTRL    -> Led_Ctrl
+      SWITCH_IN   -> Switch_In
+    """
+    parts = channel_name.split("_")
+    return "_".join(p[0].upper() + p[1:].lower() if p else "" for p in parts)

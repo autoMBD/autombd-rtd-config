@@ -62,8 +62,9 @@ from .modules.platform import PlatformProvider
 from .modules.basenxp import BaseNxpProvider
 from .modules.mcl import MclProvider
 from .modules.port import PortProvider
+from .modules.dio import DioProvider
 from .checks.static import run_static_checks
-from .backends.s32_mex.apply import apply_uart_set, apply_platform_set, apply_basenxp_set, apply_mcl_set, apply_port_set
+from .backends.s32_mex.apply import apply_uart_set, apply_platform_set, apply_basenxp_set, apply_mcl_set, apply_port_set, apply_dio_set
 from .backends.s32_mex.validation import run_validation
 
 
@@ -181,6 +182,33 @@ def build_parser() -> argparse.ArgumentParser:
     port_set.add_argument("--configure", action="store_true")
     port_set.add_argument("--backup", action="store_true")
     port_set.add_argument("--json", action="store_true")
+
+    dio_parser = subparsers.add_parser("dio")
+    dio_actions = dio_parser.add_subparsers(dest="action")
+    dio_set = dio_actions.add_parser("set")
+    dio_set.add_argument("--project", required=True)
+    dio_set.add_argument(
+        "--add-channel",
+        metavar="NAME",
+        help=(
+            "Add a DioChannel with the given symbolic name, e.g. LED_CTRL. "
+            "Requires --pin to specify the GPIO pad."
+        ),
+    )
+    dio_set.add_argument(
+        "--pin",
+        metavar="PIN",
+        help="GPIO pad to assign, e.g. PTA5. Must be a free GPIO pin.",
+    )
+    dio_set.add_argument(
+        "--direction",
+        default="output",
+        choices=["output"],
+        help="Pin direction (default: output). Only 'output' is supported in M1.",
+    )
+    dio_set.add_argument("--configure", action="store_true")
+    dio_set.add_argument("--backup", action="store_true")
+    dio_set.add_argument("--json", action="store_true")
 
     return parser
 
@@ -490,6 +518,36 @@ def cmd_port_set(args: argparse.Namespace) -> int:
     return _configure_module(args, intent, plan, apply_port_set)
 
 
+def normalize_dio_intent(args: argparse.Namespace) -> Intent:
+    """Normalize `dio set` CLI arguments into the JSON intent contract."""
+    payload: dict = {}
+    add_channel = getattr(args, "add_channel", None)
+    if add_channel:
+        payload["add_channel"] = add_channel
+    pin = getattr(args, "pin", None)
+    if pin:
+        payload["pin"] = pin
+    direction = getattr(args, "direction", "output")
+    if direction:
+        payload["direction"] = direction
+    return Intent.from_dict({"module": "dio", "action": "set", "payload": payload})
+
+
+def cmd_dio_set(args: argparse.Namespace) -> int:
+    intent = normalize_dio_intent(args)
+    plan = DioProvider().plan(intent)
+
+    if not args.configure:
+        return emit({
+            "status": "passed",
+            "command": "plan",
+            "normalized_intent": _intent_dict(intent),
+            "plan": plan.to_dict(),
+        })
+
+    return _configure_module(args, intent, plan, apply_dio_set)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -520,6 +578,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "port" and getattr(args, "action", None) == "set":
         return cmd_port_set(args)
+
+    if args.command == "dio" and getattr(args, "action", None) == "set":
+        return cmd_dio_set(args)
 
     if args.version:
         return emit({
