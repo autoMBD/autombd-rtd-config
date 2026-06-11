@@ -2,8 +2,8 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.4.0 |
-| Date | 2026-06-11 |
+| Version | 0.5.0 |
+| Date | 2026-06-12 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Current pass/fail evidence for the E2E acceptance cases defined in `rtd-config-test-cases.md`. This document is the living status record the catalog points to; the catalog defines the target, this records where the tool actually stands. |
 
@@ -43,17 +43,17 @@ on an unbuilt asset).
 | RTD-MEX-MCU-001 | MCU | FAIL | No MCU apply path. Needs clock-tree edits (CORE_CLK/AIPS_PLAT/AIPS_SLOW from 16 MHz FXOSC) **and** creating every Clock Reference Point (element insertion). |
 | RTD-MEX-BASENXP-001 | BaseNXP | **PASS** | `basenxp set --enable-system-timer`: sets `OsIfUseSystemTimer=true` and **inserts** one `OsIfCounterConfig` whose `OsIfSystemTimerClockRef` references the Mcu `FLEXIO_CLK` (CORE_CLK) reference point, with `OsIfSystemTimerClockFreq` an empty array (both are ArraySettings — scalar freq is rejected). Vendor gate green (exit 0, 120 files, no severe), 14-line narrow edit. Drove the byte-faithful element-insertion writer. |
 | RTD-MEX-PLATFORM-001 | Platform | **PASS** | `platform set --peripheral LPUART_3 --priority 2`: `IsrPriority` 0→2 on the existing `LPUART3_IRQn` entry, kept enabled with its ISR (`LPUART_UART_IP_3_IRQHandler`) registered, FLEXIO entry untouched. Vendor gate green (exit 0, 120 generated files, no severe). |
-| RTD-MEX-PORT-001 | Port | FAIL | `pins.json` foundation DONE (2091 real signals; `pin-options LPUART_0` → PTA27/PTA28, verified). Remaining: a Port `apply` path that writes the queried pin (MSCR/IMCR + mux) into the `.mex`. |
+| RTD-MEX-PORT-001 | Port | **PASS** | `port set --peripheral LPUART_0 --tx PTA27 --rx PTA28`: validates pins against pins.json (rejects illegal pins), then inserts BOTH representations — the `<pin>` header (`lpuart0_tx`@M2 + `direction=OUTPUT`; `lpuart0_rx`@N2) and the Port `PortPin` structs (`Lpuart0_Tx`/`Lpuart0_Rx`, next `PortPinId`). Vendor gate green (exit 0, 120 files, no severe); generated `Siul2_Port_Ip_PBcfg.c` confirms PTA27 ALT4/TX + PTA28 IMCR/RX. |
 | RTD-MEX-DIO-001 | Dio | FAIL | Foundations (element insertion + `pins.json`) DONE. Remaining: Dio channel **creation** + the Port direction config it depends on (needs the Port apply path). |
 | RTD-MEX-MCL-001 | Mcl | **PASS** | `mcl set --add-flexio-logic-channel FLEXIO_UART_CH0`: appends a third `FlexioMclLogicChannels` struct with a dynamically-computed unique `FlexioMclChannelId=CHANNEL_2`/`FlexioMclPinId=PIN_2` (referenceable as `/Mcl/Mcl/MclConfig/FlexioCommon_0/FLEXIO_UART_CH0`); existing UART_TX/UART_RX untouched. Vendor gate green (exit 0, 120 files, no severe), 9-line narrow edit. |
 | RTD-MEX-UART-001 | UART | FAIL | `uart set` edits an existing channel's hw/method/baud only. Needs parity/stop/word-length/callback, instance switch to LPUART_8, **and cross-module execution** (Platform ISR + MCU ref clock + priority) — currently only *declared*, never written. |
 | RTD-MEX-UART-002 | UART | FAIL | Needs FlexIO Uart channel **creation** + MCL logic-channel reference + Platform ISR (LPUART & FlexIO) — creation + orchestration both missing. |
 | RTD-MEX-UART-003 | UART | FAIL | DMA is rejected (`unsupported_uart_mode`); needs Uart DMA method + MCL DMA channel/instance + Platform ISR. |
 
-**Summary: 3 / 9 cases PASS** (PLATFORM-001, BASENXP-001, MCL-001). The acceptance
-gate is operational; the byte-faithful element-insertion writer and the complete
-`pins.json` asset (two of the five cross-cutting blockers) are landed. The
-remaining six cases follow the same Explorer→Worker→Tester→Reviewer loop.
+**Summary: 4 / 9 cases PASS** (PLATFORM-001, BASENXP-001, MCL-001, PORT-001). The
+acceptance gate is operational; the byte-faithful element-insertion writer (now
+hardened against same-prefix tag collisions) and the complete `pins.json` asset
+are landed. The remaining five cases follow the same loop.
 
 ## 3. Cross-cutting blockers (critical path)
 
@@ -91,7 +91,7 @@ Reviewer), proven against the now-operational gate.
 | 4 | ✅ Rebuild `pins.json` (2091 signals) | PORT-001, DIO-001 |
 | 5 | ✅ MCL-001: FlexIO logic-channel creation | MCL-001, UART-002 |
 | 6 | MCU-001: clock-tree edit + reference-point creation | MCU-001, UART-* |
-| 7 | Port apply (write queried pin) → PORT-001 | PORT-001, DIO-001 |
+| 7 | ✅ Port apply (write queried pin) → PORT-001 | PORT-001, DIO-001 |
 | 8 | DIO-001: channel creation + Port direction | DIO-001 |
 | 9 | UART cross-module orchestration (apply declared deps) → UART-001 | UART-001 |
 | 10 | UART-002: FlexIO channel creation + MCL ref + ISR | UART-002 |
@@ -105,3 +105,4 @@ Reviewer), proven against the now-operational gate.
 | 2026-06-11 | 0.2.0 | RTD-MEX-PLATFORM-001 **PASS** (1/9): `platform set` edits an existing `PlatformIsrConfig` priority/enable on the LPUART3 interrupt; verified end-to-end against the real S32DS gate (exit 0, 120 generated files, no severe). Marked plan step 3 done. |
 | 2026-06-11 | 0.3.0 | RTD-MEX-BASENXP-001 **PASS** (2/9): `basenxp set --enable-system-timer` inserts an OsIf counter referencing the Mcu CORE_CLK point (FLEXIO_CLK), vendor-gate green; drove the byte-faithful element-insertion writer (blocker #1 DONE) and landed the complete 2091-signal `pins.json` (blocker #3 DONE). Updated the per-case table, cross-cutting blockers, and execution plan. |
 | 2026-06-11 | 0.4.0 | RTD-MEX-MCL-001 **PASS** (3/9): `mcl set --add-flexio-logic-channel` appends a FlexIO logic channel with a dynamically-computed unique ChannelId/PinId, vendor-gate green (9-line narrow insert). Marked plan step 5 done. |
+| 2026-06-12 | 0.5.0 | RTD-MEX-PORT-001 **PASS** (4/9): `port set` validates a pin against pins.json then inserts both the `<pin>` header and the Port `PortPin` struct; vendor gate green and the generated SIUL2 source reflects the pins. Review hardening fixed a shared-writer same-prefix tag-matching bug (`<pin>` vs `<pin_features>`) that could have forced whole-file reserialization. Marked plan step 7 done. |
