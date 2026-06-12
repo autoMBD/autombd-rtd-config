@@ -1564,12 +1564,6 @@ def apply_port_set(doc: MexDocument, intent: Intent) -> ApplyResult:
 # Dio: DIO output channel insertion (cross-module: Dio owns channel, Port owns pin)
 # ---------------------------------------------------------------------------
 
-def _load_dio_asset() -> dict:
-    """Load committed dio.json asset. Never reads .xdm at runtime."""
-    dio_path = _ASSET_ROOT / "nxp" / "s32k3" / "dio" / "dio.json"
-    return json.loads(dio_path.read_text(encoding="utf-8"))
-
-
 def _find_gpio_pin_record(signals: list[dict], pin_name: str) -> dict | None:
     """Return the pins.json record where pin==pin_name and direction=='gpio'."""
     target = pin_name.upper()

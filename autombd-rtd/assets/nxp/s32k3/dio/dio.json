@@ -28,7 +28,7 @@
     "PDACSlot": {
       "type": "enum",
       "default": "VIRTUAL_WRAPPER_PDAC0",
-      "source_ref": "Dio.xdm:DioConfig/DioPort/DioChannel/PDACSlot; verified in vendor example_Dio.mex"
+      "source_ref": "fixture/vendor-example: Uart_Example_S32K344 + example_Dio.mex (VIRTUAL_WRAPPER_PDAC0 is a valid Dio.xdm:DioConfig/DioPort/DioChannel/PDACSlot enum value; the default used here was confirmed from the vendor fixture, not from a Dio.xdm DEFAULT attribute)"
     },
     "DioChannelEcucPartitionRef": {
       "type": "array",

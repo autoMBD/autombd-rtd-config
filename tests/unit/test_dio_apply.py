@@ -838,3 +838,171 @@ def test_idempotent_cli_apply(tmp_path):
     assert len(pin_entries) == 5, (
         f"Idempotency: expected 5 pin entries after 2 applies, got {len(pin_entries)}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Fix 1(a): Anti-hardcode -- DioChannelId derivation for a second port-0 pin
+# ---------------------------------------------------------------------------
+# PTA6: mscr=6, DioPortId = 6//16 = 0, DioChannelId = 6%16 = 6.
+# DioPort_0 exists in the fixture. A hardcoded channel_id=5 would fail this test.
+
+def test_dio_channel_id_pta6_anti_hardcode(tmp_path):
+    """Apply with PTA6 (mscr=6) -- DioChannelId must be 6, not hardcoded 5.
+
+    PTA6: mscr=6 -> DioPortId=0 (port 0 exists in fixture), DioChannelId=6%16=6.
+    This test makes a hardcoded 'channel_id=5' fail (proves dynamic computation).
+    PTA6 is a free GPIO in pins.json (direction='gpio', pin_mapbga257=M15).
+    """
+    project = copy_uart_fixture(tmp_path)
+    doc = MexDocument.load(project / "Uart_Example.mex")
+
+    intent = _intent(add_channel="LED2", pin="PTA6", direction="output")
+    result = apply_dio_set(doc, intent)
+
+    assert not result.blocked, [d.to_dict() for d in result.diagnostics]
+    assert "dio" in result.changed_modules
+
+    structs = _dio_channel_structs(doc)
+    assert len(structs) == 1, f"Expected 1 DioChannel struct, got {len(structs)}"
+
+    ch = structs[0]
+    actual_id = _setting_value(doc, ch, "DioChannelId")
+    assert actual_id == "6", (
+        f"PTA6 (mscr=6): DioChannelId must be 6 (=6%16), got {actual_id!r}. "
+        "If this is '5', the DioChannelId is hardcoded instead of computed from mscr."
+    )
+    assert _setting_value(doc, ch, "Name") == "LED2"
+
+
+# ---------------------------------------------------------------------------
+# Fix 1(b): Anti-hardcode -- DioPort absent for a pin with mscr >= 16
+# ---------------------------------------------------------------------------
+# PTA16: mscr=16, DioPortId = 16//16 = 1. DioPort_1 does NOT exist in the fixture
+# (only DioPort_0 exists). apply_dio_set must return the 'dio_port_not_found' blocker.
+# This proves DioPortId is computed (16//16=1) and looked up -- not assumed 0.
+
+def test_dio_port_not_found_for_port1_pin_pta16(tmp_path):
+    """Apply with PTA16 (mscr=16) -- must return dio_port_not_found blocker.
+
+    PTA16: mscr=16 -> DioPortId=16//16=1. DioPort_1 does not exist in the fixture.
+    The fixture only has DioPort_0 (DioPortId=0).
+    This confirms DioPortId is computed and looked up (not assumed 0).
+    A hardcoded DioPortId=0 would find DioPort_0 and NOT return the blocker,
+    making this test fail.
+    PTA16 is a free GPIO in pins.json (direction='gpio', pin_mapbga257=A12, mscr=16).
+    """
+    project = copy_uart_fixture(tmp_path)
+    doc = MexDocument.load(project / "Uart_Example.mex")
+
+    intent = _intent(add_channel="LED_HI", pin="PTA16", direction="output")
+    result = apply_dio_set(doc, intent)
+
+    assert result.blocked, (
+        "Expected a blocker for PTA16 (mscr=16, DioPortId=1) because DioPort_1 "
+        "does not exist in the fixture. If not blocked, DioPortId is being hardcoded "
+        "to 0 instead of computed as mscr//16."
+    )
+    codes = [d.code for d in result.diagnostics]
+    assert any("dio_port_not_found" in code for code in codes), (
+        f"Expected 'dio_port_not_found' diagnostic code, got: {codes}"
+    )
+    # Confirm the diagnostic details carry the computed port_id
+    for d in result.diagnostics:
+        if "dio_port_not_found" in d.code:
+            assert d.details.get("dio_port_id") == 1, (
+                f"Diagnostic details must show dio_port_id=1 (=16//16), "
+                f"got: {d.details}"
+            )
+            assert d.details.get("mscr") == 16, (
+                f"Diagnostic details must show mscr=16, got: {d.details}"
+            )
+
+
+# ---------------------------------------------------------------------------
+# Fix 2: dio.json asset pinning test (LL-012)
+# ---------------------------------------------------------------------------
+# Pins the Python code literals in _build_dio_channel_array_bytes and
+# apply_dio_set against the committed dio.json asset. Any divergence fails
+# the gate. _load_dio_asset is dead code; it is removed (see apply.py).
+
+def test_dio_json_matches_apply_code_literals():
+    """dio.json field order, PDACSlot default, and ID rules match the apply.py code literals.
+
+    This test pins the _build_dio_channel_array_bytes implementation against
+    dio.json so that any drift between the asset and the code fails the gate.
+    The following properties are checked:
+      - children_order matches the order emitted by _build_dio_channel_array_bytes
+      - PDACSlot default == 'VIRTUAL_WRAPPER_PDAC0'
+      - dio_port_id_rule contains '16' (the integer division divisor)
+      - dio_channel_id_rule contains '16' (the modulo divisor)
+
+    Rationale for equality test (not runtime loading):
+      _build_dio_channel_array_bytes uses string literals for speed and to
+      remain .xdm-free at runtime. The asset is the normative spec; this test
+      is the enforcement gate that keeps code and asset in sync.
+    """
+    import pathlib as _pathlib
+    asset_path = (
+        _pathlib.Path(__file__).resolve().parents[2]
+        / "autombd-rtd" / "assets" / "nxp" / "s32k3" / "dio" / "dio.json"
+    )
+    asset = json.loads(asset_path.read_text(encoding="utf-8"))
+
+    # --- Check ID derivation rules ---
+    assert "16" in asset["dio_port_id_rule"], (
+        "dio.json dio_port_id_rule must reference divisor 16 (mscr // 16)"
+    )
+    assert "16" in asset["dio_channel_id_rule"], (
+        "dio.json dio_channel_id_rule must reference modulo 16 (mscr % 16)"
+    )
+
+    # --- Check PDACSlot default ---
+    pdac_default = asset["channel_fields"]["PDACSlot"]["default"]
+    assert pdac_default == "VIRTUAL_WRAPPER_PDAC0", (
+        f"dio.json PDACSlot default must be 'VIRTUAL_WRAPPER_PDAC0', got {pdac_default!r}"
+    )
+
+    # --- Verify children_order matches the emit order in _build_dio_channel_array_bytes ---
+    # The function emits: Name, DioChannelId, PDACSlot, DioChannelEcucPartitionRef
+    expected_children_order = ["Name", "DioChannelId", "PDACSlot", "DioChannelEcucPartitionRef"]
+    actual_children_order = asset.get("children_order", [])
+    assert actual_children_order == expected_children_order, (
+        f"dio.json children_order must match _build_dio_channel_array_bytes emit order.\n"
+        f"  Asset children_order:  {actual_children_order}\n"
+        f"  Code emit order:       {expected_children_order}\n"
+        "Update either dio.json or _build_dio_channel_array_bytes to make them agree."
+    )
+
+    # --- Verify the actual byte output contains exactly the fields from children_order ---
+    # Call the production function and parse the emitted XML fragment
+    from rtd_config.backends.s32_mex.apply import _build_dio_channel_array_bytes
+    raw = _build_dio_channel_array_bytes(
+        channel_name="TEST_CH",
+        channel_id=3,
+        indent=33,
+        line_ending=b"\n",
+    )
+    fragment = raw.decode("utf-8")
+
+    # The struct must contain all four fields in order
+    for field_name in expected_children_order:
+        assert field_name in fragment, (
+            f"_build_dio_channel_array_bytes output missing field '{field_name}'"
+        )
+
+    # PDACSlot value must equal the asset default
+    assert f'name="PDACSlot" value="{pdac_default}"' in fragment, (
+        f"PDACSlot value in emitted bytes must be '{pdac_default}' (from dio.json default), "
+        f"got fragment:\n{fragment}"
+    )
+
+    # Check relative ordering of the four fields
+    pos_name = fragment.index('"Name"')
+    pos_id = fragment.index('"DioChannelId"')
+    pos_pdac = fragment.index('"PDACSlot"')
+    pos_ecuc = fragment.index('"DioChannelEcucPartitionRef"')
+    assert pos_name < pos_id < pos_pdac < pos_ecuc, (
+        f"Field order in emitted bytes does not match children_order.\n"
+        f"Positions: Name={pos_name}, DioChannelId={pos_id}, "
+        f"PDACSlot={pos_pdac}, DioChannelEcucPartitionRef={pos_ecuc}"
+    )
