@@ -65,7 +65,7 @@ from .modules.mcu import McuProvider
 from .modules.port import PortProvider
 from .modules.dio import DioProvider
 from .checks.static import run_static_checks
-from .backends.s32_mex.apply import apply_uart_set, apply_platform_set, apply_basenxp_set, apply_mcl_set, apply_port_set, apply_dio_set, apply_mcu_set
+from .backends.s32_mex.apply import apply_uart_set, apply_uart_add_flexio_channel, apply_platform_set, apply_basenxp_set, apply_mcl_set, apply_port_set, apply_dio_set, apply_mcu_set
 from .backends.s32_mex.validation import run_validation
 
 
@@ -143,6 +143,45 @@ def build_parser() -> argparse.ArgumentParser:
     uart_set.add_argument("--configure", action="store_true")
     uart_set.add_argument("--backup", action="store_true")
     uart_set.add_argument("--json", action="store_true")
+
+    uart_add_flexio = uart_actions.add_parser(
+        "add-flexio-channel",
+        help=(
+            "Create a FlexIO UART Tx+Rx channel pair (RTD-MEX-UART-002). "
+            "Inserts 2 MCL FlexIO logic channels and 2 Uart FlexIO channels "
+            "with the given communication parameters and callback. "
+            "The shared FLEXIO_IRQn/MCL_FLEXIO_ISR Platform ISR and "
+            "FLEXIO_CLK Mcu clock reference are ensured (idempotent)."
+        ),
+    )
+    uart_add_flexio.add_argument("--project", required=True)
+    uart_add_flexio.add_argument(
+        "--baud", type=int, default=921600,
+        help="Desired baud rate (default: 921600). Maps to FLEXIO_UART_BAUDRATE_<baud>.",
+    )
+    uart_add_flexio.add_argument(
+        "--word-length", dest="word_length", type=int, default=8, choices=[8],
+        help="Word length in bits (default: 8). Only 8-bit is supported by FlexIO UART.",
+    )
+    uart_add_flexio.add_argument(
+        "--mode", default="interrupt", choices=["interrupt"],
+        help="Driver mode (default: interrupt). Only interrupt mode is supported.",
+    )
+    uart_add_flexio.add_argument(
+        "--callback",
+        help="Callback function name for UartCallback[0], e.g. Autombd_UartCallback.",
+    )
+    uart_add_flexio.add_argument(
+        "--tx-name", dest="tx_name", default="UART2_TX",
+        help="Name for the TX MCL/Uart channel (default: UART2_TX).",
+    )
+    uart_add_flexio.add_argument(
+        "--rx-name", dest="rx_name", default="UART2_RX",
+        help="Name for the RX MCL/Uart channel (default: UART2_RX).",
+    )
+    uart_add_flexio.add_argument("--configure", action="store_true")
+    uart_add_flexio.add_argument("--backup", action="store_true")
+    uart_add_flexio.add_argument("--json", action="store_true")
 
     platform_parser = subparsers.add_parser("platform")
     platform_actions = platform_parser.add_subparsers(dest="action")
@@ -442,6 +481,37 @@ def cmd_uart_set(args: argparse.Namespace) -> int:
     return _configure_module(args, intent, plan, apply_uart_set)
 
 
+def normalize_uart_add_flexio_intent(args: argparse.Namespace) -> Intent:
+    """Normalize `uart add-flexio-channel` CLI arguments into the JSON intent contract."""
+    payload: dict = {
+        "baud": args.baud,
+        "word_length": args.word_length,
+        "mode": args.mode,
+    }
+    if args.callback is not None:
+        payload["callback"] = args.callback
+    if getattr(args, "tx_name", None):
+        payload["tx_name"] = args.tx_name
+    if getattr(args, "rx_name", None):
+        payload["rx_name"] = args.rx_name
+    return Intent.from_dict({"module": "uart", "action": "add_flexio_channel", "payload": payload})
+
+
+def cmd_uart_add_flexio_channel(args: argparse.Namespace) -> int:
+    intent = normalize_uart_add_flexio_intent(args)
+    plan = UartProvider().plan(intent)
+
+    if not args.configure:
+        return emit({
+            "status": "passed",
+            "command": "plan",
+            "normalized_intent": _intent_dict(intent),
+            "plan": plan.to_dict(),
+        })
+
+    return _configure_module(args, intent, plan, apply_uart_add_flexio_channel)
+
+
 def _configure_module(args: argparse.Namespace, intent: Intent, plan, apply_fn) -> int:
     """Shared configure pipeline: apply an owned edit, write, then static-check.
 
@@ -683,6 +753,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "uart" and getattr(args, "action", None) == "set":
         return cmd_uart_set(args)
+
+    if args.command == "uart" and getattr(args, "action", None) == "add-flexio-channel":
+        return cmd_uart_add_flexio_channel(args)
 
     if args.command == "platform" and getattr(args, "action", None) == "set":
         return cmd_platform_set(args)

@@ -33,6 +33,30 @@
       "LPUART_UART_BAUDRATE_460800",
       "LPUART_UART_BAUDRATE_921600"
     ],
+    "FlexioUartInteruptDmaMethod": [
+      "FLEXIO_UART_IP_DRIVER_TYPE_INTERRUPTS",
+      "FLEXIO_UART_IP_DRIVER_TYPE_DMA"
+    ],
+    "FlexioDesireBaudrate": [
+      "FLEXIO_UART_BAUDRATE_1200",
+      "FLEXIO_UART_BAUDRATE_2400",
+      "FLEXIO_UART_BAUDRATE_4800",
+      "FLEXIO_UART_BAUDRATE_9600",
+      "FLEXIO_UART_BAUDRATE_19200",
+      "FLEXIO_UART_BAUDRATE_38400",
+      "FLEXIO_UART_BAUDRATE_57600",
+      "FLEXIO_UART_BAUDRATE_115200",
+      "FLEXIO_UART_BAUDRATE_230400",
+      "FLEXIO_UART_BAUDRATE_460800",
+      "FLEXIO_UART_BAUDRATE_921600"
+    ],
+    "FlexioBitCount": [
+      "FLEXIO_UART_IP_8_BITS_PER_CHAR"
+    ],
+    "FlexioDriverDirection": [
+      "FLEXIO_UART_IP_DIRECTION_TX",
+      "FLEXIO_UART_IP_DIRECTION_RX"
+    ],
     "parity_cli_to_enum": {
       "none":  "LPUART_UART_IP_PARITY_DISABLED",
       "even":  "LPUART_UART_IP_PARITY_EVEN",
@@ -53,8 +77,29 @@
     "capability_setting": "UartCallbackCapability",
     "callback_array": "UartCallback"
   },
+  "flexio_channel_template": {
+    "_note": "Grounded in Uart.xdm FlexioModuleConfiguration field set and fixture lines 914-924 (Flexio0_Tx) and 947-957 (Flexio1_Rx). Field order is byte-faithful to the fixture.",
+    "field_order": [
+      "Name",
+      "UartHwChannelRef",
+      "FlexioUartInteruptDmaMethod",
+      "FlexioDmaChannelRef",
+      "DesireBaudrate",
+      "CustomTimerDecrement",
+      "CustomBaudrateDivider",
+      "bitCount",
+      "driverDirection"
+    ],
+    "defaults": {
+      "FlexioUartInteruptDmaMethod": "FLEXIO_UART_IP_DRIVER_TYPE_INTERRUPTS",
+      "FlexioDmaChannelRef": "",
+      "CustomTimerDecrement": "FLEXIO_TIMER_DECREMENT_FXIO_CLK_SHIFT_TMR",
+      "CustomBaudrateDivider": "0"
+    }
+  },
+  "mcl_ref_path_pattern": "/Mcl/Mcl/MclConfig/FlexioCommon_0/{channel_name}",
   "instance_irq_clock_map": {
-    "_note": "Grounded in: S32K344_IRQ.h (IRQn/handler names), Platform.xdm/.epd ISR table, Uart.xdm UartClockRef domain, fixture Uart_Example_S32K344 clock tool. LPUART_0 and LPUART_8 use AIPS_PLAT_CLK; all others (LPUART_1..7, LPUART_9..15) use AIPS_SLOW_CLK.",
+    "_note": "Grounded in: S32K344_IRQ.h (IRQn/handler names), Platform.xdm/.epd ISR table, Uart.xdm UartClockRef domain, fixture Uart_Example_S32K344 clock tool. LPUART_0 and LPUART_8 use AIPS_PLAT_CLK; all others (LPUART_1..7, LPUART_9..15) use AIPS_SLOW_CLK. FLEXIO uses FLEXIO_CLK -> CORE_CLK (shared MCL_FLEXIO_ISR).",
     "LPUART_0":  {"irq_name": "LPUART0_IRQn",  "isr_handler": "LPUART_UART_IP_0_IRQHandler",  "clock_select": "AIPS_PLAT_CLK"},
     "LPUART_1":  {"irq_name": "LPUART1_IRQn",  "isr_handler": "LPUART_UART_IP_1_IRQHandler",  "clock_select": "AIPS_SLOW_CLK"},
     "LPUART_2":  {"irq_name": "LPUART2_IRQn",  "isr_handler": "LPUART_UART_IP_2_IRQHandler",  "clock_select": "AIPS_SLOW_CLK"},
@@ -70,6 +115,7 @@
     "LPUART_12": {"irq_name": "LPUART12_IRQn", "isr_handler": "LPUART_UART_IP_12_IRQHandler", "clock_select": "AIPS_SLOW_CLK"},
     "LPUART_13": {"irq_name": "LPUART13_IRQn", "isr_handler": "LPUART_UART_IP_13_IRQHandler", "clock_select": "AIPS_SLOW_CLK"},
     "LPUART_14": {"irq_name": "LPUART14_IRQn", "isr_handler": "LPUART_UART_IP_14_IRQHandler", "clock_select": "AIPS_SLOW_CLK"},
-    "LPUART_15": {"irq_name": "LPUART15_IRQn", "isr_handler": "LPUART_UART_IP_15_IRQHandler", "clock_select": "AIPS_SLOW_CLK"}
+    "LPUART_15": {"irq_name": "LPUART15_IRQn", "isr_handler": "LPUART_UART_IP_15_IRQHandler", "clock_select": "AIPS_SLOW_CLK"},
+    "FLEXIO":    {"irq_name": "FLEXIO_IRQn",   "isr_handler": "MCL_FLEXIO_ISR",                "clock_ref_name": "FLEXIO_CLK", "clock_select": "CORE_CLK"}
   }
 }

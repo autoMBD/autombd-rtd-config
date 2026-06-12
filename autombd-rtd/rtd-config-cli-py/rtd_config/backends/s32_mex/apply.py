@@ -3061,3 +3061,452 @@ def apply_mcu_set(doc: MexDocument, intent: Intent) -> ApplyResult:
     if mcu_cfg is not None:
         result.modified_elements.append(mcu_cfg)
     return result
+
+
+# ---------------------------------------------------------------------------
+# UART-002: FlexIO Tx+Rx channel pair creation
+# ---------------------------------------------------------------------------
+
+def _find_uart_channel_array(doc: MexDocument, uart_cfg: ET.Element) -> "ET.Element | None":
+    """Return the UartChannel array inside UartGlobalConfig."""
+    for el in uart_cfg.iter():
+        if el.tag.endswith("array") and el.attrib.get("name") == "UartChannel":
+            return el
+    return None
+
+
+def _compute_next_uart_channel_id(channel_array: ET.Element, doc: MexDocument) -> int:
+    """Return the next UartChannelId (max existing + 1)."""
+    max_id = -1
+    for ch in channel_array:
+        if not ch.tag.endswith("struct"):
+            continue
+        s = doc.find_child_setting(ch, "UartChannelId")
+        if s is not None and s.attrib.get("value"):
+            try:
+                v = int(s.attrib["value"])
+                if v > max_id:
+                    max_id = v
+            except ValueError:
+                pass
+    return max_id + 1
+
+
+def _uart_channel_name_exists(channel_array: ET.Element, doc: MexDocument, name: str) -> bool:
+    """Return True if a UartChannel struct with Name==name already exists."""
+    for ch in channel_array:
+        if not ch.tag.endswith("struct"):
+            continue
+        n = doc.find_child_setting(ch, "Name")
+        if n is not None and n.attrib.get("value") == name:
+            return True
+    return False
+
+
+def _build_flexio_uart_channel_bytes(
+    struct_index: int,
+    channel_name: str,
+    uart_channel_id: int,
+    clock_ref_path: str,
+    mcl_channel_ref: str,
+    baud_enum: str,
+    bit_count_enum: str,
+    direction_enum: str,
+    struct_indent: int,
+    line_ending: bytes,
+) -> bytes:
+    """Build raw bytes for one FlexIO UartChannel <struct>.
+
+    Mirrors the EXACT field set and order of Flexio0_Tx / Flexio1_Rx structs in
+    the fixture (lines 893-925 and 926-958).
+
+    Top-level fields (struct_indent, e.g. 30 spaces):
+      Name, UartHwUsing, UartChannelId, UartClockRef, UartChannelEcucPartitionRef,
+      DetailModuleConfiguration sub-struct, FlexioModuleConfiguration sub-struct.
+
+    DetailModuleConfiguration fields (struct_indent+6, e.g. 36 spaces) mirror
+    Flexio0_Tx verbatim (dummy LPUART fields; ignored for FLEXIO_IP but required
+    by ConfigTools schema):
+      Name, UartHwChannel, DesireBaudrate, CustomBaudrateMantissa, CustomBaudrateDivisor,
+      UartInteruptDmaMethod, UartDmaTxChannelRef, UartDmaRxChannelRef, UartParityType,
+      UartStopBitNumber, UartWordLength, UartInternalLoopbackEnable, UartTimeoutEnable.
+
+    FlexioModuleConfiguration fields (struct_indent+6, e.g. 36 spaces):
+      Name, UartHwChannelRef, FlexioUartInteruptDmaMethod, FlexioDmaChannelRef,
+      DesireBaudrate, CustomTimerDecrement, CustomBaudrateDivider, bitCount,
+      driverDirection.
+    """
+    le = line_ending.decode("latin-1")
+    sp = " " * struct_indent          # struct open/close
+    sp1 = " " * (struct_indent + 3)   # direct children of channel struct
+    sp2 = " " * (struct_indent + 6)   # children of sub-structs
+
+    # Determine the dummy LPUART channel name based on channel_id
+    # (mirrors fixture: Flexio0_Tx uses LPUART_1, Flexio1_Rx uses LPUART_2)
+    dummy_lpuart = f"LPUART_{uart_channel_id}"
+
+    lines = [
+        f'{sp}<struct name="{struct_index}">',
+        f'{sp1}<setting name="Name" value="{channel_name}"/>',
+        f'{sp1}<setting name="UartHwUsing" value="FLEXIO_IP"/>',
+        f'{sp1}<setting name="UartChannelId" value="{uart_channel_id}"/>',
+        f'{sp1}<setting name="UartClockRef" value="{clock_ref_path}"/>',
+        f'{sp1}<array name="UartChannelEcucPartitionRef"/>',
+        f'{sp1}<struct name="DetailModuleConfiguration">',
+        f'{sp2}<setting name="Name" value="DetailModuleConfiguration"/>',
+        f'{sp2}<setting name="UartHwChannel" value="{dummy_lpuart}"/>',
+        f'{sp2}<setting name="DesireBaudrate" value="LPUART_UART_BAUDRATE_9600"/>',
+        f'{sp2}<setting name="CustomBaudrateMantissa" value="1"/>',
+        f'{sp2}<setting name="CustomBaudrateDivisor" value="4"/>',
+        f'{sp2}<setting name="UartInteruptDmaMethod" value="LPUART_UART_IP_USING_INTERRUPTS"/>',
+        f'{sp2}<array name="UartDmaTxChannelRef"/>',
+        f'{sp2}<array name="UartDmaRxChannelRef"/>',
+        f'{sp2}<setting name="UartParityType" value="LPUART_UART_IP_PARITY_DISABLED"/>',
+        f'{sp2}<setting name="UartStopBitNumber" value="LPUART_UART_IP_ONE_STOP_BIT"/>',
+        f'{sp2}<setting name="UartWordLength" value="{bit_count_enum}"/>',
+        f'{sp2}<setting name="UartInternalLoopbackEnable" value="false"/>',
+        f'{sp2}<setting name="UartTimeoutEnable" value="false"/>',
+        f'{sp1}</struct>',
+        f'{sp1}<struct name="FlexioModuleConfiguration">',
+        f'{sp2}<setting name="Name" value="FlexioModuleConfiguration"/>',
+        f'{sp2}<setting name="UartHwChannelRef" value="{mcl_channel_ref}"/>',
+        f'{sp2}<setting name="FlexioUartInteruptDmaMethod" value="FLEXIO_UART_IP_DRIVER_TYPE_INTERRUPTS"/>',
+        f'{sp2}<array name="FlexioDmaChannelRef"/>',
+        f'{sp2}<setting name="DesireBaudrate" value="{baud_enum}"/>',
+        f'{sp2}<setting name="CustomTimerDecrement" value="FLEXIO_TIMER_DECREMENT_FXIO_CLK_SHIFT_TMR"/>',
+        f'{sp2}<setting name="CustomBaudrateDivider" value="0"/>',
+        f'{sp2}<setting name="bitCount" value="{bit_count_enum}"/>',
+        f'{sp2}<setting name="driverDirection" value="{direction_enum}"/>',
+        f'{sp1}</struct>',
+        f'{sp}</struct>',
+    ]
+    return le.join(lines).encode("utf-8")
+
+
+def _find_flexio_clock_ref_path(doc: MexDocument) -> str:
+    """Return the UartClockRef path for the FLEXIO_CLK ref point.
+
+    Grounded in uart.json FLEXIO entry and the fixture:
+    /Mcu/Mcu/McuModuleConfiguration/McuClockSettingConfig_0/FLEXIO_CLK
+    Looks up dynamically from the Mcu config set to find FLEXIO_CLK.
+    Falls back to the fixture-grounded literal if not found.
+    """
+    mcu_cfg = doc.find_config_set("Mcu")
+    if mcu_cfg is None:
+        return "/Mcu/Mcu/McuModuleConfiguration/McuClockSettingConfig_0/FLEXIO_CLK"
+
+    for el in mcu_cfg.iter():
+        if not (el.tag.endswith("array") and el.attrib.get("name") == "McuClockSettingConfig"):
+            continue
+        for cs in el:
+            if not cs.tag.endswith("struct"):
+                continue
+            ns = doc.find_child_setting(cs, "Name")
+            cs_name = ns.attrib.get("value", "") if ns is not None else ""
+            for child in cs.iter():
+                if not (child.tag.endswith("array")
+                        and child.attrib.get("name") == "McuClockReferencePoint"):
+                    continue
+                for rp in child:
+                    if not rp.tag.endswith("struct"):
+                        continue
+                    rn = doc.find_child_setting(rp, "Name")
+                    if rn is not None and rn.attrib.get("value") == "FLEXIO_CLK":
+                        return f"/Mcu/Mcu/McuModuleConfiguration/{cs_name}/FLEXIO_CLK"
+
+    return "/Mcu/Mcu/McuModuleConfiguration/McuClockSettingConfig_0/FLEXIO_CLK"
+
+
+def apply_uart_add_flexio_channel(doc: MexDocument, intent: Intent) -> ApplyResult:
+    """Create a FlexIO Tx+Rx UART channel pair (RTD-MEX-UART-002).
+
+    Performs four orchestrated edits in one call:
+
+    1. **Mcl-owned** (config_set "Mcl"):
+       Insert TWO new FlexioMclLogicChannels structs:
+         - UART2_TX: next-available CHANNEL_N / PIN_N
+         - UART2_RX: next-available CHANNEL_N+1 / PIN_N+1
+       Idempotent: skip if Name already exists.
+
+    2. **Uart-owned** (config_set "Uart"):
+       Append TWO new UartChannel structs to UartGlobalConfig/UartChannel:
+         - UART2_TX: UartHwUsing=FLEXIO_IP, UartChannelId=next, driverDirection=TX
+         - UART2_RX: UartHwUsing=FLEXIO_IP, UartChannelId=next+1, driverDirection=RX
+       Each carries DetailModuleConfiguration (dummy LPUART fields, byte-faithful
+       mirror of fixture Flexio0_Tx) and FlexioModuleConfiguration with:
+         UartHwChannelRef -> /Mcl/.../UART2_TX or UART2_RX
+         FlexioUartInteruptDmaMethod=FLEXIO_UART_IP_DRIVER_TYPE_INTERRUPTS
+         DesireBaudrate=FLEXIO_UART_BAUDRATE_<baud>
+         bitCount=FLEXIO_UART_IP_8_BITS_PER_CHAR (or from word_length)
+         driverDirection=TX or RX
+       Idempotent: skip if Name already exists.
+
+    3. **Callback** (Uart-owned GeneralConfiguration):
+       Set UartCallbackCapability=true + UartCallback[0]=<callback> (when --callback).
+
+    4. **Platform/Mcu idempotent ensure**:
+       FLEXIO_IRQn with MCL_FLEXIO_ISR: verify present (no-op if already there --
+       the fixture has it; never add a duplicate).
+       FLEXIO_CLK with CORE_CLK: verify present (no-op if already there).
+
+    Byte-faithful: mirrors the EXACT field set/order of Flexio0_Tx and Flexio1_Rx.
+    Narrowness: only appends new structs; never rewrites existing content.
+    changed_modules: the set actually edited (["uart", "mcl"] always; platform/mcu
+    only if they were absent and had to be inserted).
+
+    Intent payload:
+      baud (int): baud rate, e.g. 921600
+      word_length (int|str): bit count, e.g. 8 (maps to FLEXIO_UART_IP_8_BITS_PER_CHAR)
+      mode (str): 'interrupt' (only supported mode)
+      callback (str, optional): callback function name
+      tx_name (str, optional): name for TX MCL/Uart channel (default 'UART2_TX')
+      rx_name (str, optional): name for RX MCL/Uart channel (default 'UART2_RX')
+    """
+    result = ApplyResult()
+    payload = intent.payload
+    mode = payload.get("mode", "interrupt")
+    baud = payload.get("baud", 921600)
+    word_length = payload.get("word_length", 8)
+    callback = payload.get("callback")
+    tx_name = payload.get("tx_name", "UART2_TX")
+    rx_name = payload.get("rx_name", "UART2_RX")
+
+    if mode not in _FLEXIO_METHOD:
+        result.diagnostics.append(Diagnostic(
+            severity="blocker",
+            code="unsupported_uart_mode",
+            module="uart",
+            message=(
+                f"Uart mode '{mode}' is not supported. RTD 7.0.1 FlexIO UART "
+                "supports interrupt mode only (DMA deferred). Use mode 'interrupt'."
+            ),
+            details={"mode": mode, "supported": sorted(_FLEXIO_METHOD)},
+        ))
+        return result
+
+    # Map baud/word_length to enum values (grounded in uart.json FlexioDesireBaudrate, FlexioBitCount)
+    baud_enum = f"FLEXIO_UART_BAUDRATE_{baud}"
+    # word_length: accept int or str "8" -> FLEXIO_UART_IP_8_BITS_PER_CHAR
+    wl_str = str(word_length)
+    bit_count_enum = f"FLEXIO_UART_IP_{wl_str}_BITS_PER_CHAR"
+
+    # MCL ref path pattern: grounded in uart.json mcl_ref_path_pattern
+    mcl_ref_tx = f"/Mcl/Mcl/MclConfig/FlexioCommon_0/{tx_name}"
+    mcl_ref_rx = f"/Mcl/Mcl/MclConfig/FlexioCommon_0/{rx_name}"
+
+    line_ending = _detect_line_ending(doc._raw)
+
+    # =====================================================================
+    # PHASE 1: Raw-bytes insertions (replace_element_region splices).
+    # All raw-bytes ops BEFORE any attribute mutations.
+    # Order: MCL channels first (both), then Uart channels (both), then
+    # Platform/Mcu ensure (idempotent no-ops if already present).
+    # Each replace_element_region reloads the tree, so re-find after each.
+    # =====================================================================
+
+    # ---- Part 1a: Mcl UART2_TX logic channel ----
+    _apply_mcl_add_channel_inner(doc, tx_name, result)
+    if result.blocked:
+        return result
+
+    # ---- Part 1b: Mcl UART2_RX logic channel (after tx, so pin/channel indices are correct) ----
+    _apply_mcl_add_channel_inner(doc, rx_name, result)
+    if result.blocked:
+        return result
+
+    # ---- Part 1c: Uart UART2_TX channel ----
+    uart_edited_tx = _apply_uart_append_flexio_channel_inner(
+        doc, tx_name, mcl_ref_tx, baud_enum, bit_count_enum,
+        "FLEXIO_UART_IP_DIRECTION_TX", line_ending, result,
+    )
+    if result.blocked:
+        return result
+
+    # ---- Part 1d: Uart UART2_RX channel ----
+    uart_edited_rx = _apply_uart_append_flexio_channel_inner(
+        doc, rx_name, mcl_ref_rx, baud_enum, bit_count_enum,
+        "FLEXIO_UART_IP_DIRECTION_RX", line_ending, result,
+    )
+    if result.blocked:
+        return result
+
+    # ---- Part 1e: Ensure FLEXIO_CLK in Mcu (idempotent no-op if present) ----
+    _ensure_mcu_clock_ref(doc, "FLEXIO_CLK", "CORE_CLK")
+
+    # ---- Part 1f: Ensure FLEXIO_IRQn in Platform (idempotent no-op if present) ----
+    _ensure_platform_isr(
+        doc,
+        irq_name="FLEXIO_IRQn",
+        isr_handler="MCL_FLEXIO_ISR",
+        priority=0,
+    )
+
+    # =====================================================================
+    # PHASE 2: Attribute mutations (no raw-bytes reload after this point).
+    # Re-find Uart config set after all Phase 1 reloads.
+    # =====================================================================
+
+    uart_cfg = doc.find_config_set("Uart")
+    if callback is not None and uart_cfg is not None:
+        _apply_uart_callback(doc, uart_cfg, callback)
+
+    # =====================================================================
+    # PHASE 3: mark_modified + clear quick_selection LAST (LL-013 ordering).
+    # =====================================================================
+
+    # Mark Mcl channels array
+    mcl_cfg = doc.find_config_set("Mcl")
+    if mcl_cfg is not None:
+        channels_array = _find_flexio_channels_array(doc, mcl_cfg)
+        if channels_array is not None:
+            doc.mark_modified(channels_array)
+            carrier = doc.find_nearest_quick_selection_ancestor(channels_array)
+            if carrier is not None:
+                doc.mark_modified(carrier)
+            result.modified_elements.append(channels_array)
+
+    # Mark Uart channel array
+    uart_cfg_final = doc.find_config_set("Uart")
+    if uart_cfg_final is not None:
+        uart_channel_array = _find_uart_channel_array(doc, uart_cfg_final)
+        if uart_channel_array is not None:
+            doc.mark_modified(uart_channel_array)
+            carrier = doc.find_nearest_quick_selection_ancestor(uart_channel_array)
+            if carrier is not None:
+                doc.mark_modified(carrier)
+            result.modified_elements.append(uart_channel_array)
+
+    # Mark Platform config if touched (ensure is always idempotent no-op for existing entries)
+    platform_cfg_final = doc.find_config_set("Platform")
+    if platform_cfg_final is not None:
+        doc.mark_modified(platform_cfg_final)
+        result.modified_elements.append(platform_cfg_final)
+
+    # Mark Mcu config if touched
+    mcu_cfg_final = doc.find_config_set("Mcu")
+    if mcu_cfg_final is not None:
+        doc.mark_modified(mcu_cfg_final)
+        result.modified_elements.append(mcu_cfg_final)
+
+    result.changed_modules = ["uart", "mcl"]
+    return result
+
+
+def _apply_mcl_add_channel_inner(
+    doc: MexDocument,
+    channel_name: str,
+    result: ApplyResult,
+) -> None:
+    """Reuse apply_mcl_set's insertion logic to add one MCL channel.
+
+    This is a delegating helper that constructs a synthetic Intent and calls
+    apply_mcl_set, then propagates any blockers into result.
+    """
+    synthetic_intent = Intent.from_dict({
+        "module": "mcl",
+        "action": "set",
+        "payload": {"add_flexio_logic_channel": channel_name},
+    })
+    mcl_result = apply_mcl_set(doc, synthetic_intent)
+    for d in mcl_result.diagnostics:
+        result.diagnostics.append(d)
+    for m in mcl_result.changed_modules:
+        if m not in result.changed_modules:
+            result.changed_modules.append(m)
+
+
+def _apply_uart_append_flexio_channel_inner(
+    doc: MexDocument,
+    channel_name: str,
+    mcl_ref: str,
+    baud_enum: str,
+    bit_count_enum: str,
+    direction_enum: str,
+    line_ending: bytes,
+    result: ApplyResult,
+) -> bool:
+    """Append one FlexIO Uart channel struct to UartGlobalConfig/UartChannel.
+
+    Idempotent: skip if a channel with channel_name already exists.
+    Returns True if an insertion was made, False if it was a no-op.
+    Propagates blockers into result if the Uart config set is not found.
+    """
+    uart_cfg = doc.find_config_set("Uart")
+    if uart_cfg is None:
+        result.diagnostics.append(Diagnostic(
+            severity="blocker",
+            code="uart_config_set_not_found",
+            module="uart",
+            message="No enabled Uart <config_set> found; cannot add FlexIO channel.",
+            details={},
+        ))
+        return False
+
+    channel_array = _find_uart_channel_array(doc, uart_cfg)
+    if channel_array is None:
+        result.diagnostics.append(Diagnostic(
+            severity="blocker",
+            code="uart_channel_array_not_found",
+            module="uart",
+            message="No UartChannel array found in UartGlobalConfig.",
+            details={},
+        ))
+        return False
+
+    # Idempotency: skip if name already exists
+    if _uart_channel_name_exists(channel_array, doc, channel_name):
+        return False  # no-op
+
+    # Compute next UartChannelId dynamically
+    next_channel_id = _compute_next_uart_channel_id(channel_array, doc)
+
+    # Count existing structs for the struct index
+    existing_structs = [c for c in channel_array if c.tag.endswith("struct")]
+    struct_index = len(existing_structs)
+
+    # Discover the FLEXIO_CLK ref path from the live Mcu config
+    clock_ref_path = _find_flexio_clock_ref_path(doc)
+
+    # Detect the struct indent from the last existing channel struct
+    last_struct = existing_structs[-1] if existing_structs else None
+    if last_struct is not None:
+        struct_indent = _detect_struct_indent(doc, last_struct)
+    else:
+        struct_indent = 30  # fixture level for UartChannel structs
+
+    # Determine LPUART word-length enum for DetailModuleConfiguration
+    # (dummy field -- not functional for FLEXIO_IP, but schema requires it)
+    # We pass bit_count_enum which is FLEXIO_UART_IP_8_BITS_PER_CHAR, but
+    # UartWordLength uses LPUART_UART_IP_8_BITS_PER_CHAR. Always use 8-bit LPUART default.
+    lpuart_wl = "LPUART_UART_IP_8_BITS_PER_CHAR"
+
+    new_struct_bytes = _build_flexio_uart_channel_bytes(
+        struct_index=struct_index,
+        channel_name=channel_name,
+        uart_channel_id=next_channel_id,
+        clock_ref_path=clock_ref_path,
+        mcl_channel_ref=mcl_ref,
+        baud_enum=baud_enum,
+        bit_count_enum=bit_count_enum,
+        direction_enum=direction_enum,
+        struct_indent=struct_indent,
+        line_ending=line_ending,
+    )
+
+    if last_struct is not None:
+        ok = _append_after_last_element(doc, last_struct, new_struct_bytes, line_ending)
+        if not ok:
+            # Fallback: insert before array close tag
+            _append_struct_before_array_close(doc, channel_array, new_struct_bytes, line_ending)
+    else:
+        # Empty array -- replace self-closed array
+        le = line_ending.decode("latin-1")
+        sp_array = " " * (struct_indent - 3)
+        array_bytes = (
+            f'<array name="UartChannel">{le}'
+            f'{new_struct_bytes.decode("utf-8")}{le}'
+            f'{sp_array}</array>'
+        ).encode("utf-8")
+        doc.replace_element_region(channel_array, array_bytes)
+
+    return True
