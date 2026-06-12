@@ -2338,7 +2338,12 @@ def apply_mcu_set(doc: MexDocument, intent: Intent) -> ApplyResult:
     (A) clock_settings section (top-level clocks tool, elements use id="..."):
         - INSERT: CORE_PLL_PD=Power_up, CORE_PLLODIV_0_DE=Enabled,
                   CORE_PLLODIV_1_DE=Enabled, MC_CGM_MUX_0.sel=PHI0
-        - CHANGE: MC_CGM_MUX_0_DIV1.scale 1->2, MC_CGM_MUX_0_DIV2.scale 2->4
+        - CHANGE: MC_CGM_MUX_0_DIV1.scale 1->2, MC_CGM_MUX_0_DIV2.scale 2->4,
+                  MC_CGM_MUX_0_DIV3.scale 1->2 (HSE_CLK=CORE/2=80 MHz; fixes SEVERE
+                  "输入频率必须小于或等于： 120 MHz" on HSE_CLK with 160MHz core)
+        - ENSURE: MC_CGM_MUX_0_DIV4.scale=4 (DCM_CLK=40 MHz), MC_CGM_MUX_0_DIV6.scale=1
+                  (QSPI_MEM_CLK=160 MHz) -- idempotent if already correct; grounded in
+                  example_Dio.mex verified working 160MHz example
         - REMOVE: PLLunderMcuControl="Disabled"
         - LEAVE UNCHANGED: CORE_MFD.scale=120, PLL_PREDIV.scale=2, PHI0.scale=3,
                            PHI1.scale=3, POSTDIV.scale=2, MC_CGM_MUX_0_DIV0.scale=1
@@ -2413,6 +2418,23 @@ def apply_mcu_set(doc: MexDocument, intent: Intent) -> ApplyResult:
 
     # A2: Change MC_CGM_MUX_0_DIV2.scale from 2 to 4
     _change_clock_setting_value(doc, "MC_CGM_MUX_0_DIV2.scale", "4")
+
+    # A2b: Change MC_CGM_MUX_0_DIV3.scale to 2 (HSE_CLK = CORE/2 = 80 MHz).
+    # Without this fix CORE_CLK=160 -> HSE_CLK=160 MHz which exceeds the 120 MHz limit,
+    # producing SEVERE: "输入频率必须小于或等于： 120 MHz" / "HSE_CLK must be half of the CORE_CLK".
+    # Grounded in example_Dio.mex verified working 160MHz example: DIV3.scale=2.
+    # Fixture has DIV3.scale=1 -> CHANGE to 2.
+    _change_clock_setting_value(doc, "MC_CGM_MUX_0_DIV3.scale", "2")
+
+    # A2c: Ensure MC_CGM_MUX_0_DIV4.scale = 4 (DCM_CLK = CORE/4 = 40 MHz).
+    # Grounded in example_Dio.mex verified working 160MHz example: DIV4.scale=4.
+    # Fixture already has DIV4.scale=4; this is idempotent (same value).
+    _change_clock_setting_value(doc, "MC_CGM_MUX_0_DIV4.scale", "4")
+
+    # A2d: Ensure MC_CGM_MUX_0_DIV6.scale = 1 (QSPI_MEM_CLK = CORE/1 = 160 MHz).
+    # Grounded in example_Dio.mex verified working 160MHz example: DIV6.scale=1.
+    # Fixture already has DIV6.scale=1; this is idempotent (same value).
+    _change_clock_setting_value(doc, "MC_CGM_MUX_0_DIV6.scale", "1")
 
     # A3: Remove PLLunderMcuControl="Disabled"
     _remove_clock_setting(doc, "PLLunderMcuControl")

@@ -281,6 +281,70 @@ def test_clock_setting_div2_scale_4(tmp_path):
     assert val == "4", f"MC_CGM_MUX_0_DIV2.scale must be '4', got {val!r}"
 
 
+# Test A3b: MC_CGM_MUX_0_DIV3.scale changed from 1 to 2 (HSE_CLK fix)
+# Root cause of SEVERE: "输入频率必须小于或等于： 120 MHz" on HSE_CLK.
+# With CORE_CLK=160 MHz and DIV3=1, HSE_CLK=160 MHz which exceeds the 120 MHz limit.
+# Grounded in example_Dio.mex clock_settings: DIV3.scale=2 -> HSE_CLK=160/2=80 MHz.
+def test_clock_setting_div3_scale_2(tmp_path):
+    project = copy_uart_fixture(tmp_path)
+    mex = project / "Uart_Example.mex"
+
+    # Verify fixture starts with DIV3.scale=1 (pre-condition for the CHANGE path)
+    before = mex.read_bytes()
+    assert b'MC_CGM_MUX_0_DIV3.scale" value="1"' in before, (
+        "Fixture must have MC_CGM_MUX_0_DIV3.scale=1 before apply (pre-condition)"
+    )
+
+    doc = MexDocument.load(mex)
+    apply_mcu_set(doc, _std_intent())
+    doc.write(mex)
+    after = mex.read_bytes()
+
+    val = _find_clock_setting(after, "MC_CGM_MUX_0_DIV3.scale")
+    assert val == "2", (
+        f"MC_CGM_MUX_0_DIV3.scale must be '2' (HSE_CLK=CORE/2=80 MHz; "
+        f"grounded in example_Dio.mex verified working example), got {val!r}"
+    )
+
+
+# Test A3c: MC_CGM_MUX_0_DIV4.scale written as 4 (DCM_CLK = CORE/4 = 40 MHz)
+# Grounded in example_Dio.mex clock_settings: DIV4.scale=4 -> DCM_CLK=160/4=40 MHz.
+# Fixture already has DIV4.scale=4; this test confirms consistency (no regression).
+def test_clock_setting_div4_scale_4(tmp_path):
+    project = copy_uart_fixture(tmp_path)
+    mex = project / "Uart_Example.mex"
+    doc = MexDocument.load(mex)
+
+    apply_mcu_set(doc, _std_intent())
+    doc.write(mex)
+    after = mex.read_bytes()
+
+    val = _find_clock_setting(after, "MC_CGM_MUX_0_DIV4.scale")
+    assert val == "4", (
+        f"MC_CGM_MUX_0_DIV4.scale must be '4' (DCM_CLK=CORE/4=40 MHz; "
+        f"grounded in example_Dio.mex verified working example), got {val!r}"
+    )
+
+
+# Test A3d: MC_CGM_MUX_0_DIV6.scale written as 1 (QSPI_MEM_CLK = CORE/1 = 160 MHz)
+# Grounded in example_Dio.mex clock_settings: DIV6.scale=1 -> QSPI_MEM_CLK=160/1=160 MHz.
+# Fixture already has DIV6.scale=1; this test confirms consistency (no regression).
+def test_clock_setting_div6_scale_1(tmp_path):
+    project = copy_uart_fixture(tmp_path)
+    mex = project / "Uart_Example.mex"
+    doc = MexDocument.load(mex)
+
+    apply_mcu_set(doc, _std_intent())
+    doc.write(mex)
+    after = mex.read_bytes()
+
+    val = _find_clock_setting(after, "MC_CGM_MUX_0_DIV6.scale")
+    assert val == "1", (
+        f"MC_CGM_MUX_0_DIV6.scale must be '1' (QSPI_MEM_CLK=CORE/1=160 MHz; "
+        f"grounded in example_Dio.mex verified working example), got {val!r}"
+    )
+
+
 # Test A4: CORE_PLL_PD = Power_up is written (was absent)
 def test_clock_setting_pll_power_up(tmp_path):
     project = copy_uart_fixture(tmp_path)
