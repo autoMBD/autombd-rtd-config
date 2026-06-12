@@ -1871,12 +1871,13 @@ def apply_dio_set(doc: MexDocument, intent: Intent) -> ApplyResult:
                 if dio_port is not None:
                     dio_channel_array = _find_dio_channel_array(doc, dio_port)
 
-    # Mark Dio modified
+    # Mark Dio channel array modified (but do NOT clear the Dio config_set's
+    # quick_selection here -- Parts B and C below both call replace_element_region
+    # which reloads the tree from raw bytes, discarding any in-memory attrib
+    # pop done before those reloads. The quick_selection clear on the Dio
+    # config_set MUST happen after the last replace_element_region call).
     if dio_channel_inserted and dio_channel_array is not None:
         doc.mark_modified(dio_channel_array)
-        carrier = doc.find_nearest_quick_selection_ancestor(dio_channel_array)
-        if carrier is not None:
-            doc.mark_modified(carrier)
         result.changed_modules.append("dio")
         result.modified_elements.append(dio_channel_array)
 
@@ -2032,6 +2033,20 @@ def apply_dio_set(doc: MexDocument, intent: Intent) -> ApplyResult:
             result.modified_elements.append(portpin_array)
         if "port" not in result.changed_modules:
             result.changed_modules.append("port")
+
+    # Clear quick_selection on the Dio config_set AFTER all replace_element_region
+    # calls. Each replace_element_region reloads the tree from raw bytes, resetting
+    # _sources (and therefore the src.attrib snapshot used by _render_minimal).
+    # Any mark_modified done before a reload is overwritten by the reload because
+    # _capture_sources() re-snaps attribs from the freshly parsed tree (which still
+    # carries quick_selection="DioDefault" in the raw bytes). The clear must happen
+    # LAST, after every insertion is complete, so the final _render_minimal sees the
+    # Dio config_set element's attrib as different from its src.attrib snapshot and
+    # calls _remove_attr to strip quick_selection from the written bytes.
+    if dio_channel_inserted:
+        dio_cfg_final = doc.find_config_set("Dio")
+        if dio_cfg_final is not None and "quick_selection" in dio_cfg_final.attrib:
+            doc.mark_modified(dio_cfg_final)
 
     return result
 

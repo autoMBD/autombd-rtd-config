@@ -583,6 +583,54 @@ def test_edit_is_byte_narrow(tmp_path):
 
 
 # ---------------------------------------------------------------------------
+# Test 7b: Dio config_set quick_selection removed after apply (codegen regression)
+# ---------------------------------------------------------------------------
+
+def test_dio_config_set_quick_selection_removed_after_write(tmp_path):
+    """After apply_dio_set + doc.write, the Dio config_set must have NO quick_selection.
+
+    Root cause: the fixture carries quick_selection=\"DioDefault\" on the
+    <config_set name=\"Dio\"> element. ConfigTools treats that as \"use default
+    configuration\" and ignores any inserted channels during code generation, so
+    DioConf_DioChannel_LED_CTRL is silently absent from Dio_Cfg.h.
+
+    The fix: clear quick_selection from the Dio config_set AFTER all
+    replace_element_region calls (each reload reloads the tree from raw bytes,
+    discarding any prior in-memory mark_modified on ancestors).
+
+    This test is the deterministic proxy that guarantees ConfigTools will emit
+    the channel macro.  It MUST fail before the fix and pass after.
+    """
+    project = copy_uart_fixture(tmp_path)
+    mex = project / "Uart_Example.mex"
+
+    doc = MexDocument.load(mex)
+    apply_dio_set(doc, _standard_intent())
+    doc.write(mex)
+
+    # Check written bytes: quick_selection must not appear on the Dio config_set
+    import re
+    content = mex.read_text(encoding="utf-8")
+    m = re.search(r'config_set\s+name="Dio"[^>]*>', content)
+    assert m is not None, "Dio config_set tag not found in written file"
+    written_tag = m.group(0)
+    assert "quick_selection" not in written_tag, (
+        f"Dio config_set still carries quick_selection after apply+write -- "
+        f"ConfigTools will ignore the inserted DioChannel during codegen.\n"
+        f"Written tag: {written_tag}"
+    )
+
+    # Also verify via reloaded document (double-check the bytes are correct)
+    reloaded = MexDocument.load(mex)
+    dio_cfg = reloaded.find_config_set("Dio")
+    assert dio_cfg is not None, "Dio config_set not found in reloaded doc"
+    assert "quick_selection" not in dio_cfg.attrib, (
+        f"Reloaded Dio config_set still has quick_selection={dio_cfg.attrib.get('quick_selection')!r}. "
+        "ConfigTools will ignore the inserted DioChannel during codegen."
+    )
+
+
+# ---------------------------------------------------------------------------
 # Test 8: well-formed reload
 # ---------------------------------------------------------------------------
 
