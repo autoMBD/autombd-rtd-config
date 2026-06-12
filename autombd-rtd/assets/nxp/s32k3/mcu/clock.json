@@ -1,34 +1,48 @@
 {
-  "_comment": "Mcu clock-tree recipe for NXP S32K3 RTD 7.0.1. Values grounded in Mcu.xdm and the 160MHz reference config (FXOSC=16MHz, CORE_PLL, PHI0/PHI1). Only the 160/80/40 recipe is supported; other combos must return a blocker.",
+  "_source": "Mcu.xdm (S32K344 RTD 7.0.1 reference config) + example_Dio.mex verified 160 MHz working config. This file is a committed reference document pinned against apply.py by test_clock_json_matches_apply_code_literals; it is NOT loaded at runtime.",
   "recipes": [
     {
       "core_clk": 160,
       "aips_plat_clk": 80,
       "aips_slow_clk": 40,
       "clock_settings_changes": [
-        {"id": "MC_CGM_MUX_0_DIV1.scale", "action": "change", "value": "2"},
-        {"id": "MC_CGM_MUX_0_DIV2.scale", "action": "change", "value": "4"}
+        {"id": "MC_CGM_MUX_0_DIV1.scale", "action": "change", "value": "2", "source_ref": "example_Dio.mex / Mcu.xdm RANGE"},
+        {"id": "MC_CGM_MUX_0_DIV2.scale", "action": "change", "value": "4", "source_ref": "example_Dio.mex / Mcu.xdm RANGE"},
+        {"id": "MC_CGM_MUX_0_DIV3.scale", "action": "change", "value": "2", "source_ref": "example_Dio.mex verified 160MHz (HSE_CLK=CORE/2=80MHz, must be <=120MHz)"},
+        {"id": "MC_CGM_MUX_0_DIV4.scale", "action": "change", "value": "4", "source_ref": "example_Dio.mex verified 160MHz (DCM_CLK=CORE/4=40MHz)"},
+        {"id": "MC_CGM_MUX_0_DIV6.scale", "action": "change", "value": "1", "source_ref": "example_Dio.mex verified 160MHz (QSPI_MEM_CLK=CORE/1=160MHz)"}
       ],
       "clock_settings_inserts": [
-        {"id": "CORE_PLL_PD", "value": "Power_up", "locked": "false"},
-        {"id": "CORE_PLLODIV_0_DE", "value": "Enabled", "locked": "false"},
-        {"id": "CORE_PLLODIV_1_DE", "value": "Enabled", "locked": "false"},
-        {"id": "MC_CGM_MUX_0.sel", "value": "PHI0", "locked": "false"}
+        {"id": "CORE_PLL_PD", "value": "Power_up", "locked": "false", "source_ref": "reference_configs/S32K344/Mcu.xdm"},
+        {"id": "CORE_PLLODIV_0_DE", "value": "Enabled", "locked": "false", "source_ref": "reference_configs/S32K344/Mcu.xdm"},
+        {"id": "CORE_PLLODIV_1_DE", "value": "Enabled", "locked": "false", "source_ref": "reference_configs/S32K344/Mcu.xdm"},
+        {"id": "MC_CGM_MUX_0.sel", "value": "PHI0", "locked": "false", "source_ref": "reference_configs/S32K344/Mcu.xdm"}
       ],
       "clock_settings_removes": [
-        {"id": "PLLunderMcuControl"}
+        {"id": "PLLunderMcuControl", "source_ref": "reference_configs/S32K344/Mcu.xdm (absent in working 160MHz config)"}
       ],
       "mcu_config_set_changes": {
+        "McuGeneralConfiguration": {
+          "McuNoPll": "false",
+          "_source_ref": "Mcu.xdm INVALID: McuNoPll=true AND McuPLLUnderMcuControl=true -> SEVERE (GAP 1 fix)"
+        },
+        "McuControlledClocksConfiguration": {
+          "McuPll0UnderMcuControl": "true",
+          "_source_ref": "Mcu.xdm INVALID: McuPLLUnderMcuControl=true but McuPll0UnderMcuControl=false -> SEVERE (GAP 2 fix)"
+        },
         "McuPll_0": {
           "McuPLLUnderMcuControl": "true",
-          "McuPLLEnabled": "true"
+          "McuPLLEnabled": "true",
+          "_source_ref": "reference_configs/S32K344/Mcu.xdm"
         },
         "McuPll_Configuration": {
           "McuPllOdiv0_En": "true",
-          "McuPllOdiv1_En": "true"
+          "McuPllOdiv1_En": "true",
+          "_source_ref": "reference_configs/S32K344/Mcu.xdm"
         },
         "McuCgm0ClockMux0": {
-          "McuClkMux0_Source": "PLL_PHI0_CLK"
+          "McuClkMux0_Source": "PLL_PHI0_CLK",
+          "_source_ref": "reference_configs/S32K344/Mcu.xdm"
         }
       },
       "McuPll_Parameter_inserts": {
@@ -36,12 +50,14 @@
         "McuPllDvMfi": "120",
         "McuPllDvOdiv2": "2",
         "McuPllOdiv0_Div": "2",
-        "McuPllOdiv1_Div": "1"
+        "McuPllOdiv1_Div": "1",
+        "_source_ref": "reference_configs/S32K344/Mcu.xdm + example_Dio.mex (FXOSC=16MHz, CORE_PLL -> PHI0=480/2/1=240 -> /2=120... see code comments)"
       },
       "McuCgm0ClockMux0_divisor_inserts": {
         "McuClkMux0Div0_Divisor": "0",
         "McuClkMux0Div1_Divisor": "1",
-        "McuClkMux0Div2_Divisor": "3"
+        "McuClkMux0Div2_Divisor": "3",
+        "_source_ref": "reference_configs/S32K344/Mcu.xdm (InfoSettings -- display-only, codegen reads MC_CGM_MUX_0_DIVx.scale)"
       }
     }
   ],

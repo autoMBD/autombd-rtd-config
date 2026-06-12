@@ -985,8 +985,175 @@ def test_all_selectable_clocks_matches_asset():
         f"Asset: {asset_clocks}"
     )
 
-    # Also verify it matches the test-level constant
-    assert _ALL_SELECTABLE_CLOCKS == _ALL_SELECTABLE_CLOCKS, "trivially true"
+    # Verify it also matches the test-level constant (code vs test cross-check)
+    from rtd_config.backends.s32_mex.apply import _ALL_SELECTABLE_CLOCKS as code_clocks
+    assert code_clocks == _ALL_SELECTABLE_CLOCKS, (
+        f"Code _ALL_SELECTABLE_CLOCKS does not match test constant.\n"
+        f"Code: {code_clocks}\n"
+        f"Test: {_ALL_SELECTABLE_CLOCKS}"
+    )
     assert asset_clocks == list(_ALL_SELECTABLE_CLOCKS), (
         "clock.json all_selectable_clocks must match the test constant"
+    )
+
+
+# ===========================================================================
+# Section G: Full recipe pin (Fix 1 -- LL-012/LL-014 anti-drift, Fix 3, Fix 4)
+# ===========================================================================
+
+# Test G1: Full clock recipe pin -- code literals vs clock.json (Fix 1)
+def test_clock_json_matches_apply_code_literals():
+    """Pin the FULL 160/80/40 recipe in apply.py against clock.json (LL-012/LL-014).
+
+    Every clock_settings change/insert/remove id+value, the PLL param values,
+    the divisors, and the GAP-field writes must all be present in clock.json.
+    Any future code/asset drift fails this gate.
+
+    clock.json is a committed reference document for the recipe; it must stay
+    current with the code via this test. The asset is NOT loaded at runtime;
+    it is pinned here.
+    """
+    from pathlib import Path
+
+    asset_path = (
+        Path(__file__).resolve().parents[2]
+        / "autombd-rtd" / "assets" / "nxp" / "s32k3" / "mcu" / "clock.json"
+    )
+    asset = json.loads(asset_path.read_text(encoding="utf-8"))
+
+    # There must be exactly one recipe for 160/80/40
+    recipes = asset["recipes"]
+    recipe = next(
+        (r for r in recipes if r["core_clk"] == 160 and r["aips_plat_clk"] == 80
+         and r["aips_slow_clk"] == 40),
+        None,
+    )
+    assert recipe is not None, "No 160/80/40 recipe found in clock.json"
+
+    # --- clock_settings_changes: all 5 scale writes ---
+    changes = {e["id"]: e["value"] for e in recipe["clock_settings_changes"]}
+    assert changes.get("MC_CGM_MUX_0_DIV1.scale") == "2", (
+        "clock.json must document DIV1.scale=2"
+    )
+    assert changes.get("MC_CGM_MUX_0_DIV2.scale") == "4", (
+        "clock.json must document DIV2.scale=4"
+    )
+    assert changes.get("MC_CGM_MUX_0_DIV3.scale") == "2", (
+        "clock.json must document DIV3.scale=2 (HSE_CLK fix -- ffc6ff2)"
+    )
+    assert changes.get("MC_CGM_MUX_0_DIV4.scale") == "4", (
+        "clock.json must document DIV4.scale=4 (DCM_CLK)"
+    )
+    assert changes.get("MC_CGM_MUX_0_DIV6.scale") == "1", (
+        "clock.json must document DIV6.scale=1 (QSPI_MEM_CLK)"
+    )
+
+    # --- clock_settings_inserts: 4 entries ---
+    inserts = {e["id"]: e["value"] for e in recipe["clock_settings_inserts"]}
+    assert inserts.get("CORE_PLL_PD") == "Power_up", (
+        "clock.json must document CORE_PLL_PD=Power_up insert"
+    )
+    assert inserts.get("CORE_PLLODIV_0_DE") == "Enabled", (
+        "clock.json must document CORE_PLLODIV_0_DE=Enabled insert"
+    )
+    assert inserts.get("CORE_PLLODIV_1_DE") == "Enabled", (
+        "clock.json must document CORE_PLLODIV_1_DE=Enabled insert"
+    )
+    assert inserts.get("MC_CGM_MUX_0.sel") == "PHI0", (
+        "clock.json must document MC_CGM_MUX_0.sel=PHI0 insert"
+    )
+
+    # --- clock_settings_removes: PLLunderMcuControl ---
+    removes = [e["id"] for e in recipe["clock_settings_removes"]]
+    assert "PLLunderMcuControl" in removes, (
+        "clock.json must document PLLunderMcuControl remove"
+    )
+
+    # --- mcu_config_set_changes: GAP fixes + PLL + Cgm source ---
+    cfg_changes = recipe["mcu_config_set_changes"]
+
+    # GAP 1: McuNoPll=false (prevents SEVERE "PLL cannot be under MCU control if McuNoPll is enabled")
+    gen_cfg = cfg_changes.get("McuGeneralConfiguration", {})
+    assert gen_cfg.get("McuNoPll") == "false", (
+        "clock.json must document McuGeneralConfiguration/McuNoPll=false (GAP 1)"
+    )
+
+    # GAP 2: McuPll0UnderMcuControl=true
+    ctrl_cfg = cfg_changes.get("McuControlledClocksConfiguration", {})
+    assert ctrl_cfg.get("McuPll0UnderMcuControl") == "true", (
+        "clock.json must document McuControlledClocksConfiguration/McuPll0UnderMcuControl=true (GAP 2)"
+    )
+
+    # McuPll_0
+    pll0 = cfg_changes.get("McuPll_0", {})
+    assert pll0.get("McuPLLUnderMcuControl") == "true"
+    assert pll0.get("McuPLLEnabled") == "true"
+
+    # McuPll_Configuration
+    pll_cfg = cfg_changes.get("McuPll_Configuration", {})
+    assert pll_cfg.get("McuPllOdiv0_En") == "true"
+    assert pll_cfg.get("McuPllOdiv1_En") == "true"
+
+    # McuCgm0ClockMux0 source
+    mux0 = cfg_changes.get("McuCgm0ClockMux0", {})
+    assert mux0.get("McuClkMux0_Source") == "PLL_PHI0_CLK", (
+        "clock.json must document McuCgm0ClockMux0/McuClkMux0_Source=PLL_PHI0_CLK"
+    )
+
+    # --- McuPll_Parameter_inserts ---
+    pll_param = recipe.get("McuPll_Parameter_inserts", {})
+    assert pll_param.get("McuPllDvRdiv") == "2"
+    assert pll_param.get("McuPllDvMfi") == "120"
+    assert pll_param.get("McuPllDvOdiv2") == "2"
+    assert pll_param.get("McuPllOdiv0_Div") == "2"
+    assert pll_param.get("McuPllOdiv1_Div") == "1"
+
+    # --- McuCgm0ClockMux0_divisor_inserts ---
+    div_inserts = recipe.get("McuCgm0ClockMux0_divisor_inserts", {})
+    assert div_inserts.get("McuClkMux0Div0_Divisor") == "0"
+    assert div_inserts.get("McuClkMux0Div1_Divisor") == "1"
+    assert div_inserts.get("McuClkMux0Div2_Divisor") == "3"
+
+    # --- _source key exists (Fix 5) ---
+    assert "_source" in asset, (
+        "clock.json must use '_source' key for provenance (not '_comment')"
+    )
+
+
+# Test G2: plan() description does NOT say "replace" -- it describes merge (Fix 4)
+def test_plan_add_all_ref_describes_merge_not_replace():
+    """plan() with add_all_clock_reference_points must describe a merge, not a replacement.
+
+    The apply code merges (preserves existing ref points + adds new selectable
+    clocks). The plan description must not say 'replace' and must convey the
+    merge semantics.
+    """
+    intent = _std_intent()
+    plan = McuProvider().plan(intent)
+
+    ref_changes = [
+        c for c in plan.changes
+        if "McuClockReferencePoint" in c.path or "reference" in c.description.lower()
+    ]
+    assert ref_changes, "plan() must emit a change for McuClockReferencePoint when add_all_ref=True"
+
+    for c in ref_changes:
+        desc_lower = c.description.lower()
+        assert "replace" not in desc_lower, (
+            f"plan() description must not say 'replace' (apply merges, not replaces).\n"
+            f"Got: {c.description!r}"
+        )
+        assert any(kw in desc_lower for kw in ("merge", "preserve", "add")), (
+            f"plan() description must describe merge semantics (merge/preserve/add).\n"
+            f"Got: {c.description!r}"
+        )
+
+
+# Test G3: _load_mcu_clock_asset is NOT importable (dead function removed -- Fix 1)
+def test_load_mcu_clock_asset_removed():
+    """_load_mcu_clock_asset must not exist in apply.py (dead function removed)."""
+    import rtd_config.backends.s32_mex.apply as apply_mod
+    assert not hasattr(apply_mod, "_load_mcu_clock_asset"), (
+        "_load_mcu_clock_asset is dead code (zero call sites) and must be removed. "
+        "The asset is pinned by test_clock_json_matches_apply_code_literals instead."
     )

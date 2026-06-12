@@ -237,8 +237,8 @@ def build_parser() -> argparse.ArgumentParser:
         "--add-all-clock-reference-points",
         action="store_true",
         help=(
-            "Replace the McuClockReferencePoint array with entries for all "
-            "selectable S32K344 clocks."
+            "Preserve existing reference points and add entries for all "
+            "selectable S32K344 clocks not already present by name."
         ),
     )
     mcu_set.add_argument("--configure", action="store_true")

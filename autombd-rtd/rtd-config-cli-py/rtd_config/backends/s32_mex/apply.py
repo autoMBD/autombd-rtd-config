@@ -2073,7 +2073,10 @@ _MCU_SUPPORTED_RECIPES: frozenset = frozenset({
 
 # Clocks available as McuClockFrequencySelect on S32K344, grounded in the
 # S32K344 reference config and Mcu.xdm. Must stay in sync with clock.json
-# and the test constants _ALL_SELECTABLE_CLOCKS.
+# (all_selectable_clocks) and the test constant _ALL_SELECTABLE_CLOCKS.
+# Drift is caught by test_clock_json_matches_apply_code_literals (LL-012).
+# clock.json is a committed reference document for the recipe; it is NOT
+# loaded at runtime -- this constant is the runtime source of truth.
 _ALL_SELECTABLE_CLOCKS: list[str] = [
     "CORE_CLK",
     "AIPS_PLAT_CLK",
@@ -2089,12 +2092,6 @@ _ALL_SELECTABLE_CLOCKS: list[str] = [
     "SIRC_CLK",
     "STM0_CLK",
 ]
-
-
-def _load_mcu_clock_asset() -> dict:
-    """Load the committed mcu/clock.json asset. Never reads .xdm at runtime."""
-    clock_path = _ASSET_ROOT / "nxp" / "s32k3" / "mcu" / "clock.json"
-    return json.loads(clock_path.read_text(encoding="utf-8"))
 
 
 def _find_clock_settings_parent(doc: MexDocument) -> ET.Element | None:
@@ -2488,6 +2485,17 @@ def apply_mcu_set(doc: MexDocument, intent: Intent) -> ApplyResult:
                 break
 
     if mux0 is not None and doc.find_child_setting(mux0, "McuClkMux0Div0_Divisor") is None:
+        # McuClkMux0Div0/1/2_Divisor are display-only InfoSettings in the Mcu
+        # component -- ConfigTools generates the divider code from
+        # MC_CGM_MUX_0_DIV0/1/2.scale (written above in Phase 1), NOT from
+        # these fields.  These mirror the scale values for human readability:
+        #   Div0_Divisor=0 mirrors DIV0.scale=1 (CORE_CLK, divisor=scale-1=0)
+        #   Div1_Divisor=1 mirrors DIV1.scale=2 (AIPS_PLAT_CLK, /2)
+        #   Div2_Divisor=3 mirrors DIV2.scale=4 (AIPS_SLOW_CLK, /4)
+        # They produce the benign [SDK/DATA] "type ... differs ... InfoSettings"
+        # log line which can be ignored.  A future reader must NOT "fix" the
+        # MC_CGM_MUX_0_DIVx.scale values and leave these stale -- they must
+        # stay consistent with the scales.
         _insert_settings_into_struct(doc, mux0, {
             "McuClkMux0Div0_Divisor": "0",
             "McuClkMux0Div1_Divisor": "1",
