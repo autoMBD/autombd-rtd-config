@@ -80,11 +80,14 @@ B) Mcu config_set:
    - McuCgm0ClockMux0: divisors added:
        McuClkMux0Div0_Divisor=0, McuClkMux0Div1_Divisor=1, McuClkMux0Div2_Divisor=3
 
-C) McuClockReferencePoint array: replaced with 13 structs (one per selectable clock),
-   each named after its clock, McuClockFrequencySelect == Name.
-   Clocks: CORE_CLK, AIPS_PLAT_CLK, AIPS_SLOW_CLK, FLEXCAN_PE_CLK0_2,
-           FLEXCAN_PE_CLK3_5, EMAC_CLK_RX, EMAC_CLK_TX, EMAC_CLK_TS,
-           QuadSPI_SFCK, QSPI_MEM_CLK, FIRC_CLK, SIRC_CLK, STM0_CLK
+C) McuClockReferencePoint array: MERGED -- existing 2 points preserved (LPUART3_CLK,
+   FLEXIO_CLK) + 13 new points added (one per selectable clock), each named after its
+   clock with McuClockFrequencySelect == Name.  Total = 15 structs, indices 0..14.
+   Clocks added: CORE_CLK, AIPS_PLAT_CLK, AIPS_SLOW_CLK, FLEXCAN_PE_CLK0_2,
+                 FLEXCAN_PE_CLK3_5, EMAC_CLK_RX, EMAC_CLK_TX, EMAC_CLK_TS,
+                 QuadSPI_SFCK, QSPI_MEM_CLK, FIRC_CLK, SIRC_CLK, STM0_CLK
+   Existing preserved: LPUART3_CLK (McuClockFrequencySelect=AIPS_SLOW_CLK),
+                       FLEXIO_CLK  (McuClockFrequencySelect=CORE_CLK)
 
 NOT written by us:
    - clock_output values (ConfigTools computes these)
@@ -120,6 +123,17 @@ _ALL_SELECTABLE_CLOCKS = [
     "SIRC_CLK",
     "STM0_CLK",
 ]
+
+# Pre-existing reference points in the fixture (preserved by the MERGE strategy).
+# Grounded in Uart_Example.mex lines 1637-1644: LPUART3_CLK (AIPS_SLOW_CLK) and
+# FLEXIO_CLK (CORE_CLK).  These have Name != McuClockFrequencySelect intentionally.
+_FIXTURE_EXISTING_REF_POINTS = [
+    "LPUART3_CLK",
+    "FLEXIO_CLK",
+]
+
+# Total after merge: existing 2 + 13 new = 15
+_EXPECTED_REF_POINT_COUNT = len(_FIXTURE_EXISTING_REF_POINTS) + len(_ALL_SELECTABLE_CLOCKS)
 
 
 def _intent(**payload) -> Intent:
@@ -522,7 +536,10 @@ def test_mcu_cgm_mux0_divisors(tmp_path):
 # Section C: McuClockReferencePoint array replacement
 # ===========================================================================
 
-# Test C1: Array has exactly the 13 required reference points
+# Test C1: Array has exactly the expected merged count (existing 2 + 13 new = 15)
+# The MERGE strategy preserves existing points (so UartClockRef paths stay resolvable)
+# and adds the 13 selectable-clock points.  Vendor gate confirmed replace-all-13
+# deletes LPUART3_CLK/FLEXIO_CLK causing SEVERE "该取值值不可用" on Uart channels.
 def test_ref_points_count(tmp_path):
     project = copy_uart_fixture(tmp_path)
     mex = project / "Uart_Example.mex"
@@ -531,12 +548,18 @@ def test_ref_points_count(tmp_path):
     apply_mcu_set(doc, _std_intent())
 
     structs = _ref_point_structs(doc)
-    assert len(structs) == len(_ALL_SELECTABLE_CLOCKS), (
-        f"Expected {len(_ALL_SELECTABLE_CLOCKS)} reference points, got {len(structs)}"
+    assert len(structs) == _EXPECTED_REF_POINT_COUNT, (
+        f"Expected {_EXPECTED_REF_POINT_COUNT} reference points "
+        f"(existing {len(_FIXTURE_EXISTING_REF_POINTS)} + new {len(_ALL_SELECTABLE_CLOCKS)}), "
+        f"got {len(structs)}"
     )
 
 
-# Test C2: Each reference point is named after its clock (Name == McuClockFrequencySelect)
+# Test C2: New clock-named reference points have Name == McuClockFrequencySelect.
+# The MERGE strategy preserves existing structs (LPUART3_CLK, FLEXIO_CLK) whose
+# Name intentionally differs from McuClockFrequencySelect (cross-references kept
+# for Uart channels).  Only the 13 NEW structs are required to have Name==FreqSelect.
+# All 13 selectable clocks must be present (vendor-confirmed requirement).
 def test_ref_points_named_after_clock(tmp_path):
     project = copy_uart_fixture(tmp_path)
     mex = project / "Uart_Example.mex"
@@ -545,7 +568,7 @@ def test_ref_points_named_after_clock(tmp_path):
     apply_mcu_set(doc, _std_intent())
 
     structs = _ref_point_structs(doc)
-    names = []
+    all_names = []
     for s in structs:
         name = doc.find_child_setting(s, "Name")
         freq_sel = doc.find_child_setting(s, "McuClockFrequencySelect")
@@ -553,14 +576,25 @@ def test_ref_points_named_after_clock(tmp_path):
         assert freq_sel is not None, "McuClockReferencePoint struct missing McuClockFrequencySelect"
         n = name.attrib.get("value", "")
         f = freq_sel.attrib.get("value", "")
-        assert n == f, f"Name ({n!r}) must equal McuClockFrequencySelect ({f!r})"
-        names.append(n)
+        all_names.append(n)
+        # For NEW clock-named structs (Name is one of the 13 selectable clocks):
+        # Name must equal McuClockFrequencySelect.
+        # Existing preserved structs (LPUART3_CLK, FLEXIO_CLK) intentionally have
+        # Name != McuClockFrequencySelect (they are cross-reference aliases).
+        if n in _ALL_SELECTABLE_CLOCKS:
+            assert n == f, (
+                f"New clock-named struct: Name ({n!r}) must equal "
+                f"McuClockFrequencySelect ({f!r})"
+            )
 
+    # All 13 selectable clocks must be present as reference point Names
     for clk in _ALL_SELECTABLE_CLOCKS:
-        assert clk in names, f"Clock {clk!r} missing from McuClockReferencePoint array"
+        assert clk in all_names, f"Clock {clk!r} missing from McuClockReferencePoint array"
 
 
-# Test C3: Struct indices are sequential from 0
+# Test C3: Struct indices are sequential from 0 across all merged structs.
+# The MERGE reorders indices 0..N-1 where N = existing + new (15 in fixture).
+# Existing structs come first (indices 0,1), new clock-named structs follow (2..14).
 def test_ref_points_sequential_indices(tmp_path):
     project = copy_uart_fixture(tmp_path)
     mex = project / "Uart_Example.mex"
@@ -569,6 +603,10 @@ def test_ref_points_sequential_indices(tmp_path):
     apply_mcu_set(doc, _std_intent())
 
     structs = _ref_point_structs(doc)
+    assert len(structs) == _EXPECTED_REF_POINT_COUNT, (
+        f"Expected {_EXPECTED_REF_POINT_COUNT} structs for sequential-index check, "
+        f"got {len(structs)}"
+    )
     for i, s in enumerate(structs):
         assert s.attrib.get("name") == str(i), (
             f"Struct at position {i} has name {s.attrib.get('name')!r}, expected '{i}'"
@@ -610,7 +648,7 @@ def test_written_file_well_formed(tmp_path):
     assert mcu_cfg is not None, "Mcu config_set not found in reloaded file"
 
     structs = _ref_point_structs(reloaded)
-    assert len(structs) == len(_ALL_SELECTABLE_CLOCKS)
+    assert len(structs) == _EXPECTED_REF_POINT_COUNT
 
 
 # Test D2: Idempotency -- second apply produces no duplicate reference points
@@ -629,8 +667,9 @@ def test_idempotent_apply(tmp_path):
     assert not result2.blocked, [d.to_dict() for d in result2.diagnostics]
     doc3 = MexDocument.load(mex)
     structs = _ref_point_structs(doc3)
-    assert len(structs) == len(_ALL_SELECTABLE_CLOCKS), (
-        f"Idempotency failed: {len(structs)} ref points after two applies"
+    assert len(structs) == _EXPECTED_REF_POINT_COUNT, (
+        f"Idempotency failed: {len(structs)} ref points after two applies, "
+        f"expected {_EXPECTED_REF_POINT_COUNT}"
     )
 
 
@@ -659,21 +698,106 @@ def test_edit_is_not_full_reserialization(tmp_path):
     assert b"McuCgm0PcfsConfig_0" in after
 
 
-# Test D4: UartClockRef paths in Uart config remain valid after reference point replacement
-def test_uart_clock_refs_still_present(tmp_path):
+# Test D4: McuNoPll must be set to false when PLL is enabled under Mcu control
+# Grounded in Mcu.xdm INVALID rule: McuNoPll='true' AND McuPLLUnderMcuControl='true'
+# produces SEVERE: "PLL cannot be under MCU control if McuNoPll is enabled."
+def test_mcu_no_pll_set_false_when_pll_enabled(tmp_path):
     project = copy_uart_fixture(tmp_path)
     mex = project / "Uart_Example.mex"
+
+    # Verify the fixture starts with McuNoPll=true (the pre-PLL default)
+    before = mex.read_bytes()
+    assert b'McuNoPll" value="true"' in before, (
+        "Fixture must have McuNoPll=true before apply (pre-condition)"
+    )
 
     doc = MexDocument.load(mex)
     apply_mcu_set(doc, _std_intent())
     doc.write(mex)
     after = mex.read_bytes()
 
-    # The Uart config section references Mcu clock points by path.
-    # After replacement the paths change (old LPUART3_CLK/FLEXIO_CLK are gone).
-    # This test just confirms the file is still structurally intact (well-formed).
-    reloaded = MexDocument.load(mex)
-    assert reloaded.find_config_set("Uart") is not None
+    # McuNoPll must be false after enabling PLL (Mcu.xdm INVALID rule)
+    assert b'McuNoPll" value="false"' in after, (
+        "McuNoPll must be set to 'false' when PLL is enabled under Mcu control "
+        "(Mcu.xdm INVALID: PLL cannot be under MCU control if McuNoPll is enabled)"
+    )
+    assert b'McuNoPll" value="true"' not in after, (
+        "McuNoPll must NOT remain 'true' after PLL enable"
+    )
+
+
+# Test D5-b: McuPll0UnderMcuControl in McuControlledClocksConfiguration must be true
+# Grounded in Mcu.xdm INVALID rule: McuPLLUnderMcuControl='true' but
+# McuControlledClocksConfiguration/McuPll0UnderMcuControl='false' produces
+# SEVERE: "The field McuGeneralConfiguration/McuControlledClocksConfiguration/
+#          McuPll0UnderMcuControl must be set to 'true' when PLL is under MCU control."
+def test_mcu_pll0_under_mcu_control_in_general_config(tmp_path):
+    project = copy_uart_fixture(tmp_path)
+    mex = project / "Uart_Example.mex"
+
+    # Verify the fixture starts with McuPll0UnderMcuControl=false (the pre-PLL default)
+    before = mex.read_bytes()
+    assert b'McuPll0UnderMcuControl" value="false"' in before, (
+        "Fixture must have McuPll0UnderMcuControl=false before apply (pre-condition)"
+    )
+
+    doc = MexDocument.load(mex)
+    apply_mcu_set(doc, _std_intent())
+    doc.write(mex)
+    after = mex.read_bytes()
+
+    # McuPll0UnderMcuControl under McuControlledClocksConfiguration must be true
+    assert b'McuPll0UnderMcuControl" value="true"' in after, (
+        "McuGeneralConfiguration/McuControlledClocksConfiguration/McuPll0UnderMcuControl "
+        "must be set to 'true' when PLL is under MCU control "
+        "(Mcu.xdm INVALID rule; vendor gate SEVERE otherwise)"
+    )
+
+
+# Test D4-uart: UartClockRef paths in Uart config remain valid after reference point replacement
+# The --add-all-clock-reference-points flag replaces the McuClockReferencePoint array.
+# Pre-existing UartClockRef paths that reference named clock points (e.g. LPUART3_CLK,
+# FLEXIO_CLK) must still resolve after the replacement, i.e. the new array must include
+# structs with those names (or the implementation must update the Uart references).
+# Vendor gate SEVERE: "该取值值不可用" (value unavailable) otherwise.
+def test_uart_clock_refs_remain_resolvable(tmp_path):
+    project = copy_uart_fixture(tmp_path)
+    mex = project / "Uart_Example.mex"
+
+    # Identify UartClockRef names in the original fixture
+    before = mex.read_bytes()
+    import re
+    uart_clock_refs = re.findall(
+        rb'UartClockRef" value="[^"]+/McuClockSettingConfig_0/([^"]+)"',
+        before,
+    )
+    # Fixture has LPUART3_CLK and FLEXIO_CLK
+    assert len(uart_clock_refs) > 0, "Fixture must have UartClockRef entries"
+    ref_names = {r.decode() for r in uart_clock_refs}
+
+    doc = MexDocument.load(mex)
+    apply_mcu_set(doc, _std_intent())
+    doc.write(mex)
+    after = mex.read_bytes()
+
+    # After apply, every UartClockRef name that existed before must exist
+    # as a Name setting in the McuClockReferencePoint array.
+    # Locate the McuClockReferencePoint array section in the written bytes.
+    rp_section_m = re.search(
+        rb'array name="McuClockReferencePoint">(.*?)</array>',
+        after,
+        re.DOTALL,
+    )
+    assert rp_section_m is not None, "McuClockReferencePoint array not found after apply"
+    rp_section = rp_section_m.group(1)
+
+    rp_names = set(re.findall(rb'Name" value="([^"]+)"', rp_section))
+    for ref in ref_names:
+        assert ref.encode() in rp_names, (
+            f"UartClockRef '{ref}' is no longer a valid McuClockReferencePoint Name after apply; "
+            f"existing names: {sorted(n.decode() for n in rp_names)}. "
+            f"Vendor gate raises SEVERE '该取值值不可用' when a UartClockRef resolves to nothing."
+        )
 
 
 # Test D5: Unsupported frequency combo returns a blocker (not a silent wrong write)

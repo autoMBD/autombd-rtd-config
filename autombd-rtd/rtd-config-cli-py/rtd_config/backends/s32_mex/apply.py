@@ -2208,14 +2208,23 @@ def _remove_clock_setting(doc: MexDocument, setting_id: str) -> bool:
     return True
 
 
-def _build_ref_point_array_bytes(
-    all_clocks: list[str],
+def _build_merged_ref_point_array_bytes(
+    doc: MexDocument,
+    existing_structs: list[ET.Element],
+    new_clocks: list[str],
     indent: int,
     line_ending: bytes,
 ) -> bytes:
-    """Build the populated McuClockReferencePoint array block as raw bytes.
+    """Build a merged McuClockReferencePoint array block as raw bytes.
 
-    Each struct has Name and McuClockFrequencySelect both == the clock name.
+    Strategy (GAP 3 fix): PRESERVE existing reference-point structs (so any
+    UartClockRef / OsIfSystemTimerClockRef paths that reference them remain
+    resolvable) AND ADD the 13 selectable-clock structs named after their clock
+    (Name == McuClockFrequencySelect), skipping any whose Name already exists.
+    Indices are renumbered sequentially 0..N-1 across the merged list.
+
+    Existing structs keep their original Name and McuClockFrequencySelect.
+    New structs have Name == McuClockFrequencySelect == clock name.
     McuClockReferencePointFrequency is NOT written (ConfigTools computes it).
 
     ``indent`` is the number of leading spaces for the <array> open tag.
@@ -2226,11 +2235,32 @@ def _build_ref_point_array_bytes(
     sp_struct = " " * (indent + 3)
     sp_child = " " * (indent + 6)
 
+    # Collect names already present in existing structs (for dedup of new ones)
+    existing_names: set[str] = set()
+    for s in existing_structs:
+        ns = doc.find_child_setting(s, "Name")
+        if ns is not None:
+            existing_names.add(ns.attrib.get("value", ""))
+
+    # Build the ordered list of (name, freq_select) tuples:
+    # first the existing structs (preserved as-is), then the new ones not already present.
+    entries: list[tuple[str, str]] = []
+    for s in existing_structs:
+        ns = doc.find_child_setting(s, "Name")
+        fs = doc.find_child_setting(s, "McuClockFrequencySelect")
+        name = ns.attrib.get("value", "") if ns is not None else ""
+        freq = fs.attrib.get("value", "") if fs is not None else ""
+        entries.append((name, freq))
+
+    for clk in new_clocks:
+        if clk not in existing_names:
+            entries.append((clk, clk))
+
     lines: list[str] = ['<array name="McuClockReferencePoint">']
-    for i, clk in enumerate(all_clocks):
+    for i, (name, freq) in enumerate(entries):
         lines.append(f'{sp_struct}<struct name="{i}">')
-        lines.append(f'{sp_child}<setting name="Name" value="{clk}"/>')
-        lines.append(f'{sp_child}<setting name="McuClockFrequencySelect" value="{clk}"/>')
+        lines.append(f'{sp_child}<setting name="Name" value="{name}"/>')
+        lines.append(f'{sp_child}<setting name="McuClockFrequencySelect" value="{freq}"/>')
         lines.append(f'{sp_struct}</struct>')
     lines.append(f'{sp_array}</array>')
     return le.join(lines).encode("utf-8")
@@ -2319,7 +2349,9 @@ def apply_mcu_set(doc: MexDocument, intent: Intent) -> ApplyResult:
         - McuPll_Configuration: McuPllOdiv0_En false->true, McuPllOdiv1_En false->true
         - McuPll_Parameter: INSERT PLL fields; CLEAR quick_selection LAST (LL-013)
         - McuCgm0ClockMux0: McuClkMux0_Source FIRC_CLK->PLL_PHI0_CLK; INSERT divisors
-        - McuClockReferencePoint array: REPLACE with 13-struct array (all S32K344 clocks)
+        - McuGeneralConfiguration: McuNoPll true->false (GAP 1: Mcu.xdm INVALID rule)
+        - McuControlledClocksConfiguration: McuPll0UnderMcuControl false->true (GAP 2)
+        - McuClockReferencePoint array: MERGE (preserve existing + add 13 clocks; GAP 3)
 
     Idempotent: second apply with same intent produces the same output.
     Returns a blocker for unsupported frequency combinations.
@@ -2441,7 +2473,11 @@ def apply_mcu_set(doc: MexDocument, intent: Intent) -> ApplyResult:
         })
         mcu_cfg = doc.find_config_set("Mcu")
 
-    # --- Part B raw: McuClockReferencePoint array replacement ---
+    # --- Part B raw: McuClockReferencePoint array MERGE ---
+    # Strategy (GAP 3 fix): preserve existing reference points so that UartClockRef
+    # paths (e.g. LPUART3_CLK, FLEXIO_CLK) remain resolvable, then add the 13
+    # selectable-clock structs (Name == McuClockFrequencySelect) for any clock
+    # not already present by Name. Dedup: skip clocks already in the array.
     if add_all_ref_points and mcu_cfg is not None:
         ref_array = None
         for el in mcu_cfg.iter():
@@ -2450,15 +2486,18 @@ def apply_mcu_set(doc: MexDocument, intent: Intent) -> ApplyResult:
                 break
 
         if ref_array is not None:
-            # Idempotency: skip if already has the correct 13 structs
             existing_structs = [c for c in ref_array if c.tag.endswith("struct")]
-            needs_replace = len(existing_structs) != len(_ALL_SELECTABLE_CLOCKS)
-            if not needs_replace and existing_structs:
-                ns = doc.find_child_setting(existing_structs[0], "Name")
-                if ns is None or ns.attrib.get("value") != _ALL_SELECTABLE_CLOCKS[0]:
-                    needs_replace = True
 
-            if needs_replace:
+            # Collect names already present
+            existing_names: set[str] = set()
+            for s in existing_structs:
+                ns = doc.find_child_setting(s, "Name")
+                if ns is not None:
+                    existing_names.add(ns.attrib.get("value", ""))
+
+            # Idempotency: skip if all 13 selectable clocks already present
+            new_clocks_needed = [c for c in _ALL_SELECTABLE_CLOCKS if c not in existing_names]
+            if new_clocks_needed:
                 # Detect indentation of the <array> tag from raw bytes
                 elements = list(doc.root.iter())
                 src_index = next(
@@ -2478,8 +2517,10 @@ def apply_mcu_set(doc: MexDocument, intent: Intent) -> ApplyResult:
                     array_indent = sp
 
                 line_ending = _detect_line_ending(doc._raw)
-                new_array_bytes = _build_ref_point_array_bytes(
-                    _ALL_SELECTABLE_CLOCKS,
+                new_array_bytes = _build_merged_ref_point_array_bytes(
+                    doc=doc,
+                    existing_structs=existing_structs,
+                    new_clocks=_ALL_SELECTABLE_CLOCKS,
                     indent=array_indent,
                     line_ending=line_ending,
                 )
@@ -2524,6 +2565,28 @@ def apply_mcu_set(doc: MexDocument, intent: Intent) -> ApplyResult:
                 s = doc.find_child_setting(el, "McuClkMux0_Source")
                 if s is not None:
                     s.set("value", "PLL_PHI0_CLK")
+                break
+
+        # B6 (GAP 1): McuGeneralConfiguration -> McuNoPll=false
+        # Mcu.xdm INVALID rule: McuNoPll='true' AND McuPLLUnderMcuControl='true'
+        # produces SEVERE "PLL cannot be under MCU control if McuNoPll is enabled."
+        for el in mcu_cfg.iter():
+            if el.tag.endswith("struct") and el.attrib.get("name") == "McuGeneralConfiguration":
+                s = doc.find_child_setting(el, "McuNoPll")
+                if s is not None:
+                    s.set("value", "false")
+                break
+
+        # B7 (GAP 2): McuControlledClocksConfiguration -> McuPll0UnderMcuControl=true
+        # Mcu.xdm INVALID rule: McuPLLUnderMcuControl='true' but
+        # McuGeneralConfiguration/McuControlledClocksConfiguration/McuPll0UnderMcuControl='false'
+        # produces SEVERE: "The field McuGeneralConfiguration/McuControlledClocksConfiguration/
+        # McuPll0UnderMcuControl must be set to 'true' when PLL is under MCU control."
+        for el in mcu_cfg.iter():
+            if el.tag.endswith("struct") and el.attrib.get("name") == "McuControlledClocksConfiguration":
+                s = doc.find_child_setting(el, "McuPll0UnderMcuControl")
+                if s is not None:
+                    s.set("value", "true")
                 break
 
     # ==================================================================
