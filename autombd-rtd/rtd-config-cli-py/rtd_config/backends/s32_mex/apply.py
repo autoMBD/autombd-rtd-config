@@ -107,8 +107,7 @@ def _lookup_lpuart_irq_clock(hw: str) -> "dict | None":
     """
     key = hw.strip().upper()
     # Normalise LPUART3 -> LPUART_3 if the caller omitted the underscore
-    import re as _re
-    m = _re.match(r"^LPUART(\d+)$", key)
+    m = re.match(r"^LPUART(\d+)$", key)
     if m:
         key = f"LPUART_{m.group(1)}"
     asset = _load_uart_asset()

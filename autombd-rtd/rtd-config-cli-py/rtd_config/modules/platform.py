@@ -46,8 +46,35 @@
 
 from __future__ import annotations
 
+import json
+import re
+from pathlib import Path
+
 from rtd_config.intent import Intent
 from rtd_config.plan import Plan, PlannedChange
+
+# Asset root: this file lives at
+#   autombd-rtd/rtd-config-cli-py/rtd_config/modules/platform.py
+# parents[3] is autombd-rtd/
+_MODULE_FILE = Path(__file__).resolve()
+_UART_ASSET_PATH = _MODULE_FILE.parents[3] / "assets" / "nxp" / "s32k3" / "uart" / "uart.json"
+
+
+def _load_lpuart_irq_entry(hw: str) -> "dict | None":
+    """Load uart.json and return the irq/handler/clock entry for ``hw``.
+
+    Normalises LPUART3 -> LPUART_3 for keys without underscore. Returns None
+    for unknown instances or non-LPUART peripherals (e.g. FLEXIO).
+    """
+    key = hw.strip().upper()
+    m = re.match(r"^LPUART(\d+)$", key)
+    if m:
+        key = f"LPUART_{m.group(1)}"
+    try:
+        data = json.loads(_UART_ASSET_PATH.read_text(encoding="utf-8"))
+        return data.get("instance_irq_clock_map", {}).get(key)
+    except (OSError, ValueError):
+        return None
 
 
 class PlatformProvider:
@@ -64,10 +91,27 @@ class PlatformProvider:
         return Plan([self.irq_dependency(intent.payload.get("hw", ""))])
 
     def irq_dependency(self, hw: str) -> PlannedChange:
-        """Return the Platform-owned IRQ dependency a consumer requires."""
+        """Return the Platform-owned IRQ dependency a consumer requires.
+
+        The description names the concrete IsrName and ISR handler derived from
+        the uart.json instance_irq_clock_map (same source as apply_uart_set),
+        so the plan accurately describes what will be written.  Falls back to a
+        generic description when the hw is not an LPUART instance with a known
+        entry (e.g. FLEXIO path or unknown instance).
+        """
+        entry = _load_lpuart_irq_entry(hw)
+        if entry is not None:
+            irq_name = entry["irq_name"]
+            isr_handler = entry["isr_handler"]
+            description = (
+                f"Insert PlatformIsrConfig for {hw}: "
+                f"IsrName={irq_name}, IsrHandler={isr_handler}, IsrEnabled=true"
+            )
+        else:
+            description = f"Configure interrupt entry for {hw}"
         return PlannedChange(
             module="platform",
             owner="platform",
             path="/Platform/Platform/IntCtrlConfig",
-            description=f"Configure interrupt entry for {hw}",
+            description=description,
         )

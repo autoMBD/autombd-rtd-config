@@ -105,11 +105,11 @@ def test_owned_edit_touches_only_changed_lines(tmp_path):
     changed = _changed_lines(original, mex.read_bytes())
     # A whole-file reserialization churns ~3000 lines; an owned edit must touch
     # only the few it actually changed. Guard far below the churn threshold.
-    # The full orchestration (RTD-MEX-UART-001) inserts a Platform ISR entry
-    # (~8 lines) and an Mcu clock-ref entry (~5 lines) plus the channel field
-    # change (1-2 lines) + UartClockRef update (2 lines) = ~20 lines total.
-    # Still far below 3000; any value under 50 guards against a full reserialization.
-    assert len(changed) <= 50, f"unexpectedly broad diff: {len(changed)} lines"
+    # Measured (LPUART_0, first apply with Platform ISR insert + Mcu clock-ref
+    # insert): UartHwChannel attr (2 lines) + UartClockRef attr (2 lines) +
+    # Platform ISR struct (7 new lines) + Mcu clock-ref struct (4 new lines)
+    # = 15 lines.  Bound is 15 + 5 headroom = 20.
+    assert len(changed) <= 20, f"unexpectedly broad diff: {len(changed)} lines"
 
     added = [line for line in changed if line.startswith("+")]
     # interrupt-only M1: the owned change here is the hardware-channel value
@@ -117,6 +117,63 @@ def test_owned_edit_touches_only_changed_lines(tmp_path):
     assert any('value="LPUART_0"' in line for line in added)
 
     # The written file re-loads as well-formed XML.
+    MexDocument.load(mex)
+
+
+def test_attribute_only_edit_is_narrow(tmp_path):
+    """Second apply (ISR + clock-ref already inserted) changes only the DesireBaudrate attr.
+
+    Protocol:
+    1. First apply LPUART_0 interrupt at 115200 baud -- inserts ISR struct and
+       Mcu clock-ref struct (Phase 1 raw-bytes splices).
+    2. Write and reload -- the splices are now committed bytes.
+    3. Second apply LPUART_0 interrupt at 9600 baud -- _ensure_platform_isr and
+       _ensure_mcu_clock_ref are both no-ops (entries already present), so only
+       the DesireBaudrate attribute changes (~2 diff lines).
+
+    Assertion: the second apply's diff is <= 8 lines (measured: 2).
+    This distinguishes attribute-only narrowness from insertion narrowness.
+    """
+    project = copy_uart_fixture(tmp_path)
+    mex = project / "Uart_Example.mex"
+
+    # Step 1+2: first apply inserts Platform ISR + Mcu clock-ref, write+reload.
+    doc1 = MexDocument.load(mex)
+    result1 = apply_uart_set(doc1, Intent.from_dict({
+        "module": "uart",
+        "action": "set",
+        "payload": {"hw": "LPUART_0", "mode": "interrupt", "baud": 115200},
+    }))
+    assert not result1.blocked
+    doc1.write(mex)
+    after_first = mex.read_bytes()
+
+    # Step 3: second apply changes only baud (all raw-bytes splices are no-ops).
+    doc2 = MexDocument.load(mex)
+    result2 = apply_uart_set(doc2, Intent.from_dict({
+        "module": "uart",
+        "action": "set",
+        "payload": {"hw": "LPUART_0", "mode": "interrupt", "baud": 9600},
+    }))
+    assert not result2.blocked
+    doc2.write(mex)
+    after_second = mex.read_bytes()
+
+    changed = _changed_lines(after_first, after_second)
+    # Measured: 2 lines (one - for old baud attr, one + for new baud attr).
+    # Bound <= 8 gives generous headroom while still catching any reserialization.
+    assert len(changed) <= 8, (
+        f"attribute-only edit produced an unexpectedly broad diff: {len(changed)} lines; "
+        "expected <= 8 (measured 2). Full reserialization or unintended splice triggered."
+    )
+
+    changed_text = "\n".join(changed)
+    assert "DesireBaudrate" in changed_text, (
+        "Expected the DesireBaudrate attribute to be the changed line"
+    )
+    assert "9600" in changed_text, "New baud value LPUART_UART_BAUDRATE_9600 must appear"
+
+    # File must still be well-formed XML after both writes.
     MexDocument.load(mex)
 
 

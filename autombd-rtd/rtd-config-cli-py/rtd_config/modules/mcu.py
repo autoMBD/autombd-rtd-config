@@ -46,8 +46,43 @@
 
 from __future__ import annotations
 
+import json
+import re
+from pathlib import Path
+
 from rtd_config.intent import Intent
 from rtd_config.plan import Plan, PlannedChange
+
+# Asset root: this file lives at
+#   autombd-rtd/rtd-config-cli-py/rtd_config/modules/mcu.py
+# parents[3] is autombd-rtd/
+_MODULE_FILE = Path(__file__).resolve()
+_UART_ASSET_PATH = _MODULE_FILE.parents[3] / "assets" / "nxp" / "s32k3" / "uart" / "uart.json"
+
+
+def _lpuart_clock_ref_name(hw: str) -> str:
+    """Convert LPUART_8 -> LPUART8_CLK (the McuClockReferencePoint Name convention)."""
+    text = hw.strip().upper()
+    m = re.fullmatch(r"LPUART_?(\d+)", text)
+    if m:
+        return f"LPUART{m.group(1)}_CLK"
+    return f"{text}_CLK"
+
+
+def _load_lpuart_clock_entry(hw: str) -> "dict | None":
+    """Load uart.json and return the irq/handler/clock entry for ``hw``.
+
+    Returns None for unknown instances or non-LPUART peripherals.
+    """
+    key = hw.strip().upper()
+    m = re.match(r"^LPUART(\d+)$", key)
+    if m:
+        key = f"LPUART_{m.group(1)}"
+    try:
+        data = json.loads(_UART_ASSET_PATH.read_text(encoding="utf-8"))
+        return data.get("instance_irq_clock_map", {}).get(key)
+    except (OSError, ValueError):
+        return None
 
 
 class McuProvider:
@@ -120,10 +155,27 @@ class McuProvider:
         return Plan(changes)
 
     def clock_dependency(self, hw: str) -> PlannedChange:
-        """Return the Mcu-owned clock dependency a consumer (Uart) requires."""
+        """Return the Mcu-owned clock dependency a consumer (Uart) requires.
+
+        The description names the concrete McuClockReferencePoint Name and
+        McuClockFrequencySelect derived from the uart.json instance_irq_clock_map
+        (same source as apply_uart_set), so the plan accurately describes what
+        will be written.  Falls back to a generic description for non-LPUART
+        peripherals or unknown instances.
+        """
+        entry = _load_lpuart_clock_entry(hw)
+        if entry is not None:
+            ref_name = _lpuart_clock_ref_name(hw)
+            clock_select = entry["clock_select"]
+            description = (
+                f"Insert McuClockReferencePoint for {hw}: "
+                f"Name={ref_name}, McuClockFrequencySelect={clock_select}"
+            )
+        else:
+            description = f"Ensure clock reference for {hw}"
         return PlannedChange(
             module="mcu",
             owner="mcu",
             path="/Mcu/Mcu/McuModuleConfiguration/McuClockSettingConfig_0",
-            description=f"Ensure clock reference for {hw}",
+            description=description,
         )

@@ -629,6 +629,99 @@ class TestPlanDependencies:
 
 
 # ---------------------------------------------------------------------------
+# plan() description fidelity (LL-010 / Fix 3)
+# Platform dep description must name IsrName + handler; Mcu dep must name clock.
+# Values are computed from uart.json instance_irq_clock_map, not hardcoded.
+# ---------------------------------------------------------------------------
+
+class TestPlanDescriptionFidelity:
+    """plan() dependency descriptions must name concrete IRQ/handler/clock substrings.
+
+    These tests pin LL-010 fidelity: the plan descriptions must contain the
+    concrete IsrName, ISR handler, and clock-select values that apply writes,
+    derived from the SAME uart.json source used by apply_uart_set.  The exact
+    string format is not pinned -- only that the key substrings appear.
+    """
+
+    def _platform_desc(self, hw: str) -> str:
+        """Return the platform-owned PlannedChange description for ``hw``."""
+        intent = _intent(hw=hw, baud=921600, mode="interrupt")
+        plan = UartProvider().plan(intent)
+        for c in plan.to_dict()["changes"]:
+            if c["owner"] == "platform":
+                return c["description"]
+        raise AssertionError("No platform-owned change in plan")
+
+    def _mcu_desc(self, hw: str) -> str:
+        """Return the mcu-owned PlannedChange description for ``hw``."""
+        intent = _intent(hw=hw, baud=921600, mode="interrupt")
+        plan = UartProvider().plan(intent)
+        for c in plan.to_dict()["changes"]:
+            if c["owner"] == "mcu":
+                return c["description"]
+        raise AssertionError("No mcu-owned change in plan")
+
+    def test_platform_description_names_irq_lpuart8(self):
+        """LPUART_8 platform dep must name LPUART8_IRQn in its description."""
+        desc = self._platform_desc("LPUART_8")
+        assert "LPUART8_IRQn" in desc, (
+            f"Platform dep description for LPUART_8 must contain 'LPUART8_IRQn', got: {desc!r}"
+        )
+
+    def test_platform_description_names_handler_lpuart8(self):
+        """LPUART_8 platform dep must name LPUART_UART_IP_8_IRQHandler."""
+        desc = self._platform_desc("LPUART_8")
+        assert "LPUART_UART_IP_8_IRQHandler" in desc, (
+            f"Platform dep description for LPUART_8 must contain handler name, got: {desc!r}"
+        )
+
+    def test_platform_description_names_irq_lpuart5(self):
+        """Anti-hardcode: LPUART_5 platform dep must name LPUART5_IRQn (not LPUART8_IRQn)."""
+        desc = self._platform_desc("LPUART_5")
+        assert "LPUART5_IRQn" in desc, (
+            f"Platform dep description for LPUART_5 must contain 'LPUART5_IRQn', got: {desc!r}"
+        )
+        assert "LPUART5_IRQHandler" in desc or "LPUART_UART_IP_5_IRQHandler" in desc, (
+            f"Platform dep description for LPUART_5 must contain handler name, got: {desc!r}"
+        )
+
+    def test_mcu_description_names_clock_ref_lpuart8(self):
+        """LPUART_8 mcu dep description must name the clock-ref name (LPUART8_CLK)."""
+        desc = self._mcu_desc("LPUART_8")
+        assert "LPUART8_CLK" in desc, (
+            f"Mcu dep description for LPUART_8 must contain 'LPUART8_CLK', got: {desc!r}"
+        )
+
+    def test_mcu_description_names_clock_select_lpuart8(self):
+        """LPUART_8 mcu dep description must name AIPS_PLAT_CLK."""
+        desc = self._mcu_desc("LPUART_8")
+        assert "AIPS_PLAT_CLK" in desc, (
+            f"Mcu dep description for LPUART_8 must contain 'AIPS_PLAT_CLK', got: {desc!r}"
+        )
+
+    def test_mcu_description_names_clock_ref_lpuart5(self):
+        """Anti-hardcode: LPUART_5 mcu dep must name LPUART5_CLK and AIPS_SLOW_CLK."""
+        desc = self._mcu_desc("LPUART_5")
+        assert "LPUART5_CLK" in desc, (
+            f"Mcu dep description for LPUART_5 must contain 'LPUART5_CLK', got: {desc!r}"
+        )
+        assert "AIPS_SLOW_CLK" in desc, (
+            f"Mcu dep description for LPUART_5 must contain 'AIPS_SLOW_CLK', got: {desc!r}"
+        )
+
+    def test_flexio_platform_dep_description_unchanged(self):
+        """FlexIO path has no uart.json IRQ entry; description must still be non-empty."""
+        intent = _intent(hw="FLEXIO_0", baud=9600, mode="interrupt")
+        plan = UartProvider().plan(intent)
+        for c in plan.to_dict()["changes"]:
+            if c["owner"] == "platform":
+                assert len(c["description"]) > 0
+                return
+        # FlexIO in interrupt mode must still declare a platform dep
+        raise AssertionError("No platform dep found for FlexIO interrupt mode")
+
+
+# ---------------------------------------------------------------------------
 # CLI integration
 # ---------------------------------------------------------------------------
 
