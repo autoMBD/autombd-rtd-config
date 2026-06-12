@@ -61,10 +61,11 @@ from .modules.uart import UartProvider
 from .modules.platform import PlatformProvider
 from .modules.basenxp import BaseNxpProvider
 from .modules.mcl import MclProvider
+from .modules.mcu import McuProvider
 from .modules.port import PortProvider
 from .modules.dio import DioProvider
 from .checks.static import run_static_checks
-from .backends.s32_mex.apply import apply_uart_set, apply_platform_set, apply_basenxp_set, apply_mcl_set, apply_port_set, apply_dio_set
+from .backends.s32_mex.apply import apply_uart_set, apply_platform_set, apply_basenxp_set, apply_mcl_set, apply_port_set, apply_dio_set, apply_mcu_set
 from .backends.s32_mex.validation import run_validation
 
 
@@ -209,6 +210,40 @@ def build_parser() -> argparse.ArgumentParser:
     dio_set.add_argument("--configure", action="store_true")
     dio_set.add_argument("--backup", action="store_true")
     dio_set.add_argument("--json", action="store_true")
+
+    mcu_parser = subparsers.add_parser("mcu")
+    mcu_actions = mcu_parser.add_subparsers(dest="action")
+    mcu_set = mcu_actions.add_parser("set")
+    mcu_set.add_argument("--project", required=True)
+    mcu_set.add_argument(
+        "--core-clk",
+        type=int,
+        metavar="MHZ",
+        help="Target CORE_CLK frequency in MHz (e.g. 160).",
+    )
+    mcu_set.add_argument(
+        "--aips-plat-clk",
+        type=int,
+        metavar="MHZ",
+        help="Target AIPS_PLAT_CLK frequency in MHz (e.g. 80).",
+    )
+    mcu_set.add_argument(
+        "--aips-slow-clk",
+        type=int,
+        metavar="MHZ",
+        help="Target AIPS_SLOW_CLK frequency in MHz (e.g. 40).",
+    )
+    mcu_set.add_argument(
+        "--add-all-clock-reference-points",
+        action="store_true",
+        help=(
+            "Replace the McuClockReferencePoint array with entries for all "
+            "selectable S32K344 clocks."
+        ),
+    )
+    mcu_set.add_argument("--configure", action="store_true")
+    mcu_set.add_argument("--backup", action="store_true")
+    mcu_set.add_argument("--json", action="store_true")
 
     return parser
 
@@ -533,6 +568,24 @@ def normalize_dio_intent(args: argparse.Namespace) -> Intent:
     return Intent.from_dict({"module": "dio", "action": "set", "payload": payload})
 
 
+def normalize_mcu_intent(args: argparse.Namespace) -> Intent:
+    """Normalize `mcu set` CLI arguments into the JSON intent contract."""
+    payload: dict = {}
+    core_clk = getattr(args, "core_clk", None)
+    if core_clk is not None:
+        payload["core_clk"] = core_clk
+    aips_plat_clk = getattr(args, "aips_plat_clk", None)
+    if aips_plat_clk is not None:
+        payload["aips_plat_clk"] = aips_plat_clk
+    aips_slow_clk = getattr(args, "aips_slow_clk", None)
+    if aips_slow_clk is not None:
+        payload["aips_slow_clk"] = aips_slow_clk
+    add_all = getattr(args, "add_all_clock_reference_points", False)
+    if add_all:
+        payload["add_all_clock_reference_points"] = True
+    return Intent.from_dict({"module": "mcu", "action": "set", "payload": payload})
+
+
 def cmd_dio_set(args: argparse.Namespace) -> int:
     intent = normalize_dio_intent(args)
     plan = DioProvider().plan(intent)
@@ -546,6 +599,21 @@ def cmd_dio_set(args: argparse.Namespace) -> int:
         })
 
     return _configure_module(args, intent, plan, apply_dio_set)
+
+
+def cmd_mcu_set(args: argparse.Namespace) -> int:
+    intent = normalize_mcu_intent(args)
+    plan = McuProvider().plan(intent)
+
+    if not args.configure:
+        return emit({
+            "status": "passed",
+            "command": "plan",
+            "normalized_intent": _intent_dict(intent),
+            "plan": plan.to_dict(),
+        })
+
+    return _configure_module(args, intent, plan, apply_mcu_set)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -581,6 +649,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "dio" and getattr(args, "action", None) == "set":
         return cmd_dio_set(args)
+
+    if args.command == "mcu" and getattr(args, "action", None) == "set":
+        return cmd_mcu_set(args)
 
     if args.version:
         return emit({

@@ -59,6 +59,7 @@ removed (the highest-risk lesson from the legacy-skills experience).
 """
 from __future__ import annotations
 
+import io
 import json
 import re
 import xml.etree.ElementTree as ET
@@ -2057,3 +2058,488 @@ def _portpin_name_for_gpio_channel(channel_name: str) -> str:
     """
     parts = channel_name.split("_")
     return "_".join(p[0].upper() + p[1:].lower() if p else "" for p in parts)
+
+
+# ---------------------------------------------------------------------------
+# Mcu: clock-tree PLL + divider + McuClockReferencePoint configuration
+# ---------------------------------------------------------------------------
+
+# Supported clock-frequency recipe table, keyed by (core_clk, aips_plat_clk, aips_slow_clk).
+# Only 160/80/40 is supported in Milestone 1. Values grounded in Mcu.xdm and
+# the S32K344 160MHz reference config (FXOSC=16MHz).
+_MCU_SUPPORTED_RECIPES: frozenset = frozenset({
+    (160, 80, 40),
+})
+
+# Clocks available as McuClockFrequencySelect on S32K344, grounded in the
+# S32K344 reference config and Mcu.xdm. Must stay in sync with clock.json
+# and the test constants _ALL_SELECTABLE_CLOCKS.
+_ALL_SELECTABLE_CLOCKS: list[str] = [
+    "CORE_CLK",
+    "AIPS_PLAT_CLK",
+    "AIPS_SLOW_CLK",
+    "FLEXCAN_PE_CLK0_2",
+    "FLEXCAN_PE_CLK3_5",
+    "EMAC_CLK_RX",
+    "EMAC_CLK_TX",
+    "EMAC_CLK_TS",
+    "QuadSPI_SFCK",
+    "QSPI_MEM_CLK",
+    "FIRC_CLK",
+    "SIRC_CLK",
+    "STM0_CLK",
+]
+
+
+def _load_mcu_clock_asset() -> dict:
+    """Load the committed mcu/clock.json asset. Never reads .xdm at runtime."""
+    clock_path = _ASSET_ROOT / "nxp" / "s32k3" / "mcu" / "clock.json"
+    return json.loads(clock_path.read_text(encoding="utf-8"))
+
+
+def _find_clock_settings_parent(doc: MexDocument) -> ET.Element | None:
+    """Return the <clock_settings> element in the top-level clocks tool section.
+
+    This is the NOT-a-config_set section; its elements use id="..." attributes.
+    """
+    for el in doc.root.iter():
+        if el.tag.endswith("clock_settings"):
+            return el
+    return None
+
+
+def _change_clock_setting_value(doc: MexDocument, setting_id: str, new_value: str) -> bool:
+    """Change an existing <setting id="..." value="..."> in clock_settings (raw bytes).
+
+    Uses regex on raw bytes to perform a byte-faithful in-place value change.
+    Returns True if the setting was found and updated, False otherwise.
+    """
+    pattern = (
+        rb'(<setting id="' + re.escape(setting_id).encode() + rb'" value=")[^"]*(")'
+    )
+    match = re.search(pattern, doc._raw)
+    if match is None:
+        return False
+    new_raw = doc._raw[:match.start(1)] + match.group(1) + new_value.encode() + match.group(2) + doc._raw[match.end(2):]
+    doc._raw = new_raw
+    doc.tree = ET.parse(io.BytesIO(new_raw))
+    doc._capture_sources()
+    return True
+
+
+def _insert_clock_setting(doc: MexDocument, setting_id: str, value: str, locked: str = "false") -> None:
+    """Insert a new <setting id="setting_id" value="value" locked="locked"/> into clock_settings.
+
+    Insertion strategy: find the last existing <setting id=...> in the
+    <clock_settings> block and append after it, preserving indentation.
+    """
+    # Find the last <setting id= ... /> line position in the raw bytes.
+    # We detect indentation from the existing settings and insert after the last one.
+    clock_settings = _find_clock_settings_parent(doc)
+    if clock_settings is None:
+        return
+
+    line_ending = _detect_line_ending(doc._raw)
+    le = line_ending
+
+    # Find the last <setting id= in the raw bytes by scanning for all occurrences
+    # and picking the one whose end we can locate.
+    all_setting_matches = list(re.finditer(
+        rb'<setting id="[^"]*" value="[^"]*"[^/]*/>', doc._raw
+    ))
+    if not all_setting_matches:
+        return
+
+    last_match = all_setting_matches[-1]
+    match_start = last_match.start()
+
+    # Detect indentation: walk backward from match_start to find the preceding newline,
+    # then count spaces from newline+1 to match_start.
+    raw = doc._raw
+    i = match_start - 1
+    while i >= 0 and raw[i:i + 1] not in (b"\n", b"\r"):
+        i -= 1
+    line_start = i + 1
+    spaces = 0
+    while line_start + spaces < match_start and raw[line_start + spaces: line_start + spaces + 1] == b" ":
+        spaces += 1
+    indent = spaces
+
+    new_setting_bytes = (
+        le + (b" " * indent)
+        + f'<setting id="{setting_id}" value="{value}" locked="{locked}"/>'.encode("utf-8")
+    )
+    insert_pos = last_match.end()
+    new_raw = raw[:insert_pos] + new_setting_bytes + raw[insert_pos:]
+    doc._raw = new_raw
+    doc.tree = ET.parse(io.BytesIO(new_raw))
+    doc._capture_sources()
+
+
+def _remove_clock_setting(doc: MexDocument, setting_id: str) -> bool:
+    """Remove a <setting id="setting_id" ...> from clock_settings (raw bytes).
+
+    Removes the element's entire line (including the newline preceding it).
+    Returns True if removed, False if not found.
+    """
+    # Match the line: optional whitespace + element + optional trailing whitespace
+    pattern = (
+        rb'[^\S\r\n]*<setting id="' + re.escape(setting_id).encode() + rb'"[^/]*/>[^\S\r\n]*'
+    )
+    raw = doc._raw
+    match = re.search(pattern, raw)
+    if match is None:
+        return False
+
+    # Include the preceding newline (LF or CRLF) to remove the whole line.
+    start = match.start()
+    end = match.end()
+    if start > 0 and raw[start - 1:start] == b"\n":
+        start -= 1
+        if start > 0 and raw[start - 1:start] == b"\r":
+            start -= 1
+    elif start > 0 and raw[start - 1:start] == b"\r":
+        start -= 1
+
+    new_raw = raw[:start] + raw[end:]
+    doc._raw = new_raw
+    doc.tree = ET.parse(io.BytesIO(new_raw))
+    doc._capture_sources()
+    return True
+
+
+def _build_ref_point_array_bytes(
+    all_clocks: list[str],
+    indent: int,
+    line_ending: bytes,
+) -> bytes:
+    """Build the populated McuClockReferencePoint array block as raw bytes.
+
+    Each struct has Name and McuClockFrequencySelect both == the clock name.
+    McuClockReferencePointFrequency is NOT written (ConfigTools computes it).
+
+    ``indent`` is the number of leading spaces for the <array> open tag.
+    Children (struct) are at indent+3; settings at indent+6.
+    """
+    le = line_ending.decode("latin-1")
+    sp_array = " " * indent
+    sp_struct = " " * (indent + 3)
+    sp_child = " " * (indent + 6)
+
+    lines: list[str] = ['<array name="McuClockReferencePoint">']
+    for i, clk in enumerate(all_clocks):
+        lines.append(f'{sp_struct}<struct name="{i}">')
+        lines.append(f'{sp_child}<setting name="Name" value="{clk}"/>')
+        lines.append(f'{sp_child}<setting name="McuClockFrequencySelect" value="{clk}"/>')
+        lines.append(f'{sp_struct}</struct>')
+    lines.append(f'{sp_array}</array>')
+    return le.join(lines).encode("utf-8")
+
+
+def _insert_settings_into_struct(
+    doc: MexDocument,
+    struct_el: ET.Element,
+    settings: dict[str, str],
+) -> None:
+    """Insert new <setting name="..." value="..."/> children into a struct element.
+
+    Strategy: locate the struct's byte region, find the closing tag's line, and
+    insert the new settings before it. Uses _insert_into_parent_before_close
+    pattern adapted for config_set settings (name=... not id=...).
+    """
+    line_ending = _detect_line_ending(doc._raw)
+
+    elements = list(doc.root.iter())
+    src_index = next((i for i, e in enumerate(elements) if e is struct_el), None)
+    if src_index is None or not doc._aligned:
+        return
+
+    src = doc._sources[src_index]
+    span_end = doc._find_element_region_end(src, struct_el)
+    if span_end is None:
+        return
+
+    parent_raw = doc._raw[src.start: span_end + 1]
+    start_tag_text = parent_raw[:src.tag_end - src.start + 1].decode("utf-8", errors="replace")
+    m = re.match(r"<([A-Za-z0-9_:.\-]+)", start_tag_text)
+    if m is None:
+        return
+    close_tag = f"</{m.group(1)}>".encode("utf-8")
+
+    close_pos = parent_raw.rfind(close_tag)
+    if close_pos < 0:
+        return
+
+    # Find the line start of the close tag
+    line_start = close_pos
+    while line_start > 0 and parent_raw[line_start - 1:line_start] not in (b"\n", b"\r"):
+        line_start -= 1
+
+    # Detect indentation for the new settings: use the close-tag's line indentation
+    # and add 3 more spaces (settings are one level inside the struct).
+    close_indent_raw = parent_raw[line_start:close_pos]
+    close_spaces = len(close_indent_raw) - len(close_indent_raw.lstrip(b" "))
+    child_indent = close_spaces + 3
+
+    le = line_ending.decode("latin-1")
+    sp = " " * child_indent
+    new_lines = []
+    for name, value in settings.items():
+        new_lines.append(f'{sp}<setting name="{name}" value="{value}"/>')
+    new_bytes = le.join(new_lines).encode("utf-8")
+
+    new_parent_raw = (
+        parent_raw[:line_start]
+        + new_bytes
+        + line_ending
+        + parent_raw[line_start:]
+    )
+    doc.replace_element_region(struct_el, new_parent_raw)
+
+
+def apply_mcu_set(doc: MexDocument, intent: Intent) -> ApplyResult:
+    """Apply the Mcu clock-tree PLL/divider recipe and McuClockReferencePoint array.
+
+    Implements RTD-MEX-MCU-001: 160/80/40 MHz clock tree for S32K344 using the
+    16MHz FXOSC -> CORE_PLL -> PHI0 path. Only the 160/80/40 recipe is
+    supported; other frequency combinations return a blocker diagnostic.
+
+    Two regions are edited:
+    (A) clock_settings section (top-level clocks tool, elements use id="..."):
+        - INSERT: CORE_PLL_PD=Power_up, CORE_PLLODIV_0_DE=Enabled,
+                  CORE_PLLODIV_1_DE=Enabled, MC_CGM_MUX_0.sel=PHI0
+        - CHANGE: MC_CGM_MUX_0_DIV1.scale 1->2, MC_CGM_MUX_0_DIV2.scale 2->4
+        - REMOVE: PLLunderMcuControl="Disabled"
+        - LEAVE UNCHANGED: CORE_MFD.scale=120, PLL_PREDIV.scale=2, PHI0.scale=3,
+                           PHI1.scale=3, POSTDIV.scale=2, MC_CGM_MUX_0_DIV0.scale=1
+        - NOT WRITTEN: clock_output values (ConfigTools recomputes them)
+
+    (B) Mcu config_set (elements use name="..."):
+        - McuPll_0: McuPLLUnderMcuControl false->true, McuPLLEnabled false->true
+        - McuPll_Configuration: McuPllOdiv0_En false->true, McuPllOdiv1_En false->true
+        - McuPll_Parameter: INSERT PLL fields; CLEAR quick_selection LAST (LL-013)
+        - McuCgm0ClockMux0: McuClkMux0_Source FIRC_CLK->PLL_PHI0_CLK; INSERT divisors
+        - McuClockReferencePoint array: REPLACE with 13-struct array (all S32K344 clocks)
+
+    Idempotent: second apply with same intent produces the same output.
+    Returns a blocker for unsupported frequency combinations.
+
+    ORDERING: All raw-bytes operations (replace_element_region / direct _raw edits)
+    happen FIRST. These reload the tree from _raw, discarding any prior in-memory
+    attribute mutations. Attribute mutations (.set("value", ...)) happen LAST, after
+    all _raw edits are complete, so they are captured by _render_minimal on write().
+    """
+    result = ApplyResult()
+    payload = intent.payload
+    core_clk = payload.get("core_clk")
+    aips_plat_clk = payload.get("aips_plat_clk")
+    aips_slow_clk = payload.get("aips_slow_clk")
+    add_all_ref_points = payload.get("add_all_clock_reference_points", False)
+
+    # Validate: only supported recipe combos may proceed
+    combo = (core_clk, aips_plat_clk, aips_slow_clk)
+    if combo not in _MCU_SUPPORTED_RECIPES:
+        result.diagnostics.append(Diagnostic(
+            severity="blocker",
+            code="mcu_unsupported_clock_combo",
+            module="mcu",
+            message=(
+                f"Clock combination core={core_clk}/plat={aips_plat_clk}/"
+                f"slow={aips_slow_clk} MHz is not supported. "
+                "Only 160/80/40 MHz is supported in Milestone 1."
+            ),
+            details={
+                "core_clk": core_clk,
+                "aips_plat_clk": aips_plat_clk,
+                "aips_slow_clk": aips_slow_clk,
+                "supported": [(160, 80, 40)],
+            },
+        ))
+        return result
+
+    mcu_cfg = doc.find_config_set("Mcu")
+    if mcu_cfg is None:
+        result.diagnostics.append(Diagnostic(
+            severity="blocker",
+            code="mcu_config_set_not_found",
+            module="mcu",
+            message="No enabled Mcu <config_set> found; M1 edits existing instances only.",
+            details={},
+        ))
+        return result
+
+    # ==================================================================
+    # PHASE 1: All raw-bytes operations (clock_settings + struct insertions +
+    #          array replacement). These each reload the tree from _raw, so
+    #          they must all complete before any attribute mutation.
+    # ==================================================================
+
+    # --- Part A: clock_settings (top-level clocks tool) ---
+
+    # A1: Change MC_CGM_MUX_0_DIV1.scale from 1 to 2
+    _change_clock_setting_value(doc, "MC_CGM_MUX_0_DIV1.scale", "2")
+
+    # A2: Change MC_CGM_MUX_0_DIV2.scale from 2 to 4
+    _change_clock_setting_value(doc, "MC_CGM_MUX_0_DIV2.scale", "4")
+
+    # A3: Remove PLLunderMcuControl="Disabled"
+    _remove_clock_setting(doc, "PLLunderMcuControl")
+
+    # A4-A7: Insert new settings (only if absent -- idempotency)
+    for sid, val in [
+        ("CORE_PLL_PD", "Power_up"),
+        ("CORE_PLLODIV_0_DE", "Enabled"),
+        ("CORE_PLLODIV_1_DE", "Enabled"),
+        ("MC_CGM_MUX_0.sel", "PHI0"),
+    ]:
+        if (b'<setting id="' + re.escape(sid).encode() + b'"') not in doc._raw:
+            _insert_clock_setting(doc, sid, val, locked="false")
+
+    # Re-find Mcu config_set after clock_settings raw edits.
+    mcu_cfg = doc.find_config_set("Mcu")
+    if mcu_cfg is None:
+        result.diagnostics.append(Diagnostic(
+            severity="blocker",
+            code="mcu_config_set_lost",
+            module="mcu",
+            message="Mcu config_set was lost after clock_settings raw edits.",
+            details={},
+        ))
+        return result
+
+    # --- Part B raw: McuPll_Parameter field insertion ---
+    # Find the current McuPll_Parameter struct and insert PLL fields if absent.
+    pll_param = None
+    for el in mcu_cfg.iter():
+        if el.tag.endswith("struct") and el.attrib.get("name") == "McuPll_Parameter":
+            pll_param = el
+            break
+
+    if pll_param is not None and doc.find_child_setting(pll_param, "McuPllDvRdiv") is None:
+        _insert_settings_into_struct(doc, pll_param, {
+            "McuPllDvRdiv": "2",
+            "McuPllDvMfi": "120",
+            "McuPllDvOdiv2": "2",
+            "McuPllOdiv0_Div": "2",
+            "McuPllOdiv1_Div": "1",
+        })
+        mcu_cfg = doc.find_config_set("Mcu")
+
+    # --- Part B raw: McuCgm0ClockMux0 divisor insertion ---
+    mux0 = None
+    if mcu_cfg is not None:
+        for el in mcu_cfg.iter():
+            if el.tag.endswith("struct") and el.attrib.get("name") == "McuCgm0ClockMux0":
+                mux0 = el
+                break
+
+    if mux0 is not None and doc.find_child_setting(mux0, "McuClkMux0Div0_Divisor") is None:
+        _insert_settings_into_struct(doc, mux0, {
+            "McuClkMux0Div0_Divisor": "0",
+            "McuClkMux0Div1_Divisor": "1",
+            "McuClkMux0Div2_Divisor": "3",
+        })
+        mcu_cfg = doc.find_config_set("Mcu")
+
+    # --- Part B raw: McuClockReferencePoint array replacement ---
+    if add_all_ref_points and mcu_cfg is not None:
+        ref_array = None
+        for el in mcu_cfg.iter():
+            if el.tag.endswith("array") and el.attrib.get("name") == "McuClockReferencePoint":
+                ref_array = el
+                break
+
+        if ref_array is not None:
+            # Idempotency: skip if already has the correct 13 structs
+            existing_structs = [c for c in ref_array if c.tag.endswith("struct")]
+            needs_replace = len(existing_structs) != len(_ALL_SELECTABLE_CLOCKS)
+            if not needs_replace and existing_structs:
+                ns = doc.find_child_setting(existing_structs[0], "Name")
+                if ns is None or ns.attrib.get("value") != _ALL_SELECTABLE_CLOCKS[0]:
+                    needs_replace = True
+
+            if needs_replace:
+                # Detect indentation of the <array> tag from raw bytes
+                elements = list(doc.root.iter())
+                src_index = next(
+                    (i for i, e in enumerate(elements) if e is ref_array), None
+                )
+                array_indent = 36  # fixture default
+                if src_index is not None and doc._aligned:
+                    arr_src = doc._sources[src_index]
+                    raw = doc._raw
+                    ii = arr_src.start - 1
+                    while ii >= 0 and raw[ii:ii + 1] not in (b"\n", b"\r"):
+                        ii -= 1
+                    ls = ii + 1
+                    sp = 0
+                    while ls + sp < arr_src.start and raw[ls + sp:ls + sp + 1] == b" ":
+                        sp += 1
+                    array_indent = sp
+
+                line_ending = _detect_line_ending(doc._raw)
+                new_array_bytes = _build_ref_point_array_bytes(
+                    _ALL_SELECTABLE_CLOCKS,
+                    indent=array_indent,
+                    line_ending=line_ending,
+                )
+                doc.replace_element_region(ref_array, new_array_bytes)
+                mcu_cfg = doc.find_config_set("Mcu")
+
+    # ==================================================================
+    # PHASE 2: Attribute mutations (no raw-bytes reload after this point).
+    # These are captured by _render_minimal when doc.write() is called.
+    # All raw-bytes operations are complete; re-find all elements now.
+    # ==================================================================
+
+    if mcu_cfg is None:
+        mcu_cfg = doc.find_config_set("Mcu")
+
+    if mcu_cfg is not None:
+        # B1-B2: McuPll_0 -> McuPLLUnderMcuControl=true, McuPLLEnabled=true
+        for el in mcu_cfg.iter():
+            if el.tag.endswith("struct") and el.attrib.get("name") == "McuPll_0":
+                s = doc.find_child_setting(el, "McuPLLUnderMcuControl")
+                if s is not None:
+                    s.set("value", "true")
+                s2 = doc.find_child_setting(el, "McuPLLEnabled")
+                if s2 is not None:
+                    s2.set("value", "true")
+                break
+
+        # B3-B4: McuPll_Configuration -> McuPllOdiv0_En=true, McuPllOdiv1_En=true
+        for el in mcu_cfg.iter():
+            if el.tag.endswith("struct") and el.attrib.get("name") == "McuPll_Configuration":
+                s = doc.find_child_setting(el, "McuPllOdiv0_En")
+                if s is not None:
+                    s.set("value", "true")
+                s2 = doc.find_child_setting(el, "McuPllOdiv1_En")
+                if s2 is not None:
+                    s2.set("value", "true")
+                break
+
+        # B5: McuCgm0ClockMux0 -> McuClkMux0_Source=PLL_PHI0_CLK
+        for el in mcu_cfg.iter():
+            if el.tag.endswith("struct") and el.attrib.get("name") == "McuCgm0ClockMux0":
+                s = doc.find_child_setting(el, "McuClkMux0_Source")
+                if s is not None:
+                    s.set("value", "PLL_PHI0_CLK")
+                break
+
+    # ==================================================================
+    # PHASE 3: Mark modified + clear quick_selection LAST (LL-013 ordering).
+    # quick_selection clear must happen after all replace_element_region calls
+    # so the final _capture_sources() snapshot sees the clear.
+    # ==================================================================
+
+    if mcu_cfg is not None:
+        # Mark McuPll_Parameter and clear its quick_selection (LL-013: LAST)
+        for el in mcu_cfg.iter():
+            if el.tag.endswith("struct") and el.attrib.get("name") == "McuPll_Parameter":
+                doc.mark_modified(el)  # removes quick_selection="Default" if present
+                break
+
+    result.changed_modules.append("mcu")
+    if mcu_cfg is not None:
+        result.modified_elements.append(mcu_cfg)
+    return result

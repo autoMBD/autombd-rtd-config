@@ -61,14 +61,62 @@ class McuProvider:
     name = "mcu"
 
     def plan(self, intent: Intent) -> Plan:
-        return Plan([
-            PlannedChange(
+        """Return planned changes for the Mcu clock-tree recipe.
+
+        For a `set` action with core_clk/aips_plat_clk/aips_slow_clk, two
+        changes are described:
+        1. PLL and CGM clock-tree configuration (clock_settings + Mcu config_set
+           PLL/divider/mux settings).
+        2. McuClockReferencePoint array replacement with all selectable S32K344
+           clocks (when add_all_clock_reference_points=True).
+        """
+        payload = intent.payload
+        core_clk = payload.get("core_clk")
+        aips_plat_clk = payload.get("aips_plat_clk")
+        aips_slow_clk = payload.get("aips_slow_clk")
+        add_all_ref = payload.get("add_all_clock_reference_points", False)
+
+        changes: list[PlannedChange] = []
+
+        if core_clk is not None or aips_plat_clk is not None or aips_slow_clk is not None:
+            changes.append(PlannedChange(
                 module="mcu",
                 owner="mcu",
                 path="/Mcu/Mcu/McuModuleConfiguration/McuClockSettingConfig_0",
-                description="Ensure Uart peripheral clock reference is present",
-            )
-        ])
+                description=(
+                    f"Configure PLL clock tree: CORE_CLK={core_clk} MHz, "
+                    f"AIPS_PLAT_CLK={aips_plat_clk} MHz, "
+                    f"AIPS_SLOW_CLK={aips_slow_clk} MHz. "
+                    "Edits clock_settings (DIV1/DIV2 scale, PLL power-up, CGM MUX0 sel=PHI0) "
+                    "and Mcu config_set (McuPll_0, McuPll_Configuration, "
+                    "McuPll_Parameter PLL params, McuCgm0ClockMux0 divisors)."
+                ),
+            ))
+
+        if add_all_ref:
+            changes.append(PlannedChange(
+                module="mcu",
+                owner="mcu",
+                path="/Mcu/Mcu/McuModuleConfiguration/McuClockSettingConfig_0/McuClockReferencePoint",
+                description=(
+                    "Replace McuClockReferencePoint array with 13 structs "
+                    "(one per selectable S32K344 clock: CORE_CLK, AIPS_PLAT_CLK, "
+                    "AIPS_SLOW_CLK, FLEXCAN_PE_CLK0_2, FLEXCAN_PE_CLK3_5, "
+                    "EMAC_CLK_RX/TX/TS, QuadSPI_SFCK, QSPI_MEM_CLK, "
+                    "FIRC_CLK, SIRC_CLK, STM0_CLK)."
+                ),
+            ))
+
+        if not changes:
+            # Fallback: general clock reference ensure (used by Uart dependency)
+            changes.append(PlannedChange(
+                module="mcu",
+                owner="mcu",
+                path="/Mcu/Mcu/McuModuleConfiguration/McuClockSettingConfig_0",
+                description="Ensure Mcu clock reference is present",
+            ))
+
+        return Plan(changes)
 
     def clock_dependency(self, hw: str) -> PlannedChange:
         """Return the Mcu-owned clock dependency a consumer (Uart) requires."""

@@ -1,0 +1,64 @@
+{
+  "_comment": "Mcu clock-tree recipe for NXP S32K3 RTD 7.0.1. Values grounded in Mcu.xdm and the 160MHz reference config (FXOSC=16MHz, CORE_PLL, PHI0/PHI1). Only the 160/80/40 recipe is supported; other combos must return a blocker.",
+  "recipes": [
+    {
+      "core_clk": 160,
+      "aips_plat_clk": 80,
+      "aips_slow_clk": 40,
+      "clock_settings_changes": [
+        {"id": "MC_CGM_MUX_0_DIV1.scale", "action": "change", "value": "2"},
+        {"id": "MC_CGM_MUX_0_DIV2.scale", "action": "change", "value": "4"}
+      ],
+      "clock_settings_inserts": [
+        {"id": "CORE_PLL_PD", "value": "Power_up", "locked": "false"},
+        {"id": "CORE_PLLODIV_0_DE", "value": "Enabled", "locked": "false"},
+        {"id": "CORE_PLLODIV_1_DE", "value": "Enabled", "locked": "false"},
+        {"id": "MC_CGM_MUX_0.sel", "value": "PHI0", "locked": "false"}
+      ],
+      "clock_settings_removes": [
+        {"id": "PLLunderMcuControl"}
+      ],
+      "mcu_config_set_changes": {
+        "McuPll_0": {
+          "McuPLLUnderMcuControl": "true",
+          "McuPLLEnabled": "true"
+        },
+        "McuPll_Configuration": {
+          "McuPllOdiv0_En": "true",
+          "McuPllOdiv1_En": "true"
+        },
+        "McuCgm0ClockMux0": {
+          "McuClkMux0_Source": "PLL_PHI0_CLK"
+        }
+      },
+      "McuPll_Parameter_inserts": {
+        "McuPllDvRdiv": "2",
+        "McuPllDvMfi": "120",
+        "McuPllDvOdiv2": "2",
+        "McuPllOdiv0_Div": "2",
+        "McuPllOdiv1_Div": "1"
+      },
+      "McuCgm0ClockMux0_divisor_inserts": {
+        "McuClkMux0Div0_Divisor": "0",
+        "McuClkMux0Div1_Divisor": "1",
+        "McuClkMux0Div2_Divisor": "3"
+      }
+    }
+  ],
+  "all_selectable_clocks": [
+    "CORE_CLK",
+    "AIPS_PLAT_CLK",
+    "AIPS_SLOW_CLK",
+    "FLEXCAN_PE_CLK0_2",
+    "FLEXCAN_PE_CLK3_5",
+    "EMAC_CLK_RX",
+    "EMAC_CLK_TX",
+    "EMAC_CLK_TS",
+    "QuadSPI_SFCK",
+    "QSPI_MEM_CLK",
+    "FIRC_CLK",
+    "SIRC_CLK",
+    "STM0_CLK"
+  ],
+  "ref_point_struct_settings": ["Name", "McuClockFrequencySelect"]
+}
