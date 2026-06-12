@@ -104,8 +104,12 @@ def test_owned_edit_touches_only_changed_lines(tmp_path):
 
     changed = _changed_lines(original, mex.read_bytes())
     # A whole-file reserialization churns ~3000 lines; an owned edit must touch
-    # only the few it changed. Guard far below the churn threshold.
-    assert len(changed) <= 8, f"unexpectedly broad diff: {len(changed)} lines"
+    # only the few it actually changed. Guard far below the churn threshold.
+    # The full orchestration (RTD-MEX-UART-001) inserts a Platform ISR entry
+    # (~8 lines) and an Mcu clock-ref entry (~5 lines) plus the channel field
+    # change (1-2 lines) + UartClockRef update (2 lines) = ~20 lines total.
+    # Still far below 3000; any value under 50 guards against a full reserialization.
+    assert len(changed) <= 50, f"unexpectedly broad diff: {len(changed)} lines"
 
     added = [line for line in changed if line.startswith("+")]
     # interrupt-only M1: the owned change here is the hardware-channel value

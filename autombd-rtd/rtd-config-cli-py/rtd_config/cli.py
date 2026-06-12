@@ -123,6 +123,23 @@ def build_parser() -> argparse.ArgumentParser:
     uart_set.add_argument("--using", choices=["LPUART_IP", "FLEXIO_IP"])
     uart_set.add_argument("--channel-id", type=int)
     uart_set.add_argument("--callback")
+    # LPUART frame parameters (mapped to Uart.xdm enums via uart.json)
+    uart_set.add_argument(
+        "--parity", choices=["none", "even", "odd"],
+        help="Parity: none (disabled), even, or odd. Maps to UartParityType enum.",
+    )
+    uart_set.add_argument(
+        "--stop-bits", dest="stop_bits", choices=["1", "2"],
+        help="Stop bits: 1 or 2. Maps to UartStopBitNumber enum.",
+    )
+    uart_set.add_argument(
+        "--word-length", dest="word_length", choices=["7", "8", "9", "10"], type=str,
+        help="Word length in bits: 7, 8, 9, or 10. Maps to UartWordLength enum.",
+    )
+    uart_set.add_argument(
+        "--priority", type=int,
+        help="ISR priority for the Platform interrupt entry (default 2).",
+    )
     uart_set.add_argument("--configure", action="store_true")
     uart_set.add_argument("--backup", action="store_true")
     uart_set.add_argument("--json", action="store_true")
@@ -253,7 +270,15 @@ def normalize_uart_intent(args: argparse.Namespace) -> Intent:
 
     Shortcut commands and JSON intents converge on this same Intent so the
     plan/apply/check pipeline has a single request shape.
+
+    CLI -> payload mapping for frame parameters (grounded in uart.json enum domains):
+      --parity none/even/odd  -> word_length via parity_cli_to_enum
+      --stop-bits 1/2         -> stop_bits via stop_bits_cli_to_enum
+      --word-length 7/8/9/10  -> word_length via word_length_cli_to_enum
+      --priority N            -> priority (ISR priority, default 2)
     """
+    from rtd_config.backends.s32_mex.apply import _load_uart_asset
+
     payload: dict = {
         "hw": args.hw,
         "mode": args.mode,
@@ -272,6 +297,30 @@ def normalize_uart_intent(args: argparse.Namespace) -> Intent:
         payload["channel_id"] = args.channel_id
     if args.callback is not None:
         payload["callback"] = args.callback
+
+    # Map frame parameters to their .mex enum values via the uart.json asset.
+    asset = _load_uart_asset()
+    enums = asset.get("enum_domains", {})
+
+    parity = getattr(args, "parity", None)
+    if parity is not None:
+        parity_map = enums.get("parity_cli_to_enum", {})
+        payload["parity"] = parity_map.get(parity, parity)
+
+    stop_bits = getattr(args, "stop_bits", None)
+    if stop_bits is not None:
+        sb_map = enums.get("stop_bits_cli_to_enum", {})
+        payload["stop_bits"] = sb_map.get(stop_bits, stop_bits)
+
+    word_length = getattr(args, "word_length", None)
+    if word_length is not None:
+        wl_map = enums.get("word_length_cli_to_enum", {})
+        payload["word_length"] = wl_map.get(str(word_length), word_length)
+
+    priority = getattr(args, "priority", None)
+    if priority is not None:
+        payload["priority"] = priority
+
     return Intent.from_dict({"module": "uart", "action": "set", "payload": payload})
 
 

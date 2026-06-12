@@ -1,0 +1,75 @@
+{
+  "_source": "Uart.xdm (S32K3 RTD 7.0.1), Platform.xdm/.epd (S32K3 RTD 7.0.1 interrupt table), S32K344 IRQ header (S32K344_IRQ.h from SDK), fixture Uart_Example_S32K344 clock tool. This asset is loaded at runtime by apply_uart_set and pinned by test_uart_apply.py::TestUartAsset (LL-012).",
+  "enum_domains": {
+    "UartWordLength": [
+      "LPUART_UART_IP_7_BITS_PER_CHAR",
+      "LPUART_UART_IP_8_BITS_PER_CHAR",
+      "LPUART_UART_IP_9_BITS_PER_CHAR",
+      "LPUART_UART_IP_10_BITS_PER_CHAR"
+    ],
+    "UartParityType": [
+      "LPUART_UART_IP_PARITY_DISABLED",
+      "LPUART_UART_IP_PARITY_EVEN",
+      "LPUART_UART_IP_PARITY_ODD"
+    ],
+    "UartStopBitNumber": [
+      "LPUART_UART_IP_ONE_STOP_BIT",
+      "LPUART_UART_IP_TWO_STOP_BIT"
+    ],
+    "UartInteruptDmaMethod": [
+      "LPUART_UART_IP_USING_INTERRUPTS",
+      "LPUART_UART_IP_USING_DMA"
+    ],
+    "DesireBaudrate": [
+      "LPUART_UART_BAUDRATE_1200",
+      "LPUART_UART_BAUDRATE_2400",
+      "LPUART_UART_BAUDRATE_4800",
+      "LPUART_UART_BAUDRATE_9600",
+      "LPUART_UART_BAUDRATE_19200",
+      "LPUART_UART_BAUDRATE_38400",
+      "LPUART_UART_BAUDRATE_57600",
+      "LPUART_UART_BAUDRATE_115200",
+      "LPUART_UART_BAUDRATE_230400",
+      "LPUART_UART_BAUDRATE_460800",
+      "LPUART_UART_BAUDRATE_921600"
+    ],
+    "parity_cli_to_enum": {
+      "none":  "LPUART_UART_IP_PARITY_DISABLED",
+      "even":  "LPUART_UART_IP_PARITY_EVEN",
+      "odd":   "LPUART_UART_IP_PARITY_ODD"
+    },
+    "stop_bits_cli_to_enum": {
+      "1": "LPUART_UART_IP_ONE_STOP_BIT",
+      "2": "LPUART_UART_IP_TWO_STOP_BIT"
+    },
+    "word_length_cli_to_enum": {
+      "7":  "LPUART_UART_IP_7_BITS_PER_CHAR",
+      "8":  "LPUART_UART_IP_8_BITS_PER_CHAR",
+      "9":  "LPUART_UART_IP_9_BITS_PER_CHAR",
+      "10": "LPUART_UART_IP_10_BITS_PER_CHAR"
+    }
+  },
+  "callback_fields": {
+    "capability_setting": "UartCallbackCapability",
+    "callback_array": "UartCallback"
+  },
+  "instance_irq_clock_map": {
+    "_note": "Grounded in: S32K344_IRQ.h (IRQn/handler names), Platform.xdm/.epd ISR table, Uart.xdm UartClockRef domain, fixture Uart_Example_S32K344 clock tool. LPUART_0 and LPUART_8 use AIPS_PLAT_CLK; all others (LPUART_1..7, LPUART_9..15) use AIPS_SLOW_CLK.",
+    "LPUART_0":  {"irq_name": "LPUART0_IRQn",  "isr_handler": "LPUART_UART_IP_0_IRQHandler",  "clock_select": "AIPS_PLAT_CLK"},
+    "LPUART_1":  {"irq_name": "LPUART1_IRQn",  "isr_handler": "LPUART_UART_IP_1_IRQHandler",  "clock_select": "AIPS_SLOW_CLK"},
+    "LPUART_2":  {"irq_name": "LPUART2_IRQn",  "isr_handler": "LPUART_UART_IP_2_IRQHandler",  "clock_select": "AIPS_SLOW_CLK"},
+    "LPUART_3":  {"irq_name": "LPUART3_IRQn",  "isr_handler": "LPUART_UART_IP_3_IRQHandler",  "clock_select": "AIPS_SLOW_CLK"},
+    "LPUART_4":  {"irq_name": "LPUART4_IRQn",  "isr_handler": "LPUART_UART_IP_4_IRQHandler",  "clock_select": "AIPS_SLOW_CLK"},
+    "LPUART_5":  {"irq_name": "LPUART5_IRQn",  "isr_handler": "LPUART_UART_IP_5_IRQHandler",  "clock_select": "AIPS_SLOW_CLK"},
+    "LPUART_6":  {"irq_name": "LPUART6_IRQn",  "isr_handler": "LPUART_UART_IP_6_IRQHandler",  "clock_select": "AIPS_SLOW_CLK"},
+    "LPUART_7":  {"irq_name": "LPUART7_IRQn",  "isr_handler": "LPUART_UART_IP_7_IRQHandler",  "clock_select": "AIPS_SLOW_CLK"},
+    "LPUART_8":  {"irq_name": "LPUART8_IRQn",  "isr_handler": "LPUART_UART_IP_8_IRQHandler",  "clock_select": "AIPS_PLAT_CLK"},
+    "LPUART_9":  {"irq_name": "LPUART9_IRQn",  "isr_handler": "LPUART_UART_IP_9_IRQHandler",  "clock_select": "AIPS_SLOW_CLK"},
+    "LPUART_10": {"irq_name": "LPUART10_IRQn", "isr_handler": "LPUART_UART_IP_10_IRQHandler", "clock_select": "AIPS_SLOW_CLK"},
+    "LPUART_11": {"irq_name": "LPUART11_IRQn", "isr_handler": "LPUART_UART_IP_11_IRQHandler", "clock_select": "AIPS_SLOW_CLK"},
+    "LPUART_12": {"irq_name": "LPUART12_IRQn", "isr_handler": "LPUART_UART_IP_12_IRQHandler", "clock_select": "AIPS_SLOW_CLK"},
+    "LPUART_13": {"irq_name": "LPUART13_IRQn", "isr_handler": "LPUART_UART_IP_13_IRQHandler", "clock_select": "AIPS_SLOW_CLK"},
+    "LPUART_14": {"irq_name": "LPUART14_IRQn", "isr_handler": "LPUART_UART_IP_14_IRQHandler", "clock_select": "AIPS_SLOW_CLK"},
+    "LPUART_15": {"irq_name": "LPUART15_IRQn", "isr_handler": "LPUART_UART_IP_15_IRQHandler", "clock_select": "AIPS_SLOW_CLK"}
+  }
+}

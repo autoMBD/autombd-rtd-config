@@ -92,6 +92,29 @@ _FLEXIO_METHOD = {
 }
 
 
+def _load_uart_asset() -> dict:
+    """Load the committed uart.json asset at runtime. Never reads raw .xdm."""
+    asset_path = _ASSET_ROOT / "nxp" / "s32k3" / "uart" / "uart.json"
+    return json.loads(asset_path.read_text(encoding="utf-8"))
+
+
+def _lookup_lpuart_irq_clock(hw: str) -> "dict | None":
+    """Return the irq_name/isr_handler/clock_select entry for an LPUART instance.
+
+    Grounded in uart.json instance_irq_clock_map (derived from S32K344_IRQ.h,
+    Platform.xdm/.epd, and the fixture clock tool).  Returns None for unknown
+    instances or non-LPUART peripherals (e.g. FLEXIO).
+    """
+    key = hw.strip().upper()
+    # Normalise LPUART3 -> LPUART_3 if the caller omitted the underscore
+    import re as _re
+    m = _re.match(r"^LPUART(\d+)$", key)
+    if m:
+        key = f"LPUART_{m.group(1)}"
+    asset = _load_uart_asset()
+    return asset.get("instance_irq_clock_map", {}).get(key)
+
+
 @dataclass
 class ApplyResult:
     changed_modules: list[str] = field(default_factory=list)
@@ -129,15 +152,47 @@ def _select_channel(doc: MexDocument, uart_cfg: ET.Element, want_flexio: bool, c
 
 
 def apply_uart_set(doc: MexDocument, intent: Intent) -> ApplyResult:
-    """Apply an owned Uart channel edit to the loaded document.
+    """Apply the full Uart channel orchestration to the loaded document.
 
-    Returns an ApplyResult. On any unsafe/unfound condition it returns a blocker
-    Diagnostic instead of raising, so the caller can emit a structured Result.
+    Performs three owned edits in one call (RTD-MEX-UART-001):
+
+    1. **Uart-owned** (config_set "Uart"):
+       - UartHwChannel, DesireBaudrate, UartInteruptDmaMethod (LPUART path)
+       - UartWordLength, UartParityType, UartStopBitNumber (when supplied)
+       - UartCallbackCapability=true + UartCallback[0]=<callback> (when --callback)
+       - UartClockRef -> /Mcu/Mcu/McuModuleConfiguration/<ClockSetting>/<LPUART_N_CLK>
+
+    2. **Platform-owned** (config_set "Platform"):
+       - INSERT a new PlatformIsrConfig struct for the LPUART instance
+         (skip if IsrName already present -- idempotent).
+       - IsrName, IsrEnabled=true, IsrPriority=<priority>, IsrHandler
+         all grounded in uart.json instance_irq_clock_map.
+
+    3. **Mcu-owned** (config_set "Mcu"):
+       - INSERT a new McuClockReferencePoint struct for <LPUART_N_CLK>
+         (skip if Name already present -- idempotent).
+       - Name=<LPUART_N_CLK>, McuClockFrequencySelect=<AIPS_PLAT_CLK|AIPS_SLOW_CLK>
+         grounded in uart.json instance_irq_clock_map.
+       - McuClockReferencePointFrequency is NOT written (ConfigTools computes it).
+
+    The FLEXIO path does NOT orchestrate Platform/Mcu (unchanged from the prior
+    single-module behaviour -- FlexIO ISR and clock are handled by Mcl/Platform
+    via their own providers).
+
+    DMA is not supported (blocker: unsupported_uart_mode). Use mode 'interrupt'.
+
+    changed_modules is the set actually edited (e.g. ["uart","platform","mcu"]).
+    Idempotent: running twice with the same intent produces identical output.
     """
     payload = intent.payload
     hw = payload.get("hw", "")
     mode = payload.get("mode", "interrupt")
     baud = payload.get("baud")
+    callback = payload.get("callback")
+    priority = payload.get("priority", 2)
+    word_length = payload.get("word_length")
+    parity = payload.get("parity")
+    stop_bits = payload.get("stop_bits")
     want_flexio = _is_flexio_request(hw)
 
     result = ApplyResult()
@@ -210,23 +265,394 @@ def apply_uart_set(doc: MexDocument, intent: Intent) -> ApplyResult:
         ))
         return result
 
-    if method_setting is not None and method_value is not None:
-        method_setting.set("value", method_value)
-    if baud_value is not None:
-        baud_setting = doc.find_child_setting(container, "DesireBaudrate")
-        if baud_setting is not None:
-            baud_setting.set("value", baud_value)
+    # =====================================================================
+    # PHASE 1: All raw-bytes operations (replace_element_region splices).
+    # These each reload the tree from _raw, so they MUST all complete before
+    # any attribute mutation (.set("value", ...)). Attribute mutations done
+    # before a raw-bytes reload are lost because _capture_sources() re-snaps
+    # attribs from the freshly parsed tree. (Same ordering rule as apply_mcu_set.)
+    # =====================================================================
 
-    # Mark the modified channel so any stale quick_selection on the nearest
-    # carrying ancestor is removed before the document is written.
-    doc.mark_modified(channel)
-    carrier = doc.find_nearest_quick_selection_ancestor(channel)
-    if carrier is not None:
-        doc.mark_modified(carrier)
+    # For the LPUART path, look up IRQ/handler/clock from uart.json asset.
+    irq_clock = None
+    clock_setting_name = ""
+    ref_clock_name = ""
+    if not want_flexio:
+        irq_clock = _lookup_lpuart_irq_clock(hw)
+        if irq_clock is not None:
+            # Discover the McuClockSettingConfig name BEFORE any raw-bytes splices.
+            clock_setting_name = _find_clock_setting_config_name(doc)
+            ref_clock_name = _lpuart_clock_ref_name(hw)  # e.g. "LPUART8_CLK"
+
+            # Part A: Mcu clock-ref insertion (raw bytes; reloads tree)
+            _ensure_mcu_clock_ref(doc, ref_clock_name, irq_clock["clock_select"])
+
+            # Part B: Platform ISR insertion (raw bytes; reloads tree)
+            _ensure_platform_isr(
+                doc,
+                irq_name=irq_clock["irq_name"],
+                isr_handler=irq_clock["isr_handler"],
+                priority=priority,
+            )
+
+            if "platform" not in result.changed_modules:
+                result.changed_modules.append("platform")
+            if "mcu" not in result.changed_modules:
+                result.changed_modules.append("mcu")
+
+    # =====================================================================
+    # PHASE 2: Attribute mutations (no raw-bytes reload after this point).
+    # Re-find all elements now; they are stale after Phase 1 raw splices.
+    # =====================================================================
+
+    uart_cfg = doc.find_config_set("Uart")
+    channel = (
+        _select_channel(doc, uart_cfg, want_flexio, payload.get("channel_id"))
+        if uart_cfg is not None else None
+    )
+
+    if channel is not None:
+        container = _find_struct(
+            channel,
+            "FlexioModuleConfiguration" if want_flexio else "DetailModuleConfiguration",
+        )
+
+    if channel is not None and container is not None:
+        if want_flexio:
+            method_setting = doc.find_child_setting(container, "FlexioUartInteruptDmaMethod")
+        else:
+            hw_setting = doc.find_child_setting(container, "UartHwChannel")
+            if hw_setting is not None:
+                hw_setting.set("value", hw)
+            method_setting = doc.find_child_setting(container, "UartInteruptDmaMethod")
+
+        if method_setting is not None and method_value is not None:
+            method_setting.set("value", method_value)
+
+        if baud_value is not None:
+            baud_setting = doc.find_child_setting(container, "DesireBaudrate")
+            if baud_setting is not None:
+                baud_setting.set("value", baud_value)
+
+        # Optional LPUART-specific frame parameters
+        if not want_flexio:
+            if word_length is not None:
+                wl_setting = doc.find_child_setting(container, "UartWordLength")
+                if wl_setting is not None:
+                    wl_setting.set("value", word_length)
+            if parity is not None:
+                par_setting = doc.find_child_setting(container, "UartParityType")
+                if par_setting is not None:
+                    par_setting.set("value", parity)
+            if stop_bits is not None:
+                sb_setting = doc.find_child_setting(container, "UartStopBitNumber")
+                if sb_setting is not None:
+                    sb_setting.set("value", stop_bits)
+
+    # UartClockRef update (LPUART path, after all raw splices so ref is stable)
+    if not want_flexio and channel is not None and clock_setting_name and ref_clock_name:
+        clock_ref_path = (
+            f"/Mcu/Mcu/McuModuleConfiguration/{clock_setting_name}/{ref_clock_name}"
+        )
+        clock_ref_setting = doc.find_child_setting(channel, "UartClockRef")
+        if clock_ref_setting is not None:
+            clock_ref_setting.set("value", clock_ref_path)
+
+    # Callback fields (GeneralConfiguration: UartCallbackCapability + UartCallback[0])
+    if callback is not None and uart_cfg is not None:
+        _apply_uart_callback(doc, uart_cfg, callback)
+
+    # =====================================================================
+    # PHASE 3: mark_modified + clear quick_selection LAST (LL-013 ordering).
+    # Must happen after ALL replace_element_region calls so the final
+    # _capture_sources() snapshot sees the cleared attributes.
+    # =====================================================================
+
+    if channel is not None:
+        doc.mark_modified(channel)
+        carrier = doc.find_nearest_quick_selection_ancestor(channel)
+        if carrier is not None:
+            doc.mark_modified(carrier)
+        result.modified_elements.append(channel)
+
+    if not want_flexio:
+        platform_cfg = doc.find_config_set("Platform")
+        if platform_cfg is not None:
+            doc.mark_modified(platform_cfg)
+            result.modified_elements.append(platform_cfg)
+        mcu_cfg_final = doc.find_config_set("Mcu")
+        if mcu_cfg_final is not None:
+            doc.mark_modified(mcu_cfg_final)
+            result.modified_elements.append(mcu_cfg_final)
 
     result.changed_modules.append("uart")
-    result.modified_elements.append(channel)
+    # Ensure uart appears first (matches historical contract).
+    result.changed_modules = (
+        ["uart"] + [m for m in result.changed_modules if m != "uart"]
+    )
     return result
+
+
+def _apply_uart_callback(doc: MexDocument, uart_cfg: ET.Element, callback: str) -> None:
+    """Set UartCallbackCapability=true and UartCallback[0]=callback.
+
+    Edits happen in-memory (attribute mutations); no raw-bytes splice needed.
+    Grounded in uart.json callback_fields: capability_setting=UartCallbackCapability,
+    callback_array=UartCallback. The array already contains a <setting name="0" value=""/>
+    in the fixture; we update its value attribute directly.
+    """
+    for el in uart_cfg.iter():
+        if el.tag.endswith("struct") and el.attrib.get("name") == "GeneralConfiguration":
+            cap = doc.find_child_setting(el, "UartCallbackCapability")
+            if cap is not None:
+                cap.set("value", "true")
+            for arr in el:
+                if arr.tag.endswith("array") and arr.attrib.get("name") == "UartCallback":
+                    for child in arr:
+                        if child.attrib.get("name") == "0":
+                            child.set("value", callback)
+                            break
+            break
+
+
+def _find_clock_setting_config_name(doc: MexDocument) -> str:
+    """Return the Name of the first McuClockSettingConfig struct (e.g. 'McuClockSettingConfig_0')."""
+    mcu_cfg = doc.find_config_set("Mcu")
+    if mcu_cfg is None:
+        return "McuClockSettingConfig_0"
+    for el in mcu_cfg.iter():
+        if el.tag.endswith("array") and el.attrib.get("name") == "McuClockSettingConfig":
+            for child in el:
+                if child.tag.endswith("struct"):
+                    ns = doc.find_child_setting(child, "Name")
+                    if ns is not None:
+                        return ns.attrib.get("value", "McuClockSettingConfig_0")
+    return "McuClockSettingConfig_0"
+
+
+def _lpuart_clock_ref_name(hw: str) -> str:
+    """Convert LPUART_8 -> LPUART8_CLK (the McuClockReferencePoint Name convention).
+
+    Grounded in the fixture: LPUART_3 -> LPUART3_CLK, FLEXIO -> FLEXIO_CLK.
+    """
+    text = hw.strip().upper()
+    m = re.fullmatch(r"LPUART_?(\d+)", text)
+    if m:
+        return f"LPUART{m.group(1)}_CLK"
+    return f"{text}_CLK"
+
+
+def _ensure_mcu_clock_ref(
+    doc: MexDocument,
+    ref_name: str,
+    clock_select: str,
+) -> None:
+    """Insert a new McuClockReferencePoint struct (idempotent: skip if Name exists).
+
+    Appends the new struct after the last existing struct in the
+    McuClockReferencePoint array. McuClockReferencePointFrequency is NOT written
+    (ConfigTools computes it -- writing it causes SEVERE).
+
+    Indentation grounded in the fixture: array=33sp, struct=36sp, setting=39sp.
+    """
+    mcu_cfg = doc.find_config_set("Mcu")
+    if mcu_cfg is None:
+        return
+
+    ref_array = None
+    for el in mcu_cfg.iter():
+        if el.tag.endswith("array") and el.attrib.get("name") == "McuClockReferencePoint":
+            ref_array = el
+            break
+    if ref_array is None:
+        return
+
+    existing_structs = [c for c in ref_array if c.tag.endswith("struct")]
+
+    # Idempotency: skip if already present
+    for s in existing_structs:
+        ns = doc.find_child_setting(s, "Name")
+        if ns is not None and ns.attrib.get("value") == ref_name:
+            return  # already present
+
+    new_struct_index = len(existing_structs)
+    line_ending = _detect_line_ending(doc._raw)
+
+    new_struct_bytes = _build_mcu_clock_ref_struct_bytes(
+        struct_index=new_struct_index,
+        name=ref_name,
+        clock_select=clock_select,
+        struct_indent=36,
+        line_ending=line_ending,
+    )
+
+    if existing_structs:
+        last_struct = existing_structs[-1]
+        ok = _append_after_last_element(doc, last_struct, new_struct_bytes, line_ending)
+        if not ok:
+            # Fallback: try raw regex append before </array>
+            _append_struct_before_array_close(doc, ref_array, new_struct_bytes, line_ending)
+    else:
+        # Empty array case: replace the self-closed or empty array
+        le = line_ending.decode("latin-1")
+        sp_array = " " * 33
+        array_bytes = (
+            f'<array name="McuClockReferencePoint">{le}'
+            f'{new_struct_bytes.decode("utf-8")}{le}'
+            f'{sp_array}</array>'
+        ).encode("utf-8")
+        doc.replace_element_region(ref_array, array_bytes)
+
+
+def _build_mcu_clock_ref_struct_bytes(
+    struct_index: int,
+    name: str,
+    clock_select: str,
+    struct_indent: int,
+    line_ending: bytes,
+) -> bytes:
+    """Build raw bytes for one McuClockReferencePoint <struct>.
+
+    Field set grounded in uart.json and Mcu.xdm: Name + McuClockFrequencySelect.
+    McuClockReferencePointFrequency is NOT written (ConfigTools computes it).
+    """
+    le = line_ending.decode("latin-1")
+    sp_struct = " " * struct_indent
+    sp_child = " " * (struct_indent + 3)
+    lines = [
+        f'{sp_struct}<struct name="{struct_index}">',
+        f'{sp_child}<setting name="Name" value="{name}"/>',
+        f'{sp_child}<setting name="McuClockFrequencySelect" value="{clock_select}"/>',
+        f'{sp_struct}</struct>',
+    ]
+    return le.join(lines).encode("utf-8")
+
+
+def _ensure_platform_isr(
+    doc: MexDocument,
+    irq_name: str,
+    isr_handler: str,
+    priority: int,
+) -> None:
+    """Insert a new PlatformIsrConfig struct (idempotent: skip if IsrName exists).
+
+    Appends after the last existing struct in the PlatformIsrConfig array.
+    The Name field is PlatformIsrConfig_<next_index>.
+    Indentation grounded in the fixture: struct=33sp, setting=36sp.
+    """
+    platform_cfg = doc.find_config_set("Platform")
+    if platform_cfg is None:
+        return
+
+    isr_array = None
+    for el in platform_cfg.iter():
+        if el.tag.endswith("array") and el.attrib.get("name") == "PlatformIsrConfig":
+            isr_array = el
+            break
+    if isr_array is None:
+        return
+
+    existing_structs = [c for c in isr_array if c.tag.endswith("struct")]
+
+    # Idempotency: skip if already present
+    for s in existing_structs:
+        ns = doc.find_child_setting(s, "IsrName")
+        if ns is not None and ns.attrib.get("value") == irq_name:
+            return  # already present
+
+    new_struct_index = len(existing_structs)
+    line_ending = _detect_line_ending(doc._raw)
+
+    new_struct_bytes = _build_platform_isr_struct_bytes(
+        struct_index=new_struct_index,
+        irq_name=irq_name,
+        isr_handler=isr_handler,
+        priority=priority,
+        struct_indent=33,
+        line_ending=line_ending,
+    )
+
+    if existing_structs:
+        last_struct = existing_structs[-1]
+        ok = _append_after_last_element(doc, last_struct, new_struct_bytes, line_ending)
+        if not ok:
+            _append_struct_before_array_close(doc, isr_array, new_struct_bytes, line_ending)
+    else:
+        # Empty array case: replace with populated array
+        le = line_ending.decode("latin-1")
+        sp_array = " " * 30
+        array_bytes = (
+            f'<array name="PlatformIsrConfig">{le}'
+            f'{new_struct_bytes.decode("utf-8")}{le}'
+            f'{sp_array}</array>'
+        ).encode("utf-8")
+        doc.replace_element_region(isr_array, array_bytes)
+
+
+def _build_platform_isr_struct_bytes(
+    struct_index: int,
+    irq_name: str,
+    isr_handler: str,
+    priority: int,
+    struct_indent: int,
+    line_ending: bytes,
+) -> bytes:
+    """Build raw bytes for one PlatformIsrConfig <struct>.
+
+    Field set grounded in uart.json / Platform.xdm/.epd fixture:
+    Name, IsrName, IsrEnabled, IsrPriority, IsrHandler.
+    """
+    le = line_ending.decode("latin-1")
+    sp_struct = " " * struct_indent
+    sp_child = " " * (struct_indent + 3)
+    config_name = f"PlatformIsrConfig_{struct_index}"
+    lines = [
+        f'{sp_struct}<struct name="{struct_index}">',
+        f'{sp_child}<setting name="Name" value="{config_name}"/>',
+        f'{sp_child}<setting name="IsrName" value="{irq_name}"/>',
+        f'{sp_child}<setting name="IsrEnabled" value="true"/>',
+        f'{sp_child}<setting name="IsrPriority" value="{priority}"/>',
+        f'{sp_child}<setting name="IsrHandler" value="{isr_handler}"/>',
+        f'{sp_struct}</struct>',
+    ]
+    return le.join(lines).encode("utf-8")
+
+
+def _append_struct_before_array_close(
+    doc: MexDocument,
+    array_el: ET.Element,
+    new_bytes: bytes,
+    line_ending: bytes,
+) -> None:
+    """Fallback: insert new_bytes before the </array> close tag using raw bytes.
+
+    Used when _append_after_last_element fails (e.g. alignment mismatch).
+    Finds the array element's region in raw bytes, locates the last </array>
+    close tag, and inserts new_bytes on the preceding line.
+    """
+    elements = list(doc.root.iter())
+    src_index = next((i for i, e in enumerate(elements) if e is array_el), None)
+    if src_index is None or not doc._aligned:
+        return
+    src = doc._sources[src_index]
+    span_end = doc._find_element_region_end(src, array_el)
+    if span_end is None:
+        return
+    parent_raw = doc._raw[src.start: span_end + 1]
+    close_tag = b"</array>"
+    close_pos = parent_raw.rfind(close_tag)
+    if close_pos < 0:
+        return
+    line_start = close_pos
+    while line_start > 0 and parent_raw[line_start - 1:line_start] not in (b"\n", b"\r"):
+        line_start -= 1
+    new_parent_raw = (
+        parent_raw[:line_start]
+        + new_bytes
+        + line_ending
+        + parent_raw[line_start:]
+    )
+    doc.replace_element_region(array_el, new_parent_raw)
 
 
 def _find_struct(parent: ET.Element, name: str) -> ET.Element | None:
