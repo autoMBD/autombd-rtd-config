@@ -166,28 +166,12 @@ def _check_enabled_modules(doc: MexDocument, checks: dict, diagnostics: list[Dia
 
 
 def _check_dma(doc: MexDocument, diagnostics: list[Diagnostic]) -> None:
-    # Uart-level DMA enable.
-    for setting in _settings_named(doc.root, "UartDmaEnable"):
-        if setting.attrib.get("value", "false").lower() == "true":
-            diagnostics.append(Diagnostic(
-                severity="blocker",
-                code="dma_not_supported_in_m1",
-                module="uart",
-                message="Uart DMA is out of Milestone 1 scope; it must be rejected, not partially configured.",
-                details={"setting": "UartDmaEnable"},
-            ))
-            break
-    # Mcl-level DMA enable.
-    for setting in _settings_named(doc.root, "MclEnableDma"):
-        if setting.attrib.get("value", "false").lower() == "true":
-            diagnostics.append(Diagnostic(
-                severity="blocker",
-                code="dma_not_supported_in_m1",
-                module="mcl",
-                message="Mcl DMA common resources are out of Milestone 1 scope.",
-                details={"setting": "MclEnableDma"},
-            ))
-            break
+    """DMA configuration validation.
+
+    DMA mode (RTD-MEX-UART-003) is supported as of the full minimal-system delivery.
+    UartDmaEnable=true and MclEnableDma=true are valid when DMA mode is configured.
+    No blocker is raised; structural consistency is validated elsewhere.
+    """
 
 
 def _check_flexio_refs(doc: MexDocument, diagnostics: list[Diagnostic]) -> None:

@@ -95,3 +95,27 @@ class MclProvider:
     # Keep the legacy public name for any existing callers.
     def flexio_dependency(self, hw: str) -> PlannedChange:
         return self._flexio_dependency(hw)
+
+    def dma_dependency(self, hw: str) -> PlannedChange:
+        """Return the Mcl-owned DMA logic-channel dependency for DMA mode (RTD-MEX-UART-003).
+
+        In DMA mode, two dmaLogicChannel_Type structs are required:
+        - dmaLogicChannel_Type_0 (TX, existing in fixture, activated)
+        - dmaLogicChannel_Type_1 (RX, added by DMA path)
+        Grounded in uart.json dma_channel_ref_path_pattern and fixture dmaLogicChannel_Type_0.
+        """
+        return PlannedChange(
+            module="mcl",
+            owner="mcl",
+            path="/Mcl/Mcl/MclConfig/dmaLogicChannel_Type",
+            description=(
+                f"Activate dmaLogicChannel_Type_0 (TX, DMA_IP_HW_CH_0) for {hw} DMA TX: "
+                "set dmaLogicChannel_EnableGlobalConfig=true, "
+                "dmaGlobalRequest_enDmaRequest=true (LPUART HW DMA request triggers transfer), "
+                "dmaLogicChannelConfig_enDmaMajorInterrupt=true (generates DMATCD0_IRQn). "
+                "Add dmaLogicChannel_Type_1 (RX, DMA_IP_HW_CH_1) mirroring _0 field set with "
+                "all activation flags=true (generates DMATCD1_IRQn). "
+                "Enable MclEnableDma=true. "
+                "Grounded in uart.json dma_channel_ref_path_pattern + fixture dmaLogicChannel_Type_0."
+            ),
+        )

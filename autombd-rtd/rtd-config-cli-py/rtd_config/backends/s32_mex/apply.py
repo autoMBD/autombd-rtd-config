@@ -81,11 +81,12 @@ _ASSET_ROOT = _SKILL_ROOT / "assets"
 # Uart "asynchronous method" enum. RTD 7.0.1 ConfigTools models this field with
 # exactly two values per IP -- INTERRUPTS or DMA -- and has NO polling value
 # (verified against Uart.xdm and the s32k344 .epd: a "USING_POLLING" enum does
-# not exist; ConfigTools rejects it as "value not available"). Milestone 1
-# supports interrupt (IRQ); DMA is out of M1 scope. "Polling/blocking" is an
-# application-level driver-call pattern, not a .mex async-method value.
+# not exist; ConfigTools rejects it as "value not available"). Both interrupt (IRQ)
+# and DMA modes are supported. "Polling/blocking" is an application-level driver-call
+# pattern, not a .mex async-method value.
 _LPUART_METHOD = {
     "interrupt": "LPUART_UART_IP_USING_INTERRUPTS",
+    "dma": "LPUART_UART_IP_USING_DMA",
 }
 _FLEXIO_METHOD = {
     "interrupt": "FLEXIO_UART_IP_DRIVER_TYPE_INTERRUPTS",
@@ -178,7 +179,8 @@ def apply_uart_set(doc: MexDocument, intent: Intent) -> ApplyResult:
     single-module behaviour -- FlexIO ISR and clock are handled by Mcl/Platform
     via their own providers).
 
-    DMA is not supported (blocker: unsupported_uart_mode). Use mode 'interrupt'.
+    DMA mode (mode='dma') is also supported: see apply_uart_set_dma_edits for the
+    four-module edit set (Uart method/refs, Mcl channels, Platform DMATCD ISRs).
 
     changed_modules is the set actually edited (e.g. ["uart","platform","mcu"]).
     Idempotent: running twice with the same intent produces identical output.
@@ -196,9 +198,9 @@ def apply_uart_set(doc: MexDocument, intent: Intent) -> ApplyResult:
 
     result = ApplyResult()
 
-    # RTD 7.0.1 has no polling async-method value; M1 supports interrupt only
-    # (DMA is out of scope). Reject any other mode with an actionable blocker
-    # rather than writing an enum ConfigTools marks "value not available".
+    # RTD 7.0.1 has no polling async-method value; interrupt and DMA are supported.
+    # Reject any other mode with an actionable blocker rather than writing an enum
+    # ConfigTools marks "value not available".
     method_map = _FLEXIO_METHOD if want_flexio else _LPUART_METHOD
     if mode not in method_map:
         result.diagnostics.append(Diagnostic(
@@ -206,10 +208,9 @@ def apply_uart_set(doc: MexDocument, intent: Intent) -> ApplyResult:
             code="unsupported_uart_mode",
             module="uart",
             message=(
-                f"Uart mode '{mode}' is not supported in Milestone 1. RTD 7.0.1 "
-                "models the Uart asynchronous method as interrupt (IRQ) or DMA "
-                "only -- there is no polling value -- and DMA is out of M1 scope. "
-                "Use mode 'interrupt'."
+                f"Uart mode '{mode}' is not supported. RTD 7.0.1 models the Uart "
+                "asynchronous method as interrupt (IRQ) or DMA only -- there is no "
+                "polling value. Use mode 'interrupt' or 'dma'."
             ),
             details={"mode": mode, "supported": sorted(method_map)},
         ))
@@ -284,19 +285,28 @@ def apply_uart_set(doc: MexDocument, intent: Intent) -> ApplyResult:
             ref_clock_name = _lpuart_clock_ref_name(hw)  # e.g. "LPUART8_CLK"
 
             # Part A: Mcu clock-ref insertion (raw bytes; reloads tree)
-            _ensure_mcu_clock_ref(doc, ref_clock_name, irq_clock["clock_select"])
+            mcu_inserted = _ensure_mcu_clock_ref(doc, ref_clock_name, irq_clock["clock_select"])
 
-            # Part B: Platform ISR insertion (raw bytes; reloads tree)
-            _ensure_platform_isr(
-                doc,
-                irq_name=irq_clock["irq_name"],
-                isr_handler=irq_clock["isr_handler"],
-                priority=priority,
-            )
+            if mode == "interrupt":
+                # Part B (interrupt): Platform LPUART ISR insertion
+                _ensure_platform_isr(
+                    doc,
+                    irq_name=irq_clock["irq_name"],
+                    isr_handler=irq_clock["isr_handler"],
+                    priority=priority,
+                )
+                if "platform" not in result.changed_modules:
+                    result.changed_modules.append("platform")
 
-            if "platform" not in result.changed_modules:
-                result.changed_modules.append("platform")
-            if "mcu" not in result.changed_modules:
+            elif mode == "dma":
+                # Part B (DMA): MCL ch1 add + Platform DMATCD ISR insertions (raw-bytes).
+                _apply_uart_set_dma_phase1(doc, result, priority)
+                # Part C (DMA): Populate UartDmaTxChannelRef + UartDmaRxChannelRef (raw-bytes).
+                # Must happen in Phase 1 BEFORE attribute mutations -- replace_element_region
+                # reloads the tree and wipes any prior .set() mutations.
+                _populate_uart_dma_refs(doc)
+
+            if mcu_inserted and "mcu" not in result.changed_modules:
                 result.changed_modules.append("mcu")
 
     # =====================================================================
@@ -348,6 +358,12 @@ def apply_uart_set(doc: MexDocument, intent: Intent) -> ApplyResult:
                 if sb_setting is not None:
                     sb_setting.set("value", stop_bits)
 
+            # DMA mode Phase 2: attribute-only mutations (no raw-bytes splice).
+            # UartDmaEnable and MCL ch0 flags are attribute mutations.
+            # Tx/Rx ref population was done in Phase 1 (_populate_uart_dma_refs).
+            if mode == "dma":
+                _apply_uart_set_dma_attrs(doc, uart_cfg)
+
     # UartClockRef update (LPUART path, after all raw splices so ref is stable)
     if not want_flexio and channel is not None and clock_setting_name and ref_clock_name:
         clock_ref_path = (
@@ -383,6 +399,12 @@ def apply_uart_set(doc: MexDocument, intent: Intent) -> ApplyResult:
         if mcu_cfg_final is not None:
             doc.mark_modified(mcu_cfg_final)
             result.modified_elements.append(mcu_cfg_final)
+        # DMA: also mark Mcl config as modified
+        if mode == "dma":
+            mcl_cfg_final = doc.find_config_set("Mcl")
+            if mcl_cfg_final is not None:
+                doc.mark_modified(mcl_cfg_final)
+                result.modified_elements.append(mcl_cfg_final)
 
     result.changed_modules.append("uart")
     # Ensure uart appears first (matches historical contract).
@@ -412,6 +434,450 @@ def _apply_uart_callback(doc: MexDocument, uart_cfg: ET.Element, callback: str) 
                             child.set("value", callback)
                             break
             break
+
+
+def _build_dma_logic_channel_struct_bytes(
+    struct_index: int,
+    channel_index: int,
+    struct_indent: int,
+    line_ending: bytes,
+) -> bytes:
+    """Build raw bytes for one dmaLogicChannel_Type <struct> (RX channel).
+
+    Replicates the EXACT field set and order of dmaLogicChannel_Type_0 in the
+    fixture (lines ~592-674 of Uart_Example.mex), with updated Name/LogicName/
+    HwChId for the new channel_index and all activation flags set to true
+    (EnableGlobalConfig, dmaGlobalRequest_enDmaRequest,
+    dmaLogicChannelConfig_enDmaMajorInterrupt).
+
+    Grounded in: fixture dmaLogicChannel_Type_0 field set, Mcl.xdm DMA channel
+    schema, uart.json mcl_dma_channel_template.
+
+    ``struct_index``: index of the new struct in the dmaLogicChannel_Type array.
+    ``channel_index``: DMA hardware channel index (e.g. 1 for RX).
+    Indentation: struct_indent spaces for <struct>, +3/+6/+9 for nested levels.
+    """
+    le = line_ending.decode("latin-1")
+    sp = " " * struct_indent           # struct open/close (e.g. 33 spaces)
+    sp1 = " " * (struct_indent + 3)    # direct children (e.g. 36 spaces)
+    sp2 = " " * (struct_indent + 6)    # nested struct open/close (e.g. 39 spaces)
+    sp3 = " " * (struct_indent + 9)    # nested children (e.g. 42 spaces)
+    sp4 = " " * (struct_indent + 12)   # double-nested (e.g. 45 spaces)
+    sp5 = " " * (struct_indent + 15)   # triple-nested (e.g. 48 spaces)
+
+    ch_n = channel_index
+    # Self-ref path for MinorLoop/MajorLoop link (mirrors fixture pattern: _0 refs itself)
+    self_ref = f"/Mcl/Mcl/MclConfig/dmaLogicChannel_Type_{ch_n}"
+
+    lines = [
+        f'{sp}<struct name="{struct_index}">',
+        f'{sp1}<setting name="Name" value="dmaLogicChannel_Type_{ch_n}"/>',
+        f'{sp1}<setting name="dmaLogicChannel_LogicName" value="DMA_LOGIC_CH_{ch_n}"/>',
+        f'{sp1}<setting name="dmaLogicChannel_HwInstId" value="DMA_IP_HW_INST_0"/>',
+        f'{sp1}<setting name="dmaLogicChannel_HwChId" value="DMA_IP_HW_CH_{ch_n}"/>',
+        f'{sp1}<setting name="dmaLogicChannel_InterruptCallback" value="NULL_PTR"/>',
+        f'{sp1}<setting name="dmaLogicChannel_ErrorInterruptCallback" value="NULL_PTR"/>',
+        f'{sp1}<setting name="dmaLogicChannel_EcucPartitionRef" value=""/>',
+        f'{sp1}<setting name="dmaLogicChannel_EnableGlobalConfig" value="true"/>',
+        f'{sp1}<setting name="dmaLogicChannel_EnableTransferConfig" value="false"/>',
+        f'{sp1}<setting name="dmaLogicChannel_EnableScatterGather" value="false"/>',
+        f'{sp1}<struct name="dmaLogicChannel_ConfigType">',
+        f'{sp2}<setting name="Name" value="dmaLogicChannel_ConfigType"/>',
+        f'{sp2}<struct name="dmaLogicChannel_GlobalConfigType">',
+        f'{sp3}<setting name="Name" value="dmaLogicChannel_GlobalConfigType"/>',
+        f'{sp3}<struct name="dmaLogicChannelConfig_GlobalControlType">',
+        f'{sp4}<setting name="Name" value="dmaLogicChannelConfig_GlobalControlType"/>',
+        f'{sp4}<setting name="dmaGlobalControl_enMasterIdReplication" value="false"/>',
+        f'{sp4}<setting name="dmaGlobalControl_enBufferedWrites" value="false"/>',
+        f'{sp3}</struct>',
+        f'{sp3}<struct name="dmaLogicChannelConfig_GlobalRequestType">',
+        f'{sp4}<setting name="Name" value="dmaLogicChannelConfig_GlobalRequestType"/>',
+        f'{sp4}<setting name="dmaGlobalRequest_enDmaRequest" value="true"/>',
+        f'{sp3}</struct>',
+        f'{sp3}<struct name="dmaLogicChannelConfig_GlobalInterruptType">',
+        f'{sp4}<setting name="Name" value="dmaLogicChannelConfig_GlobalInterruptType"/>',
+        f'{sp4}<setting name="dmaGlobalInterrupt_enDmaErrorInterrupt" value="false"/>',
+        f'{sp3}</struct>',
+        f'{sp3}<struct name="dmaLogicChannelConfig_GlobalPriorityType">',
+        f'{sp4}<setting name="Name" value="dmaLogicChannelConfig_GlobalPriorityType"/>',
+        f'{sp4}<setting name="dmaGlobalPriority_GroupPriority" value="DMA_IP_GROUP_PRIO0"/>',
+        f'{sp4}<setting name="dmaGlobalPriority_LevelPriority" value="DMA_IP_LEVEL_PRIO0"/>',
+        f'{sp4}<setting name="dmaGlobalPriority_enPreemption" value="false"/>',
+        f'{sp4}<setting name="dmaGlobalPriority_disPreempt" value="false"/>',
+        f'{sp3}</struct>',
+        f'{sp2}</struct>',
+        f'{sp2}<struct name="dmaLogicChannel_TransferConfigType">',
+        f'{sp3}<setting name="Name" value="dmaLogicChannel_TransferConfigType"/>',
+        f'{sp3}<struct name="dmaLogicChannelConfig_TransferControlType">',
+        f'{sp4}<setting name="Name" value="dmaLogicChannelConfig_TransferControlType"/>',
+        f'{sp4}<setting name="dmaLogicChannelConfig_enDmaMajorInterrupt" value="true"/>',
+        f'{sp4}<setting name="dmaLogicChannelConfig_enDmaHalfMajorInterrupt" value="false"/>',
+        f'{sp4}<setting name="dmaLogicChannelConfig_disDmaAutoHwReq" value="false"/>',
+        f'{sp4}<setting name="dmaLogicChannelConfig_enEndOfPacketSignal" value="false"/>',
+        f'{sp4}<setting name="dmaLogicChannelConfig_bandwidthControl" value="DMA_IP_BWC_ENGINE_NO_STALL"/>',
+        f'{sp4}<setting name="dmaLogicChannelConfig_DestinationStoreAddressType" value=""/>',
+        f'{sp3}</struct>',
+        f'{sp3}<struct name="dmaLogicChannelConfig_TransferSourceType">',
+        f'{sp4}<setting name="Name" value="dmaLogicChannelConfig_TransferSourceType"/>',
+        f'{sp4}<setting name="dmaLogicChannelConfig_SourceSignedOffsetType" value="0"/>',
+        f'{sp4}<setting name="dmaLogicChannelConfig_SourceLastAddressAdjustmentType" value="0"/>',
+        f'{sp4}<setting name="dmaTransferConfig_TransferSizeType" value="DMA_IP_TRANSFER_SIZE_1_BYTE"/>',
+        f'{sp4}<setting name="dmaLogicChannelConfig_SourceModuloType" value="0"/>',
+        f'{sp3}</struct>',
+        f'{sp3}<struct name="dmaLogicChannelConfig_TransferDestinationType">',
+        f'{sp4}<setting name="Name" value="dmaLogicChannelConfig_TransferDestinationType"/>',
+        f'{sp4}<setting name="dmaLogicChannelConfig_DestinationSignedOffsetType" value="0"/>',
+        f'{sp4}<setting name="dmaLogicChannelConfig_DestinationLastAddressAdjustmentType" value="0"/>',
+        f'{sp4}<setting name="dmaTransferConfig_TransferSizeType" value="DMA_IP_TRANSFER_SIZE_1_BYTE"/>',
+        f'{sp4}<setting name="dmaLogicChannelConfig_DestinationModuloType" value="0"/>',
+        f'{sp3}</struct>',
+        f'{sp3}<struct name="dmaLogicChannelConfig_TransferMinorLoopType">',
+        f'{sp4}<setting name="Name" value="dmaLogicChannelConfig_TransferMinorLoopType"/>',
+        f'{sp4}<setting name="dmaLogicChannelConfig_enSourceOffset" value="false"/>',
+        f'{sp4}<setting name="dmaLogicChannelConfig_enDestinationOffset" value="false"/>',
+        f'{sp4}<setting name="dmaLogicChannelConfig_OffsetValueType" value="0"/>',
+        f'{sp4}<setting name="dmaLogicChannelConfig_enMinorLoopLinkCh" value="false"/>',
+        f'{sp4}<setting name="dynamic_dmaLogicChannelConfig_MinorLoopLinkChValueType" value="{self_ref}"/>',
+        f'{sp4}<setting name="dmaLogicChannelConfig_MinorLoopSizeType" value="0"/>',
+        f'{sp3}</struct>',
+        f'{sp3}<struct name="dmaLogicChannelConfig_TransferMajorLoopType">',
+        f'{sp4}<setting name="Name" value="dmaLogicChannelConfig_TransferMajorLoopType"/>',
+        f'{sp4}<setting name="dmaLogicChannelConfig_enMajorLoopLinkCh" value="false"/>',
+        f'{sp4}<setting name="dynamic_dmaLogicChannelConfig_MajorLoopLinkChValueType" value="{self_ref}"/>',
+        f'{sp4}<setting name="dmaLogicChannelConfig_MajorLoopCountType" value="0"/>',
+        f'{sp3}</struct>',
+        f'{sp2}</struct>',
+        f'{sp2}<struct name="dmaLogicChannel_ScatterGatherConfigType">',
+        f'{sp3}<setting name="Name" value="dmaLogicChannel_ScatterGatherConfigType"/>',
+        f'{sp3}<array name="dmaLogicChannelConfig_ScatterGatherArrayType"/>',
+        f'{sp2}</struct>',
+        f'{sp1}</struct>',
+        f'{sp}</struct>',
+    ]
+    return le.join(lines).encode("utf-8")
+
+
+def _ensure_dma_logic_channel(doc: MexDocument, channel_index: int) -> bool:
+    """Ensure a dmaLogicChannel_Type_<N> struct exists in the Mcl dmaLogicChannel_Type array.
+
+    If a struct with Name==dmaLogicChannel_Type_<N> already exists, returns False (no-op).
+    Otherwise appends a new struct after the last existing struct.
+
+    Used by DMA mode to add dmaLogicChannel_Type_1 (RX channel).
+    Returns True if inserted, False if already present.
+    """
+    mcl_cfg = doc.find_config_set("Mcl")
+    if mcl_cfg is None:
+        return False
+
+    ch_array = None
+    for el in mcl_cfg.iter():
+        if el.tag.endswith("array") and el.attrib.get("name") == "dmaLogicChannel_Type":
+            ch_array = el
+            break
+    if ch_array is None:
+        return False
+
+    target_name = f"dmaLogicChannel_Type_{channel_index}"
+    existing_structs = [c for c in ch_array if c.tag.endswith("struct")]
+
+    # Idempotency: skip if already present
+    for s in existing_structs:
+        ns = doc.find_child_setting(s, "Name")
+        if ns is not None and ns.attrib.get("value") == target_name:
+            return False
+
+    new_struct_index = len(existing_structs)
+    line_ending = _detect_line_ending(doc._raw)
+
+    # Detect struct indent from last existing struct
+    if existing_structs:
+        struct_indent = _detect_struct_indent(doc, existing_structs[-1])
+    else:
+        struct_indent = 33  # fixture level (30 sp array + 3 = 33 for struct)
+
+    new_struct_bytes = _build_dma_logic_channel_struct_bytes(
+        struct_index=new_struct_index,
+        channel_index=channel_index,
+        struct_indent=struct_indent,
+        line_ending=line_ending,
+    )
+
+    if existing_structs:
+        ok = _append_after_last_element(doc, existing_structs[-1], new_struct_bytes, line_ending)
+        if not ok:
+            _append_struct_before_array_close(doc, ch_array, new_struct_bytes, line_ending)
+    else:
+        le = line_ending.decode("latin-1")
+        sp_array = " " * (struct_indent - 3)
+        array_bytes = (
+            f'<array name="dmaLogicChannel_Type">{le}'
+            f'{new_struct_bytes.decode("utf-8")}{le}'
+            f'{sp_array}</array>'
+        ).encode("utf-8")
+        doc.replace_element_region(ch_array, array_bytes)
+
+    return True
+
+
+def _activate_dma_logic_channel_0(doc: MexDocument) -> None:
+    """Activate dmaLogicChannel_Type_0 for DMA TX use.
+
+    Sets the three activation flags on the EXISTING dmaLogicChannel_Type_0 struct:
+    - dmaLogicChannel_EnableGlobalConfig = true  (channel visible to driver)
+    - dmaGlobalRequest_enDmaRequest = true        (LPUART HW DMA request triggers transfer)
+    - dmaLogicChannelConfig_enDmaMajorInterrupt = true  (generates DMATCD IRQ on completion)
+
+    All three are attribute mutations (no raw-bytes splice). The fixture has all
+    three fields present with value="false"; we update them in place.
+    Grounded in fixture lines ~600, ~614, ~632 and uart.json mcl_dma_channel_template.
+    """
+    mcl_cfg = doc.find_config_set("Mcl")
+    if mcl_cfg is None:
+        return
+
+    for arr in mcl_cfg.iter():
+        if not (arr.tag.endswith("array") and arr.attrib.get("name") == "dmaLogicChannel_Type"):
+            continue
+        for ch in arr:
+            if not ch.tag.endswith("struct"):
+                continue
+            ns = doc.find_child_setting(ch, "Name")
+            if ns is None or ns.attrib.get("value") != "dmaLogicChannel_Type_0":
+                continue
+            # Found ch0: update EnableGlobalConfig
+            en_global = doc.find_child_setting(ch, "dmaLogicChannel_EnableGlobalConfig")
+            if en_global is not None:
+                en_global.set("value", "true")
+            # Update dmaGlobalRequest_enDmaRequest (nested in GlobalConfigType/GlobalRequestType)
+            for el in ch.iter():
+                if el.tag.endswith("setting") and el.attrib.get("name") == "dmaGlobalRequest_enDmaRequest":
+                    el.set("value", "true")
+                if el.tag.endswith("setting") and el.attrib.get("name") == "dmaLogicChannelConfig_enDmaMajorInterrupt":
+                    el.set("value", "true")
+            break
+
+
+def _build_dma_channel_ref_array_bytes(
+    array_name: str,
+    ref_path: str,
+    array_indent: int,
+    line_ending: bytes,
+) -> bytes:
+    """Build raw bytes for a populated DMA channel ref array.
+
+    Replaces the self-closed empty ``<array name="UartDmaTxChannelRef"/>`` or
+    ``<array name="UartDmaRxChannelRef"/>`` with a populated version containing
+    one <setting name="0" value="{ref_path}"/>.
+
+    ``array_indent``: leading spaces before the <array> tag (splice start has
+    no leading whitespace -- it is already in the raw bytes before src.start).
+    """
+    le = line_ending.decode("latin-1")
+    sp_child = " " * (array_indent + 3)
+    sp_close = " " * array_indent
+    lines = [
+        f'<array name="{array_name}">',
+        f'{sp_child}<setting name="0" value="{ref_path}"/>',
+        f'{sp_close}</array>',
+    ]
+    return le.join(lines).encode("utf-8")
+
+
+def _ensure_dma_channel_ref_populated(
+    doc: MexDocument,
+    ref_array: ET.Element,
+    ref_path: str,
+) -> bool:
+    """Populate a DMA channel ref array (Tx or Rx) with one setting entry.
+
+    Idempotent: if the array already contains a child with name="0", no-op.
+    Uses replace_element_region to splice the populated array in place.
+
+    Returns True if insertion was made, False if already populated (no-op).
+    """
+    existing = [c for c in ref_array]
+    for child in existing:
+        if child.attrib.get("name") == "0":
+            return False  # already populated
+
+    # Detect indent of the <array> tag in raw bytes
+    elements = list(doc.root.iter())
+    src_index = next((i for i, e in enumerate(elements) if e is ref_array), None)
+    if src_index is None or not doc._aligned:
+        return False
+
+    arr_src = doc._sources[src_index]
+    raw = doc._raw
+    i = arr_src.start - 1
+    while i >= 0 and raw[i:i + 1] not in (b"\n", b"\r"):
+        i -= 1
+    line_start = i + 1
+    spaces = 0
+    while line_start + spaces < arr_src.start and raw[line_start + spaces:line_start + spaces + 1] == b" ":
+        spaces += 1
+    array_indent = spaces
+
+    line_ending = _detect_line_ending(doc._raw)
+    array_name = ref_array.attrib.get("name", "")
+    new_bytes = _build_dma_channel_ref_array_bytes(
+        array_name=array_name,
+        ref_path=ref_path,
+        array_indent=array_indent,
+        line_ending=line_ending,
+    )
+    doc.replace_element_region(ref_array, new_bytes)
+    return True
+
+
+def _apply_uart_set_dma_phase1(
+    doc: MexDocument,
+    result: ApplyResult,
+    priority: int,
+) -> None:
+    """Phase 1 (raw-bytes) DMA edits for apply_uart_set DMA mode (RTD-MEX-UART-003).
+
+    Performs three raw-bytes operations (each reloads the tree):
+    1. Add dmaLogicChannel_Type_1 (RX DMA channel) to Mcl dmaLogicChannel_Type array.
+    2. Insert DMATCD0_IRQn / Dma0_Ch0_IRQHandler Platform ISR (TX DMA complete IRQ).
+    3. Insert DMATCD1_IRQn / Dma0_Ch1_IRQHandler Platform ISR (RX DMA complete IRQ).
+
+    The activation flags on dmaLogicChannel_Type_0 (EnableGlobalConfig,
+    dmaGlobalRequest_enDmaRequest, dmaLogicChannelConfig_enDmaMajorInterrupt)
+    are attribute mutations and happen in Phase 2.
+
+    DMA channel -> ISR/handler mapping loaded from uart.json dma_hw_channel_irq_map
+    (not hardcoded). DMA channel ref path loaded from uart.json dma_channel_ref_path_pattern.
+
+    Propagates changed_modules: adds "mcl" and "platform" to result.
+    """
+    asset = _load_uart_asset()
+    dma_map = asset.get("dma_hw_channel_irq_map", {})
+
+    # 1. Add MCL dmaLogicChannel_Type_1 (RX, ch index=1)
+    mcl_inserted = _ensure_dma_logic_channel(doc, channel_index=1)
+    if mcl_inserted and "mcl" not in result.changed_modules:
+        result.changed_modules.append("mcl")
+
+    # 2. Insert Platform DMATCD0_IRQn (TX DMA complete)
+    ch0_entry = dma_map.get("0") or dma_map.get(0)
+    if ch0_entry:
+        _ensure_platform_isr(
+            doc,
+            irq_name=ch0_entry["irq_name"],
+            isr_handler=ch0_entry["isr_handler"],
+            priority=priority,
+        )
+
+    # 3. Insert Platform DMATCD1_IRQn (RX DMA complete)
+    ch1_entry = dma_map.get("1") or dma_map.get(1)
+    if ch1_entry:
+        _ensure_platform_isr(
+            doc,
+            irq_name=ch1_entry["irq_name"],
+            isr_handler=ch1_entry["isr_handler"],
+            priority=priority,
+        )
+
+    if (ch0_entry or ch1_entry) and "platform" not in result.changed_modules:
+        result.changed_modules.append("platform")
+
+
+def _find_lpuart_ip_channel_detail(doc: MexDocument) -> "ET.Element | None":
+    """Re-find the LPUART_IP UartChannel's DetailModuleConfiguration after a tree reload."""
+    uart_cfg = doc.find_config_set("Uart")
+    if uart_cfg is None:
+        return None
+    for arr in uart_cfg.iter():
+        if arr.tag.endswith("array") and arr.attrib.get("name") == "UartChannel":
+            for ch in arr:
+                if not ch.tag.endswith("struct"):
+                    continue
+                using = doc.find_child_setting(ch, "UartHwUsing")
+                if using is not None and using.attrib.get("value") == "LPUART_IP":
+                    return _find_struct(ch, "DetailModuleConfiguration")
+    return None
+
+
+def _populate_uart_dma_refs(doc: MexDocument) -> None:
+    """Phase 1 raw-bytes: populate UartDmaTxChannelRef[0] and UartDmaRxChannelRef[0].
+
+    Replaces the self-closed empty arrays with populated versions containing
+    one <setting name="0" value="{ref_path}"/> each.
+    Idempotent: no-op if already populated.
+    Each replace_element_region reloads the tree; re-find between ops.
+
+    Ref paths loaded from uart.json dma_channel_ref_path_pattern (not hardcoded).
+    """
+    asset = _load_uart_asset()
+    ref_pattern = asset.get(
+        "dma_channel_ref_path_pattern",
+        "/Mcl/Mcl/MclConfig/dmaLogicChannel_Type_{index}",
+    )
+    tx_ref_path = ref_pattern.format(index=0)
+    rx_ref_path = ref_pattern.format(index=1)
+
+    # Populate TX ref
+    container = _find_lpuart_ip_channel_detail(doc)
+    if container is not None:
+        for child in container:
+            if child.tag.endswith("array") and child.attrib.get("name") == "UartDmaTxChannelRef":
+                _ensure_dma_channel_ref_populated(doc, child, tx_ref_path)
+                break
+
+    # Re-find after reload, then populate RX ref
+    container = _find_lpuart_ip_channel_detail(doc)
+    if container is not None:
+        for child in container:
+            if child.tag.endswith("array") and child.attrib.get("name") == "UartDmaRxChannelRef":
+                _ensure_dma_channel_ref_populated(doc, child, rx_ref_path)
+                break
+
+
+def _activate_mcl_dma(doc: MexDocument) -> None:
+    """Set MclEnableDma=true and activate dmaLogicChannel_Type_0 flags.
+
+    Pure attribute mutations (no raw-bytes splice). Called in Phase 2.
+
+    1. Sets MclDma/MclEnableDma=true (fixture line ~542: value="false").
+    2. Delegates dmaLogicChannel_Type_0 three-flag activation to
+       _activate_dma_logic_channel_0.
+
+    Grounded in fixture Mcl MclGeneral/MclDma and uart.json mcl_dma_channel_template.
+    """
+    mcl_cfg = doc.find_config_set("Mcl")
+    if mcl_cfg is not None:
+        for el in mcl_cfg.iter():
+            if el.tag.endswith("struct") and el.attrib.get("name") == "MclDma":
+                dma_en = doc.find_child_setting(el, "MclEnableDma")
+                if dma_en is not None:
+                    dma_en.set("value", "true")
+                break
+    _activate_dma_logic_channel_0(doc)
+
+
+def _apply_uart_set_dma_attrs(doc: MexDocument, uart_cfg: "ET.Element | None") -> None:
+    """Phase 2 attribute-only DMA mutations for apply_uart_set DMA mode.
+
+    Two attribute mutations only (no replace_element_region):
+    1. Set UartDmaEnable=true in Uart GeneralConfiguration.
+    2. Set MclEnableDma=true and activate dmaLogicChannel_Type_0 flags in Mcl config.
+
+    Called in Phase 2 of apply_uart_set after ALL raw-bytes splices are done.
+    The Tx/Rx ref population is done in Phase 1 (_populate_uart_dma_refs).
+    """
+    # 1. UartDmaEnable=true in Uart GeneralConfiguration
+    cfg = uart_cfg if uart_cfg is not None else doc.find_config_set("Uart")
+    if cfg is not None:
+        for el in cfg.iter():
+            if el.tag.endswith("struct") and el.attrib.get("name") == "GeneralConfiguration":
+                dma_en = doc.find_child_setting(el, "UartDmaEnable")
+                if dma_en is not None:
+                    dma_en.set("value", "true")
+                break
+
+    # 2. MclEnableDma=true + activate dmaLogicChannel_Type_0 flags
+    _activate_mcl_dma(doc)
 
 
 def _find_clock_setting_config_name(doc: MexDocument) -> str:

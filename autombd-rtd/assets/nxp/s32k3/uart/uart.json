@@ -98,6 +98,18 @@
     }
   },
   "mcl_ref_path_pattern": "/Mcl/Mcl/MclConfig/FlexioCommon_0/{channel_name}",
+  "dma_channel_ref_path_pattern": "/Mcl/Mcl/MclConfig/dmaLogicChannel_Type_{index}",
+  "dma_hw_channel_irq_map": {
+    "_note": "Grounded in: Platform.epd DMATCD IRQ table, Dma_Ip_Irq.c Dma0_Ch<N>_IRQHandler, Spi_Transfer example, fixture Uart_Example_S32K344. Mapping: DMA HW channel N -> DMATCD<N>_IRQn / Dma0_Ch<N>_IRQHandler. DMA TX uses ch 0 (existing fixture dmaLogicChannel_Type_0 HwChId=DMA_IP_HW_CH_0). DMA RX uses ch 1 (new dmaLogicChannel_Type_1 HwChId=DMA_IP_HW_CH_1).",
+    "0": {"irq_name": "DMATCD0_IRQn", "isr_handler": "Dma0_Ch0_IRQHandler"},
+    "1": {"irq_name": "DMATCD1_IRQn", "isr_handler": "Dma0_Ch1_IRQHandler"}
+  },
+  "mcl_dma_channel_template": {
+    "_note": "Field set for activating a DMA logic channel. Grounded in fixture dmaLogicChannel_Type_0 (lines ~591-674 Uart_Example.mex). EnableGlobalConfig=true allows channel use. dmaGlobalRequest_enDmaRequest=true lets LPUART HW DMA request trigger transfer. dmaLogicChannelConfig_enDmaMajorInterrupt=true generates the DMATCD IRQ on transfer complete.",
+    "dmaLogicChannel_EnableGlobalConfig": "true",
+    "dmaGlobalRequest_enDmaRequest": "true",
+    "dmaLogicChannelConfig_enDmaMajorInterrupt": "true"
+  },
   "instance_irq_clock_map": {
     "_note": "Grounded in: S32K344_IRQ.h (IRQn/handler names), Platform.xdm/.epd ISR table, Uart.xdm UartClockRef domain, fixture Uart_Example_S32K344 clock tool. LPUART_0 and LPUART_8 use AIPS_PLAT_CLK; all others (LPUART_1..7, LPUART_9..15) use AIPS_SLOW_CLK. FLEXIO uses FLEXIO_CLK -> CORE_CLK (shared MCL_FLEXIO_ISR).",
     "LPUART_0":  {"irq_name": "LPUART0_IRQn",  "isr_handler": "LPUART_UART_IP_0_IRQHandler",  "clock_select": "AIPS_PLAT_CLK"},

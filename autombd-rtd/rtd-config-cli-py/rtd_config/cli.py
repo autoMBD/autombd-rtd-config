@@ -114,9 +114,8 @@ def build_parser() -> argparse.ArgumentParser:
     uart_set = uart_actions.add_parser("set")
     uart_set.add_argument("--project", required=True)
     uart_set.add_argument("--hw", required=True)
-    # RTD 7.0.1 has no polling async-method value; M1 supports interrupt only
-    # (DMA is reserved for a later milestone).
-    uart_set.add_argument("--mode", default="interrupt", choices=["interrupt"])
+    # RTD 7.0.1 has no polling async-method value; interrupt and DMA are supported.
+    uart_set.add_argument("--mode", default="interrupt", choices=["interrupt", "dma"])
     uart_set.add_argument("--baud", type=int, default=115200)
     uart_set.add_argument("--tx")
     uart_set.add_argument("--rx")

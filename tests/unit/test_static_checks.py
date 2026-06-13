@@ -109,15 +109,20 @@ def test_stale_flexio_uart_hw_channel_ref_is_blocked(tmp_path):
     assert "stale_flexio_uart_hw_channel_ref" in codes
 
 
-def test_dma_enabled_uart_is_rejected_for_m1(tmp_path):
+def test_dma_enabled_uart_passes_static_check(tmp_path):
+    """DMA mode (RTD-MEX-UART-003) is now supported; UartDmaEnable=true must not block.
+
+    The former ``dma_not_supported_in_m1`` blocker was removed when DMA mode was
+    implemented.  This test verifies the static checker accepts a DMA-configured
+    file without producing that code.
+    """
     mex, doc = _load(tmp_path)
     for setting in doc.root.iter():
         if setting.tag.endswith("setting") and setting.attrib.get("name") == "UartDmaEnable":
             setting.set("value", "true")
     result = run_static_checks(mex, doc)
     codes = _codes(result)
-    assert result.status == "blocked"
-    assert "dma_not_supported_in_m1" in codes
+    assert "dma_not_supported_in_m1" not in codes
 
 
 def test_duplicate_lpuart_hw_channel_is_flagged(tmp_path):
