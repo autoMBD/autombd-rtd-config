@@ -72,15 +72,7 @@ def test_project_cli_and_skill_versions_match():
     assert versions.package == versions.skill
 
 
-def test_deploy_copies_only_released_skill_payload(tmp_path):
-    deploy = load_deploy_module()
-    repo_root = Path(__file__).resolve().parents[2]
-
-    result = deploy.deploy(repo_root, tmp_path)
-
-    installed = tmp_path / "skills" / "autombd-rtd"
-    assert result.action == "deployed"
-    assert result.version == "0.1.0"
+def assert_released_payload(installed: Path):
     assert (installed / "SKILL.md").is_file()
     assert (installed / "__main__.py").is_file()
     assert (installed / "rtd-config-cli-py" / "rtd_config" / "cli.py").is_file()
@@ -90,10 +82,37 @@ def test_deploy_copies_only_released_skill_payload(tmp_path):
     assert not (installed / "tools").exists()
 
 
+def test_deploy_defaults_to_codex_and_claude_project_skill_indexes(tmp_path):
+    deploy = load_deploy_module()
+    repo_root = Path(__file__).resolve().parents[2]
+
+    results = deploy.deploy(repo_root, tmp_path)
+
+    assert {result.agent for result in results} == {"codex", "claude"}
+    for result in results:
+        assert result.action == "deployed"
+        assert result.version == "0.1.0"
+    assert_released_payload(tmp_path / ".agents" / "skills" / "autombd-rtd")
+    assert_released_payload(tmp_path / ".claude" / "skills" / "autombd-rtd")
+
+
+def test_deploy_can_target_only_claude_project_skill_index(tmp_path):
+    deploy = load_deploy_module()
+    repo_root = Path(__file__).resolve().parents[2]
+
+    results = deploy.deploy(repo_root, tmp_path, agents=("claude",))
+
+    assert len(results) == 1
+    assert results[0].agent == "claude"
+    assert results[0].destination == tmp_path / ".claude" / "skills" / "autombd-rtd"
+    assert_released_payload(results[0].destination)
+    assert not (tmp_path / ".agents").exists()
+
+
 def test_deploy_updates_when_installed_version_is_older(tmp_path):
     deploy = load_deploy_module()
     repo_root = Path(__file__).resolve().parents[2]
-    installed = tmp_path / "skills" / "autombd-rtd"
+    installed = tmp_path / ".agents" / "skills" / "autombd-rtd"
     installed.mkdir(parents=True)
     (installed / "SKILL.md").write_text(
         "---\nname: autombd-rtd\nversion: 0.0.9\n---\n# stale\n",
@@ -101,7 +120,7 @@ def test_deploy_updates_when_installed_version_is_older(tmp_path):
     )
     (installed / "old-development-note.txt").write_text("remove me", encoding="utf-8")
 
-    result = deploy.deploy(repo_root, tmp_path)
+    result = deploy.deploy_one(repo_root, tmp_path, "codex")
 
     assert result.action == "deployed"
     assert "old-development-note.txt" not in {p.name for p in installed.iterdir()}
@@ -111,7 +130,7 @@ def test_deploy_updates_when_installed_version_is_older(tmp_path):
 def test_deploy_skips_when_installed_version_is_current_or_newer(tmp_path):
     deploy = load_deploy_module()
     repo_root = Path(__file__).resolve().parents[2]
-    installed = tmp_path / "skills" / "autombd-rtd"
+    installed = tmp_path / ".agents" / "skills" / "autombd-rtd"
     installed.mkdir(parents=True)
     (installed / "SKILL.md").write_text(
         "---\nname: autombd-rtd\nversion: 9.9.9\n---\n# newer\n",
@@ -123,8 +142,9 @@ def test_deploy_skips_when_installed_version_is_current_or_newer(tmp_path):
     sentinel = installed / "keep.txt"
     sentinel.write_text("must stay", encoding="utf-8")
 
-    result = deploy.deploy(repo_root, tmp_path)
+    result = deploy.deploy_one(repo_root, tmp_path, "codex")
 
     assert result.action == "skipped"
+    assert result.agent == "codex"
     assert result.reason == "installed_version_is_current_or_newer"
     assert sentinel.read_text(encoding="utf-8") == "must stay"

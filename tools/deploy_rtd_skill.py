@@ -41,8 +41,8 @@
 # Author:      autoMBD <tkung.lqk@foxmail.com>
 # Date:        2026-06-13
 # Version:     0.1.0
-# Description: Deploy the released RTD CfgFile CLI companion skill into a Codex
-#              skills index without copying development-only project material.
+# Description: Deploy the released RTD CfgFile CLI companion skill into Codex
+#              and Claude Code skill indexes without copying development data.
 # =================================================================================
 
 from __future__ import annotations
@@ -56,6 +56,11 @@ from pathlib import Path
 
 SKILL_NAME = "autombd-rtd"
 SKILL_PAYLOAD_ITEMS = ("SKILL.md", "__main__.py", "rtd-config-cli-py", "assets")
+SUPPORTED_AGENTS = ("codex", "claude")
+AGENT_SKILL_DIRS = {
+    "codex": Path(".agents") / "skills",
+    "claude": Path(".claude") / "skills",
+}
 
 
 @dataclass(frozen=True)
@@ -67,6 +72,7 @@ class ProjectVersions:
 
 @dataclass(frozen=True)
 class DeployResult:
+    agent: str
     action: str
     version: str
     destination: Path
@@ -140,11 +146,30 @@ def require_consistent_project_versions(versions: ProjectVersions) -> str:
     return versions.skill
 
 
-def resolve_skills_dir(target_root: Path) -> Path:
-    target_root = target_root.expanduser()
-    if target_root.name.lower() == "skills":
-        return target_root
-    return target_root / "skills"
+def normalize_agents(agents: tuple[str, ...] | list[str]) -> tuple[str, ...]:
+    normalized: list[str] = []
+    for agent in agents:
+        agent = agent.lower()
+        if agent == "both":
+            for supported_agent in SUPPORTED_AGENTS:
+                if supported_agent not in normalized:
+                    normalized.append(supported_agent)
+            continue
+        if agent not in SUPPORTED_AGENTS:
+            raise ValueError(
+                f"unsupported agent {agent!r}; expected one of: "
+                f"{', '.join((*SUPPORTED_AGENTS, 'both'))}"
+            )
+        if agent not in normalized:
+            normalized.append(agent)
+    if not normalized:
+        raise ValueError("at least one agent must be selected")
+    return tuple(normalized)
+
+
+def resolve_agent_skills_dir(target_project: Path, agent: str) -> Path:
+    agent = normalize_agents((agent,))[0]
+    return target_project.expanduser() / AGENT_SKILL_DIRS[agent]
 
 
 def installed_payload_complete(destination: Path) -> bool:
@@ -183,18 +208,20 @@ def copy_released_payload(source_skill_root: Path, destination: Path) -> None:
     staging.rename(destination)
 
 
-def deploy(repo_root: Path, target_root: Path) -> DeployResult:
+def deploy_one(repo_root: Path, target_project: Path, agent: str) -> DeployResult:
     repo_root = repo_root.resolve()
     source_skill_root = repo_root / SKILL_NAME
     if not source_skill_root.is_dir():
         raise RuntimeError(f"source skill not found: {source_skill_root}")
 
     source_version = require_consistent_project_versions(read_project_versions(repo_root))
-    skills_dir = resolve_skills_dir(target_root)
+    agent = normalize_agents((agent,))[0]
+    skills_dir = resolve_agent_skills_dir(target_project, agent)
     destination = skills_dir / SKILL_NAME
     should_copy, reason = should_deploy(source_version, destination)
     if not should_copy:
         return DeployResult(
+            agent=agent,
             action="skipped",
             version=source_version,
             destination=destination,
@@ -203,6 +230,7 @@ def deploy(repo_root: Path, target_root: Path) -> DeployResult:
 
     copy_released_payload(source_skill_root, destination)
     return DeployResult(
+        agent=agent,
         action="deployed",
         version=source_version,
         destination=destination,
@@ -210,15 +238,33 @@ def deploy(repo_root: Path, target_root: Path) -> DeployResult:
     )
 
 
+def deploy(
+    repo_root: Path,
+    target_project: Path,
+    agents: tuple[str, ...] | list[str] = ("both",),
+) -> tuple[DeployResult, ...]:
+    return tuple(
+        deploy_one(repo_root, target_project, agent) for agent in normalize_agents(agents)
+    )
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
-            "Deploy the RTD CfgFile CLI companion skill into a target skills index. "
-            "Pass an agent home directory to deploy under <target>/skills, or pass "
-            "the skills directory itself."
+            "Deploy the RTD CfgFile CLI companion skill into project-local "
+            "Codex and Claude Code skill indexes."
         )
     )
-    parser.add_argument("target", type=Path, help="agent home directory or skills index")
+    parser.add_argument("target", type=Path, help="target project directory")
+    parser.add_argument(
+        "--agent",
+        choices=(*SUPPORTED_AGENTS, "both"),
+        default="both",
+        help=(
+            "agent skill index to deploy: codex -> <target>/.agents/skills, "
+            "claude -> <target>/.claude/skills, both -> both indexes"
+        ),
+    )
     parser.add_argument(
         "--repo-root",
         type=Path,
@@ -230,17 +276,18 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    result = deploy(args.repo_root, args.target)
-    if result.action == "deployed":
-        print(
-            f"deployed {SKILL_NAME} {result.version} to {result.destination} "
-            f"({result.reason})"
-        )
-    else:
-        print(
-            f"skipped {SKILL_NAME} {result.version} at {result.destination} "
-            f"({result.reason})"
-        )
+    results = deploy(args.repo_root, args.target, agents=(args.agent,))
+    for result in results:
+        if result.action == "deployed":
+            print(
+                f"deployed {SKILL_NAME} {result.version} for {result.agent} "
+                f"to {result.destination} ({result.reason})"
+            )
+        else:
+            print(
+                f"skipped {SKILL_NAME} {result.version} for {result.agent} "
+                f"at {result.destination} ({result.reason})"
+            )
     return 0
 
 
