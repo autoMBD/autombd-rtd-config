@@ -445,7 +445,7 @@ def _ensure_mcu_clock_ref(
     doc: MexDocument,
     ref_name: str,
     clock_select: str,
-) -> None:
+) -> bool:
     """Insert a new McuClockReferencePoint struct (idempotent: skip if Name exists).
 
     Appends the new struct after the last existing struct in the
@@ -453,10 +453,12 @@ def _ensure_mcu_clock_ref(
     (ConfigTools computes it -- writing it causes SEVERE).
 
     Indentation grounded in the fixture: array=33sp, struct=36sp, setting=39sp.
+
+    Returns True if a new struct was inserted, False if already present (no-op).
     """
     mcu_cfg = doc.find_config_set("Mcu")
     if mcu_cfg is None:
-        return
+        return False
 
     ref_array = None
     for el in mcu_cfg.iter():
@@ -464,7 +466,7 @@ def _ensure_mcu_clock_ref(
             ref_array = el
             break
     if ref_array is None:
-        return
+        return False
 
     existing_structs = [c for c in ref_array if c.tag.endswith("struct")]
 
@@ -472,7 +474,7 @@ def _ensure_mcu_clock_ref(
     for s in existing_structs:
         ns = doc.find_child_setting(s, "Name")
         if ns is not None and ns.attrib.get("value") == ref_name:
-            return  # already present
+            return False  # already present -- no-op
 
     new_struct_index = len(existing_structs)
     line_ending = _detect_line_ending(doc._raw)
@@ -501,6 +503,8 @@ def _ensure_mcu_clock_ref(
             f'{sp_array}</array>'
         ).encode("utf-8")
         doc.replace_element_region(ref_array, array_bytes)
+
+    return True  # insertion was made
 
 
 def _build_mcu_clock_ref_struct_bytes(
@@ -532,16 +536,18 @@ def _ensure_platform_isr(
     irq_name: str,
     isr_handler: str,
     priority: int,
-) -> None:
+) -> bool:
     """Insert a new PlatformIsrConfig struct (idempotent: skip if IsrName exists).
 
     Appends after the last existing struct in the PlatformIsrConfig array.
     The Name field is PlatformIsrConfig_<next_index>.
     Indentation grounded in the fixture: struct=33sp, setting=36sp.
+
+    Returns True if a new struct was inserted, False if already present (no-op).
     """
     platform_cfg = doc.find_config_set("Platform")
     if platform_cfg is None:
-        return
+        return False
 
     isr_array = None
     for el in platform_cfg.iter():
@@ -549,7 +555,7 @@ def _ensure_platform_isr(
             isr_array = el
             break
     if isr_array is None:
-        return
+        return False
 
     existing_structs = [c for c in isr_array if c.tag.endswith("struct")]
 
@@ -557,7 +563,7 @@ def _ensure_platform_isr(
     for s in existing_structs:
         ns = doc.find_child_setting(s, "IsrName")
         if ns is not None and ns.attrib.get("value") == irq_name:
-            return  # already present
+            return False  # already present -- no-op
 
     new_struct_index = len(existing_structs)
     line_ending = _detect_line_ending(doc._raw)
@@ -586,6 +592,8 @@ def _ensure_platform_isr(
             f'{sp_array}</array>'
         ).encode("utf-8")
         doc.replace_element_region(isr_array, array_bytes)
+
+    return True  # insertion was made
 
 
 def _build_platform_isr_struct_bytes(
@@ -3284,15 +3292,33 @@ def apply_uart_add_flexio_channel(doc: MexDocument, intent: Intent) -> ApplyResu
         ))
         return result
 
-    # Map baud/word_length to enum values (grounded in uart.json FlexioDesireBaudrate, FlexioBitCount)
+    # Load asset to validate baud and build MCL ref path (Fix 1 / LL-012).
+    uart_asset = _load_uart_asset()
+
+    # Validate baud against FlexioDesireBaudrate enum domain (LOAD approach).
+    valid_baud_enums: list[str] = uart_asset["enum_domains"]["FlexioDesireBaudrate"]
     baud_enum = f"FLEXIO_UART_BAUDRATE_{baud}"
+    if baud_enum not in valid_baud_enums:
+        result.diagnostics.append(Diagnostic(
+            severity="blocker",
+            code="unsupported_flexio_baud",
+            module="uart",
+            message=(
+                f"FlexIO UART baud rate {baud!r} is not supported. "
+                f"Supported values: {valid_baud_enums}."
+            ),
+            details={"baud": baud, "baud_enum": baud_enum, "valid_bauds": valid_baud_enums},
+        ))
+        return result
+
     # word_length: accept int or str "8" -> FLEXIO_UART_IP_8_BITS_PER_CHAR
     wl_str = str(word_length)
     bit_count_enum = f"FLEXIO_UART_IP_{wl_str}_BITS_PER_CHAR"
 
-    # MCL ref path pattern: grounded in uart.json mcl_ref_path_pattern
-    mcl_ref_tx = f"/Mcl/Mcl/MclConfig/FlexioCommon_0/{tx_name}"
-    mcl_ref_rx = f"/Mcl/Mcl/MclConfig/FlexioCommon_0/{rx_name}"
+    # MCL ref path pattern: LOADED from uart.json mcl_ref_path_pattern (Fix 1 / LL-012).
+    mcl_ref_pattern: str = uart_asset["mcl_ref_path_pattern"]
+    mcl_ref_tx = mcl_ref_pattern.format(channel_name=tx_name)
+    mcl_ref_rx = mcl_ref_pattern.format(channel_name=rx_name)
 
     line_ending = _detect_line_ending(doc._raw)
 
@@ -3315,7 +3341,7 @@ def apply_uart_add_flexio_channel(doc: MexDocument, intent: Intent) -> ApplyResu
         return result
 
     # ---- Part 1c: Uart UART2_TX channel ----
-    uart_edited_tx = _apply_uart_append_flexio_channel_inner(
+    _apply_uart_append_flexio_channel_inner(
         doc, tx_name, mcl_ref_tx, baud_enum, bit_count_enum,
         "FLEXIO_UART_IP_DIRECTION_TX", line_ending, result,
     )
@@ -3323,18 +3349,20 @@ def apply_uart_add_flexio_channel(doc: MexDocument, intent: Intent) -> ApplyResu
         return result
 
     # ---- Part 1d: Uart UART2_RX channel ----
-    uart_edited_rx = _apply_uart_append_flexio_channel_inner(
+    _apply_uart_append_flexio_channel_inner(
         doc, rx_name, mcl_ref_rx, baud_enum, bit_count_enum,
         "FLEXIO_UART_IP_DIRECTION_RX", line_ending, result,
     )
     if result.blocked:
         return result
 
-    # ---- Part 1e: Ensure FLEXIO_CLK in Mcu (idempotent no-op if present) ----
-    _ensure_mcu_clock_ref(doc, "FLEXIO_CLK", "CORE_CLK")
+    # ---- Part 1e: Ensure FLEXIO_CLK in Mcu (idempotent no-op if present).
+    # Returns True only when an insertion was made (absent before this call).
+    mcu_inserted = _ensure_mcu_clock_ref(doc, "FLEXIO_CLK", "CORE_CLK")
 
-    # ---- Part 1f: Ensure FLEXIO_IRQn in Platform (idempotent no-op if present) ----
-    _ensure_platform_isr(
+    # ---- Part 1f: Ensure FLEXIO_IRQn in Platform (idempotent no-op if present).
+    # Returns True only when an insertion was made (absent before this call).
+    platform_inserted = _ensure_platform_isr(
         doc,
         irq_name="FLEXIO_IRQn",
         isr_handler="MCL_FLEXIO_ISR",
@@ -3376,19 +3404,28 @@ def apply_uart_add_flexio_channel(doc: MexDocument, intent: Intent) -> ApplyResu
                 doc.mark_modified(carrier)
             result.modified_elements.append(uart_channel_array)
 
-    # Mark Platform config if touched (ensure is always idempotent no-op for existing entries)
-    platform_cfg_final = doc.find_config_set("Platform")
-    if platform_cfg_final is not None:
-        doc.mark_modified(platform_cfg_final)
-        result.modified_elements.append(platform_cfg_final)
+    # Mark Platform config only when an insertion was actually made (not a no-op).
+    if platform_inserted:
+        platform_cfg_final = doc.find_config_set("Platform")
+        if platform_cfg_final is not None:
+            doc.mark_modified(platform_cfg_final)
+            result.modified_elements.append(platform_cfg_final)
 
-    # Mark Mcu config if touched
-    mcu_cfg_final = doc.find_config_set("Mcu")
-    if mcu_cfg_final is not None:
-        doc.mark_modified(mcu_cfg_final)
-        result.modified_elements.append(mcu_cfg_final)
+    # Mark Mcu config only when an insertion was actually made (not a no-op).
+    if mcu_inserted:
+        mcu_cfg_final = doc.find_config_set("Mcu")
+        if mcu_cfg_final is not None:
+            doc.mark_modified(mcu_cfg_final)
+            result.modified_elements.append(mcu_cfg_final)
 
+    # changed_modules: uart and mcl always (both get new channel structs);
+    # platform/mcu only when an entry was actually inserted (not a no-op).
     result.changed_modules = ["uart", "mcl"]
+    if platform_inserted:
+        result.changed_modules.append("platform")
+    if mcu_inserted:
+        result.changed_modules.append("mcu")
+
     return result
 
 

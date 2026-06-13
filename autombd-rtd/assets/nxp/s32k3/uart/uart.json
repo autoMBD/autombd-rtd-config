@@ -1,5 +1,5 @@
 {
-  "_source": "Uart.xdm (S32K3 RTD 7.0.1), Platform.xdm/.epd (S32K3 RTD 7.0.1 interrupt table), S32K344 IRQ header (S32K344_IRQ.h from SDK), fixture Uart_Example_S32K344 clock tool. This asset is loaded at runtime by apply_uart_set and pinned by test_uart_apply.py::TestUartAsset (LL-012).",
+  "_source": "Installed-RTD-derived (S32K3 RTD 7.0.1 Uart.xdm / Platform.xdm / .epd), S32K344 IRQ header (S32K344_IRQ.h from SDK), fixture Uart_Example_S32K344 (committed: tests/fixtures/nxp/ds/s32k3/Uart_Example_S32K344). Uart.xdm is not committed in this repo; all field/enum values are fixture-verified and pinned by test_uart_apply.py::TestUartAsset and test_uart_flexio_add_channel.py::TestUartAssetFlexioEnums (LL-012, LL-012b).",
   "enum_domains": {
     "UartWordLength": [
       "LPUART_UART_IP_7_BITS_PER_CHAR",
@@ -78,7 +78,7 @@
     "callback_array": "UartCallback"
   },
   "flexio_channel_template": {
-    "_note": "Grounded in Uart.xdm FlexioModuleConfiguration field set and fixture lines 914-924 (Flexio0_Tx) and 947-957 (Flexio1_Rx). Field order is byte-faithful to the fixture.",
+    "_note": "Grounded in installed-RTD-derived FlexioModuleConfiguration field set (fixture-verified) and fixture lines 893-925 (Flexio0_Tx channel struct) and 926-958 (Flexio1_Rx channel struct). Field order is byte-faithful to the fixture.",
     "field_order": [
       "Name",
       "UartHwChannelRef",
