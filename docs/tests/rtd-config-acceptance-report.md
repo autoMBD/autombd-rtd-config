@@ -2,8 +2,8 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.8.0 |
-| Date | 2026-06-12 |
+| Version | 0.9.0 |
+| Date | 2026-06-13 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Current pass/fail evidence for the E2E acceptance cases defined in `rtd-config-test-cases.md`. This document is the living status record the catalog points to; the catalog defines the target, this records where the tool actually stands. |
 
@@ -47,15 +47,14 @@ on an unbuilt asset).
 | RTD-MEX-DIO-001 | Dio | **PASS** | `dio set --add-channel LED_CTRL --pin PTA5` (cross-module Dio+Port): inserts the DioChannel (`DioChannelId`=mscr%16=5 in DioPort_0) AND the Port GPIO pin (`<pin>` SIUL2 gpio,5 OUTPUT + PortPin struct), clearing the Dio `config_set` `quick_selection` so codegen emits the channel. Vendor gate green; generated `Dio_Cfg.h` has `DioConf_DioChannel_LED_CTRL ((uint16)0x0005U)` and SIUL2 configures PTA5 as GPIO output. |
 | RTD-MEX-MCL-001 | Mcl | **PASS** | `mcl set --add-flexio-logic-channel FLEXIO_UART_CH0`: appends a third `FlexioMclLogicChannels` struct with a dynamically-computed unique `FlexioMclChannelId=CHANNEL_2`/`FlexioMclPinId=PIN_2` (referenceable as `/Mcl/Mcl/MclConfig/FlexioCommon_0/FLEXIO_UART_CH0`); existing UART_TX/UART_RX untouched. Vendor gate green (exit 0, 120 files, no severe), 9-line narrow edit. |
 | RTD-MEX-UART-001 | UART | **PASS** | `uart set --hw LPUART_8 --baud 921600 --parity none --stop-bits 1 --word-length 8 --callback Autombd_UartCallback --priority 2`: edits the channel (incl. UartClockRef→LPUART8_CLK) + module callback, AND orchestrates the cross-module deps — inserts the Platform ISR (`LPUART8_IRQn`/`LPUART_UART_IP_8_IRQHandler`/prio 2) and the Mcu clock ref (`LPUART8_CLK`→AIPS_PLAT_CLK). `changed_modules=[uart,platform,mcu]`. Vendor + 3-module codegen verified (HW channel 8U/921600/Autombd_UartCallback; LPUART8 ISR; LPUART8_CLK). Instance→IRQ/handler/clock map computed (anti-hardcode tested). |
-| RTD-MEX-UART-002 | UART | FAIL | Needs FlexIO Uart channel **creation** + MCL logic-channel reference + Platform ISR (LPUART & FlexIO) — creation + orchestration both missing. |
+| RTD-MEX-UART-002 | UART | **PASS** | `uart add-flexio-channel --baud 921600`: creates 2 MCL FlexIO logic channels (UART2_TX/CHANNEL_2, UART2_RX/CHANNEL_3) + 2 FlexIO Uart channels (UartChannelId 3/4, FLEXIO_IP, bitCount 8, interrupt, the `UartHwChannelRef`s matching the new MCL names) + module callback; ensures the shared `FLEXIO_IRQn`/`FLEXIO_CLK` (idempotent). Vendor + end-to-end codegen verified (`MCL_FLEXIOCOMMON_0_UART2_TX=CHANNEL_2`; FlexIO channel configs reference them; callback present). `changed_modules=[uart,mcl]`. |
 | RTD-MEX-UART-003 | UART | FAIL | DMA is rejected (`unsupported_uart_mode`); needs Uart DMA method + MCL DMA channel/instance + Platform ISR. |
 
-**Summary: 7 / 9 cases PASS** (PLATFORM-001, BASENXP-001, MCL-001, PORT-001,
-DIO-001, MCU-001, UART-001). All seven minimal-system modules now have an
-accepted, vendor- and codegen-verified capability; UART-001 proved the full
-three-module orchestration (Uart channel + Platform ISR + MCU clock ref in one
-command). Remaining: UART-002 (new FlexIO Uart channel + MCL + Platform/MCU) and
-UART-003 (DMA — a new capability the tool currently rejects).
+**Summary: 8 / 9 cases PASS** (PLATFORM-001, BASENXP-001, MCL-001, PORT-001,
+DIO-001, MCU-001, UART-001, UART-002). UART-002 added FlexIO Uart channel
+*creation* with consistent MCL references. The single remaining case is UART-003
+(DMA — a new capability the tool currently rejects with `dma_not_supported_in_m1`;
+needs the Uart DMA method + MCL DMA channel/instance + the DMA-completion ISR).
 
 ## 3. Cross-cutting blockers (critical path)
 
@@ -96,7 +95,7 @@ Reviewer), proven against the now-operational gate.
 | 7 | ✅ Port apply (write queried pin) → PORT-001 | PORT-001, DIO-001 |
 | 8 | ✅ DIO-001: channel creation + Port direction (cross-module) | DIO-001 |
 | 9 | ✅ UART cross-module orchestration → UART-001 | UART-001 |
-| 10 | UART-002: FlexIO channel creation + MCL ref + ISR | UART-002 |
+| 10 | ✅ UART-002: FlexIO channel creation + MCL ref + ISR | UART-002 |
 | 11 | DMA capability (Uart + Mcl + Platform) → UART-003 | UART-003 |
 
 ## Changelog
@@ -111,3 +110,4 @@ Reviewer), proven against the now-operational gate.
 | 2026-06-12 | 0.6.0 | RTD-MEX-DIO-001 **PASS** (5/9): `dio set` (cross-module Dio+Port) inserts the DioChannel + the Port GPIO output pin and clears the Dio `config_set` `quick_selection` so codegen emits the channel; vendor gate green and `Dio_Cfg.h` contains `DioConf_DioChannel_LED_CTRL`. Established the codegen-verification gate step (LL-013) and confirmed MCL-001 codegen. Marked plan step 8 done. |
 | 2026-06-12 | 0.7.0 | RTD-MEX-MCU-001 **PASS** (6/9): `mcu set` configures the 160/80/40 clock tree (PLL + MC_CGM dividers incl. HSE_CLK/2), McuNoPll/mirror fixes, and merges the Clock Reference Points; vendor + codegen verified over 3 vendor-driven refine iterations. Established LL-014 (comprehensive Problems-view SEVERE scan for clock cases). All 6 non-UART modules done; remaining UART-001/002/003. |
 | 2026-06-12 | 0.8.0 | RTD-MEX-UART-001 **PASS** (7/9): `uart set` (3-module orchestration) edits the LPUART_8 channel + module callback and inserts the Platform ISR + Mcu clock ref; vendor + 3-module codegen verified (converged on the first vendor run). Established LL-015 (narrowness-bound discipline as orchestration grows). All 7 modules now have an accepted capability; remaining UART-002 (FlexIO channel creation) + UART-003 (DMA). |
+| 2026-06-13 | 0.9.0 | RTD-MEX-UART-002 **PASS** (8/9): `uart add-flexio-channel` creates a FlexIO Tx+Rx Uart channel pair + their MCL logic channels with consistent references + module callback; vendor + end-to-end codegen verified (converged first vendor run). LL-016 ended the recurring documentation-only-asset pattern (FlexIO asset keys now loaded/pinned). Marked plan step 10 done. Only UART-003 (DMA) remains. |
