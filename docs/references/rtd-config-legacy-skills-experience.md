@@ -2,8 +2,8 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.1.2 |
-| Date | 2026-06-03 |
+| Version | 0.1.4 |
+| Date | 2026-06-13 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Development-time reference: captures `.mex` editing experience from the deprecated S32K3 RTD configuration skills that must guide the tool's `.mex` implementation. Historical milestone wording in the body reflects when the experience was captured. |
 
@@ -156,7 +156,7 @@ Confirmed exit `0` with zero SEVERE `[TOOL]` problems on the unmodified fixture
 and on the tool-edited LPUART and FlexIO **interrupt** configs. The flow also
 caught a real defect: a `polling` config wrote an invalid `UartInteruptDmaMethod`
 enum (RTD 7.0.1 has only INTERRUPTS / DMA), which ConfigTools rejected as
-`值不可用` -- the reason M1 is interrupt-only.
+an unavailable-value error -- the reason M1 is interrupt-only.
 
 ## Module Experience Summary
 
@@ -296,3 +296,4 @@ The Milestone 1 execution plan must use these experience-derived checks:
 | 2026-06-03 | 0.1.1 | Added empirically verified S32DS 3.6.7 validation findings: launcher `.ini`, ConfigTools application id, headless-exit limitation, and benign-edit parity check. |
 | 2026-06-03 | 0.1.2 | Corrected the S32DS findings: the headless flow IS reproducible with `-HeadlessTool` + workspace registration (PlatformSDK `-sdkPath`); recorded the polling-enum defect and the interrupt-only M1 decision, and the exit-0-plus-no-SEVERE-`[TOOL]` pass gate. |
 | 2026-06-10 | 0.1.3 | Fourth-round review resolution: moved from `docs/specs/` to `docs/references/` (development-time reference, not a spec); dropped M1 from the title. |
+| 2026-06-13 | 0.1.4 | Reworded the localized unavailable-value vendor message in English and aligned metadata with the append-only changelog. |

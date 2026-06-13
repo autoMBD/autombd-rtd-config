@@ -2,8 +2,8 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.6.0 |
-| Date | 2026-06-10 |
+| Version | 0.6.1 |
+| Date | 2026-06-13 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Long-term architecture and goals for the RTD CfgFile CLI. Holds the stable CLI/JSON contract, module-ownership rules, the subagent development workflow, and the documentation map. Domain facts live in domain-truth; the test method lives in the test strategy; E2E cases live in the test-cases catalog; `.mex` pitfalls live in the legacy-skills baseline (references/). |
 
@@ -199,13 +199,17 @@ The product is built by an autonomous loop of four roles (`.claude/agents/`).
 - **Worker** implements one scoped capability TDD-first against that truth,
   inventing nothing.
 - **Tester** runs the convergence gate: the deterministic suite, vendor
-  validation, and the E2E acceptance cases. **E2E execution is
-  context-isolated**: the executing agent sees only the released skill, the
-  case's prompt, and the staged fixture — never this repository. Context
-  isolation is the requirement; the mechanism is whatever the agent platform
-  provides (a fresh, non-inherited context).
-- The main agent routes on the result: **fail → next iteration (Explorer); pass
-  → Reviewer**. The **Reviewer** (read-only, only after the gate is green)
+  validation, and the E2E acceptance cases, and records KPI evidence for each
+  case. **E2E execution is context-isolated**: the executing agent sees only the
+  released skill, the case's prompt, and the staged fixture — never this
+  repository. Context isolation is the requirement; the mechanism is whatever
+  the agent platform provides (a fresh, non-inherited context).
+- The main agent routes on the result: **functional fail → next iteration
+  (Explorer); functional pass with KPI miss → Worker KPI optimization, capped at
+  three optimization iterations for the same case; functional pass with KPI
+  pass, or still-missed KPI after the third optimization iteration → record the
+  true KPI result and dispatch Reviewer**. The **Reviewer** (read-only, only
+  after the functional gate is green)
   reviews the non-test requirements — domain values vs the `.xdm`, uniform
   header / missed skill triggers, ownership/boundaries, test adequacy, diff
   hygiene — and appends a **lessons-learned** entry
@@ -231,8 +235,10 @@ acceptance rule, roles); the concrete E2E cases live in
 sole "done" signal; a module is accepted when the deterministic suite, static
 checks, the vendor gate, and its E2E cases (context-isolated protocol) all
 pass; **every supported module reaches the same validated bar**. Delivery
-staging lives in the roadmap. KPIs: 3 min focused / 5 min E2E / 10 min
-intervention.
+staging lives in the roadmap. KPIs are monitored during E2E execution: KPI
+misses trigger Worker optimization for up to three iterations, then the final
+KPI result is recorded honestly. Timing targets: 3 min focused / 5 min E2E /
+10 min intervention.
 
 ## Success criteria
 
@@ -246,7 +252,7 @@ intervention.
 - static and vendor diagnostics are actionable;
 - **every supported module passes the vendor gate** (for `.mex`: exit 0 + no
   SEVERE `[TOOL]`) **and its E2E cases**; focused validation meets the 3-minute
-  KPI.
+  KPI or the KPI result is recorded after the capped optimization loop.
 
 ## Documentation map
 
@@ -298,6 +304,7 @@ flowchart TD
 
 | Date | Version | Description |
 | --- | --- | --- |
+| 2026-06-13 | 0.6.1 | Added the KPI-monitoring route to the subagent workflow: functional PASS with KPI miss returns to Worker optimization for up to three iterations, then records the true KPI result before Reviewer review. |
 | 2026-06-10 | 0.6.0 | Fourth-round review resolution: unified committed-data terminology and location as **assets** (`autombd-rtd/assets/`); removed milestone/schedule wording from goals, diagram, backends, and acceptance (staging lives only in the roadmap); per-backend vendor validation stated (`.mex` → S32DS, `.xdm` → EB tresos, same gate semantics); added G10 (full RTD surface incl. all driver modules, FreeRTOS, Stacks, CDDs); replaced the capability-table model with the all-legal-edits provider model (capabilities doc removed); context isolation made generic and moved to the Tester's E2E execution; linked source materials; added the documentation map; restored the itemized changelog. |
 | 2026-06-03 | 0.5.0 | Major slim: removed the glossary/mechanics/duplicated KPI+boundary+S32DS prose; pointed domain facts to domain-truth, tests to the test strategy. Added seven-module parity (equal priority) with the S32DS pass gate as the acceptance bar, and the Explorer/Worker/Tester/Reviewer subagent workflow. |
 | 2026-06-02 | 0.4.2 | Added M1 legacy-skills experience baseline requirement and quick-selection handling requirement for `.mex` edits. |

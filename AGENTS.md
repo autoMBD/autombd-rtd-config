@@ -43,8 +43,9 @@ The main agent owns:
   **context-isolated** — the validation agent inherits no prior conversation
   state and sees only the released skill, the case prompt, and the staged
   fixture; the isolation mechanism is whatever the agent platform provides;
-- monitoring subagent progress, collecting evidence, comparing outputs against
-  active specs, and rejecting incomplete or off-scope results;
+- monitoring subagent progress and per-case KPI evidence, collecting evidence,
+  comparing outputs against active specs, and rejecting incomplete or off-scope
+  results;
 - correcting direction when a subagent violates ownership boundaries, runtime
   dependency rules, `.mex` editing rules, testing scope, or validation flow;
 - integrating subagent findings into a coherent engineering decision, not just
@@ -76,13 +77,16 @@ values).
   domains, pin-mux data, fixture state, exact S32DS commands — and records it in
   domain-truth. Never edits files.
 - **Worker**: implements one scoped capability TDD-first, within module-ownership
-  and narrow / byte-faithful `.mex` edit rules.
+  and narrow / byte-faithful `.mex` edit rules. When the Tester reports a KPI
+  miss on a functionally passing case, the Worker optimizes the public
+  flow/diagnostics/assets without weakening functional correctness.
 - **Tester**: owns the convergence gate — runs the deterministic suite, S32DS
   validation (pass gate: exit 0 AND no SEVERE `[TOOL]`), and the E2E acceptance
-  cases (`docs/tests/rtd-config-test-cases.md`). **E2E execution is
-  context-isolated**: the executing agent sees only the released skill, the
-  case prompt, and the staged fixture — never this repository. Edits tests
-  only; reports production gaps instead of weakening a test.
+  cases (`docs/tests/rtd-config-test-cases.md`). The Tester also measures each
+  case against its KPI. **E2E execution is context-isolated**: the executing
+  agent sees only the released skill, the case prompt, and the staged fixture —
+  never this repository. Edits tests only; reports production gaps instead of
+  weakening a test.
 - **Reviewer** (read-only): runs **only after the Tester's gate is green**, and
   reviews every development requirement the gate cannot catch — domain values
   vs each `<Module>.xdm`, uniform file header and other missed skill triggers,
@@ -95,12 +99,18 @@ values).
 iteration. The main agent reads the Tester's result and routes:
 
 - **tests fail →** start the next iteration (back to the Explorer);
-- **tests pass →** dispatch the **Reviewer** for non-test acceptance review.
+- **tests pass but KPI misses →** return to the Worker for KPI optimization,
+  with at most three KPI-optimization iterations for the same case;
+- **tests pass and KPI passes, or KPI still misses after three optimization
+  iterations →** record the true KPI result and dispatch the **Reviewer** for
+  non-test acceptance review.
 
-Tests are the convergence signal, owned by the Tester; the Reviewer is the
-non-test acceptance gate and the keeper of lessons learned. The orchestrator
-integrates evidence, protects scope, and intervenes when a role exceeds its time
-budget or exposes a systemic issue.
+Tests are the convergence signal, owned by the Tester. KPI misses are
+optimization triggers, not permission to weaken the functional gate. The
+Reviewer is the non-test acceptance gate and the keeper of lessons learned. The
+orchestrator integrates evidence, protects scope, enforces the three-iteration
+KPI optimization cap, and intervenes when a role exceeds its time budget or
+exposes a systemic issue.
 
 ## Testing Terminology
 
@@ -119,6 +129,12 @@ budget or exposes a systemic issue.
   protocol) all pass. The minimal system's seven modules (Mcu, BaseNXP,
   Platform, Port, Dio, Mcl, Uart) are equal priority and land together;
   delivery staging lives only in `docs/roadmaps/rtd-config-roadmap.md`.
+- Each E2E case also has a KPI. The Tester records KPI evidence during isolated
+  execution. If functional validation passes but the KPI is missed, the case
+  returns to the Worker for optimization. The orchestrator allows at most three
+  KPI-optimization iterations for the same case; after the third miss, the true
+  KPI result is recorded and the case may proceed with the functional PASS
+  evidence intact.
 - Focused independent subagent validation should converge within 3 minutes.
   E2E subagent validation should converge within 5 minutes. A subagent run may
   continue up to 10 minutes to expose useful problem evidence; after 10

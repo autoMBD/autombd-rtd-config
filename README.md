@@ -90,10 +90,13 @@ pyproject.toml               # pytest configuration + project metadata
 ## Development workflow
 
 The product is built by an autonomous agent loop —
-`main → Explorer → Worker → Tester → main` — where **tests are the sole convergence
-signal**. On a green gate the **Reviewer** performs non-test acceptance review and
-appends a [lessons-learned](docs/common/rtd-config-lessons-learned.md) entry. Roles
-live in [`.claude/agents/`](.claude/agents/); the charter is [`AGENTS.md`](AGENTS.md).
+`main → Explorer → Worker → Tester → main` — where **tests are the sole functional
+convergence signal**. The Tester also records per-case KPI evidence; a functional
+PASS with a KPI miss returns to the Worker for up to three optimization
+iterations, then records the true KPI result. On a green functional gate the
+**Reviewer** performs non-test acceptance review and appends a
+[lessons-learned](docs/common/rtd-config-lessons-learned.md) entry. Roles live in
+[`.claude/agents/`](.claude/agents/); the charter is [`AGENTS.md`](AGENTS.md).
 
 ```bash
 python -m pytest -q          # deterministic gate
@@ -105,8 +108,8 @@ python -m pytest -q          # deterministic gate
 | --- | --- |
 | [Core design](docs/specs/rtd-config-core-design.md) | Architecture + CLI/JSON contract |
 | [Domain truth & validation](docs/specs/rtd-config-domain-truth.md) | RTD enum sourcing rule + verified S32DS flow |
-| [Test strategy](docs/tests/rtd-config-test-strategy.md) | The convergence contract: layers, vendor gate, acceptance rule, roles |
-| [E2E test cases](docs/tests/rtd-config-test-cases.md) | The E2E acceptance case catalog (`RTD-MEX-*`, isolated protocol) |
+| [Test strategy](docs/tests/rtd-config-test-strategy.md) | The convergence contract: layers, vendor gate, acceptance rule, roles, KPI loop |
+| [E2E test cases](docs/tests/rtd-config-test-cases.md) | The E2E acceptance case catalog (`RTD-MEX-*`, isolated protocol, KPI) |
 | [Implementation plan](docs/plans/rtd-cfgfile-cli-implementation-plan.md) | The module-by-module delivery framework |
 | [Roadmap](docs/roadmaps/rtd-config-roadmap.md) | The staged delivery route (stages live only here) |
 
