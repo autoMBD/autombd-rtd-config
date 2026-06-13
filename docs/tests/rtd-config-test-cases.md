@@ -67,16 +67,16 @@ All cases use the fixture `tests/fixtures/nxp/ds/s32k3/Uart_Example_S32K344/`
 ## 3. Case status and dependencies
 
 The catalog defines the **acceptance target**; current pass/fail evidence is
-recorded in [`rtd-config-acceptance-report.md`](rtd-config-acceptance-report.md).
-Known capability dependencies:
+recorded in [`rtd-config-acceptance-report.md`](rtd-config-acceptance-report.md),
+where all nine cases pass the vendor gate with their generated code verified. The
+capability dependencies that once gated these cases are now resolved:
 
-- `RTD-MEX-UART-003` requires the Uart/Mcl **DMA capability**, which is not yet
-  implemented — the current tool intentionally rejects DMA requests
-  (diagnostic `dma_not_supported_in_m1`). The case stands as the target that
-  drives that capability; it is not weakened to match the current tool.
-- `RTD-MEX-PORT-001` (and every pin-applying case) depends on the complete
-  `pins.json` asset rebuilt from the pin-mux source workbook
-  (domain-truth §1); until then `pin-options` output is unverified.
+- `RTD-MEX-UART-003` is delivered — the Uart/Mcl **DMA capability** is
+  implemented (`uart set --mode dma`; the static checks enforce DMA coherence via
+  `dma_mcl_not_enabled` / `dma_refs_incomplete`).
+- `RTD-MEX-PORT-001` (and every pin-applying case) uses the complete `pins.json`
+  asset rebuilt from the pin-mux source workbook (domain-truth §1); `pin-options`
+  output is verified.
 
 ## Changelog
 
