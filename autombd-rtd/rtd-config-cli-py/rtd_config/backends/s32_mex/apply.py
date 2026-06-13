@@ -2626,6 +2626,49 @@ def _find_dio_channel_array(doc: MexDocument, dio_port: ET.Element) -> ET.Elemen
     return None
 
 
+def _find_dio_port_array(dio_cfg: ET.Element) -> ET.Element | None:
+    """Return the <array name="DioPort"> element inside the Dio DioConfig struct."""
+    for el in dio_cfg.iter():
+        if el.tag.endswith("array") and el.attrib.get("name") == "DioPort":
+            return el
+    return None
+
+
+def _build_dio_port_struct_bytes(
+    array_index: int,
+    port_id: int,
+    struct_indent: int,
+    line_ending: bytes,
+) -> bytes:
+    """Build raw bytes for a new DioPort <struct> with empty DioChannel/DioChannelGroup/
+    DioPortEcucPartitionRef arrays.
+
+    ``array_index`` is the zero-based index in the DioPort array (used for struct name
+    and the Name setting).  ``port_id`` is the computed DioPortId (mscr // 16), which
+    may differ from array_index when ports are non-contiguous.
+
+    Indentation is byte-faithful: ``struct_indent`` spaces for the <struct> open/close;
+    children are indented by struct_indent + 3.
+
+    Field order matches the fixture (Dio.xdm / Uart_Example.mex DioPort_0):
+      Name, DioPortId, DioChannel (self-closed array),
+      DioChannelGroup (self-closed array), DioPortEcucPartitionRef (self-closed array).
+    """
+    le = line_ending.decode("latin-1")
+    sp = " " * struct_indent
+    sp_child = " " * (struct_indent + 3)
+    lines = [
+        f'{sp}<struct name="{array_index}">',
+        f'{sp_child}<setting name="Name" value="DioPort_{array_index}"/>',
+        f'{sp_child}<setting name="DioPortId" value="{port_id}"/>',
+        f'{sp_child}<array name="DioChannel"/>',
+        f'{sp_child}<array name="DioChannelGroup"/>',
+        f'{sp_child}<array name="DioPortEcucPartitionRef"/>',
+        f'{sp}</struct>',
+    ]
+    return le.join(lines).encode("utf-8")
+
+
 def apply_dio_set(doc: MexDocument, intent: Intent) -> ApplyResult:
     """Apply a Dio output channel insertion with cross-module Port GPIO pin routing.
 
@@ -2648,7 +2691,8 @@ def apply_dio_set(doc: MexDocument, intent: Intent) -> ApplyResult:
 
     Blocker codes:
       dio_config_set_not_found   -- Dio <config_set> is absent
-      dio_port_not_found         -- DioPort for the computed DioPortId is absent
+      dio_port_array_not_found   -- DioPort <array> is absent; cannot auto-create port
+      dio_port_create_failed     -- auto-created DioPort not found after splice
       dio_pin_not_gpio           -- pin does not have direction='gpio' in pins.json
       port_config_set_not_found  -- Port <config_set> is absent
       port_pins_function_not_found -- <pins> section is absent
@@ -2702,21 +2746,76 @@ def apply_dio_set(doc: MexDocument, intent: Intent) -> ApplyResult:
         ))
         return result
 
-    # ---- Locate DioPort for the computed DioPortId ----
+    # ---- Locate DioPort for the computed DioPortId; auto-create if absent ----
     dio_port = _find_dio_port_by_id(doc, dio_cfg, dio_port_id)
     if dio_port is None:
-        result.diagnostics.append(Diagnostic(
-            severity="blocker",
-            code="dio_port_not_found",
-            module="dio",
-            message=(
-                f"No DioPort with DioPortId={dio_port_id} found in the Dio config set. "
-                f"Pin '{pin_name}' (mscr={mscr}) maps to DioPortId={dio_port_id}; "
-                "this DioPort must exist before a DioChannel can be inserted."
-            ),
-            details={"pin": pin_name, "mscr": mscr, "dio_port_id": dio_port_id},
-        ))
-        return result
+        # Auto-create the missing DioPort struct and append it to the DioPort array.
+        # Phase ordering (LL-013): raw-byte splices first; re-find elements after reload;
+        # quick_selection clear happens LAST in the existing ~2947 block.
+        dio_port_array = _find_dio_port_array(dio_cfg)
+        if dio_port_array is None:
+            result.diagnostics.append(Diagnostic(
+                severity="blocker",
+                code="dio_port_array_not_found",
+                module="dio",
+                message="No DioPort <array> found in the Dio config set; cannot auto-create port.",
+                details={"pin": pin_name, "mscr": mscr, "dio_port_id": dio_port_id},
+            ))
+            return result
+
+        # new_array_index = count of existing DioPort <struct> children (zero-based)
+        existing_port_structs = [c for c in dio_port_array if c.tag.endswith("struct")]
+        new_array_index = len(existing_port_structs)
+
+        # Detect struct indent from the last existing port struct, or use fixture default
+        if existing_port_structs:
+            struct_indent = _detect_struct_indent(doc, existing_port_structs[-1])
+        else:
+            struct_indent = 30  # fixture default: DioPort <struct> indented 30 spaces
+
+        new_port_bytes = _build_dio_port_struct_bytes(
+            array_index=new_array_index,
+            port_id=dio_port_id,
+            struct_indent=struct_indent,
+            line_ending=line_ending,
+        )
+
+        if existing_port_structs:
+            ok = _append_after_last_element(
+                doc, existing_port_structs[-1], new_port_bytes, line_ending
+            )
+            if not ok:
+                _append_struct_before_array_close(
+                    doc, dio_port_array, new_port_bytes, line_ending
+                )
+        else:
+            # Empty DioPort array -- replace with populated one
+            le = line_ending.decode("latin-1")
+            sp_array = " " * (struct_indent - 3)
+            array_bytes = (
+                f'<array name="DioPort">{le}'
+                f'{new_port_bytes.decode("utf-8")}{le}'
+                f'{sp_array}</array>'
+            ).encode("utf-8")
+            doc.replace_element_region(dio_port_array, array_bytes)
+
+        # Re-find everything after tree reload
+        dio_cfg = doc.find_config_set("Dio")
+        if dio_cfg is not None:
+            dio_port = _find_dio_port_by_id(doc, dio_cfg, dio_port_id)
+
+        if dio_port is None:
+            result.diagnostics.append(Diagnostic(
+                severity="blocker",
+                code="dio_port_create_failed",
+                module="dio",
+                message=(
+                    f"Auto-creation of DioPort for DioPortId={dio_port_id} failed; "
+                    "could not locate the new port after splice."
+                ),
+                details={"pin": pin_name, "mscr": mscr, "dio_port_id": dio_port_id},
+            ))
+            return result
 
     # ---- Part A: Insert DioChannel into DioPort's DioChannel array ----
     dio_channel_array = _find_dio_channel_array(doc, dio_port)

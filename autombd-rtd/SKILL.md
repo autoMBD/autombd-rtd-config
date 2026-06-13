@@ -89,7 +89,8 @@ sequence on the same project, then `validate` once at the end.
   `pin-options` first.
 - **`rtd-config dio set --add-channel <NAME> --pin <PIN>`** — add a DIO channel
   (e.g. `LED_CTRL`) on a free GPIO pad; the GPIO direction is configured on the
-  Port side automatically (`--direction output`).
+  Port side automatically (`--direction output`). The pin's `DioPort` container
+  is created automatically if it does not yet exist.
 - **`rtd-config mcl set --add-flexio-logic-channel <NAME>`** — append a FlexIO
   logic channel; the next free `CHANNEL_N`/`PIN_N` ids are computed and
   uniqueness is enforced.

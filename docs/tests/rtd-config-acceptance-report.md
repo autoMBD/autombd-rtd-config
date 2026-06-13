@@ -2,7 +2,7 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.11.0 |
+| Version | 0.12.0 |
 | Date | 2026-06-13 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Current pass/fail evidence for the E2E acceptance cases defined in `rtd-config-test-cases.md`. This document is the living status record the catalog points to; the catalog defines the target, this records where the tool actually stands. |
@@ -52,14 +52,16 @@ measured KPI result.
 | RTD-MEX-PLATFORM-001 | Platform | **PASS** | `platform set --peripheral LPUART_3 --priority 2`: `IsrPriority` 0→2 on the existing `LPUART3_IRQn` entry, kept enabled with its ISR (`LPUART_UART_IP_3_IRQHandler`) registered, FLEXIO entry untouched. Vendor gate green (exit 0, 120 generated files, no severe). |
 | RTD-MEX-PORT-001 | Port | **PASS** | `port set --peripheral LPUART_0 --tx PTA27 --rx PTA28`: validates pins against pins.json (rejects illegal pins), then inserts BOTH representations — the `<pin>` header (`lpuart0_tx`@M2 + `direction=OUTPUT`; `lpuart0_rx`@N2) and the Port `PortPin` structs (`Lpuart0_Tx`/`Lpuart0_Rx`, next `PortPinId`). Vendor gate green (exit 0, 120 files, no severe); generated `Siul2_Port_Ip_PBcfg.c` confirms PTA27 ALT4/TX + PTA28 IMCR/RX. |
 | RTD-MEX-DIO-001 | Dio | **PASS** | `dio set --add-channel LED_CTRL --pin PTA5` (cross-module Dio+Port): inserts the DioChannel (`DioChannelId`=mscr%16=5 in DioPort_0) AND the Port GPIO pin (`<pin>` SIUL2 gpio,5 OUTPUT + PortPin struct), clearing the Dio `config_set` `quick_selection` so codegen emits the channel. Vendor gate green; generated `Dio_Cfg.h` has `DioConf_DioChannel_LED_CTRL ((uint16)0x0005U)` and SIUL2 configures PTA5 as GPIO output. |
+| RTD-MEX-DIO-002 | Dio | **PASS** | `dio set --add-channel LED_CTRL --pin PTA30` on a pin whose DioPort container is ABSENT: **auto-creates `DioPort_1`** (DioPortId=1, array index 1 — the struct name/`Name` use the array index, `DioPortId` is computed `mscr//16`) then inserts the channel (`DioChannelId`=mscr%16=14), clearing the Dio `config_set` `quick_selection`. Vendor gate green under isolation (exit 0, 120 files, no severe); generated `Dio_Cfg.h` has `DioConf_DioChannel_LED_CTRL ((uint16)0x001eU)` and `DioConf_DioPort_DioPort_1 ((uint8)0x01U)`. Proven cold (auto-discovery) on the focused case AND the full 5-task combined scenario (LL-019). |
 | RTD-MEX-MCL-001 | Mcl | **PASS** | `mcl set --add-flexio-logic-channel FLEXIO_UART_CH0`: appends a third `FlexioMclLogicChannels` struct with a dynamically-computed unique `FlexioMclChannelId=CHANNEL_2`/`FlexioMclPinId=PIN_2` (referenceable as `/Mcl/Mcl/MclConfig/FlexioCommon_0/FLEXIO_UART_CH0`); existing UART_TX/UART_RX untouched. Vendor gate green (exit 0, 120 files, no severe), 9-line narrow edit. |
 | RTD-MEX-UART-001 | UART | **PASS** | `uart set --hw LPUART_8 --baud 921600 --parity none --stop-bits 1 --word-length 8 --callback Autombd_UartCallback --priority 2`: edits the channel (incl. UartClockRef→LPUART8_CLK) + module callback, AND orchestrates the cross-module deps — inserts the Platform ISR (`LPUART8_IRQn`/`LPUART_UART_IP_8_IRQHandler`/prio 2) and the Mcu clock ref (`LPUART8_CLK`→AIPS_PLAT_CLK). `changed_modules=[uart,platform,mcu]`. Vendor + 3-module codegen verified (HW channel 8U/921600/Autombd_UartCallback; LPUART8 ISR; LPUART8_CLK). Instance→IRQ/handler/clock map computed (anti-hardcode tested). |
 | RTD-MEX-UART-002 | UART | **PASS** | `uart add-flexio-channel --baud 921600`: creates 2 MCL FlexIO logic channels (UART2_TX/CHANNEL_2, UART2_RX/CHANNEL_3) + 2 FlexIO Uart channels (UartChannelId 3/4, FLEXIO_IP, bitCount 8, interrupt, the `UartHwChannelRef`s matching the new MCL names) + module callback; ensures the shared `FLEXIO_IRQn`/`FLEXIO_CLK` (idempotent). Vendor + end-to-end codegen verified (`MCL_FLEXIOCOMMON_0_UART2_TX=CHANNEL_2`; FlexIO channel configs reference them; callback present). `changed_modules=[uart,mcl]`. |
 | RTD-MEX-UART-003 | UART | **PASS** | `uart set --hw LPUART_3 --mode dma --callback Autombd_UartCallback`: the new DMA capability — Uart `UartInteruptDmaMethod=USING_DMA` + `UartDmaEnable` + Tx/Rx refs to MCL DMA channels + callback; MCL `MclEnableDma` + activate `dmaLogicChannel_Type_0` (TX) + add `_1` (RX) with `enDmaRequest`/`enDmaMajorInterrupt`; Platform `DMATCD0/1_IRQn`→`Dma0_Ch0/1_IRQHandler`. Vendor + 4-module codegen verified (built with no end-to-end vendor example; S32DS gate the authority). `changed_modules=[uart,mcl,platform]`. `_check_dma` now enforces the DMA INVALID rule. |
 
-**Summary: 9 / 9 cases PASS — the minimal system is COMPLETE.** All seven modules
+**Summary: 10 / 10 cases PASS — the seven-module minimal system is COMPLETE**
+(RTD-MEX-DIO-002 added as black-box round-2 hardening). All seven modules
 (Mcu, BaseNXP, Platform, Port, Dio, Mcl, Uart) reach the full acceptance bar:
-deterministic suite (389 tests green), static checks, the S32DS vendor gate
+deterministic suite (422 tests green), static checks, the S32DS vendor gate
 (exit 0 + no SEVERE `[TOOL]` + code generated), AND each E2E case's generated
 code verified to reflect the edit (LL-013). Every case also passed independent
 Reviewer acceptance with its findings closed. The five cross-cutting blockers
@@ -114,6 +116,7 @@ Reviewer), proven against the now-operational gate.
 
 | Date | Version | Description |
 | --- | --- | --- |
+| 2026-06-14 | 0.12.0 | RTD-MEX-DIO-002 **PASS**: `dio set --pin PTA30` auto-creates the absent `DioPort_1` container (DioPortId 1, array index 1) then inserts the channel (DioChannelId 14); vendor + codegen verified cold (auto-discovery) on the focused case and the full 5-task combined scenario — `Dio_Cfg.h` has `DioConf_DioChannel_LED_CTRL ((uint16)0x001eU)` and `DioConf_DioPort_DioPort_1 ((uint8)0x01U)`. Added as black-box round-2 hardening (LL-019); deterministic suite 422 green. |
 | 2026-06-13 | 0.11.0 | Added the KPI evidence policy: functionally passing cases that miss KPI return to Worker optimization for up to three iterations; after the third miss, the true KPI result is recorded in this report. |
 | 2026-06-11 | 0.1.0 | Created the acceptance report (the catalog's pass/fail record). Recorded the repaired vendor gate (Flow B, operational + error-detecting + project-safe), the honest 0/9 per-case baseline with each gap, the cross-cutting critical-path blockers, and the sequenced execution plan. |
 | 2026-06-11 | 0.2.0 | RTD-MEX-PLATFORM-001 **PASS** (1/9): `platform set` edits an existing `PlatformIsrConfig` priority/enable on the LPUART3 interrupt; verified end-to-end against the real S32DS gate (exit 0, 120 generated files, no severe). Marked plan step 3 done. |

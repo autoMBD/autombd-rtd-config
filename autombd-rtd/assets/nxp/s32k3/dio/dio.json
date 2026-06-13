@@ -42,5 +42,46 @@
     "DioChannelId",
     "PDACSlot",
     "DioChannelEcucPartitionRef"
-  ]
+  ],
+
+  "port_fields": {
+    "Name": {
+      "type": "string",
+      "description": "Port container name. Value is 'DioPort_<array_index>' where array_index is the zero-based position of this struct in the DioPort array.",
+      "source_ref": "Dio.xdm:DioConfig/DioPort/Name + fixture Uart_Example_S32K344 DioPort_0"
+    },
+    "DioPortId": {
+      "type": "uint16",
+      "description": "S32K3 GPIO port number. Computed as mscr // 16. May differ from array_index when ports are non-contiguous.",
+      "source_ref": "Dio.xdm:DioConfig/DioPort/DioPortId + fixture Uart_Example_S32K344 DioPort_0 (DioPortId=0)"
+    },
+    "DioChannel": {
+      "type": "array",
+      "default": "empty",
+      "description": "Child array for DioChannel structs. Starts empty; channels are appended by the tool.",
+      "source_ref": "Dio.xdm:DioConfig/DioPort/DioChannel + fixture Uart_Example_S32K344 DioPort_0"
+    },
+    "DioChannelGroup": {
+      "type": "array",
+      "default": "empty",
+      "description": "Child array for DioChannelGroup structs. Empty for auto-created ports.",
+      "source_ref": "Dio.xdm:DioConfig/DioPort/DioChannelGroup + fixture Uart_Example_S32K344 DioPort_0"
+    },
+    "DioPortEcucPartitionRef": {
+      "type": "array",
+      "default": "empty",
+      "description": "Child array for partition references. Empty for auto-created ports.",
+      "source_ref": "Dio.xdm:DioConfig/DioPort/DioPortEcucPartitionRef + fixture Uart_Example_S32K344 DioPort_0"
+    }
+  },
+
+  "port_children_order": [
+    "Name",
+    "DioPortId",
+    "DioChannel",
+    "DioChannelGroup",
+    "DioPortEcucPartitionRef"
+  ],
+
+  "port_naming_rule": "DioPort_<array_index>  (struct name attribute = array_index as string; Name setting = 'DioPort_' + str(array_index); DioPortId = mscr // 16, independent of array_index)"
 }

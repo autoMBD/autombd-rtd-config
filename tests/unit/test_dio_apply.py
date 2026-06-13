@@ -134,6 +134,42 @@ def _dio_channel_structs(doc: MexDocument) -> list[ET.Element]:
     return [c for c in arr if c.tag.endswith("struct")]
 
 
+def _find_dio_port_by_port_id(
+    doc: MexDocument, dio_cfg: ET.Element, port_id: int
+) -> ET.Element | None:
+    """Return the DioPort struct with DioPortId==port_id from the Dio config set."""
+    for el in dio_cfg.iter():
+        if el.tag.endswith("array") and el.attrib.get("name") == "DioPort":
+            for child in el:
+                if not child.tag.endswith("struct"):
+                    continue
+                id_setting = doc.find_child_setting(child, "DioPortId")
+                if id_setting is not None and id_setting.attrib.get("value") == str(port_id):
+                    return child
+    return None
+
+
+def _count_dio_port_structs(doc: MexDocument) -> int:
+    """Count total DioPort struct children in the DioPort array."""
+    cfg = _dio_cfg(doc)
+    if cfg is None:
+        return 0
+    for el in cfg.iter():
+        if el.tag.endswith("array") and el.attrib.get("name") == "DioPort":
+            return sum(1 for c in el if c.tag.endswith("struct"))
+    return 0
+
+
+def _find_dio_channel_array_in_port(
+    doc: MexDocument, port: ET.Element
+) -> ET.Element | None:
+    """Return the DioChannel array inside a given DioPort struct."""
+    for el in port:
+        if el.tag.endswith("array") and el.attrib.get("name") == "DioChannel":
+            return el
+    return None
+
+
 def _pins_function(doc: MexDocument) -> ET.Element | None:
     """Return the <pins> child of the PortContainer_0_VS_0 function element."""
     for el in doc.root.iter():
@@ -875,20 +911,21 @@ def test_dio_channel_id_pta6_anti_hardcode(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# Fix 1(b): Anti-hardcode -- DioPort absent for a pin with mscr >= 16
+# Fix 1(b): Auto-create missing DioPort -- PTA16 (mscr=16, DioPortId=1)
 # ---------------------------------------------------------------------------
 # PTA16: mscr=16, DioPortId = 16//16 = 1. DioPort_1 does NOT exist in the fixture
-# (only DioPort_0 exists). apply_dio_set must return the 'dio_port_not_found' blocker.
-# This proves DioPortId is computed (16//16=1) and looked up -- not assumed 0.
+# (only DioPort_0 exists). apply_dio_set must AUTO-CREATE DioPort_1 and insert
+# the channel -- no longer a blocker. Proves DioPortId is computed (not hardcoded 0).
 
-def test_dio_port_not_found_for_port1_pin_pta16(tmp_path):
-    """Apply with PTA16 (mscr=16) -- must return dio_port_not_found blocker.
+def test_dio_port_autocreated_for_port1_pin_pta16(tmp_path):
+    """Apply with PTA16 (mscr=16) -- auto-creates DioPort with DioPortId=1.
 
     PTA16: mscr=16 -> DioPortId=16//16=1. DioPort_1 does not exist in the fixture.
     The fixture only has DioPort_0 (DioPortId=0).
-    This confirms DioPortId is computed and looked up (not assumed 0).
-    A hardcoded DioPortId=0 would find DioPort_0 and NOT return the blocker,
-    making this test fail.
+    The tool must CREATE the missing DioPort (array index=1, DioPortId=1) and insert
+    the channel LED_HI (DioChannelId=0) into it.
+    A hardcoded DioPortId=0 would insert into DioPort_0 with wrong DioChannelId,
+    and a hardcoded array_index=port_id would fail the anti-hardcode test.
     PTA16 is a free GPIO in pins.json (direction='gpio', pin_mapbga257=A12, mscr=16).
     """
     project = copy_uart_fixture(tmp_path)
@@ -897,25 +934,42 @@ def test_dio_port_not_found_for_port1_pin_pta16(tmp_path):
     intent = _intent(add_channel="LED_HI", pin="PTA16", direction="output")
     result = apply_dio_set(doc, intent)
 
-    assert result.blocked, (
-        "Expected a blocker for PTA16 (mscr=16, DioPortId=1) because DioPort_1 "
-        "does not exist in the fixture. If not blocked, DioPortId is being hardcoded "
-        "to 0 instead of computed as mscr//16."
+    assert not result.blocked, (
+        f"PTA16 (mscr=16, DioPortId=1): tool must auto-create missing DioPort_1, "
+        f"not return a blocker. diagnostics={[d.to_dict() for d in result.diagnostics]}"
     )
-    codes = [d.code for d in result.diagnostics]
-    assert any("dio_port_not_found" in code for code in codes), (
-        f"Expected 'dio_port_not_found' diagnostic code, got: {codes}"
+    assert "dio" in result.changed_modules
+
+    # Verify the newly created DioPort has the correct attributes
+    dio_cfg = doc.find_config_set("Dio")
+    assert dio_cfg is not None
+    created_port = _find_dio_port_by_port_id(doc, dio_cfg, 1)
+    assert created_port is not None, (
+        "DioPort with DioPortId=1 must have been created by auto-creation"
     )
-    # Confirm the diagnostic details carry the computed port_id
-    for d in result.diagnostics:
-        if "dio_port_not_found" in d.code:
-            assert d.details.get("dio_port_id") == 1, (
-                f"Diagnostic details must show dio_port_id=1 (=16//16), "
-                f"got: {d.details}"
-            )
-            assert d.details.get("mscr") == 16, (
-                f"Diagnostic details must show mscr=16, got: {d.details}"
-            )
+    assert _setting_value(doc, created_port, "DioPortId") == "1"
+    # array index must be 1 (one existing DioPort_0 was already there)
+    assert created_port.attrib.get("name") == "1", (
+        f"auto-created DioPort struct name must be '1' (array index), "
+        f"got '{created_port.attrib.get('name')}'"
+    )
+    assert _setting_value(doc, created_port, "Name") == "DioPort_1"
+
+    # Channel must be in the new port
+    ch_array = _find_dio_channel_array_in_port(doc, created_port)
+    assert ch_array is not None
+    structs = [c for c in ch_array if c.tag.endswith("struct")]
+    assert len(structs) == 1
+    assert _setting_value(doc, structs[0], "Name") == "LED_HI"
+    assert _setting_value(doc, structs[0], "DioChannelId") == "0"  # mscr%16=16%16=0
+
+    # DioPort_0 must be untouched (no new channels)
+    port0 = _dio_port_0(doc)
+    assert port0 is not None
+    port0_ch_array_0 = _dio_channel_array(doc)
+    if port0_ch_array_0 is not None:
+        port0_channels = [c for c in port0_ch_array_0 if c.tag.endswith("struct")]
+        assert len(port0_channels) == 0, "DioPort_0 must be untouched (no channels added)"
 
 
 # ---------------------------------------------------------------------------
@@ -1006,3 +1060,374 @@ def test_dio_json_matches_apply_code_literals():
         f"Positions: Name={pos_name}, DioChannelId={pos_id}, "
         f"PDACSlot={pos_pdac}, DioChannelEcucPartitionRef={pos_ecuc}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Fix 3 (LL-012): DioPort struct field / asset pin test
+# ---------------------------------------------------------------------------
+# Mirrors test_dio_json_matches_apply_code_literals for the port level.
+# Pins: port_children_order, port_naming_rule, and the actual byte output of
+# _build_dio_port_struct_bytes against dio.json port_fields /
+# port_children_order.  Any drift between the asset and the code fails the gate.
+# Ground truth: Dio.xdm + fixture Uart_Example_S32K344 DioPort_0.
+
+def test_dio_json_port_fields_match_apply_code_literals():
+    """dio.json port_fields/port_children_order match _build_dio_port_struct_bytes.
+
+    Checked properties:
+      - port_children_order matches the emit order of _build_dio_port_struct_bytes
+        (Name, DioPortId, DioChannel, DioChannelGroup, DioPortEcucPartitionRef)
+      - port_naming_rule contains 'DioPort_' (the name prefix)
+      - every field in port_children_order appears in the emitted bytes
+      - field relative ordering in emitted bytes matches port_children_order
+      - struct name attribute equals the array_index argument (zero-based)
+      - Name setting equals 'DioPort_<array_index>'
+      - DioPortId setting equals the port_id argument (may differ from array_index)
+
+    Grounded in Dio.xdm:DioConfig/DioPort and fixture DioPort_0
+    (struct name='0', Name='DioPort_0', DioPortId='0',
+     empty DioChannel/DioChannelGroup/DioPortEcucPartitionRef arrays).
+    """
+    import pathlib as _pathlib
+    asset_path = (
+        _pathlib.Path(__file__).resolve().parents[2]
+        / "autombd-rtd" / "assets" / "nxp" / "s32k3" / "dio" / "dio.json"
+    )
+    asset = json.loads(asset_path.read_text(encoding="utf-8"))
+
+    # --- port_children_order must exist and match the function's emit order ---
+    expected_port_children_order = [
+        "Name", "DioPortId", "DioChannel", "DioChannelGroup", "DioPortEcucPartitionRef"
+    ]
+    actual_port_children_order = asset.get("port_children_order", [])
+    assert actual_port_children_order == expected_port_children_order, (
+        f"dio.json port_children_order must match _build_dio_port_struct_bytes emit order.\n"
+        f"  Asset port_children_order:  {actual_port_children_order}\n"
+        f"  Code emit order:            {expected_port_children_order}\n"
+        "Update either dio.json or _build_dio_port_struct_bytes to make them agree."
+    )
+
+    # --- port_naming_rule must reference the 'DioPort_' prefix ---
+    naming_rule = asset.get("port_naming_rule", "")
+    assert "DioPort_" in naming_rule, (
+        f"dio.json port_naming_rule must contain 'DioPort_' prefix, got: {naming_rule!r}"
+    )
+
+    # --- port_fields must list all expected fields ---
+    port_fields = asset.get("port_fields", {})
+    for field in expected_port_children_order:
+        assert field in port_fields, (
+            f"dio.json port_fields missing entry for '{field}'"
+        )
+
+    # --- Call _build_dio_port_struct_bytes and verify actual byte output ---
+    from rtd_config.backends.s32_mex.apply import _build_dio_port_struct_bytes
+
+    # Use array_index=1, port_id=2 to exercise the case where they differ (PTB0-style)
+    raw = _build_dio_port_struct_bytes(
+        array_index=1,
+        port_id=2,
+        struct_indent=30,
+        line_ending=b"\n",
+    )
+    fragment = raw.decode("utf-8")
+
+    # struct name must equal array_index (not port_id)
+    assert 'name="1"' in fragment, (
+        f"_build_dio_port_struct_bytes struct name must be '1' (array_index), "
+        f"not '2' (port_id). fragment:\n{fragment}"
+    )
+
+    # Name setting must be DioPort_<array_index>
+    assert 'name="Name" value="DioPort_1"' in fragment, (
+        f"Name setting must be 'DioPort_1' (uses array_index=1). fragment:\n{fragment}"
+    )
+
+    # DioPortId setting must be port_id
+    assert 'name="DioPortId" value="2"' in fragment, (
+        f"DioPortId setting must be '2' (port_id=2). fragment:\n{fragment}"
+    )
+
+    # All five child names from port_children_order must appear in the fragment
+    for child_name in expected_port_children_order:
+        assert child_name in fragment, (
+            f"_build_dio_port_struct_bytes output missing child '{child_name}'"
+        )
+
+    # Check relative ordering of the five children in the fragment
+    positions = {child: fragment.index(f'"{child}"') for child in expected_port_children_order}
+    ordered_positions = [positions[c] for c in expected_port_children_order]
+    assert ordered_positions == sorted(ordered_positions), (
+        f"Field order in emitted bytes does not match port_children_order.\n"
+        f"Positions: { {c: positions[c] for c in expected_port_children_order} }"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Auto-create DioPort capability tests (new port auto-creation)
+# ---------------------------------------------------------------------------
+# The following tests cover the capability described in the brief:
+# When the pin's DioPort container does not exist, the tool must CREATE it
+# rather than returning a 'dio_port_not_found' blocker.
+#
+# Ground truth from pins.json:
+#   PTA30: mscr=30, DioPortId=1 (=30//16), DioChannelId=14 (=30%16)
+#   PTB0:  mscr=32, DioPortId=2 (=32//16), DioChannelId=0  (=32%16)
+# The fixture has only DioPort_0 (DioPortId=0), so BOTH of these pins
+# require the auto-create path.
+# ---------------------------------------------------------------------------
+
+
+def test_new_port_created_for_pta30(tmp_path):
+    """PTA30 (mscr=30, DioPortId=1): auto-creates DioPort and inserts LED_CTRL.
+
+    Pristine fixture has only DioPort_0 (DioPortId=0). Adding LED_CTRL on PTA30
+    must CREATE a new DioPort struct:
+      struct name="1" (array index = count of existing structs before insert = 1)
+      Name="DioPort_1"
+      DioPortId="1"
+    Then insert the channel LED_CTRL (DioChannelId=14) into it.
+    DioPort_0 must remain untouched (no new channels).
+    """
+    project = copy_uart_fixture(tmp_path)
+    doc = MexDocument.load(project / "Uart_Example.mex")
+
+    intent = _intent(add_channel="LED_CTRL", pin="PTA30", direction="output")
+    result = apply_dio_set(doc, intent)
+
+    assert not result.blocked, (
+        f"PTA30: auto-creation must succeed, got blockers: "
+        f"{[d.to_dict() for d in result.diagnostics]}"
+    )
+    assert "dio" in result.changed_modules
+
+    # Two DioPort structs now: DioPort_0 and DioPort_1
+    assert _count_dio_port_structs(doc) == 2, (
+        f"Expected 2 DioPort structs after auto-create, got {_count_dio_port_structs(doc)}"
+    )
+
+    # Verify the new DioPort_1 struct
+    dio_cfg = doc.find_config_set("Dio")
+    new_port = _find_dio_port_by_port_id(doc, dio_cfg, 1)
+    assert new_port is not None, "DioPort with DioPortId=1 must exist after auto-create"
+    assert new_port.attrib.get("name") == "1", (
+        f"New DioPort struct name must be '1' (array index), "
+        f"got '{new_port.attrib.get('name')}'"
+    )
+    assert _setting_value(doc, new_port, "Name") == "DioPort_1", (
+        f"New DioPort Name must be 'DioPort_1', got {_setting_value(doc, new_port, 'Name')!r}"
+    )
+    assert _setting_value(doc, new_port, "DioPortId") == "1", (
+        f"New DioPort DioPortId must be '1', got {_setting_value(doc, new_port, 'DioPortId')!r}"
+    )
+
+    # Channel LED_CTRL is in DioPort_1 with correct DioChannelId
+    ch_array = _find_dio_channel_array_in_port(doc, new_port)
+    assert ch_array is not None, "New DioPort must contain a DioChannel array"
+    ch_structs = [c for c in ch_array if c.tag.endswith("struct")]
+    assert len(ch_structs) == 1, f"Expected 1 channel in new port, got {len(ch_structs)}"
+    assert _setting_value(doc, ch_structs[0], "Name") == "LED_CTRL"
+    assert _setting_value(doc, ch_structs[0], "DioChannelId") == "14", (
+        f"PTA30 (mscr=30): DioChannelId must be 14 (=30%16), "
+        f"got {_setting_value(doc, ch_structs[0], 'DioChannelId')!r}"
+    )
+
+    # DioPort_0 is untouched (empty DioChannel array)
+    port0 = _dio_port_0(doc)
+    assert port0 is not None, "DioPort_0 must still exist"
+    port0_ch_array = _find_dio_channel_array_in_port(doc, port0)
+    if port0_ch_array is not None:
+        port0_structs = [c for c in port0_ch_array if c.tag.endswith("struct")]
+        assert len(port0_structs) == 0, (
+            f"DioPort_0 must be untouched (0 channels), got {len(port0_structs)}"
+        )
+
+
+def test_anti_hardcode_port_id_vs_array_index(tmp_path):
+    """PTB0 (mscr=32, DioPortId=2): struct name='1' (array index) != DioPortId='2'.
+
+    This test pins the CRITICAL distinction:
+      - struct name attribute uses the ZERO-BASED ARRAY INDEX (count of existing structs = 1)
+      - DioPortId setting uses the COMPUTED port id (mscr // 16 = 32 // 16 = 2)
+    These differ for PTB0: array_index=1, DioPortId=2.
+    A hardcode of either value (e.g. using port_id as array index) will fail this test.
+
+    Ground truth: pins.json PTB0 mscr=32, pin_mapbga257=P16.
+    Fixture starts with only DioPort_0 (DioPortId=0), so new port gets array index=1.
+    """
+    project = copy_uart_fixture(tmp_path)
+    doc = MexDocument.load(project / "Uart_Example.mex")
+
+    intent = _intent(add_channel="CAN_EN", pin="PTB0", direction="output")
+    result = apply_dio_set(doc, intent)
+
+    assert not result.blocked, (
+        f"PTB0: auto-creation must succeed, got blockers: "
+        f"{[d.to_dict() for d in result.diagnostics]}"
+    )
+
+    dio_cfg = doc.find_config_set("Dio")
+    new_port = _find_dio_port_by_port_id(doc, dio_cfg, 2)
+    assert new_port is not None, "DioPort with DioPortId=2 must exist"
+
+    # CRITICAL: array index must be 1, NOT 2
+    assert new_port.attrib.get("name") == "1", (
+        f"struct name must be '1' (array index of second port), "
+        f"NOT '2' (DioPortId). Got '{new_port.attrib.get('name')}'. "
+        "This proves array_index != DioPortId for PTB0."
+    )
+    assert _setting_value(doc, new_port, "Name") == "DioPort_1", (
+        f"Name must be 'DioPort_1' (uses array index), got {_setting_value(doc, new_port, 'Name')!r}"
+    )
+    # DioPortId must be 2 (computed, not the array index)
+    assert _setting_value(doc, new_port, "DioPortId") == "2", (
+        f"DioPortId must be '2' (=32//16), got {_setting_value(doc, new_port, 'DioPortId')!r}"
+    )
+
+    # Channel with DioChannelId=0 (=32%16)
+    ch_array = _find_dio_channel_array_in_port(doc, new_port)
+    assert ch_array is not None
+    ch_structs = [c for c in ch_array if c.tag.endswith("struct")]
+    assert len(ch_structs) == 1
+    assert _setting_value(doc, ch_structs[0], "DioChannelId") == "0", (
+        f"PTB0 (mscr=32): DioChannelId must be 0 (=32%16), "
+        f"got {_setting_value(doc, ch_structs[0], 'DioChannelId')!r}"
+    )
+
+
+def test_new_port_idempotent_pta30(tmp_path):
+    """Adding PTA30 twice does not duplicate the DioPort or the DioChannel.
+
+    First apply: creates DioPort_1 and inserts LED_CTRL channel.
+    Second apply: detects existing port and existing channel, no-ops both.
+    Result: still exactly 2 DioPort structs and 1 channel in DioPort_1.
+    """
+    project = copy_uart_fixture(tmp_path)
+    mex = project / "Uart_Example.mex"
+
+    # First apply
+    doc1 = MexDocument.load(mex)
+    r1 = apply_dio_set(doc1, _intent(add_channel="LED_CTRL", pin="PTA30", direction="output"))
+    assert not r1.blocked, [d.to_dict() for d in r1.diagnostics]
+    doc1.write(mex)
+
+    # Second apply on the written file
+    doc2 = MexDocument.load(mex)
+    r2 = apply_dio_set(doc2, _intent(add_channel="LED_CTRL", pin="PTA30", direction="output"))
+    assert not r2.blocked, [d.to_dict() for d in r2.diagnostics]
+    doc2.write(mex)
+
+    # Reload and verify no duplication
+    doc3 = MexDocument.load(mex)
+    assert _count_dio_port_structs(doc3) == 2, (
+        f"Idempotency: expected 2 DioPort structs, got {_count_dio_port_structs(doc3)}"
+    )
+    dio_cfg = doc3.find_config_set("Dio")
+    port1 = _find_dio_port_by_port_id(doc3, dio_cfg, 1)
+    assert port1 is not None
+    ch_array = _find_dio_channel_array_in_port(doc3, port1)
+    if ch_array is not None:
+        ch_structs = [c for c in ch_array if c.tag.endswith("struct")]
+        assert len(ch_structs) == 1, (
+            f"Idempotency: expected 1 channel in DioPort_1, got {len(ch_structs)}"
+        )
+
+
+def test_regression_pta5_no_new_port_created(tmp_path):
+    """DIO-001 regression: PTA5 (DioPortId=0) uses existing DioPort_0, no new port.
+
+    DioPort_0 already exists in the fixture (DioPortId=0). Adding LED_CTRL on PTA5
+    must NOT create a second DioPort. Total DioPort count must remain 1.
+    """
+    project = copy_uart_fixture(tmp_path)
+    doc = MexDocument.load(project / "Uart_Example.mex")
+
+    result = apply_dio_set(doc, _standard_intent())
+
+    assert not result.blocked, [d.to_dict() for d in result.diagnostics]
+    assert "dio" in result.changed_modules
+
+    # Still exactly 1 DioPort (DioPort_0)
+    assert _count_dio_port_structs(doc) == 1, (
+        f"DIO-001 regression: PTA5 must use existing DioPort_0, "
+        f"not create a new one. Count={_count_dio_port_structs(doc)}"
+    )
+
+    # The channel is in DioPort_0
+    structs = _dio_channel_structs(doc)
+    assert len(structs) == 1
+    assert _setting_value(doc, structs[0], "Name") == "LED_CTRL"
+    assert _setting_value(doc, structs[0], "DioChannelId") == "5"  # mscr=5, 5%16=5
+
+
+def test_new_port_quick_selection_removed(tmp_path):
+    """After auto-creating DioPort_1 (PTA30), quick_selection is cleared on Dio config_set.
+
+    LL-013: The quick_selection clear on the Dio config_set must fire when
+    dio_channel_inserted is True, which includes the new-port code path.
+    Without this, ConfigTools ignores the inserted channel during code generation.
+    """
+    project = copy_uart_fixture(tmp_path)
+    mex = project / "Uart_Example.mex"
+
+    doc = MexDocument.load(mex)
+    apply_dio_set(doc, _intent(add_channel="LED_CTRL", pin="PTA30", direction="output"))
+    doc.write(mex)
+
+    import re
+    content = mex.read_text(encoding="utf-8")
+    m = re.search(r'config_set\s+name="Dio"[^>]*>', content)
+    assert m is not None, "Dio config_set tag not found in written file"
+    written_tag = m.group(0)
+    assert "quick_selection" not in written_tag, (
+        f"Dio config_set still carries quick_selection after new-port auto-create + write. "
+        f"Written tag: {written_tag}"
+    )
+
+    reloaded = MexDocument.load(mex)
+    dio_cfg = reloaded.find_config_set("Dio")
+    assert dio_cfg is not None
+    assert "quick_selection" not in dio_cfg.attrib, (
+        f"Reloaded Dio config_set still has quick_selection after PTA30 new-port path."
+    )
+
+
+def test_new_port_written_file_well_formed(tmp_path):
+    """After auto-creating DioPort_1 (PTA30), written .mex is well-formed XML.
+
+    Validates that the raw-byte splice produces valid XML that can be reloaded
+    and that all three insertions (new DioPort, DioChannel, PortPin) are accessible.
+    """
+    project = copy_uart_fixture(tmp_path)
+    mex = project / "Uart_Example.mex"
+
+    doc = MexDocument.load(mex)
+    apply_dio_set(doc, _intent(add_channel="LED_CTRL", pin="PTA30", direction="output"))
+    doc.write(mex)
+
+    reloaded = MexDocument.load(mex)
+
+    # DioPort_1 must exist in the reloaded document
+    dio_cfg = reloaded.find_config_set("Dio")
+    assert dio_cfg is not None
+    port1 = _find_dio_port_by_port_id(reloaded, dio_cfg, 1)
+    assert port1 is not None, "DioPort_1 not found in reloaded doc after auto-create"
+    assert _setting_value(reloaded, port1, "Name") == "DioPort_1"
+    assert _setting_value(reloaded, port1, "DioPortId") == "1"
+
+    # Channel LED_CTRL in DioPort_1
+    ch_array = _find_dio_channel_array_in_port(reloaded, port1)
+    assert ch_array is not None
+    ch_structs = [c for c in ch_array if c.tag.endswith("struct")]
+    assert len(ch_structs) == 1
+    assert _setting_value(reloaded, ch_structs[0], "Name") == "LED_CTRL"
+    assert _setting_value(reloaded, ch_structs[0], "DioChannelId") == "14"
+
+    # DioPort_0 intact
+    port0 = _dio_port_0(reloaded)
+    assert port0 is not None
+    assert _setting_value(reloaded, port0, "DioPortId") == "0"
+
+    # XML declaration preserved
+    raw_lines = mex.read_bytes().decode("utf-8").splitlines()
+    assert raw_lines[0] == '<?xml version="1.0" encoding= "UTF-8" ?>'
