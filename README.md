@@ -71,6 +71,28 @@ python autombd-rtd validate --project <path> --s32ds-root C:\NXP\S32DS.3.6.7 --j
 Every shortcut command normalizes to the same JSON intent and the same
 plan → apply → check → validate pipeline.
 
+## Deploy the Skill
+
+Use the deployment helper to publish only the released skill payload into an
+agent skills index:
+
+```bash
+python tools/deploy_rtd_skill.py <agent-home-or-skills-dir>
+```
+
+If the argument is an agent home directory, the helper deploys to
+`<target>/skills/autombd-rtd/`. If the argument itself is named `skills`, it
+deploys directly to `<target>/autombd-rtd/`. The helper checks the source
+version across `autombd-rtd/SKILL.md`, the launcher header, and the Python
+package version before copying. It deploys only when the target skill, bundled
+tool payload, or version metadata is missing, or when the installed version is
+older than the project version. Current or newer complete installations are
+left untouched.
+
+The copied payload is intentionally limited to `SKILL.md`, `__main__.py`,
+`rtd-config-cli-py/`, and `assets/`; development materials such as `docs/`,
+`tests/`, and `tools/` are not included.
+
 ## Repository layout
 
 ```text
