@@ -2,7 +2,7 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 1.1.0 |
+| Version | 0.11.0 |
 | Date | 2026-06-13 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Current pass/fail evidence for the E2E acceptance cases defined in `rtd-config-test-cases.md`. This document is the living status record the catalog points to; the catalog defines the target, this records where the tool actually stands. |
@@ -114,7 +114,7 @@ Reviewer), proven against the now-operational gate.
 
 | Date | Version | Description |
 | --- | --- | --- |
-| 2026-06-13 | 1.1.0 | Added the KPI evidence policy: functionally passing cases that miss KPI return to Worker optimization for up to three iterations; after the third miss, the true KPI result is recorded in this report. |
+| 2026-06-13 | 0.11.0 | Added the KPI evidence policy: functionally passing cases that miss KPI return to Worker optimization for up to three iterations; after the third miss, the true KPI result is recorded in this report. |
 | 2026-06-11 | 0.1.0 | Created the acceptance report (the catalog's pass/fail record). Recorded the repaired vendor gate (Flow B, operational + error-detecting + project-safe), the honest 0/9 per-case baseline with each gap, the cross-cutting critical-path blockers, and the sequenced execution plan. |
 | 2026-06-11 | 0.2.0 | RTD-MEX-PLATFORM-001 **PASS** (1/9): `platform set` edits an existing `PlatformIsrConfig` priority/enable on the LPUART3 interrupt; verified end-to-end against the real S32DS gate (exit 0, 120 generated files, no severe). Marked plan step 3 done. |
 | 2026-06-11 | 0.3.0 | RTD-MEX-BASENXP-001 **PASS** (2/9): `basenxp set --enable-system-timer` inserts an OsIf counter referencing the Mcu CORE_CLK point (FLEXIO_CLK), vendor-gate green; drove the byte-faithful element-insertion writer (blocker #1 DONE) and landed the complete 2091-signal `pins.json` (blocker #3 DONE). Updated the per-case table, cross-cutting blockers, and execution plan. |
@@ -124,4 +124,4 @@ Reviewer), proven against the now-operational gate.
 | 2026-06-12 | 0.7.0 | RTD-MEX-MCU-001 **PASS** (6/9): `mcu set` configures the 160/80/40 clock tree (PLL + MC_CGM dividers incl. HSE_CLK/2), McuNoPll/mirror fixes, and merges the Clock Reference Points; vendor + codegen verified over 3 vendor-driven refine iterations. Established LL-014 (comprehensive Problems-view SEVERE scan for clock cases). All 6 non-UART modules done; remaining UART-001/002/003. |
 | 2026-06-12 | 0.8.0 | RTD-MEX-UART-001 **PASS** (7/9): `uart set` (3-module orchestration) edits the LPUART_8 channel + module callback and inserts the Platform ISR + Mcu clock ref; vendor + 3-module codegen verified (converged on the first vendor run). Established LL-015 (narrowness-bound discipline as orchestration grows). All 7 modules now have an accepted capability; remaining UART-002 (FlexIO channel creation) + UART-003 (DMA). |
 | 2026-06-13 | 0.9.0 | RTD-MEX-UART-002 **PASS** (8/9): `uart add-flexio-channel` creates a FlexIO Tx+Rx Uart channel pair + their MCL logic channels with consistent references + module callback; vendor + end-to-end codegen verified (converged first vendor run). LL-016 ended the recurring documentation-only-asset pattern (FlexIO asset keys now loaded/pinned). Marked plan step 10 done. Only UART-003 (DMA) remains. |
-| 2026-06-13 | 1.0.0 | RTD-MEX-UART-003 **PASS** (9/9 — minimal system COMPLETE): developed the DMA capability (Uart DMA method + Tx/Rx refs + MCL DMA channels/instance + Platform DMATCD ISRs); vendor + 4-module codegen verified; `_check_dma` now enforces the DMA INVALID rule (LL-017). All seven modules accepted: deterministic (389), static, vendor gate, and per-case codegen all green; every case Reviewer-approved. All five cross-cutting blockers resolved. |
+| 2026-06-13 | 0.10.0 | RTD-MEX-UART-003 **PASS** (9/9 — minimal system COMPLETE): developed the DMA capability (Uart DMA method + Tx/Rx refs + MCL DMA channels/instance + Platform DMATCD ISRs); vendor + 4-module codegen verified; `_check_dma` now enforces the DMA INVALID rule (LL-017). All seven modules accepted: deterministic (389), static, vendor gate, and per-case codegen all green; every case Reviewer-approved. All five cross-cutting blockers resolved. |

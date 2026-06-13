@@ -2,7 +2,7 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.3.0 |
+| Version | 0.3.1 |
 | Date | 2026-06-13 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | The E2E acceptance test cases for the RTD CfgFile CLI (`.mex` backend, scheme `RTD-MEX-*`). Each case is executed by a fully isolated subagent that sees nothing of this repository — only the released `autombd-rtd` skill/CLI, the case's prompt, and the test fixture. Unit/integration coverage lives in the deterministic pytest suite and is governed by the test strategy, not listed here. |
@@ -82,6 +82,7 @@ capability dependencies that once gated these cases are now resolved:
 
 | Date | Version | Description |
 | --- | --- | --- |
+| 2026-06-13 | 0.3.1 | Recorded the section-3 case-status update that the previous commit applied without a changelog row: the capability dependencies that once gated the cases are now marked resolved (DMA delivered — `uart set --mode dma`, coherence via `dma_mcl_not_enabled`/`dma_refs_incomplete`; `pins.json` rebuilt), matching the 9/9 acceptance report. |
 | 2026-06-13 | 0.3.0 | Added mandatory KPI evidence handling to the isolated execution protocol: functional PASS with KPI miss returns to Worker optimization for at most three iterations, then records the true KPI result. Added the `KPI` column contract and converted all non-`Subagent Prompt` case text to English. |
 | 2026-06-10 | 0.2.0 | Fourth-round review resolution: restructured to E2E-only cases in the format ID/Module/Scenario/Subagent Prompt/Test fixture/Pass criteria (scheme `RTD-MEX-*`); seeded with the reviewer's MCU clock and three UART cases (incl. DMA) and extended to all seven minimal-system modules; added the fully-isolated subagent execution protocol; renamed the document from `rtd-config-m1-test-cases.md` (m1 dropped from all doc names). |
 | 2026-06-11 | 0.2.1 | Corrected the PASS evidence step to the verified Flow B `-ExportSrc` code generation (was `-UpdateCode`, which belonged to the superseded registration flow); aligned the SEVERE marker wording with domain-truth §3. Added the companion [`rtd-config-acceptance-report.md`](rtd-config-acceptance-report.md) as the living pass/fail record. |
