@@ -66,7 +66,7 @@ from .modules.port import PortProvider
 from .modules.dio import DioProvider
 from .checks.static import run_static_checks
 from .backends.s32_mex.apply import apply_uart_set, apply_uart_add_flexio_channel, apply_platform_set, apply_basenxp_set, apply_mcl_set, apply_port_set, apply_dio_set, apply_mcu_set
-from .backends.s32_mex.validation import run_validation
+from .backends.s32_mex.validation import find_s32ds_root, probe_which_root, run_validation
 
 
 # Skill root, used to resolve committed runtime assets independently of cwd.
@@ -417,8 +417,20 @@ def cmd_validate(args: argparse.Namespace) -> int:
     # Static check always runs first; vendor validation never substitutes for it.
     static_result = run_static_checks(mex)
 
-    s32ds_root = args.s32ds_root or os.environ.get("RTD_CONFIG_S32DS_ROOT")
-    if not s32ds_root:
+    root = find_s32ds_root(args.s32ds_root)
+    if root is None:
+        # Check whether s32dsc.exe was found on PATH but its root was invalid
+        # (e.g. the K3 PlatformSDK directory is missing). Surface the probed
+        # path as a breadcrumb so the user knows where to look.
+        _which_root = probe_which_root()
+        _which_breadcrumb = (
+            f"s32dsc.exe was found at {_which_root / 'eclipse' / 's32dsc.exe'} "
+            f"but the derived root ({_which_root}) is incomplete (missing "
+            f"S32DS/software/PlatformSDK_S32K3). Check that the full S32DS "
+            f"package is installed, or provide the correct path explicitly."
+            if _which_root is not None
+            else ""
+        )
         return emit({
             "status": "blocked",
             "command": "validate",
@@ -428,10 +440,17 @@ def cmd_validate(args: argparse.Namespace) -> int:
                     "code": "s32ds_root_not_configured",
                     "module": "backend",
                     "message": (
-                        "S32DS root is not configured; set --s32ds-root or "
-                        "RTD_CONFIG_S32DS_ROOT to run headless ConfigTools validation."
+                        "S32DS root could not be found. Auto-discovery was attempted "
+                        "(PATH search via s32dsc.exe, and standard C:\\NXP\\S32DS* "
+                        "installs). Provide the location via --s32ds-root <path> or "
+                        "set the RTD_CONFIG_S32DS_ROOT environment variable."
                     ),
-                    "details": {},
+                    "details": {
+                        "probed_which_root": (
+                            str(_which_root) if _which_root is not None else None
+                        ),
+                        "breadcrumb": _which_breadcrumb or None,
+                    },
                 }
             ],
             "runtime_verification": {"static_check": static_result.to_dict()},
@@ -442,7 +461,7 @@ def cmd_validate(args: argparse.Namespace) -> int:
     sdk_path = Path(args.sdk_path) if args.sdk_path else None
     outcome = run_validation(
         config.project,
-        Path(s32ds_root),
+        root,
         workspace=workspace,
         sdk_path=sdk_path,
         timeout_s=config.validation_timeout_s,

@@ -109,6 +109,16 @@ DEFAULT_HEADLESS_TOOL = "Peripherals"
 _SEVERE_TOOL_MARKER = "has the following error"
 
 
+# Default parent directories to scan when neither --s32ds-root nor
+# RTD_CONFIG_S32DS_ROOT is set and s32dsc.exe is not on PATH.  The list is
+# tried in order; within each parent, valid children are sorted by parsed
+# version descending so the newest install wins.
+_DEFAULT_S32DS_PARENTS: list[Path] = [
+    Path(r"C:\NXP"),
+    Path(r"C:\nxp"),
+]
+
+
 def _executable(s32ds_root: Path) -> Path:
     """Return the s32dsc.exe launcher path under an S32DS installation."""
     return s32ds_root / "eclipse" / "s32dsc.exe"
@@ -132,6 +142,135 @@ def _launcher_ini(s32ds_root: Path) -> Path | None:
 def default_sdk_path(s32ds_root: Path) -> Path:
     """Return the bundled S32DS PlatformSDK root that ships ``sdk_manifest.xml``."""
     return s32ds_root / "S32DS" / "software" / "PlatformSDK_S32K3"
+
+
+def is_valid_s32ds_root(root: Path) -> bool:
+    """Return True iff *root* looks like a complete S32DS installation.
+
+    Both the headless launcher (``eclipse/s32dsc.exe``) and the bundled
+    PlatformSDK directory (``S32DS/software/PlatformSDK_S32K3``) must be
+    present.  The SDK directory is required because ``run_validation`` passes
+    it to ``-sdkPath``; an install that lacks it cannot validate .mex files.
+    """
+    return (
+        _executable(root).exists()
+        and default_sdk_path(root).is_dir()
+    )
+
+
+def _parse_s32ds_version(name: str) -> tuple[int, ...]:
+    """Parse ``S32DS.X.Y.Z`` into a version tuple for comparison.
+
+    Returns an empty tuple when the name does not follow the expected pattern
+    so that unparseable names sort below any parseable one.
+    """
+    # Expected format: S32DS.<major>.<minor>.<patch>
+    prefix = "S32DS."
+    if not name.upper().startswith(prefix.upper()):
+        return ()
+    tail = name[len(prefix):]
+    parts = tail.split(".")
+    try:
+        return tuple(int(p) for p in parts)
+    except ValueError:
+        return ()
+
+
+def find_s32ds_root(
+    explicit: str | None = None,
+    *,
+    env: dict[str, str] | None = None,
+    search_parents: list[Path] | None = None,
+    which: object = shutil.which,
+) -> Path | None:
+    """Locate the S32DS installation root using a priority-ordered search.
+
+    Resolution order (first hit wins):
+
+    1. *explicit* — path from ``--s32ds-root``; returned as-is as a ``Path``
+       even when it does not satisfy ``is_valid_s32ds_root``.  The user stated
+       where S32DS is; a clearer downstream error is better than silently
+       ignoring the request.
+    2. ``env["RTD_CONFIG_S32DS_ROOT"]`` (defaults to ``os.environ``) — same
+       trust-and-return rule as explicit.
+    3. ``which("s32dsc.exe")`` — if the exe is on PATH, derive the root as
+       ``Path(exe).parent.parent`` and return it **only** when
+       ``is_valid_s32ds_root`` passes (a stray exe without a matching SDK is
+       not a usable root).
+    4. Parent-directory glob — for each directory in *search_parents*
+       (defaults to ``_DEFAULT_S32DS_PARENTS``, i.e. ``C:\\NXP`` and
+       ``C:\\nxp``): collect child directories whose names start with
+       ``S32DS`` (case-insensitive), keep only valid roots, sort descending
+       by ``(parsed_version_tuple, directory_name)`` so a higher parseable
+       version always wins; among roots whose names do not parse to a version
+       (empty tuple tie), the directory name provides a deterministic
+       descending lexicographic tiebreak.
+    5. ``None`` — no usable root found; the caller emits a diagnostic.
+
+    This function never raises.
+    """
+    # 1. Explicit path from --s32ds-root
+    if explicit is not None:
+        return Path(explicit)
+
+    # 2. Environment variable
+    if env is None:
+        env = os.environ
+    env_val = env.get("RTD_CONFIG_S32DS_ROOT")
+    if env_val:
+        return Path(env_val)
+
+    # 3. which("s32dsc.exe") — exe on PATH
+    try:
+        exe_str = which("s32dsc.exe")  # type: ignore[operator]
+    except Exception:
+        exe_str = None
+    if exe_str:
+        derived = Path(exe_str).parent.parent
+        if is_valid_s32ds_root(derived):
+            return derived
+
+    # 4. Parent-directory glob
+    parents = _DEFAULT_S32DS_PARENTS if search_parents is None else search_parents
+    for parent in parents:
+        if not parent.is_dir():
+            continue
+        candidates: list[tuple[tuple[int, ...], Path]] = []
+        for child in parent.iterdir():
+            if not child.is_dir():
+                continue
+            if not child.name.upper().startswith("S32DS"):
+                continue
+            if not is_valid_s32ds_root(child):
+                continue
+            candidates.append((_parse_s32ds_version(child.name), child))
+        if candidates:
+            # Sort descending by (version_tuple, name): a higher parseable
+            # version always wins; equal/empty-tuple roots fall back to
+            # descending directory-name order for a deterministic tiebreak.
+            candidates.sort(key=lambda t: (t[0], t[1].name), reverse=True)
+            return candidates[0][1]
+
+    # 5. Not found
+    return None
+
+
+def probe_which_root(which_fn: object = shutil.which) -> Path | None:
+    """Return the S32DS root derived from ``which("s32dsc.exe")``, or None.
+
+    Unlike the ``which`` branch inside :func:`find_s32ds_root` — which silently
+    drops an invalid root — this helper returns the derived path even when
+    ``is_valid_s32ds_root`` fails, so callers can surface a breadcrumb such as
+    "found s32dsc.exe at <path> but the installation is incomplete" rather than
+    the generic "not configured" message.
+    """
+    try:
+        exe_str = which_fn("s32dsc.exe")  # type: ignore[operator]
+    except Exception:
+        exe_str = None
+    if exe_str:
+        return Path(exe_str).parent.parent
+    return None
 
 
 def _launcher_prefix(s32ds_root: Path) -> list[str]:

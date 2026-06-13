@@ -5,10 +5,10 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![Python](https://img.shields.io/badge/python-3.11%2B-blue.svg)
 ![Dependencies](https://img.shields.io/badge/deps-stdlib--only-success.svg)
-![Tests](https://img.shields.io/badge/tests-44%20passing-brightgreen.svg)
+![Tests](https://img.shields.io/badge/tests-411%20passing-brightgreen.svg)
 ![Backend](https://img.shields.io/badge/backend-S32%20ConfigTools%20.mex-blue.svg)
 ![NXP RTD](https://img.shields.io/badge/NXP%20RTD-7.0.1-blue.svg)
-![Roadmap](https://img.shields.io/badge/roadmap-stage%201%20·%20minimal%20system-orange.svg)
+![Minimal system](https://img.shields.io/badge/minimal%20system-complete-brightgreen.svg)
 ![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)
 
 ## What it is
@@ -31,16 +31,16 @@ self-contained on another machine or in another agent environment.
 
 ## Status
 
-**Minimal system (roadmap stage 1) — in progress.** The **Uart reference path**
-(LPUART and FlexIO, interrupt mode) is delivered and vendor-validated end to
-end. The acceptance bar is **module parity**: `Mcu, BaseNXP, Platform, Port,
-Dio, Mcl, Uart` — all equal priority — each passing its E2E acceptance cases
-and the S32DS gate. See
+**Minimal system (roadmap stage 1) — complete.** All seven modules — `Mcu,
+BaseNXP, Platform, Port, Dio, Mcl, Uart` (equal priority) — are delivered and
+vendor-validated end to end: every E2E acceptance case passes the S32DS gate
+(exit `0`, code generated, no SEVERE `[TOOL]`) with its generated code verified.
+See
 [`docs/tests/rtd-config-acceptance-report.md`](docs/tests/rtd-config-acceptance-report.md).
 
-> RTD models the Uart asynchronous method as **interrupt or DMA only** (no polling).
-> The delivered Uart path currently supports interrupt; the DMA capability is a
-> tracked target (`RTD-MEX-UART-003` in the test cases).
+> RTD models the Uart asynchronous method as **interrupt or DMA only** (no
+> polling). Both modes are delivered: `uart set --mode interrupt|dma` (DMA wires
+> the Mcl DMA channels and the Platform DMATCD completion ISRs).
 
 ## Quick start
 
@@ -62,7 +62,8 @@ python autombd-rtd uart set --project <path> --hw LPUART_0 --mode interrupt \
 
 # Static checks only / full S32DS headless validation
 python autombd-rtd check --project <path> --json
-python autombd-rtd validate --project <path> --s32ds-root C:\NXP\S32DS.3.6.7 --json
+# validate auto-discovers a standard S32DS install (override: --s32ds-root / RTD_CONFIG_S32DS_ROOT)
+python autombd-rtd validate --project <path> --json
 ```
 
 (Equivalent without the launcher: put `autombd-rtd/rtd-config-cli-py` on

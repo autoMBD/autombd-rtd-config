@@ -47,11 +47,21 @@
 from pathlib import Path
 
 
-def test_rtd_config_skill_names_public_cli_and_m1_scope():
+def test_rtd_config_skill_documents_public_cli_and_module_surface():
     skill = Path("autombd-rtd/SKILL.md").read_text(encoding="utf-8")
+    # Names the tool and its read-only CLI surface.
     assert "RTD CfgFile CLI" in skill
     assert "rtd-config inspect" in skill
     assert "rtd-config pin-options" in skill
-    assert "Milestone 1" in skill
+    assert "validate" in skill
+    # Documents the full seven-module configure surface, not uart alone.
+    for fragment in (
+        "mcu set", "basenxp set", "platform set", "port set",
+        "dio set", "mcl set", "uart set",
+    ):
+        assert fragment in skill, f"SKILL.md must document `{fragment}`"
+    # DMA is a supported Uart mode now; the milestone-era rejection is gone.
     assert "DMA" in skill
-    assert "not in Milestone 1" in skill
+    assert "dma_not_supported_in_m1" not in skill
+    # Active docs stay milestone-free; guard against regression to M1 wording.
+    assert "Milestone 1" not in skill
