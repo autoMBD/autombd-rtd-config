@@ -623,15 +623,18 @@ def _ensure_dma_logic_channel(doc: MexDocument, channel_index: int) -> bool:
 def _activate_dma_logic_channel_0(doc: MexDocument) -> None:
     """Activate dmaLogicChannel_Type_0 for DMA TX use.
 
-    Sets the three activation flags on the EXISTING dmaLogicChannel_Type_0 struct:
-    - dmaLogicChannel_EnableGlobalConfig = true  (channel visible to driver)
-    - dmaGlobalRequest_enDmaRequest = true        (LPUART HW DMA request triggers transfer)
-    - dmaLogicChannelConfig_enDmaMajorInterrupt = true  (generates DMATCD IRQ on completion)
+    Sets the three activation flags on the EXISTING dmaLogicChannel_Type_0 struct.
+    Flag values are loaded from uart.json mcl_dma_channel_template (not hardcoded)
+    to ensure the asset is the single truth source.
 
-    All three are attribute mutations (no raw-bytes splice). The fixture has all
-    three fields present with value="false"; we update them in place.
     Grounded in fixture lines ~600, ~614, ~632 and uart.json mcl_dma_channel_template.
     """
+    asset = _load_uart_asset()
+    tmpl = asset.get("mcl_dma_channel_template", {})
+    flag_global = tmpl.get("dmaLogicChannel_EnableGlobalConfig", "true")
+    flag_req = tmpl.get("dmaGlobalRequest_enDmaRequest", "true")
+    flag_irq = tmpl.get("dmaLogicChannelConfig_enDmaMajorInterrupt", "true")
+
     mcl_cfg = doc.find_config_set("Mcl")
     if mcl_cfg is None:
         return
@@ -645,16 +648,16 @@ def _activate_dma_logic_channel_0(doc: MexDocument) -> None:
             ns = doc.find_child_setting(ch, "Name")
             if ns is None or ns.attrib.get("value") != "dmaLogicChannel_Type_0":
                 continue
-            # Found ch0: update EnableGlobalConfig
+            # Found ch0: update EnableGlobalConfig (from template)
             en_global = doc.find_child_setting(ch, "dmaLogicChannel_EnableGlobalConfig")
             if en_global is not None:
-                en_global.set("value", "true")
-            # Update dmaGlobalRequest_enDmaRequest (nested in GlobalConfigType/GlobalRequestType)
+                en_global.set("value", flag_global)
+            # Update nested flags (from template)
             for el in ch.iter():
                 if el.tag.endswith("setting") and el.attrib.get("name") == "dmaGlobalRequest_enDmaRequest":
-                    el.set("value", "true")
+                    el.set("value", flag_req)
                 if el.tag.endswith("setting") and el.attrib.get("name") == "dmaLogicChannelConfig_enDmaMajorInterrupt":
-                    el.set("value", "true")
+                    el.set("value", flag_irq)
             break
 
 
@@ -754,9 +757,11 @@ def _apply_uart_set_dma_phase1(
     asset = _load_uart_asset()
     dma_map = asset.get("dma_hw_channel_irq_map", {})
 
-    # 1. Add MCL dmaLogicChannel_Type_1 (RX, ch index=1)
-    mcl_inserted = _ensure_dma_logic_channel(doc, channel_index=1)
-    if mcl_inserted and "mcl" not in result.changed_modules:
+    # 1. Add MCL dmaLogicChannel_Type_1 (RX, ch index=1).
+    # "mcl" is always added to changed_modules in DMA mode: even on an idempotent
+    # re-apply the MCL attribute mutations (MclEnableDma, ch0 flags) are re-written.
+    _ensure_dma_logic_channel(doc, channel_index=1)
+    if "mcl" not in result.changed_modules:
         result.changed_modules.append("mcl")
 
     # 2. Insert Platform DMATCD0_IRQn (TX DMA complete)
@@ -779,6 +784,8 @@ def _apply_uart_set_dma_phase1(
             priority=priority,
         )
 
+    # "platform" is always added in DMA mode: even on idempotent re-apply the
+    # platform config_set is marked modified and ISR entries are confirmed present.
     if (ch0_entry or ch1_entry) and "platform" not in result.changed_modules:
         result.changed_modules.append("platform")
 

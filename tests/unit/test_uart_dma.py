@@ -757,44 +757,131 @@ class TestDmaByteNarrow:
 # ---------------------------------------------------------------------------
 
 class TestDmaAntiHardcode:
-    """The DMA channel->ISR/handler mapping must be computed, not hardcoded."""
+    """The DMA channel->ISR/handler mapping must be derived from the asset, not hardcoded.
 
-    def test_dma_isr_derivation_from_hw_ch_id(self, tmp_path):
-        """The ISR names and handlers are derived from DMA channel ids, not literal strings.
+    The real proof is: perturb the asset map at load time and assert the WRITTEN
+    Platform ISR name/handler in the mex track the perturbed values. This way, any
+    hardcode of DMATCD0_IRQn / Dma0_Ch0_IRQHandler in production code would cause
+    the test to fail when the asset map is changed.
+    """
 
-        Verify: dma_hw_channel_irq_map key=0 -> DMATCD0_IRQn/Dma0_Ch0_IRQHandler.
-        This tests the ASSET is the single truth source, not code constants.
+    def test_written_dmatcd0_isr_name_tracks_asset_map(self, tmp_path, monkeypatch):
+        """DMATCD0_IRQn in the written mex must equal the dma_hw_channel_irq_map[0].irq_name.
+
+        Monkeypatches the loaded asset to use a sentinel IRQ name, then verifies
+        the written Platform ISR entry carries that sentinel -- not a hardcoded literal.
         """
-        data = json.loads(_UART_ASSET.read_text(encoding="utf-8"))
-        dma_map = data["dma_hw_channel_irq_map"]
+        import rtd_config.backends.s32_mex.apply as apply_mod
+        sentinel_irq = "SENTINEL_DMA0_IRQn"
+        sentinel_handler = "Sentinel_Ch0_IRQHandler"
 
-        # Both string and int keys should resolve
-        ch0 = dma_map.get("0") or dma_map.get(0)
-        ch1 = dma_map.get("1") or dma_map.get(1)
+        original_load = apply_mod._load_uart_asset
 
-        assert ch0 is not None
-        assert ch1 is not None
+        def _patched_load():
+            data = original_load()
+            data = dict(data)
+            data["dma_hw_channel_irq_map"] = {
+                "0": {"irq_name": sentinel_irq, "isr_handler": sentinel_handler},
+                "1": {"irq_name": "SENTINEL_DMA1_IRQn", "isr_handler": "Sentinel_Ch1_IRQHandler"},
+            }
+            return data
 
-        # Pattern: DMATCD<N>_IRQn / Dma0_Ch<N>_IRQHandler
-        assert ch0["irq_name"] == f"DMATCD0_IRQn"
-        assert ch0["isr_handler"] == f"Dma0_Ch0_IRQHandler"
-        assert ch1["irq_name"] == f"DMATCD1_IRQn"
-        assert ch1["isr_handler"] == f"Dma0_Ch1_IRQHandler"
+        monkeypatch.setattr(apply_mod, "_load_uart_asset", _patched_load)
 
-    def test_dma_channel_to_irq_pattern_is_computed(self):
-        """Verify ISR name and handler patterns follow DMATCD<N>_IRQn / Dma0_Ch<N>_IRQHandler.
+        project = copy_uart_fixture(tmp_path)
+        doc = MexDocument.load(project / "Uart_Example.mex")
+        result = apply_uart_set(doc, _intent(hw="LPUART_3", mode="dma", priority=2))
+        assert not result.blocked, [d.to_dict() for d in result.diagnostics]
 
-        If someone tries to hardcode 'DMATCD0_IRQn' directly in production code,
-        changing the asset map should NOT affect the test outcome.
-        This test verifies the ASSET is authoritative for each channel index.
+        # The ISR name written to the mex must match the (monkeypatched) asset
+        assert _platform_isr_setting(doc, sentinel_irq, "IsrHandler") == sentinel_handler, (
+            "DMA ch0 ISR name/handler in mex must come from the asset map, not a hardcoded literal"
+        )
+        # Confirm the real DMATCD0_IRQn was NOT written (it was replaced by the sentinel)
+        assert _platform_isr_entry(doc, _DMATCD0_IRQ) is None, (
+            "The real DMATCD0_IRQn must NOT appear when the asset map uses a sentinel"
+        )
+
+    def test_written_dmatcd1_isr_name_tracks_asset_map(self, tmp_path, monkeypatch):
+        """DMATCD1_IRQn in the written mex must equal the dma_hw_channel_irq_map[1].irq_name.
+
+        Same sentinel pattern as above, for the RX channel.
         """
-        data = json.loads(_UART_ASSET.read_text(encoding="utf-8"))
-        dma_map = data["dma_hw_channel_irq_map"]
-        for ch_idx in range(2):
-            entry = dma_map.get(str(ch_idx)) or dma_map.get(ch_idx)
-            assert entry is not None, f"Missing entry for channel {ch_idx}"
-            assert entry["irq_name"] == f"DMATCD{ch_idx}_IRQn"
-            assert entry["isr_handler"] == f"Dma0_Ch{ch_idx}_IRQHandler"
+        import rtd_config.backends.s32_mex.apply as apply_mod
+        sentinel_irq = "SENTINEL_DMA1_IRQn"
+        sentinel_handler = "Sentinel_Ch1_IRQHandler"
+
+        original_load = apply_mod._load_uart_asset
+
+        def _patched_load():
+            data = original_load()
+            data = dict(data)
+            data["dma_hw_channel_irq_map"] = {
+                "0": {"irq_name": "SENTINEL_DMA0_IRQn", "isr_handler": "Sentinel_Ch0_IRQHandler"},
+                "1": {"irq_name": sentinel_irq, "isr_handler": sentinel_handler},
+            }
+            return data
+
+        monkeypatch.setattr(apply_mod, "_load_uart_asset", _patched_load)
+
+        project = copy_uart_fixture(tmp_path)
+        doc = MexDocument.load(project / "Uart_Example.mex")
+        result = apply_uart_set(doc, _intent(hw="LPUART_3", mode="dma", priority=2))
+        assert not result.blocked, [d.to_dict() for d in result.diagnostics]
+
+        assert _platform_isr_setting(doc, sentinel_irq, "IsrHandler") == sentinel_handler, (
+            "DMA ch1 ISR name/handler in mex must come from the asset map, not a hardcoded literal"
+        )
+        assert _platform_isr_entry(doc, _DMATCD1_IRQ) is None, (
+            "The real DMATCD1_IRQn must NOT appear when the asset map uses a sentinel"
+        )
+
+    def test_activation_flags_track_asset_template(self, tmp_path, monkeypatch):
+        """The three activation flags written to dmaLogicChannel_Type_0 must equal the asset template.
+
+        Monkeypatches the template to use "false" for all three flags, then asserts
+        the WRITTEN values in the mex match the (patched) template -- not hardcoded "true".
+        """
+        import rtd_config.backends.s32_mex.apply as apply_mod
+        original_load = apply_mod._load_uart_asset
+
+        def _patched_load():
+            data = original_load()
+            data = dict(data)
+            # Overwrite the template flags so they differ from the real values
+            data["mcl_dma_channel_template"] = {
+                "dmaLogicChannel_EnableGlobalConfig": "false",
+                "dmaGlobalRequest_enDmaRequest": "false",
+                "dmaLogicChannelConfig_enDmaMajorInterrupt": "false",
+            }
+            return data
+
+        monkeypatch.setattr(apply_mod, "_load_uart_asset", _patched_load)
+
+        project = copy_uart_fixture(tmp_path)
+        doc = MexDocument.load(project / "Uart_Example.mex")
+        apply_uart_set(doc, _intent(hw="LPUART_3", mode="dma"))
+
+        # With the template overridden to "false", the written values must also be "false"
+        # (not hardcoded "true"). If production hardcodes "true" this fails.
+        val_global = _mcl_dma_channel_setting(
+            doc, "dmaLogicChannel_Type_0", "dmaLogicChannel_EnableGlobalConfig"
+        )
+        val_req = _mcl_dma_channel_setting(
+            doc, "dmaLogicChannel_Type_0", "dmaGlobalRequest_enDmaRequest"
+        )
+        val_irq = _mcl_dma_channel_setting(
+            doc, "dmaLogicChannel_Type_0", "dmaLogicChannelConfig_enDmaMajorInterrupt"
+        )
+        assert val_global == "false", (
+            "dmaLogicChannel_EnableGlobalConfig must come from asset template, not hardcoded 'true'"
+        )
+        assert val_req == "false", (
+            "dmaGlobalRequest_enDmaRequest must come from asset template, not hardcoded 'true'"
+        )
+        assert val_irq == "false", (
+            "dmaLogicChannelConfig_enDmaMajorInterrupt must come from asset template, not hardcoded 'true'"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -924,3 +1011,171 @@ class TestCliDmaIntegration:
         assert result.returncode == 0, result.stderr
         assert payload["status"] == "passed"
         assert "uart" in payload["changed_modules"]
+
+
+# ---------------------------------------------------------------------------
+# Fix 3: Structural equivalence dmaLogicChannel_Type_1 vs _0
+# ---------------------------------------------------------------------------
+
+def _collect_nested_struct_and_setting_names(el: ET.Element) -> set[str]:
+    """Return the set of all struct.name and setting.name in the subtree (excluding root)."""
+    names: set[str] = set()
+    for child in el.iter():
+        if child is el:
+            continue
+        tag = child.tag
+        if tag.endswith("struct") or tag.endswith("setting"):
+            n = child.attrib.get("name")
+            if n:
+                names.add(n)
+    return names
+
+
+# Setting names that are allowed to differ between _0 and _1 (index-varying fields).
+_CHANNEL_VARYING_SETTINGS = {
+    "Name",
+    "dmaLogicChannel_LogicName",
+    "dmaLogicChannel_HwChId",
+    "dmaLogicChannel_EnableGlobalConfig",
+    "dmaGlobalRequest_enDmaRequest",
+    "dmaLogicChannelConfig_enDmaMajorInterrupt",
+    "dynamic_dmaLogicChannelConfig_MinorLoopLinkChValueType",
+    "dynamic_dmaLogicChannelConfig_MajorLoopLinkChValueType",
+}
+
+
+class TestDmaLogicChannelStructuralEquivalence:
+    """dmaLogicChannel_Type_1 must have the IDENTICAL nested struct+setting NAME set as _0.
+
+    Values may differ only at the channel-varying settings; the schema (field names)
+    must be identical. This catches a future dropped/added field in
+    _build_dma_logic_channel_struct_bytes.
+    """
+
+    def test_ch1_and_ch0_have_identical_struct_name_set(self, tmp_path):
+        """All struct names present in _0 must also appear in _1, and vice versa."""
+        project = copy_uart_fixture(tmp_path)
+        doc = MexDocument.load(project / "Uart_Example.mex")
+        apply_uart_set(doc, _intent(hw="LPUART_3", mode="dma"))
+
+        ch0 = _mcl_dma_channel(doc, "dmaLogicChannel_Type_0")
+        ch1 = _mcl_dma_channel(doc, "dmaLogicChannel_Type_1")
+        assert ch0 is not None, "dmaLogicChannel_Type_0 must exist"
+        assert ch1 is not None, "dmaLogicChannel_Type_1 must exist after DMA apply"
+
+        def _struct_names(el):
+            return {
+                child.attrib.get("name")
+                for child in el.iter()
+                if child is not el and child.tag.endswith("struct") and child.attrib.get("name")
+            }
+
+        structs0 = _struct_names(ch0)
+        structs1 = _struct_names(ch1)
+        only_in_0 = structs0 - structs1
+        only_in_1 = structs1 - structs0
+        assert not only_in_0, f"Struct names in _0 but not in _1: {sorted(only_in_0)}"
+        assert not only_in_1, f"Struct names in _1 but not in _0: {sorted(only_in_1)}"
+
+    def test_ch1_and_ch0_have_identical_setting_name_set(self, tmp_path):
+        """All setting names present in _0 must also appear in _1, and vice versa."""
+        project = copy_uart_fixture(tmp_path)
+        doc = MexDocument.load(project / "Uart_Example.mex")
+        apply_uart_set(doc, _intent(hw="LPUART_3", mode="dma"))
+
+        ch0 = _mcl_dma_channel(doc, "dmaLogicChannel_Type_0")
+        ch1 = _mcl_dma_channel(doc, "dmaLogicChannel_Type_1")
+        assert ch0 is not None
+        assert ch1 is not None
+
+        def _setting_names(el):
+            return {
+                child.attrib.get("name")
+                for child in el.iter()
+                if child is not el and child.tag.endswith("setting") and child.attrib.get("name")
+            }
+
+        settings0 = _setting_names(ch0)
+        settings1 = _setting_names(ch1)
+        only_in_0 = settings0 - settings1
+        only_in_1 = settings1 - settings0
+        assert not only_in_0, f"Setting names in _0 but not in _1: {sorted(only_in_0)}"
+        assert not only_in_1, f"Setting names in _1 but not in _0: {sorted(only_in_1)}"
+
+    def test_ch1_non_varying_settings_have_same_values_as_ch0(self, tmp_path):
+        """Non-index-varying settings must have identical values in _0 and _1."""
+        project = copy_uart_fixture(tmp_path)
+        doc = MexDocument.load(project / "Uart_Example.mex")
+        # Apply DMA to set ch0 flags; ch1 is the freshly built struct
+        apply_uart_set(doc, _intent(hw="LPUART_3", mode="dma"))
+
+        ch0 = _mcl_dma_channel(doc, "dmaLogicChannel_Type_0")
+        ch1 = _mcl_dma_channel(doc, "dmaLogicChannel_Type_1")
+        assert ch0 is not None
+        assert ch1 is not None
+
+        def _setting_map(el):
+            return {
+                child.attrib.get("name"): child.attrib.get("value")
+                for child in el.iter()
+                if child is not el
+                and child.tag.endswith("setting")
+                and child.attrib.get("name") not in _CHANNEL_VARYING_SETTINGS
+            }
+
+        map0 = _setting_map(ch0)
+        map1 = _setting_map(ch1)
+        mismatches = {
+            k: (map0.get(k), map1.get(k))
+            for k in map0.keys() | map1.keys()
+            if map0.get(k) != map1.get(k)
+        }
+        assert not mismatches, (
+            "Non-varying settings differ between _0 and _1:\n"
+            + "\n".join(f"  {k}: _0={v0!r}, _1={v1!r}" for k, (v0, v1) in sorted(mismatches.items()))
+        )
+
+
+# ---------------------------------------------------------------------------
+# Fix 5: changed_modules accuracy on idempotent re-run
+# ---------------------------------------------------------------------------
+
+class TestDmaIdempotentChangedModules:
+    """changed_modules must include mcl even on an idempotent (second) DMA apply.
+
+    The second apply re-activates the MCL attributes (MclEnableDma, ch0 flags),
+    so mcl is part of the actual edited set even when no new struct is inserted.
+    """
+
+    def test_idempotent_dma_changed_modules_includes_mcl(self, tmp_path):
+        project = copy_uart_fixture(tmp_path)
+        mex = project / "Uart_Example.mex"
+
+        # First apply
+        doc1 = MexDocument.load(mex)
+        apply_uart_set(doc1, _intent(hw="LPUART_3", mode="dma", priority=2))
+        doc1.write(mex)
+
+        # Second apply (idempotent)
+        doc2 = MexDocument.load(mex)
+        result2 = apply_uart_set(doc2, _intent(hw="LPUART_3", mode="dma", priority=2))
+        assert not result2.blocked, [d.to_dict() for d in result2.diagnostics]
+        assert "mcl" in result2.changed_modules, (
+            "mcl must appear in changed_modules even on idempotent re-apply "
+            "(MCL attributes are re-written each time)"
+        )
+
+    def test_idempotent_dma_changed_modules_includes_platform(self, tmp_path):
+        project = copy_uart_fixture(tmp_path)
+        mex = project / "Uart_Example.mex"
+
+        doc1 = MexDocument.load(mex)
+        apply_uart_set(doc1, _intent(hw="LPUART_3", mode="dma", priority=2))
+        doc1.write(mex)
+
+        doc2 = MexDocument.load(mex)
+        result2 = apply_uart_set(doc2, _intent(hw="LPUART_3", mode="dma", priority=2))
+        assert not result2.blocked
+        assert "platform" in result2.changed_modules, (
+            "platform must appear in changed_modules even on idempotent re-apply"
+        )

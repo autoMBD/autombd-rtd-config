@@ -100,7 +100,7 @@
   "mcl_ref_path_pattern": "/Mcl/Mcl/MclConfig/FlexioCommon_0/{channel_name}",
   "dma_channel_ref_path_pattern": "/Mcl/Mcl/MclConfig/dmaLogicChannel_Type_{index}",
   "dma_hw_channel_irq_map": {
-    "_note": "Grounded in: Platform.epd DMATCD IRQ table, Dma_Ip_Irq.c Dma0_Ch<N>_IRQHandler, Spi_Transfer example, fixture Uart_Example_S32K344. Mapping: DMA HW channel N -> DMATCD<N>_IRQn / Dma0_Ch<N>_IRQHandler. DMA TX uses ch 0 (existing fixture dmaLogicChannel_Type_0 HwChId=DMA_IP_HW_CH_0). DMA RX uses ch 1 (new dmaLogicChannel_Type_1 HwChId=DMA_IP_HW_CH_1).",
+    "_note": "Grounded in installed-RTD-derived sources: Platform.epd DMATCD IRQ table and Dma_Ip_Irq.c Dma0_Ch<N>_IRQHandler (S32K3 RTD 7.0.1, S32K344). NOT derived from the committed fixture (Uart_Example_S32K344). Mapping: DMA HW channel N -> DMATCD<N>_IRQn / Dma0_Ch<N>_IRQHandler. DMA TX uses ch 0 (existing fixture dmaLogicChannel_Type_0 HwChId=DMA_IP_HW_CH_0). DMA RX uses ch 1 (new dmaLogicChannel_Type_1 HwChId=DMA_IP_HW_CH_1). Cross-cutting fact also recorded in docs/specs/rtd-config-domain-truth.md §4.",
     "0": {"irq_name": "DMATCD0_IRQn", "isr_handler": "Dma0_Ch0_IRQHandler"},
     "1": {"irq_name": "DMATCD1_IRQn", "isr_handler": "Dma0_Ch1_IRQHandler"}
   },

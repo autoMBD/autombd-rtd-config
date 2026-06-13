@@ -168,10 +168,100 @@ def _check_enabled_modules(doc: MexDocument, checks: dict, diagnostics: list[Dia
 def _check_dma(doc: MexDocument, diagnostics: list[Diagnostic]) -> None:
     """DMA configuration validation.
 
-    DMA mode (RTD-MEX-UART-003) is supported as of the full minimal-system delivery.
-    UartDmaEnable=true and MclEnableDma=true are valid when DMA mode is configured.
-    No blocker is raised; structural consistency is validated elsewhere.
+    DMA mode (RTD-MEX-UART-003) is supported. When a Uart channel has
+    UartInteruptDmaMethod == LPUART_UART_IP_USING_DMA (or GeneralConfiguration
+    UartDmaEnable == true), the Uart.xdm INVALID rule requires:
+      - UartDmaTxChannelRef[0] must be non-empty.
+      - UartDmaRxChannelRef[0] must be non-empty.
+      - Mcl MclEnableDma must be true.
+
+    Missing or incomplete DMA configuration is a blocker: ConfigTools marks these
+    fields INVALID and rejects the configuration.
+
+    Channels with UartInteruptDmaMethod != LPUART_UART_IP_USING_DMA are skipped
+    (interrupt mode has no DMA refs and MclEnableDma may remain false).
+
+    Grounded in: Uart.xdm INVALID rules (domain-truth §1); fixture
+    Uart_Example_S32K344; uart.json UartInteruptDmaMethod enum domain.
     """
+    uart_cfg = doc.find_config_set("Uart")
+    if uart_cfg is None:
+        return
+
+    # Collect all LPUART channels that use DMA method
+    dma_channels: list[ET.Element] = []
+    for array in uart_cfg.iter():
+        if not (array.tag.endswith("array") and array.attrib.get("name") == "UartChannel"):
+            continue
+        for channel in array:
+            if not channel.tag.endswith("struct"):
+                continue
+            using_el = doc.find_child_setting(channel, "UartHwUsing")
+            if using_el is None or using_el.attrib.get("value") != "LPUART_IP":
+                continue
+            # Look for UartInteruptDmaMethod in DetailModuleConfiguration
+            for el in channel.iter():
+                if el.tag.endswith("struct") and el.attrib.get("name") == "DetailModuleConfiguration":
+                    method_el = doc.find_child_setting(el, "UartInteruptDmaMethod")
+                    if (
+                        method_el is not None
+                        and method_el.attrib.get("value") == "LPUART_UART_IP_USING_DMA"
+                    ):
+                        dma_channels.append(channel)
+                    break
+
+    if not dma_channels:
+        return
+
+    # At least one DMA channel present: check MclEnableDma
+    mcl_dma_enabled = False
+    for setting in doc.root.iter():
+        if setting.tag.endswith("setting") and setting.attrib.get("name") == "MclEnableDma":
+            if setting.attrib.get("value", "false").lower() == "true":
+                mcl_dma_enabled = True
+                break
+
+    if not mcl_dma_enabled:
+        diagnostics.append(Diagnostic(
+            severity="blocker",
+            code="dma_mcl_not_enabled",
+            module="mcl",
+            message=(
+                "Uart DMA mode requires MclEnableDma=true in Mcl configuration. "
+                "Set MclEnableDma=true or use interrupt mode."
+            ),
+            details={},
+        ))
+
+    # For each DMA channel, check that Tx/Rx refs are populated
+    for channel in dma_channels:
+        ch_name = _channel_name(doc, channel)
+        tx_populated = False
+        rx_populated = False
+        for el in channel.iter():
+            if el.tag.endswith("struct") and el.attrib.get("name") == "DetailModuleConfiguration":
+                for child in el:
+                    if child.tag.endswith("array") and child.attrib.get("name") == "UartDmaTxChannelRef":
+                        for item in child:
+                            if item.attrib.get("name") == "0" and item.attrib.get("value", "").strip():
+                                tx_populated = True
+                    if child.tag.endswith("array") and child.attrib.get("name") == "UartDmaRxChannelRef":
+                        for item in child:
+                            if item.attrib.get("name") == "0" and item.attrib.get("value", "").strip():
+                                rx_populated = True
+                break
+
+        if not tx_populated or not rx_populated:
+            diagnostics.append(Diagnostic(
+                severity="blocker",
+                code="dma_refs_incomplete",
+                module="uart",
+                message=(
+                    "Uart DMA channel requires non-empty UartDmaTxChannelRef[0] and "
+                    "UartDmaRxChannelRef[0] (Uart.xdm INVALID rule)."
+                ),
+                details={"channel": ch_name, "tx_populated": tx_populated, "rx_populated": rx_populated},
+            ))
 
 
 def _check_flexio_refs(doc: MexDocument, diagnostics: list[Diagnostic]) -> None:
