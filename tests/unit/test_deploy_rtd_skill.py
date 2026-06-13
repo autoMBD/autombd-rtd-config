@@ -82,6 +82,11 @@ def assert_released_payload(installed: Path):
     assert not (installed / "tools").exists()
 
 
+def assert_link_points_to(link: Path, target: Path):
+    assert link.exists()
+    assert link.resolve() == target.resolve()
+
+
 def test_deploy_defaults_to_codex_and_claude_project_skill_indexes(tmp_path):
     deploy = load_deploy_module()
     repo_root = Path(__file__).resolve().parents[2]
@@ -89,11 +94,14 @@ def test_deploy_defaults_to_codex_and_claude_project_skill_indexes(tmp_path):
     results = deploy.deploy(repo_root, tmp_path)
 
     assert {result.agent for result in results} == {"codex", "claude"}
-    for result in results:
-        assert result.action == "deployed"
-        assert result.version == "0.1.0"
-    assert_released_payload(tmp_path / ".agents" / "skills" / "autombd-rtd")
-    assert_released_payload(tmp_path / ".claude" / "skills" / "autombd-rtd")
+    by_agent = {result.agent: result for result in results}
+    assert by_agent["codex"].action == "deployed"
+    assert by_agent["claude"].action == "linked"
+    canonical = tmp_path / ".agents" / "skills" / "autombd-rtd"
+    linked = tmp_path / ".claude" / "skills" / "autombd-rtd"
+    assert_released_payload(canonical)
+    assert_link_points_to(linked, canonical)
+    assert_released_payload(linked)
 
 
 def test_deploy_can_target_only_claude_project_skill_index(tmp_path):
@@ -104,9 +112,12 @@ def test_deploy_can_target_only_claude_project_skill_index(tmp_path):
 
     assert len(results) == 1
     assert results[0].agent == "claude"
+    assert results[0].action == "linked"
     assert results[0].destination == tmp_path / ".claude" / "skills" / "autombd-rtd"
+    canonical = tmp_path / ".agents" / "skills" / "autombd-rtd"
+    assert_released_payload(canonical)
+    assert_link_points_to(results[0].destination, canonical)
     assert_released_payload(results[0].destination)
-    assert not (tmp_path / ".agents").exists()
 
 
 def test_deploy_updates_when_installed_version_is_older(tmp_path):
@@ -125,6 +136,37 @@ def test_deploy_updates_when_installed_version_is_older(tmp_path):
     assert result.action == "deployed"
     assert "old-development-note.txt" not in {p.name for p in installed.iterdir()}
     assert "version: 0.1.0" in (installed / "SKILL.md").read_text(encoding="utf-8")
+
+
+def test_deploy_replaces_existing_claude_copy_with_link(tmp_path):
+    deploy = load_deploy_module()
+    repo_root = Path(__file__).resolve().parents[2]
+    installed = tmp_path / ".claude" / "skills" / "autombd-rtd"
+    installed.mkdir(parents=True)
+    (installed / "SKILL.md").write_text(
+        "---\nname: autombd-rtd\nversion: 0.0.9\n---\n# stale\n",
+        encoding="utf-8",
+    )
+
+    result = deploy.deploy_one(repo_root, tmp_path, "claude")
+
+    canonical = tmp_path / ".agents" / "skills" / "autombd-rtd"
+    assert result.action == "linked"
+    assert_link_points_to(installed, canonical)
+
+
+def test_main_reports_linked_agent_destinations(tmp_path, capsys):
+    deploy = load_deploy_module()
+    repo_root = Path(__file__).resolve().parents[2]
+
+    exit_code = deploy.main(
+        [str(tmp_path), "--agent", "claude", "--repo-root", str(repo_root)]
+    )
+
+    output = capsys.readouterr().out
+    assert exit_code == 0
+    assert "linked autombd-rtd 0.1.0 for claude" in output
+    assert "skipped autombd-rtd 0.1.0 for claude" not in output
 
 
 def test_deploy_skips_when_installed_version_is_current_or_newer(tmp_path):

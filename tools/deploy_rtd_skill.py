@@ -50,6 +50,7 @@ from __future__ import annotations
 import argparse
 import re
 import shutil
+import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -57,6 +58,7 @@ from pathlib import Path
 SKILL_NAME = "autombd-rtd"
 SKILL_PAYLOAD_ITEMS = ("SKILL.md", "__main__.py", "rtd-config-cli-py", "assets")
 SUPPORTED_AGENTS = ("codex", "claude")
+CANONICAL_AGENT = "codex"
 AGENT_SKILL_DIRS = {
     "codex": Path(".agents") / "skills",
     "claude": Path(".claude") / "skills",
@@ -203,25 +205,56 @@ def copy_released_payload(source_skill_root: Path, destination: Path) -> None:
         else:
             shutil.copy2(source, target)
 
-    if destination.exists():
-        shutil.rmtree(destination)
+    remove_path(destination)
     staging.rename(destination)
 
 
-def deploy_one(repo_root: Path, target_project: Path, agent: str) -> DeployResult:
+def remove_path(path: Path) -> None:
+    if path.is_symlink() or path.is_file():
+        path.unlink()
+    elif path.exists():
+        shutil.rmtree(path)
+
+
+def ensure_link(source: Path, destination: Path) -> str:
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    source = source.resolve()
+    if destination.exists() and destination.resolve() == source:
+        return "installed_link_is_current"
+    remove_path(destination)
+    try:
+        destination.symlink_to(source, target_is_directory=True)
+        return "symlink_to_canonical_skill"
+    except OSError as exc:
+        if sys.platform != "win32":
+            raise RuntimeError("failed to create directory symlink") from exc
+        result = subprocess.run(
+            ["cmd", "/c", "mklink", "/J", str(destination), str(source)],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if result.returncode != 0:
+            raise RuntimeError(
+                "failed to create directory symlink or Windows junction; "
+                "enable Developer Mode or run the deployment from an elevated shell"
+            ) from exc
+        return "junction_to_canonical_skill"
+
+
+def deploy_canonical(repo_root: Path, target_project: Path) -> DeployResult:
     repo_root = repo_root.resolve()
     source_skill_root = repo_root / SKILL_NAME
     if not source_skill_root.is_dir():
         raise RuntimeError(f"source skill not found: {source_skill_root}")
 
     source_version = require_consistent_project_versions(read_project_versions(repo_root))
-    agent = normalize_agents((agent,))[0]
-    skills_dir = resolve_agent_skills_dir(target_project, agent)
+    skills_dir = resolve_agent_skills_dir(target_project, CANONICAL_AGENT)
     destination = skills_dir / SKILL_NAME
     should_copy, reason = should_deploy(source_version, destination)
     if not should_copy:
         return DeployResult(
-            agent=agent,
+            agent=CANONICAL_AGENT,
             action="skipped",
             version=source_version,
             destination=destination,
@@ -230,9 +263,26 @@ def deploy_one(repo_root: Path, target_project: Path, agent: str) -> DeployResul
 
     copy_released_payload(source_skill_root, destination)
     return DeployResult(
-        agent=agent,
+        agent=CANONICAL_AGENT,
         action="deployed",
         version=source_version,
+        destination=destination,
+        reason=reason,
+    )
+
+
+def deploy_one(repo_root: Path, target_project: Path, agent: str) -> DeployResult:
+    agent = normalize_agents((agent,))[0]
+    canonical_result = deploy_canonical(repo_root, target_project)
+    if agent == CANONICAL_AGENT:
+        return canonical_result
+
+    destination = resolve_agent_skills_dir(target_project, agent) / SKILL_NAME
+    reason = ensure_link(canonical_result.destination, destination)
+    return DeployResult(
+        agent=agent,
+        action="skipped" if reason == "installed_link_is_current" else "linked",
+        version=canonical_result.version,
         destination=destination,
         reason=reason,
     )
@@ -281,6 +331,11 @@ def main(argv: list[str] | None = None) -> int:
         if result.action == "deployed":
             print(
                 f"deployed {SKILL_NAME} {result.version} for {result.agent} "
+                f"to {result.destination} ({result.reason})"
+            )
+        elif result.action == "linked":
+            print(
+                f"linked {SKILL_NAME} {result.version} for {result.agent} "
                 f"to {result.destination} ({result.reason})"
             )
         else:

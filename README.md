@@ -82,15 +82,20 @@ python tools/deploy_rtd_skill.py <target-project-dir> --agent codex
 python tools/deploy_rtd_skill.py <target-project-dir> --agent claude
 ```
 
-By default the helper deploys both supported agent indexes:
-`<target>/.agents/skills/autombd-rtd/` for Codex and
-`<target>/.claude/skills/autombd-rtd/` for Claude Code. Use `--agent codex`,
-`--agent claude`, or `--agent both` to select the destination set explicitly.
+By default the helper supports both agent indexes with one physical payload:
+`<target>/.agents/skills/autombd-rtd/` is the canonical Codex copy, and
+`<target>/.claude/skills/autombd-rtd/` is a filesystem link to that same copy
+for Claude Code. Use `--agent codex`, `--agent claude`, or `--agent both` to
+select the destination set explicitly. Deploying only Claude Code still ensures
+the canonical Codex copy exists first, then links Claude Code to it. On Windows,
+the helper creates a directory symlink when permitted and falls back to an NTFS
+junction when symlink privileges are unavailable.
+
 The helper checks the source version across `autombd-rtd/SKILL.md`, the
-launcher header, and the Python package version before copying. It deploys only
-when the target skill, bundled tool payload, or version metadata is missing, or
-when the installed version is older than the project version. Current or newer
-complete installations are left untouched.
+launcher header, and the Python package version before updating the canonical
+copy. It deploys only when the canonical skill, bundled tool payload, or version
+metadata is missing, or when the installed version is older than the project
+version. Current or newer complete installations are left untouched.
 
 The copied payload is intentionally limited to `SKILL.md`, `__main__.py`,
 `rtd-config-cli-py/`, and `assets/`; development materials such as `docs/`,
