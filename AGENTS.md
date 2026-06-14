@@ -39,10 +39,11 @@ The main agent owns:
   expected evidence, time budgets, and success/failure criteria;
 - dispatching independent implementation, investigation, review, and validation
   subagents instead of personally doing all task-level execution;
-- ensuring independent subagent validation (E2E execution) remains
-  **context-isolated** — the validation agent inherits no prior conversation
-  state and sees only the released skill, the case prompt, and the staged
-  fixture; the isolation mechanism is whatever the agent platform provides;
+- ensuring independent E2E validation is a **true black box** — driven through
+  an independent third-party agent CLI (the `tools/blackbox_e2e.py` harness;
+  Codex-first, extensible registry) that sees only the deployed skill, the case
+  prompt, and the staged fixture, never this repository; the embedded subagent is
+  **not** a valid black box because it inherits repo context and filesystem;
 - monitoring subagent progress and per-case KPI evidence, collecting evidence,
   comparing outputs against active specs, and rejecting incomplete or off-scope
   results;
@@ -83,10 +84,14 @@ values).
 - **Tester**: owns the convergence gate — runs the deterministic suite, S32DS
   validation (pass gate: exit 0 AND no SEVERE `[TOOL]`), and the E2E acceptance
   cases (`docs/tests/rtd-config-test-cases.md`). The Tester also measures each
-  case against its KPI. **E2E execution is context-isolated**: the executing
-  agent sees only the released skill, the case prompt, and the staged fixture —
-  never this repository. Edits tests only; reports production gaps instead of
-  weakening a test.
+  case against its KPI. **E2E runs as a TRUE black box** via the
+  `tools/blackbox_e2e.py` harness, which deploys the released skill into a temp
+  dir and drives an **independent third-party agent CLI** (Codex now; extensible
+  registry) seeing only the case's Subagent Prompt + the deployed skill + the
+  fixture — never this repository, and never the embedded subagent (which would
+  inherit repo context + filesystem). The Tester independently re-runs the vendor
+  gate on the agent-produced `.mex`. Edits tests only; reports production gaps
+  instead of weakening a test.
 - **Reviewer** (read-only): runs **only after the Tester's gate is green**, and
   reviews every development requirement the gate cannot catch — domain values
   vs each `<Module>.xdm`, uniform file header and other missed skill triggers,
@@ -125,7 +130,7 @@ exposes a systemic issue.
 - Tests are the sole convergence signal for the agent development workflow.
   A module is accepted only when its deterministic tests, static checks, the
   S32DS gate (exit code 0 AND no SEVERE `[TOOL]` resource problem), and its
-  E2E acceptance cases (`docs/tests/rtd-config-test-cases.md`, fully isolated
+  E2E acceptance cases (`docs/tests/rtd-config-test-cases.md`, black-box
   protocol) all pass. The minimal system's seven modules (Mcu, BaseNXP,
   Platform, Port, Dio, Mcl, Uart) are equal priority and land together;
   delivery staging lives only in `docs/roadmaps/rtd-config-roadmap.md`.

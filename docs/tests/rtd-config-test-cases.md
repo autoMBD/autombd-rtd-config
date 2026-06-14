@@ -2,10 +2,10 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.3.2 |
+| Version | 0.3.3 |
 | Date | 2026-06-13 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
-| Description | The E2E acceptance test cases for the RTD CfgFile CLI (`.mex` backend, scheme `RTD-MEX-*`). Each case is executed by a fully isolated subagent that sees nothing of this repository — only the released `autombd-rtd` skill/CLI, the case's prompt, and the test fixture. Unit/integration coverage lives in the deterministic pytest suite and is governed by the test strategy, not listed here. |
+| Description | The E2E acceptance test cases for the RTD CfgFile CLI (`.mex` backend, scheme `RTD-MEX-*`). Each case is executed as a true black box by the `tools/blackbox_e2e.py` harness driving an independent third-party agent CLI (Codex now; extensible) that sees nothing of this repository — only the deployed `autombd-rtd` skill/CLI, the case's prompt, and the test fixture. Unit/integration coverage lives in the deterministic pytest suite and is governed by the test strategy, not listed here. |
 
 > **Governed by [`rtd-config-test-strategy.md`](rtd-config-test-strategy.md)**
 > (test layers, the vendor pass gate — exit `0` AND no SEVERE `[TOOL]` —, the
@@ -16,36 +16,43 @@
 > New modules add their cases here in the same format; delivery staging lives in
 > the [roadmap](../roadmaps/rtd-config-roadmap.md).
 
-## 1. Execution protocol — fully isolated subagent
+## 1. Execution protocol — true black box via a third-party agent CLI
 
-E2E cases prove the **released skill** works in a cold environment. The
-executing subagent (the Tester role, or its delegate) is **context-isolated**:
-it must not see this repository, its specs, sources, or tests. The isolation
-mechanism is whatever the agent platform provides (a fresh, non-inherited
-context).
+E2E cases prove the **released skill** works in a cold environment, driven by a
+genuinely independent agent that sees nothing of this repository. The harness
+`tools/blackbox_e2e.py` runs the protocol; the **embedded subagent is NOT a
+valid black box** (it inherits this repo's `CLAUDE.md`/`AGENTS.md` and its
+filesystem, so it can peek), which is why a separate third-party agent CLI is
+required.
 
-1. Create a dedicated temporary directory outside this repository
-   (e.g. `%TEMP%\autombd-rtd-e2e-<case-id>\`).
-2. Stage into it **only**: (a) a copy of the released `autombd-rtd/` skill
-   (`SKILL.md`, the `__main__.py` launcher, `assets/`, and the bundled CLI under
-   `rtd-config-cli-py/`), and (b) a copy of the case's test fixture project.
-3. Dispatch the isolated subagent whose entire input is the case's **Subagent
-   Prompt** plus the two staged paths.
-4. The subagent satisfies the prompt using the skill and its CLI only
-   (`python <skill-dir> <command>`).
-5. Evidence required for functional PASS: the case's **Pass criteria**, the vendor gate
-   (ConfigTools exit `0` **and** no SEVERE `[TOOL] … has the following error`
-   problem), and successful code generation (the validation flow's `-ExportSrc`
-   step emits generated source — verified Flow B, domain-truth §3).
+1. The harness creates a dedicated temporary directory outside this repository.
+2. It deploys the released `autombd-rtd/` skill into the temp dir via
+   `tools/deploy_rtd_skill.py` (`SKILL.md`, the `__main__.py` launcher,
+   `assets/`, and the bundled CLI under `rtd-config-cli-py/`), and copies the
+   case's test fixture project beside it.
+3. It drives an **independent third-party agent CLI** — **Codex** today
+   (`codex exec`, sandboxed to the temp dir); the runner registry is extensible
+   to other agents — whose entire input is the case's **Subagent Prompt** plus a
+   structured-result suffix, with a timeout of **3× the max catalog KPI** (so
+   S32DS validation, which the per-case KPI excludes, still fits).
+4. The agent satisfies the prompt using only the deployed skill and its CLI
+   (`python <skill-dir> <command>`); it never sees this repository or any prior
+   context.
+5. Evidence required for functional PASS: the case's **Pass criteria**, the
+   vendor gate (ConfigTools exit `0` **and** no SEVERE `[TOOL] … has the
+   following error` problem), and successful code generation (Flow B
+   `-ExportSrc`, domain-truth §3). The Tester does **not** trust the agent's
+   self-reported result — it independently re-runs `validate` on the
+   agent-produced `.mex` from the trusted environment, and on failure/timeout
+   collects the agent's full trace (the kept workdir `_blackbox_run.log` and the
+   agent session) for root-cause analysis.
 6. KPI evidence is mandatory for every case. If functional validation passes but
    the KPI is missed, the main agent returns the case to the Worker for KPI
    optimization. The same case gets at most three KPI-optimization iterations.
    After the third KPI miss, the Tester records the true KPI result and the case
    may proceed with its functional PASS evidence.
-7. KPIs (strategy §4): focused ≤ 3 min; E2E ≤ 5 min; the orchestrator
-   intervenes at 10 min. The case table's `Subagent Prompt` cells may stay in
-   Chinese because they are the exact user-facing prompts; all other catalog
-   text is English.
+7. The case table's `Subagent Prompt` cells may stay in Chinese because they are
+   the exact user-facing prompts; all other catalog text is English.
 
 ## 2. Test cases
 
@@ -83,6 +90,7 @@ capability dependencies that once gated these cases are now resolved:
 
 | Date | Version | Description |
 | --- | --- | --- |
+| 2026-06-14 | 0.3.3 | Rewrote section 1 to the TRUE black-box execution protocol: cases are driven by an independent third-party agent CLI (Codex now; extensible registry) via the `tools/blackbox_e2e.py` harness (deploy skill + copy fixture + sandboxed run, timeout 3× the max catalog KPI), NOT the embedded subagent (which inherits repo context/filesystem); the Tester independently re-runs the vendor gate on the agent-produced `.mex` and harvests the trace on failure. |
 | 2026-06-14 | 0.3.2 | Added RTD-MEX-DIO-002 (add a Dio channel on a pin whose DioPort container does not yet exist, e.g. PTA30 → DioPort_1) to codify the DioPort auto-creation capability at the E2E altitude — DIO-001 only ever used a pin in the pre-existing DioPort_0, so the container-creation path lacked E2E coverage (LL-019). Made the section-3 wording count-agnostic. |
 | 2026-06-13 | 0.3.1 | Recorded the section-3 case-status update that the previous commit applied without a changelog row: the capability dependencies that once gated the cases are now marked resolved (DMA delivered — `uart set --mode dma`, coherence via `dma_mcl_not_enabled`/`dma_refs_incomplete`; `pins.json` rebuilt), matching the 9/9 acceptance report. |
 | 2026-06-13 | 0.3.0 | Added mandatory KPI evidence handling to the isolated execution protocol: functional PASS with KPI miss returns to Worker optimization for at most three iterations, then records the true KPI result. Added the `KPI` column contract and converted all non-`Subagent Prompt` case text to English. |

@@ -2,7 +2,7 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.2.1 |
+| Version | 0.2.2 |
 | Date | 2026-06-13 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | How the RTD CfgFile CLI is implemented: one fixed development framework, applied module by module. The first seven modules form the minimal system and are delivered together; every later module is added on explicit user instruction under the same framework. Delivery staging lives in the roadmap. |
@@ -49,9 +49,11 @@ them hold:
    editable surface** (core design G10).
 4. **Deterministic tests (Tester).** Unit/integration coverage for the new
    capability is green: `python -m pytest -q`.
-5. **E2E acceptance (Tester, context-isolated).** The module's E2E case(s) in
-   `docs/tests/rtd-config-test-cases.md` pass under the isolation protocol —
-   released skill + prompt + fixture only — including the vendor gate (exit `0`
+5. **E2E acceptance (Tester, true black box).** The module's E2E case(s) in
+   `docs/tests/rtd-config-test-cases.md` pass under the black-box protocol — the
+   `tools/blackbox_e2e.py` harness drives an independent third-party agent CLI
+   (Codex now; extensible) against the deployed skill + fixture only — including
+   the vendor gate (exit `0`
    AND no SEVERE `[TOOL]`) and successful code generation. Tester records the
    case KPI. If functional validation passes but KPI misses, route back to the
    Worker for optimization; after at most three KPI-optimization iterations,
@@ -80,7 +82,7 @@ them hold:
 | `docs/specs/rtd-config-core-design.md` | Architecture, contract, goals, doc map |
 | `docs/specs/rtd-config-domain-truth.md` | `.xdm` sourcing rule; vendor validation flow + gate; fixture usage |
 | `docs/tests/rtd-config-test-strategy.md` | Test layers, acceptance rule, roles, KPI optimization loop |
-| `docs/tests/rtd-config-test-cases.md` | E2E acceptance cases (`RTD-MEX-*`) + isolation protocol + per-case KPI |
+| `docs/tests/rtd-config-test-cases.md` | E2E acceptance cases (`RTD-MEX-*`) + black-box protocol + per-case KPI |
 | `docs/roadmaps/rtd-config-roadmap.md` | Delivery staging (the only place stages live) |
 | `docs/references/rtd-config-source-materials.md` | Development-time inputs for asset building |
 | `docs/references/rtd-config-legacy-skills-experience.md` | `.mex` editing pitfalls baseline |
@@ -89,6 +91,7 @@ them hold:
 
 | Date | Version | Description |
 | --- | --- | --- |
+| 2026-06-14 | 0.2.2 | Aligned the §5 E2E-acceptance step with the TRUE black-box protocol: cases pass via the `tools/blackbox_e2e.py` harness driving an independent third-party agent CLI (Codex now; extensible) against the deployed skill + fixture only — the embedded subagent is not a valid black box. |
 | 2026-06-13 | 0.2.1 | Added the KPI-monitoring and capped Worker optimization loop to the module delivery checklist and references. |
 | 2026-06-10 | 0.2.0 | Fourth-round review resolution: rewrote as a milestone-agnostic, module-by-module implementation plan (one fixed framework; the first seven modules form the minimal system and land together; later modules are added on user instruction). Removed the historical Milestone-1 task recipes (archived in `docs/OBSOLETE_NEVER_TOUCH!!!/fourth-review/`); renamed the document from `rtd-cfgfile-cli-milestone1-implementation-plan.md`. |
 | 2026-06-02 | 0.1.1 | Added M1 legacy-skills experience baseline and quick-selection requirements to document core, static checks, and acceptance. |
