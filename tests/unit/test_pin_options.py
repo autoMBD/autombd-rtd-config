@@ -49,14 +49,14 @@ import subprocess
 import sys
 
 
-def test_pin_options_returns_runtime_data_without_vendor_launch():
-    result = subprocess.run(
+def _run_pin_options(peripheral):
+    return subprocess.run(
         [
             sys.executable, "-m", "rtd_config",
             "pin-options",
             "--device", "s32k344",
             "--package", "default",
-            "--peripheral", "LPUART_0",
+            "--peripheral", peripheral,
             "--json",
         ],
         text=True,
@@ -64,8 +64,62 @@ def test_pin_options_returns_runtime_data_without_vendor_launch():
         stderr=subprocess.PIPE,
         check=False,
     )
+
+
+def test_pin_options_returns_runtime_data_without_vendor_launch():
+    result = _run_pin_options("LPUART_0")
     assert result.returncode == 0
     payload = json.loads(result.stdout)
     assert payload["status"] == "passed"
     assert payload["command"] == "pin-options"
+    # Peripheral must be presented in user-facing underscore form ("LPUART_0"),
+    # even though the asset stores "LPUART0" internally.
     assert any(item["peripheral"] == "LPUART_0" for item in payload["options"])
+
+
+def test_pin_options_lpuart0_returns_real_pins_not_stub():
+    """LPUART_0 pin options must list real IOMUX-verified pins, not the old stub.
+
+    The stub incorrectly listed PTA15/PTA16.  The correct LPUART0 TX/RX are on
+    PTA27/PTA28 (verified from S32K344_IO Signal Table rows 329, 345).
+    """
+    result = _run_pin_options("LPUART_0")
+    assert result.returncode == 0
+    payload = json.loads(result.stdout)
+    options = payload["options"]
+
+    # Collect all pins returned
+    pins = {item["pin"] for item in options}
+
+    # The wrong stub pins must NOT appear as LPUART_0 options
+    assert "PTA15" not in pins, (
+        "PTA15 returned for LPUART_0 — this was the stub value; "
+        "PTA15 has no LPUART0 function on S32K344."
+    )
+    assert "PTA16" not in pins, (
+        "PTA16 returned for LPUART_0 — this was the stub value; "
+        "PTA16 has no LPUART0 function on S32K344."
+    )
+
+    # The verified correct TX/RX pins must appear
+    assert "PTA27" in pins, (
+        "PTA27 not in LPUART_0 options — expected LPUART0_TX on PTA27 "
+        "(verified from S32K344 IOMUX workbook row 329)."
+    )
+    assert "PTA28" in pins, (
+        "PTA28 not in LPUART_0 options — expected LPUART0_RX on PTA28 "
+        "(verified from S32K344 IOMUX workbook row 345)."
+    )
+
+
+def test_pin_options_lpuart0_has_tx_and_rx():
+    """LPUART_0 options must include at least one TX and one RX signal."""
+    result = _run_pin_options("LPUART_0")
+    assert result.returncode == 0
+    payload = json.loads(result.stdout)
+    options = payload["options"]
+
+    has_tx = any(item.get("signal") == "TX" for item in options)
+    has_rx = any(item.get("signal") == "RX" for item in options)
+    assert has_tx, "No TX signal option returned for LPUART_0"
+    assert has_rx, "No RX signal option returned for LPUART_0"

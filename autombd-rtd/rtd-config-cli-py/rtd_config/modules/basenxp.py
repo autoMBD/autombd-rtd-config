@@ -53,19 +53,58 @@ from rtd_config.plan import Plan, PlannedChange
 class BaseNxpProvider:
     """Owns BaseNXP/OsIf shared infrastructure.
 
-    OsIf timer choices affect Uart timeout behaviour. For Milestone 1 the
-    provider only preserves/asserts the existing BaseNXP/OsIf region needed by
-    the complete fixture; it does not invent timer or DET behaviour.
+    OsIf timer choices affect Uart timeout behaviour. The provider owns the
+    OsIfGeneral region including the system-timer flag and counter configuration.
+    Values are grounded in the committed osif.json asset (derived from BaseNXP.xdm).
     """
 
     name = "basenxp"
 
     def plan(self, intent: Intent) -> Plan:
-        return Plan([
-            PlannedChange(
+        changes = []
+        if intent.payload.get("enable_system_timer", False):
+            # Basenxp-owned change 1: enable the OsIf system timer flag.
+            changes.append(PlannedChange(
+                module="basenxp",
+                owner="basenxp",
+                path="/BaseNXP/BaseNXP/OsIfGeneral/OsIfUseSystemTimer",
+                description="Enable OsIf system timer (OsIfUseSystemTimer=true)",
+            ))
+            # Basenxp-owned change 2: insert one OsIfCounterConfig whose
+            # OsIfSystemTimerClockRef is populated with an Mcu McuClockReferencePoint
+            # (CORE_CLK preferred, else first available) discovered from the project.
+            # OsIfSystemTimerClockFreq is left as an empty array (ConfigTools type:
+            # ArraySetting; a scalar <setting> causes vendor gate SEVERE).
+            changes.append(PlannedChange(
+                module="basenxp",
+                owner="basenxp",
+                path="/BaseNXP/BaseNXP/OsIfGeneral/OsIfCounterConfig",
+                description=(
+                    "Insert OsIfCounterConfig_0: OsIfSystemTimerClockRef populated "
+                    "with an existing Mcu McuClockReferencePoint (CORE_CLK preferred, "
+                    "else first available); OsIfSystemTimerClockFreq as empty array "
+                    "(ConfigTools ArraySetting type)"
+                ),
+            ))
+            # Cross-module dependency: BaseNXP reads (read-only) an existing Mcu
+            # McuClockReferencePoint to populate OsIfSystemTimerClockRef. This
+            # dependency is declared explicitly per AGENTS.md; apply_basenxp_set
+            # discovers the path at runtime via _find_mcu_clock_ref_path.
+            changes.append(PlannedChange(
+                module="mcu",
+                owner="mcu",
+                path="/Mcu/Mcu/McuModuleConfiguration/McuClockSettingConfig_0/McuClockReferencePoint",
+                description=(
+                    "Read-only dependency: BaseNXP requires an existing Mcu "
+                    "McuClockReferencePoint to populate OsIfSystemTimerClockRef "
+                    "(CORE_CLK preferred, else first available)"
+                ),
+            ))
+        else:
+            changes.append(PlannedChange(
                 module="basenxp",
                 owner="basenxp",
                 path="/BaseNXP/BaseNXP/OsIfGeneral",
                 description="Preserve OsIf configuration used by Uart timeout",
-            )
-        ])
+            ))
+        return Plan(changes)

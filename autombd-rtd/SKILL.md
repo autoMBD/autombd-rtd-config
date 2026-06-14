@@ -1,79 +1,174 @@
 ---
 name: autombd-rtd
+version: 0.1.0
 description: >-
   Configure NXP S32K3 RTD 7.0.1 .mex automotive projects through the bundled RTD
-  CfgFile CLI. Use when a user asks to inspect, plan, or configure Uart (LPUART
-  or FlexIO) channels, query pin options, run static checks, or run S32DS
-  headless validation on an S32 ConfigTools .mex project. Milestone 1 scope only.
+  CfgFile CLI. Use when a user asks to inspect a project, query pin options, or
+  plan/configure any of the seven minimal-system modules — Mcu (clock tree),
+  BaseNXP (OsIf system timer), Platform (interrupts/ISR), Port (pin mux), Dio
+  (channels), Mcl (FlexIO/DMA logic channels), or Uart (LPUART or FlexIO
+  channels, interrupt or DMA mode) — run static checks, or run S32DS headless
+  validation on an S32 ConfigTools .mex project.
 license: MIT
 ---
 
 # RTD CfgFile CLI Companion Skill
 
-The official tool is the **RTD CfgFile CLI**. It edits existing NXP S32
+The official tool is the **RTD CfgFile CLI**. It edits **existing** NXP S32
 ConfigTools `.mex` projects for S32K3 RTD 7.0.1. Always drive it through the
-public CLI; never edit `.mex` XML by hand and never read Excel workbooks, raw
-RTD `.xdm` descriptors, or local RTD installation scans to answer a request.
+public CLI; never edit `.mex` XML by hand, and never read Excel workbooks, raw
+RTD `.xdm` descriptors, or local RTD installation scans to answer a request —
+the committed assets bundled with the skill already carry every value the tool
+needs.
 
-## Running the Bundled CLI
+## Running the bundled CLI
 
 This skill bundles its own implementation; no network access and no install are
-required (Python 3.11+, standard library only). It ships a **zero-config
-launcher** at the skill root, so the simplest invocation works from any
-directory:
+required (Python 3.11+, standard library only). A **zero-config launcher** sits
+at the skill root, so the simplest invocation works from any directory:
 
 - **Recommended:** `python <skill-dir> <command>` — e.g.
-  `python autombd-rtd inspect --project <p> --json`. No environment setup.
+  `python autombd-rtd inspect --project <dir> --json`. No environment setup.
 - Equivalent: put `<skill-dir>/rtd-config-cli-py` on `PYTHONPATH` (or `cd` into
   it), then `python -m rtd_config <command>`.
 
-The launcher and the CLI resolve the committed assets (pin maps, per-module
-caches) from the `assets/` directory beside `rtd-config-cli-py/`, located
-relative to the skill itself — so it works from any working directory and any
-install location. The command reference below is written as `rtd-config
-<command>`; run each as `python <skill-dir> <command>`.
+The launcher resolves the committed assets (pin maps, per-module caches) from
+the `assets/` directory beside `rtd-config-cli-py/`, so it works from any
+working directory and install location. The command reference below is written
+as `rtd-config <command>`; run each as `python <skill-dir> <command>`.
 
-## Operating Rules
+`--project` always takes the **project directory** (the folder that contains the
+single `.mex`), never the `.mex` file path. Add `--json` to any command for
+machine-readable output.
 
-- Use only the public CLI commands below. Convert every user request into a JSON
-  intent or an equivalent shortcut command, then run the same
-  plan / configure / check / validate pipeline.
-- `inspect`, `pin-options`, `plan` (the default `uart set` output), and `check`
-  never launch a vendor tool. Only `validate` may launch S32DS, and only
-  headlessly when its environment is configured.
-- Configure edits **existing** module instances only. Creating missing modules
-  or a `.mex` from scratch is **not in Milestone 1**.
-- Always run `check` (static checks) after a configure. Treat S32DS `validate`
-  as confirmation, never as a substitute for the static check.
-- By default run only the mandatory minimum tests. Run advanced tests only when
-  the user explicitly asks for them.
+## The plan → configure → validate workflow
 
-## Public Commands
+Every module command is **`<module> set`**, and it is two-phase by design:
 
-- `rtd-config inspect --project <path> --json` — report backend, family,
-  device, RTD version, and the enabled module list.
+1. **Plan (default).** `<module> set …` *without* `--configure` writes nothing —
+   it normalizes the request into a JSON intent and prints the plan, including
+   the cross-module dependencies it will satisfy. Review it first.
+2. **Configure.** Add **`--configure`** to apply: the provider makes a narrow,
+   byte-faithful edit to its owned `.mex` region(s), strips any stale
+   `quick_selection`, writes the file, and immediately runs the static checks.
+   Add **`--backup`** to first copy the original to `<file>.mex.bak`.
+3. **Validate (vendor gate).** Run `validate` to confirm with S32DS ConfigTools
+   (see below). Static checks never substitute for the vendor gate, and the
+   vendor gate never substitutes for the static checks.
+
+Independent edits compose: run several `<module> set --configure` calls in
+sequence on the same project, then `validate` once at the end.
+
+## Public commands
+
+### Inspection & checks (never launch a vendor tool)
+- `rtd-config inspect --project <dir> --json` — report backend, family, device,
+  package, RTD version, the resolved `.mex`, and the enabled module list.
 - `rtd-config pin-options --device s32k344 --package default --peripheral
-  LPUART_0 --json` — list prepared TX/RX pin options before assigning Uart
-  pins. Query this before choosing `--tx` / `--rx`.
-- `rtd-config uart set --project <path> --hw <LPUART_0|FLEXIO_0> --mode
-  interrupt --baud <rate> --tx <pin> --rx <pin> --json` — normalize a Uart
-  request into an intent and emit the plan (Mcu/Port/Platform/Mcl
-  dependencies). Plan-only; writes nothing. `interrupt` is the only M1 mode.
-- Add `--configure` to apply the plan: it makes a real localized Uart edit,
-  strips stale `quick_selection`, writes the `.mex`, and runs static-check
-  runtime verification. Add `--backup` to keep a `<file>.mex.bak` first.
-- `rtd-config check --project <path> --json` — run the static checks
+  LPUART_0 --json` — list verified TX/RX pin options for a peripheral. Query
+  this **before** choosing `--tx`/`--rx` for `port set`.
+- `rtd-config check --project <dir> --json` — run the static checks
   (well-formedness, single `.mex`, enabled modules, duplicate names,
-  quick_selection conflicts, stale FlexIO refs, missing Mcl FlexIO channels,
-  duplicate LPUART hardware, invalid callback, DMA rejection).
-- `rtd-config validate --project <path> --json` — run S32DS / S32 ConfigTools
-  headless validation when `--s32ds-root` or `RTD_CONFIG_S32DS_ROOT` is set. The
-  tool registers the project in the S32DS workspace, drives the `Peripherals`
-  headless tool with `-sdkPath` at the bundled PlatformSDK, and reports problems.
-  The pass condition is ConfigTools exit code `0` **and** no SEVERE `[TOOL]`
-  resource-configuration problem (exit `0` alone is not sufficient).
+  `quick_selection` conflicts, FlexIO reference coherence, DMA coherence,
+  duplicate LPUART hardware, callback validity).
 
-## JSON Intent Contract
+### Module configuration (`set`; add `--configure` to write)
+- **`rtd-config mcu set`** — clock tree. `--core-clk <MHz> --aips-plat-clk <MHz>
+  --aips-slow-clk <MHz>` set the PLL + MC_CGM dividers; `--add-all-clock-
+  reference-points` preserves existing reference points and adds every
+  selectable S32K344 clock by name. e.g.
+  `mcu set --project <dir> --core-clk 160 --aips-plat-clk 80 --aips-slow-clk 40 --add-all-clock-reference-points --configure`
+- **`rtd-config basenxp set --enable-system-timer`** — enable the OsIf system
+  timer and insert one `OsIfCounterConfig` (the time base for driver timeouts).
+- **`rtd-config platform set --peripheral <e.g. LPUART_3> --priority <n>`** —
+  set an existing interrupt's priority, keep it enabled, and confirm its ISR is
+  registered. Target by `--peripheral` or exact `--isr-name`.
+- **`rtd-config port set --peripheral <e.g. LPUART_0> --tx <PIN> --rx <PIN>`** —
+  route a peripheral's TX/RX pins (mux + electrical + direction). Pins are
+  validated against the pin database (illegal pins are rejected) — query
+  `pin-options` first.
+- **`rtd-config dio set --add-channel <NAME> --pin <PIN>`** — add a DIO channel
+  (e.g. `LED_CTRL`) on a free GPIO pad; the GPIO direction is configured on the
+  Port side automatically (`--direction output`). The pin's `DioPort` container
+  is created automatically if it does not yet exist.
+- **`rtd-config mcl set --add-flexio-logic-channel <NAME>`** — append a FlexIO
+  logic channel; the next free `CHANNEL_N`/`PIN_N` ids are computed and
+  uniqueness is enforced.
+- **`rtd-config uart set --hw <LPUART_n|FLEXIO_n>`** — configure an existing Uart
+  channel and orchestrate its dependencies. Flags: `--mode interrupt|dma`,
+  `--baud`, `--parity none|even|odd`, `--stop-bits 1|2`,
+  `--word-length 7|8|9|10`, `--callback <CIdent>`, `--priority <n>`,
+  `--tx`/`--rx` (pins), `--using LPUART_IP|FLEXIO_IP`, `--channel-id <n>`.
+  Setting the channel pulls in the Mcu peripheral-clock reference, the Platform
+  ISR (the interrupt ISR, or the DMA-completion ISR in DMA mode), and the Mcl
+  channels.
+- **`rtd-config uart add-flexio-channel`** — create a **new** FlexIO-backed Uart
+  Tx+Rx channel pair plus their two Mcl FlexIO logic channels, with consistent
+  references and a callback. `--baud` (default 921600), `--word-length 8`,
+  `--callback`, `--tx-name`/`--rx-name`. The shared FlexIO ISR + clock reference
+  are ensured idempotently.
+
+### Vendor validation
+- `rtd-config validate --project <dir> --json` — run S32DS / S32 ConfigTools
+  **headless** validation. The tool **auto-discovers** a standard S32DS install
+  (e.g. `C:\NXP\S32DS.<version>`, or `s32dsc.exe` on `PATH`); override with
+  `--s32ds-root <path>` or the `RTD_CONFIG_S32DS_ROOT` environment variable. It
+  loads the `.mex`, exports generated code to a throwaway folder, and reports
+  problems. **Pass = exit code `0` AND code generated AND no SEVERE
+  `[TOOL] … has the following error` resource problem** (exit `0` alone is not
+  sufficient). Validation always runs on a **throwaway copy**, so your `.mex` is
+  never modified. If no install is found, the result is
+  `s32ds_root_not_configured` — set the flag or env var.
+
+## Module ownership
+
+Each provider edits only its own module region; cross-module needs are explicit
+declared dependencies, never silent edits:
+
+- **Mcu** owns the clock tree and the peripheral clock reference points.
+- **Port** owns TX/RX pin mux/electrical/direction (consumers request pins).
+- **Platform** owns the interrupt entries and ISR registration.
+- **Mcl** owns the FlexIO common resources, the FlexIO logic channels, and the
+  DMA logic channels/instance.
+- **BaseNXP** owns the OsIf system-timer counter.
+- **Uart** owns channel settings and the Uart-side references, and declares the
+  Mcu / Port / Platform / Mcl dependencies above.
+
+## Interrupt and DMA modes
+
+RTD 7.0.1 models the Uart asynchronous method as **interrupt or DMA only** —
+there is no "polling" value (blocking/polling is an application-level
+driver-call pattern, not a `.mex` setting). Both modes are fully supported:
+
+- **Interrupt** (`--mode interrupt`, the default): the Platform LPUART/FlexIO
+  ISR is enabled and registered with the chosen priority.
+- **DMA** (`--mode dma`): the tool sets the Uart DMA method, enables
+  `UartDmaEnable`, points the Tx/Rx references at Mcl DMA logic channels,
+  enables `MclEnableDma` with the DMA channels/instance, and registers the
+  Platform DMATCD completion ISRs. Coherence is enforced by the static checks
+  (`dma_mcl_not_enabled`, `dma_refs_incomplete`).
+
+## Clock outputs are ConfigTools-derived
+
+`mcu set` writes the authoritative clock **inputs** — the PLL configuration, the
+MC_CGM dividers, and the clock reference points. The Clocks-view `clock_output`
+numbers are a **derived display cache that ConfigTools owns and recomputes**;
+the tool deliberately does not recompute them (re-deriving the full clock tree
+outside ConfigTools would risk diverging from it). The cache refreshes when the
+project is opened in S32DS or when `validate` generates code. A Clocks-view
+figure that still shows an old value right after `mcu set` is expected — do not
+hand-edit it, and do not patch the tool to write it.
+
+## Scope
+
+The tool configures **existing** module instances and writes configuration
+values, including the callback **name**. Implementing the C callback function
+(e.g. `Autombd_UartCallback`) and building the project are the user's
+responsibility — the tool does not generate or edit `.c`/`.h` sources. Creating
+a `.mex` from scratch, adding an absent top-level module, EB tresos, and
+non-S32K3 devices are out of scope.
+
+## JSON intent contract
 
 Shortcut commands and JSON intents converge on one shape:
 
@@ -81,54 +176,34 @@ Shortcut commands and JSON intents converge on one shape:
 {
   "module": "uart",
   "action": "set",
-  "payload": {"hw": "LPUART_0", "mode": "interrupt", "baud": 115200,
-              "pins": {"tx": "PTA15", "rx": "PTA16"}}
+  "payload": {"hw": "LPUART_3", "mode": "dma", "baud": 921600,
+              "callback": "Autombd_UartCallback"}
 }
 ```
 
-## Module Ownership
+## Diagnostics
 
-Each provider edits only its own module region. Uart owns channel settings and
-Uart-side references and declares dependencies owned elsewhere:
+Results are JSON with a `status` (`passed` / `blocked`) and a `diagnostics`
+list. Read diagnostics instead of guessing. Key codes:
 
-- **Mcu** owns the peripheral clock reference (always required).
-- **Port** owns TX/RX pin mux/electrical configuration (consumer requests pins).
-- **Platform** owns the interrupt entry (interrupt mode only).
-- **Mcl** owns the FlexIO common resources and logic channels (FlexIO path).
-
-## Milestone 1 Scope and DMA
-
-Milestone 1 supports LPUART and FlexIO-backed Uart in **interrupt (IRQ) mode**
-on the S32K344 Uart fixture. RTD 7.0.1 models the Uart asynchronous method as
-interrupt or DMA only -- there is no polling value -- so "polling" is not a
-configurable `.mex` mode (blocking/polling is an application-level driver-call
-pattern). DMA is out of M1 scope.
-
-- **DMA is not in Milestone 1.** Reject or defer any DMA request; never
-  partially configure DMA. If a project already has `UartDmaEnable=true` or
-  `MclEnableDma=true`, `check` returns a `dma_not_supported_in_m1` blocker.
-- FlexIO Uart word length is constrained to 8 bits in RTD 7.0.1.
-- A Uart callback must be a valid C identifier; `NULL_PTR` is rejected as a
-  callback name (`invalid_uart_callback`).
-- `.mex` creation, missing-module completion, EB tresos, K1/K5 validation, and
-  runtime Excel/RTD-scan parsing are out of scope for Milestone 1.
-
-## Diagnostics Interpretation
-
-Results are JSON with a `status` (`passed` / `failed` / `blocked`) and a
-`diagnostics` list. Read diagnostics instead of guessing. Key codes:
-
-- `quick_selection_conflict` — a modified element still carries
-  `quick_selection`. ConfigTools may revert it. **Highest-risk case:** a Uart
-  out-of-range error after adding FlexIO-backed Uart usually traces to a stale
-  `quick_selection` on `<config_set name="Mcl">`, not to the Uart channel
-  fields. Check Mcl `quick_selection` first.
-- `stale_flexio_uart_hw_channel_ref` — a FlexIO Uart `UartHwChannelRef` does not
-  point to an existing Mcl FlexIO logic channel.
-- `missing_mcl_flexio_logic_channel` — FlexIO-backed Uart needs a coherent Mcl
-  FlexIO common + logic channel; plan Mcl and Uart together.
-- `duplicate_lpuart_hw_channel` — two active LPUART channels share one hardware
-  instance.
-- `dma_not_supported_in_m1` — DMA was requested or present; reject/defer it.
-- `uart_channel_not_found` / `uart_config_set_not_found` — the requested
-  existing instance was not found; M1 does not create it.
+- `quick_selection_conflict` — a modified element still carries a
+  `quick_selection`; ConfigTools may revert it. **Highest-risk case:** a Uart
+  out-of-range error after adding a FlexIO Uart usually traces to a stale
+  `quick_selection` on `<config_set name="Mcl">`, not to the Uart fields —
+  check Mcl first.
+- `dma_mcl_not_enabled` / `dma_refs_incomplete` — a DMA Uart needs
+  `MclEnableDma=true` and complete Tx/Rx DMA channel references.
+- `missing_mcl_flexio_logic_channel` / `stale_flexio_uart_hw_channel_ref` — a
+  FlexIO Uart's `UartHwChannelRef` must point at an existing Mcl FlexIO logic
+  channel; plan Mcl and Uart together.
+- `duplicate_lpuart_hw_channel` — two active LPUART channels share one instance.
+- `port_illegal_pin` — the requested pin is not valid for that peripheral
+  signal; query `pin-options`.
+- `invalid_uart_callback` — the callback is not a valid C identifier
+  (`NULL_PTR` is rejected).
+- `*_config_set_not_found` / `*_not_found` (e.g. `uart_channel_not_found`,
+  `platform_isr_not_found`, `mcu_config_set_not_found`) — the targeted existing
+  instance was not found; the tool edits existing instances, it does not create
+  them.
+- `s32ds_root_not_configured` — `validate` found no S32DS install; pass
+  `--s32ds-root` or set `RTD_CONFIG_S32DS_ROOT`.

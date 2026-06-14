@@ -41,7 +41,7 @@
 # Author:      autoMBD <tkung.lqk@foxmail.com>
 # Date:        2026-06-03
 # Version:     0.1.0
-# Description: Mcl module provider (FlexIO common resources for M1).
+# Description: Mcl module provider (FlexIO common resources).
 # =================================================================================
 
 from __future__ import annotations
@@ -53,23 +53,69 @@ from rtd_config.plan import Plan, PlannedChange
 class MclProvider:
     """Owns Mcl common resources (FlexIO common + FlexIO logic channels).
 
-    For Milestone 1, FlexIO common resources are owned by Mcl and consumed by
-    Uart. MclEnableFlexioCommon must match real FlexIO common/channel entries.
-    DMA stays deferred. When Mcl content changes, the highest-risk lesson is to
-    strip a stale quick_selection from <config_set name="Mcl"> so ConfigTools
-    does not revert the Mcl tree and misreport a Uart out-of-range error.
+    FlexIO common resources are owned by Mcl and consumed by Uart.
+    MclEnableFlexioCommon must match real FlexIO common/channel entries.
+    When Mcl content changes, the highest-risk lesson is to strip a stale
+    quick_selection from <config_set name="Mcl"> so ConfigTools does not
+    revert the Mcl tree and misreport a Uart out-of-range error.
     """
 
     name = "mcl"
 
     def plan(self, intent: Intent) -> Plan:
-        return Plan([self.flexio_dependency(intent.payload.get("hw", ""))])
+        changes = []
+        channel_name = intent.payload.get("add_flexio_logic_channel")
+        if channel_name:
+            changes.append(PlannedChange(
+                module="mcl",
+                owner="mcl",
+                path="/Mcl/Mcl/MclConfig/FlexioCommon_0/FlexioMclLogicChannels",
+                description=(
+                    f"Append FlexIO logic channel '{channel_name}' to "
+                    "FlexioMclLogicChannels with next-available CHANNEL_N and PIN_N ids "
+                    "(uniqueness enforced per Mcl.xdm constraint)"
+                ),
+            ))
+        else:
+            # Legacy plan path: used when called without add_flexio_logic_channel
+            # (e.g., by the Uart provider's cross-module dependency declaration).
+            hw = intent.payload.get("hw", "")
+            changes.append(self._flexio_dependency(hw))
+        return Plan(changes)
 
-    def flexio_dependency(self, hw: str) -> PlannedChange:
+    def _flexio_dependency(self, hw: str) -> PlannedChange:
         """Return the Mcl-owned FlexIO logic-channel dependency Uart requires."""
         return PlannedChange(
             module="mcl",
             owner="mcl",
             path="/Mcl/Mcl/MclConfig/FlexioCommon_0/FlexioMclLogicChannels",
             description=f"Ensure FlexIO logic channel for {hw}",
+        )
+
+    # Keep the legacy public name for any existing callers.
+    def flexio_dependency(self, hw: str) -> PlannedChange:
+        return self._flexio_dependency(hw)
+
+    def dma_dependency(self, hw: str) -> PlannedChange:
+        """Return the Mcl-owned DMA logic-channel dependency for DMA mode (RTD-MEX-UART-003).
+
+        In DMA mode, two dmaLogicChannel_Type structs are required:
+        - dmaLogicChannel_Type_0 (TX, existing in fixture, activated)
+        - dmaLogicChannel_Type_1 (RX, added by DMA path)
+        Grounded in uart.json dma_channel_ref_path_pattern and fixture dmaLogicChannel_Type_0.
+        """
+        return PlannedChange(
+            module="mcl",
+            owner="mcl",
+            path="/Mcl/Mcl/MclConfig/dmaLogicChannel_Type",
+            description=(
+                f"Activate dmaLogicChannel_Type_0 (TX, DMA_IP_HW_CH_0) for {hw} DMA TX: "
+                "set dmaLogicChannel_EnableGlobalConfig=true, "
+                "dmaGlobalRequest_enDmaRequest=true (LPUART HW DMA request triggers transfer), "
+                "dmaLogicChannelConfig_enDmaMajorInterrupt=true (generates DMATCD0_IRQn). "
+                "Add dmaLogicChannel_Type_1 (RX, DMA_IP_HW_CH_1) mirroring _0 field set with "
+                "all activation flags=true (generates DMATCD1_IRQn). "
+                "Enable MclEnableDma=true. "
+                "Grounded in uart.json dma_channel_ref_path_pattern + fixture dmaLogicChannel_Type_0."
+            ),
         )

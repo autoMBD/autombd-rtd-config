@@ -5,10 +5,10 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![Python](https://img.shields.io/badge/python-3.11%2B-blue.svg)
 ![Dependencies](https://img.shields.io/badge/deps-stdlib--only-success.svg)
-![Tests](https://img.shields.io/badge/tests-44%20passing-brightgreen.svg)
+![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg)
 ![Backend](https://img.shields.io/badge/backend-S32%20ConfigTools%20.mex-blue.svg)
 ![NXP RTD](https://img.shields.io/badge/NXP%20RTD-7.0.1-blue.svg)
-![Roadmap](https://img.shields.io/badge/roadmap-stage%201%20·%20minimal%20system-orange.svg)
+![Minimal system](https://img.shields.io/badge/minimal%20system-complete-brightgreen.svg)
 ![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)
 
 ## What it is
@@ -31,16 +31,16 @@ self-contained on another machine or in another agent environment.
 
 ## Status
 
-**Minimal system (roadmap stage 1) — in progress.** The **Uart reference path**
-(LPUART and FlexIO, interrupt mode) is delivered and vendor-validated end to
-end. The acceptance bar is **module parity**: `Mcu, BaseNXP, Platform, Port,
-Dio, Mcl, Uart` — all equal priority — each passing its E2E acceptance cases
-and the S32DS gate. See
+**Minimal system — complete.** All seven modules — `Mcu,
+BaseNXP, Platform, Port, Dio, Mcl, Uart` (equal priority) — are delivered and
+vendor-validated end to end: every E2E acceptance case passes the S32DS gate
+(exit `0`, code generated, no SEVERE `[TOOL]`) with its generated code verified.
+See
 [`docs/tests/rtd-config-acceptance-report.md`](docs/tests/rtd-config-acceptance-report.md).
 
-> RTD models the Uart asynchronous method as **interrupt or DMA only** (no polling).
-> The delivered Uart path currently supports interrupt; the DMA capability is a
-> tracked target (`RTD-MEX-UART-003` in the test cases).
+> RTD models the Uart asynchronous method as **interrupt or DMA only** (no
+> polling). Both modes are delivered: `uart set --mode interrupt|dma` (DMA wires
+> the Mcl DMA channels and the Platform DMATCD completion ISRs).
 
 ## Quick start
 
@@ -62,7 +62,8 @@ python autombd-rtd uart set --project <path> --hw LPUART_0 --mode interrupt \
 
 # Static checks only / full S32DS headless validation
 python autombd-rtd check --project <path> --json
-python autombd-rtd validate --project <path> --s32ds-root C:\NXP\S32DS.3.6.7 --json
+# validate auto-discovers a standard S32DS install (override: --s32ds-root / RTD_CONFIG_S32DS_ROOT)
+python autombd-rtd validate --project <path> --json
 ```
 
 (Equivalent without the launcher: put `autombd-rtd/rtd-config-cli-py` on
@@ -70,6 +71,36 @@ python autombd-rtd validate --project <path> --s32ds-root C:\NXP\S32DS.3.6.7 --j
 
 Every shortcut command normalizes to the same JSON intent and the same
 plan → apply → check → validate pipeline.
+
+## Deploy the Skill
+
+Use the deployment helper to publish only the released skill payload into an
+agent project skills index:
+
+```bash
+python tools/deploy_rtd_skill.py <target-project-dir>
+python tools/deploy_rtd_skill.py <target-project-dir> --agent codex
+python tools/deploy_rtd_skill.py <target-project-dir> --agent claude
+```
+
+By default the helper supports both agent indexes with one physical payload:
+`<target>/.agents/skills/autombd-rtd/` is the canonical Codex copy, and
+`<target>/.claude/skills/autombd-rtd/` is a filesystem link to that same copy
+for Claude Code. Use `--agent codex`, `--agent claude`, or `--agent both` to
+select the destination set explicitly. Deploying only Claude Code still ensures
+the canonical Codex copy exists first, then links Claude Code to it. On Windows,
+the helper creates a directory symlink when permitted and falls back to an NTFS
+junction when symlink privileges are unavailable.
+
+The helper checks the source version across `autombd-rtd/SKILL.md`, the
+launcher header, and the Python package version before updating the canonical
+copy. It deploys only when the canonical skill, bundled tool payload, or version
+metadata is missing, or when the installed version is older than the project
+version. Current or newer complete installations are left untouched.
+
+The copied payload is intentionally limited to `SKILL.md`, `__main__.py`,
+`rtd-config-cli-py/`, and `assets/`; development materials such as `docs/`,
+`tests/`, and `tools/` are not included.
 
 ## Repository layout
 
@@ -90,10 +121,13 @@ pyproject.toml               # pytest configuration + project metadata
 ## Development workflow
 
 The product is built by an autonomous agent loop —
-`main → Explorer → Worker → Tester → main` — where **tests are the sole convergence
-signal**. On a green gate the **Reviewer** performs non-test acceptance review and
-appends a [lessons-learned](docs/common/rtd-config-lessons-learned.md) entry. Roles
-live in [`.claude/agents/`](.claude/agents/); the charter is [`AGENTS.md`](AGENTS.md).
+`main → Explorer → Worker → Tester → main` — where **tests are the sole functional
+convergence signal**. The Tester also records per-case KPI evidence; a functional
+PASS with a KPI miss returns to the Worker for up to three optimization
+iterations, then records the true KPI result. On a green functional gate the
+**Reviewer** performs non-test acceptance review and appends a
+[lessons-learned](docs/common/rtd-config-lessons-learned.md) entry. Roles live in
+[`.claude/agents/`](.claude/agents/); the charter is [`AGENTS.md`](AGENTS.md).
 
 ```bash
 python -m pytest -q          # deterministic gate
@@ -105,8 +139,8 @@ python -m pytest -q          # deterministic gate
 | --- | --- |
 | [Core design](docs/specs/rtd-config-core-design.md) | Architecture + CLI/JSON contract |
 | [Domain truth & validation](docs/specs/rtd-config-domain-truth.md) | RTD enum sourcing rule + verified S32DS flow |
-| [Test strategy](docs/tests/rtd-config-test-strategy.md) | The convergence contract: layers, vendor gate, acceptance rule, roles |
-| [E2E test cases](docs/tests/rtd-config-test-cases.md) | The E2E acceptance case catalog (`RTD-MEX-*`, isolated protocol) |
+| [Test strategy](docs/tests/rtd-config-test-strategy.md) | The convergence contract: layers, vendor gate, acceptance rule, roles, KPI loop |
+| [E2E test cases](docs/tests/rtd-config-test-cases.md) | The E2E acceptance case catalog (`RTD-MEX-*`, isolated protocol, KPI) |
 | [Implementation plan](docs/plans/rtd-cfgfile-cli-implementation-plan.md) | The module-by-module delivery framework |
 | [Roadmap](docs/roadmaps/rtd-config-roadmap.md) | The staged delivery route (stages live only here) |
 

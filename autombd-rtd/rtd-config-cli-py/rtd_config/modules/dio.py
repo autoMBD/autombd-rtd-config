@@ -53,10 +53,15 @@ from rtd_config.plan import Plan, PlannedChange
 class DioProvider:
     """Owns symbolic digital-I/O IDs (ports, channels, channel groups).
 
+    The provider configures a Dio channel (DioPortId, DioChannelId, PDACSlot)
+    inside an existing DioPort struct in the Dio config set. DioPortId and
+    DioChannelId are derived from the pin's mscr value using the rules in
+    dio.json (DioPortId = mscr // 16, DioChannelId = mscr % 16).
+
     Dio does not configure pin mux, direction, pull, or default output level;
-    those are Port-owned. If a requested Dio channel targets a board pin, the
-    plan must add a Port-owned GPIO dependency. This is a plan-only provider in
-    Milestone 1 (the Uart fixture contains no Dio instance).
+    those are Port-owned. When ``--pin`` is given, the plan declares a
+    Port-owned GPIO cross-module dependency (pin header + PortPin struct) that
+    apply_dio_set orchestrates alongside the Dio channel insertion.
     """
 
     name = "dio"

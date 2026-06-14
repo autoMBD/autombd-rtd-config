@@ -60,7 +60,7 @@ def is_flexio(hw: str) -> bool:
 
 
 class UartProvider:
-    """User-facing Uart driver path (LPUART and FlexIO, interrupt mode).
+    """User-facing Uart driver path (LPUART and FlexIO, interrupt and DMA modes).
 
     Uart owns channel settings and Uart-side references. It does not edit other
     modules directly; instead it declares explicit dependency PlannedChange
@@ -68,15 +68,20 @@ class UartProvider:
 
     - Mcu owns the clock reference (always required);
     - Port owns TX/RX pin routing (when pins are requested);
-    - Platform owns the IRQ entry (interrupt mode only);
-    - Mcl owns the FlexIO logic channel (FlexIO path only).
-
-    DMA is outside Milestone 1 and is rejected/deferred by the static checks.
+    - Platform owns the IRQ entry (interrupt mode: LPUART IRQ; DMA mode: DMATCD IRQs);
+    - Mcl owns the FlexIO logic channel (FlexIO path) or DMA logic channels (DMA mode).
     """
 
     name = "uart"
 
     def plan(self, intent: Intent) -> Plan:
+        action = intent.action
+        if action == "add_flexio_channel":
+            return self._plan_add_flexio_channel(intent)
+        return self._plan_set(intent)
+
+    def _plan_set(self, intent: Intent) -> Plan:
+        """Plan for `uart set` (LPUART / FlexIO channel configure, RTD-MEX-UART-001/003)."""
         payload = intent.payload
         hw = payload.get("hw", "")
         mode = payload.get("mode", "interrupt")
@@ -98,12 +103,80 @@ class UartProvider:
         if payload.get("pins"):
             changes.append(PortProvider().pin_dependency(payload["pins"]))
 
-        # Platform IRQ dependency in interrupt mode only.
         if mode == "interrupt":
+            # Platform IRQ dependency in interrupt mode: LPUART peripheral IRQ.
             changes.append(PlatformProvider().irq_dependency(hw))
+        elif mode == "dma":
+            # DMA mode: Platform owns DMATCD ISRs, Mcl owns DMA logic channels.
+            changes.append(PlatformProvider().dma_isr_dependency(hw))
+            changes.append(MclProvider().dma_dependency(hw))
 
         # Mcl FlexIO logic-channel dependency on the FlexIO path only.
         if is_flexio(hw):
             changes.append(MclProvider().flexio_dependency(hw))
 
+        return Plan(changes)
+
+    def _plan_add_flexio_channel(self, intent: Intent) -> Plan:
+        """Plan for `uart add-flexio-channel` (FlexIO Tx+Rx pair, RTD-MEX-UART-002).
+
+        Declares explicit dependencies for all four modules edited:
+        - uart: owns the 2 new UartChannel structs
+        - mcl: owns the 2 new FlexioMclLogicChannels structs
+        - platform: ensure FLEXIO_IRQn / MCL_FLEXIO_ISR is present+enabled
+          (concrete values grounded in uart.json instance_irq_clock_map FLEXIO entry)
+        - mcu: ensure FLEXIO_CLK / CORE_CLK is present
+          (concrete values grounded in uart.json instance_irq_clock_map FLEXIO entry)
+        """
+        payload = intent.payload
+        tx_name = payload.get("tx_name", "UART2_TX")
+        rx_name = payload.get("rx_name", "UART2_RX")
+        baud = payload.get("baud", 921600)
+
+        changes = [
+            PlannedChange(
+                module="uart",
+                owner="uart",
+                path="/Uart/Uart/UartGlobalConfig/UartChannel",
+                description=(
+                    f"Append two FlexIO UART channels ({tx_name}, {rx_name}) to "
+                    f"UartGlobalConfig/UartChannel at {baud} baud, interrupt mode. "
+                    "Each carries both DetailModuleConfiguration (dummy LPUART fields) "
+                    "and FlexioModuleConfiguration with UartHwChannelRef to the "
+                    f"corresponding MCL logic channel."
+                ),
+            ),
+            PlannedChange(
+                module="mcl",
+                owner="mcl",
+                path="/Mcl/Mcl/MclConfig/FlexioCommon_0/FlexioMclLogicChannels",
+                description=(
+                    f"Append two FlexIO MCL logic channels ({tx_name}, {rx_name}) to "
+                    "FlexioMclLogicChannels with next-available CHANNEL_N/PIN_N ids "
+                    "(computed dynamically, uniqueness enforced per Mcl.xdm)."
+                ),
+            ),
+            PlannedChange(
+                module="platform",
+                owner="platform",
+                path="/Platform/Platform/IntCtrlConfig/PlatformIsrConfig",
+                description=(
+                    "Ensure PlatformIsrConfig for FlexIO shared ISR is present+enabled: "
+                    "IsrName=FLEXIO_IRQn, IsrHandler=MCL_FLEXIO_ISR, IsrEnabled=true. "
+                    "Idempotent no-op if already present (fixture has it). "
+                    "Grounded in uart.json instance_irq_clock_map[FLEXIO]."
+                ),
+            ),
+            PlannedChange(
+                module="mcu",
+                owner="mcu",
+                path="/Mcu/Mcu/McuModuleConfiguration/McuClockSettingConfig_0/McuClockReferencePoint",
+                description=(
+                    "Ensure McuClockReferencePoint for FlexIO clock is present: "
+                    "Name=FLEXIO_CLK, McuClockFrequencySelect=CORE_CLK. "
+                    "Idempotent no-op if already present (fixture has it). "
+                    "Grounded in uart.json instance_irq_clock_map[FLEXIO]."
+                ),
+            ),
+        ]
         return Plan(changes)

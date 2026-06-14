@@ -46,8 +46,38 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from .runtime import load_json
+
+
+def _normalize_peripheral(peripheral: str) -> str:
+    """Normalize a user-facing peripheral name to the asset-internal form.
+
+    The asset stores peripheral names as they appear in the IOMUX workbook's
+    Module/peripheral column (col E), e.g. "LPUART0", "LPSPI3", "LPI2C1".
+    The user-facing CLI form (and the existing test contract) uses an underscore
+    before the instance digit, e.g. "LPUART_0", "LPSPI_3", "LPI2C_1".
+
+    Normalization rule: remove an underscore that appears immediately before a
+    sequence of digits at the end of the name, e.g. LPUART_0 -> LPUART0.
+    This is a mechanical transform with no invented values — it mirrors the
+    exact difference between the two naming conventions in the workbook.
+    """
+    return re.sub(r"_(\d+)$", r"\1", peripheral)
+
+
+def _present_peripheral(asset_peripheral: str, requested_peripheral: str) -> str:
+    """Return the peripheral name in the user-facing form.
+
+    If the requested form (e.g. "LPUART_0") differs from the asset form
+    (e.g. "LPUART0") only by the underscore-before-digit convention, return
+    the requested form so the caller sees a consistent presentation.
+    Otherwise return the asset form unchanged.
+    """
+    if _normalize_peripheral(requested_peripheral) == asset_peripheral:
+        return requested_peripheral
+    return asset_peripheral
 
 
 def pin_options(
@@ -57,11 +87,25 @@ def pin_options(
     peripheral: str,
     family: str = "s32k3",
 ) -> list[dict]:
-    # Committed asset layout: assets/<vendor>/<family>/<module>/. Pin mapping is
-    # owned by the Port module and is family-scoped (one file covers the family's
-    # devices/packages). `device`/`package` are accepted for CLI/API compatibility
-    # and become in-file filters once pins.json is rebuilt complete from the
-    # pin-mux source (the current file is a stub -- see domain-truth).
+    """Return pin-option records for a peripheral from the committed runtime asset.
+
+    Committed asset layout: assets/<vendor>/<family>/<module>/pins.json.
+    The asset stores peripheral names in the IOMUX workbook form (e.g. "LPUART0").
+    The caller may supply the user-facing underscore form (e.g. "LPUART_0");
+    normalization bridges the two naming conventions transparently.
+    The returned records present `peripheral` in the caller-supplied form so
+    the CLI JSON output is consistent with the user's request.
+    """
     path = data_root / "nxp" / family / "port" / "pins.json"
     data = load_json(path)
-    return [item for item in data["signals"] if item["peripheral"] == peripheral]
+    asset_peripheral = _normalize_peripheral(peripheral)
+    result = []
+    for item in data["signals"]:
+        if item["peripheral"] == asset_peripheral:
+            # Return a copy with peripheral in the user-facing form
+            presented = dict(item)
+            presented["peripheral"] = _present_peripheral(
+                item["peripheral"], peripheral
+            )
+            result.append(presented)
+    return result

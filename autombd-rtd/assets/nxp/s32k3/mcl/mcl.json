@@ -1,0 +1,71 @@
+{
+  "_source": "Mcl.xdm (RTD 7.0.1, FlexioCommon / FlexioMclLogicChannels) + per-package EPD enum validation (RTD/Mcl_TS_T40D34M70I1R0/autosar/Mcl_s32k344_lqfp100.epd / Mcl_s32k344_hdqfp172.epd / Mcl_s32k344_mapbga257.epd)",
+  "FlexioMclLogicChannel": {
+    "description": "One FlexIO logic-channel entry under Mcl/MclConfig/FlexioCommon[n]/FlexioMclLogicChannels. Each channel consumes one FlexIO timer/shifter pair identified by a unique channel+pin id pair within the array.",
+    "source_ref": "Mcl.xdm:MclConfig/FlexioCommon/FlexioMclLogicChannels",
+    "uniqueness_constraint": "FlexioMclChannelId and FlexioMclPinId must each be unique within the FlexioMclLogicChannels array. Duplicates are rejected by Mcl.xdm INVALID rule.",
+    "children_order": [
+      "Name",
+      "FlexioMclChannelId",
+      "FlexioMclPinId",
+      "FlexioMclAddPinEnable",
+      "FlexioMclAddPinId",
+      "FlexioMclAddChannelEnable",
+      "FlexioMclAddChannelId"
+    ],
+    "fields": {
+      "Name": {
+        "type": "string",
+        "description": "Symbolic name for the logic channel; used as reference path tail /Mcl/Mcl/MclConfig/FlexioCommon_N/<Name>.",
+        "source_ref": "Mcl.xdm:FlexioMclLogicChannels/struct/Name"
+      },
+      "FlexioMclChannelId": {
+        "type": "enum",
+        "description": "FlexIO hardware channel (timer+shifter index). Must be unique within the FlexioMclLogicChannels array.",
+        "enum_values": [
+          "CHANNEL_0", "CHANNEL_1", "CHANNEL_2", "CHANNEL_3",
+          "CHANNEL_4", "CHANNEL_5", "CHANNEL_6", "CHANNEL_7"
+        ],
+        "source_ref": "Mcl.xdm:FlexioMclLogicChannels/FlexioMclChannelId; Mcl_s32k344_<package>.epd confirms CHANNEL_0..7 for FLEXIO_0"
+      },
+      "FlexioMclPinId": {
+        "type": "enum",
+        "description": "FlexIO hardware pin index. Must be unique within the FlexioMclLogicChannels array.",
+        "enum_values": [
+          "PIN_0",  "PIN_1",  "PIN_2",  "PIN_3",  "PIN_4",  "PIN_5",  "PIN_6",  "PIN_7",
+          "PIN_8",  "PIN_9",  "PIN_10", "PIN_11", "PIN_12", "PIN_13", "PIN_14", "PIN_15",
+          "PIN_16", "PIN_17", "PIN_18", "PIN_19", "PIN_20", "PIN_21", "PIN_22", "PIN_23",
+          "PIN_24", "PIN_25", "PIN_26", "PIN_27", "PIN_28", "PIN_29", "PIN_30", "PIN_31"
+        ],
+        "source_ref": "Mcl.xdm:FlexioMclLogicChannels/FlexioMclPinId; Mcl_s32k344_<package>.epd confirms PIN_0..31 for FLEXIO_0"
+      },
+      "FlexioMclAddPinEnable": {
+        "type": "bool",
+        "default": "false",
+        "description": "Enable an additional pin for this logic channel.",
+        "source_ref": "Mcl.xdm:FlexioMclLogicChannels/FlexioMclAddPinEnable"
+      },
+      "FlexioMclAddPinId": {
+        "type": "enum",
+        "default": "PIN_0",
+        "description": "Additional pin id (used when FlexioMclAddPinEnable=true). Defaults to PIN_0. NOTE: PIN_0 shown here is the disabled-state serialization value written when FlexioMclAddPinEnable=false; the true Mcl.xdm DEFAULT is index-relative and applies only when FlexioMclAddPinEnable is true.",
+        "enum_ref": "same as FlexioMclPinId",
+        "source_ref": "Mcl.xdm:FlexioMclLogicChannels/FlexioMclAddPinId"
+      },
+      "FlexioMclAddChannelEnable": {
+        "type": "bool",
+        "default": "false",
+        "description": "Enable an additional channel for this logic channel.",
+        "source_ref": "Mcl.xdm:FlexioMclLogicChannels/FlexioMclAddChannelEnable"
+      },
+      "FlexioMclAddChannelId": {
+        "type": "enum",
+        "default": "CHANNEL_0",
+        "description": "Additional channel id (used when FlexioMclAddChannelEnable=true). Defaults to CHANNEL_0. NOTE: CHANNEL_0 shown here is the disabled-state serialization value written when FlexioMclAddChannelEnable=false; the true Mcl.xdm DEFAULT is index-relative and applies only when FlexioMclAddChannelEnable is true.",
+        "enum_ref": "same as FlexioMclChannelId",
+        "source_ref": "Mcl.xdm:FlexioMclLogicChannels/FlexioMclAddChannelId"
+      }
+    },
+    "next_id_algorithm": "Scan existing FlexioMclLogicChannels structs; new struct name = count of existing structs; new FlexioMclChannelId = CHANNEL_<max_existing_channel_index + 1>; new FlexioMclPinId = PIN_<max_existing_pin_index + 1>. This guarantees uniqueness without hardcoding indices."
+  }
+}

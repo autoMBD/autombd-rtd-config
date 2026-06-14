@@ -1,0 +1,16 @@
+{
+  "family": "s32k3",
+  "device": "s32k344",
+  "rtd_version": "7_0_1",
+  "source": "RTD/Platform_TS_T40D34M70I1R0/config/Platform.xdm",
+  "isr_priority": {
+    "min": 0,
+    "max_ref": "Platform.irqMaxPrio",
+    "note": "Platform.xdm IsrPriority INVALID range: >=0 AND <= ecu:get('Platform.irqMaxPrio'). The device-specific upper bound is a processor feature value, authoritatively enforced by the S32DS validation gate; the provider enforces the known lower bound."
+  },
+  "isr_name_patterns": {
+    "LPUART_<n>": "LPUART<n>_IRQn",
+    "FLEXIO_<x>": "FLEXIO_IRQn",
+    "note": "PlatformIsrConfig.IsrName domain is ecu:list('Platform.irqsList'). These patterns cover the minimal-system peripherals and are confirmed against Uart_Example_S32K344 (LPUART3_IRQn, FLEXIO_IRQn). The provider derives a candidate name then verifies it exists in the project's PlatformIsrConfig before editing -- it never invents an entry."
+  }
+}

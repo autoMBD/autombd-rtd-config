@@ -46,8 +46,43 @@
 
 from __future__ import annotations
 
+import json
+import re
+from pathlib import Path
+
 from rtd_config.intent import Intent
 from rtd_config.plan import Plan, PlannedChange
+
+# Asset root: this file lives at
+#   autombd-rtd/rtd-config-cli-py/rtd_config/modules/mcu.py
+# parents[3] is autombd-rtd/
+_MODULE_FILE = Path(__file__).resolve()
+_UART_ASSET_PATH = _MODULE_FILE.parents[3] / "assets" / "nxp" / "s32k3" / "uart" / "uart.json"
+
+
+def _lpuart_clock_ref_name(hw: str) -> str:
+    """Convert LPUART_8 -> LPUART8_CLK (the McuClockReferencePoint Name convention)."""
+    text = hw.strip().upper()
+    m = re.fullmatch(r"LPUART_?(\d+)", text)
+    if m:
+        return f"LPUART{m.group(1)}_CLK"
+    return f"{text}_CLK"
+
+
+def _load_lpuart_clock_entry(hw: str) -> "dict | None":
+    """Load uart.json and return the irq/handler/clock entry for ``hw``.
+
+    Returns None for unknown instances or non-LPUART peripherals.
+    """
+    key = hw.strip().upper()
+    m = re.match(r"^LPUART(\d+)$", key)
+    if m:
+        key = f"LPUART_{m.group(1)}"
+    try:
+        data = json.loads(_UART_ASSET_PATH.read_text(encoding="utf-8"))
+        return data.get("instance_irq_clock_map", {}).get(key)
+    except (OSError, ValueError):
+        return None
 
 
 class McuProvider:
@@ -61,20 +96,86 @@ class McuProvider:
     name = "mcu"
 
     def plan(self, intent: Intent) -> Plan:
-        return Plan([
-            PlannedChange(
+        """Return planned changes for the Mcu clock-tree recipe.
+
+        For a `set` action with core_clk/aips_plat_clk/aips_slow_clk, two
+        changes are described:
+        1. PLL and CGM clock-tree configuration (clock_settings + Mcu config_set
+           PLL/divider/mux settings).
+        2. McuClockReferencePoint array merge: preserve existing reference points
+           and add entries for all selectable S32K344 clocks
+           (when add_all_clock_reference_points=True).
+        """
+        payload = intent.payload
+        core_clk = payload.get("core_clk")
+        aips_plat_clk = payload.get("aips_plat_clk")
+        aips_slow_clk = payload.get("aips_slow_clk")
+        add_all_ref = payload.get("add_all_clock_reference_points", False)
+
+        changes: list[PlannedChange] = []
+
+        if core_clk is not None or aips_plat_clk is not None or aips_slow_clk is not None:
+            changes.append(PlannedChange(
                 module="mcu",
                 owner="mcu",
                 path="/Mcu/Mcu/McuModuleConfiguration/McuClockSettingConfig_0",
-                description="Ensure Uart peripheral clock reference is present",
-            )
-        ])
+                description=(
+                    f"Configure PLL clock tree: CORE_CLK={core_clk} MHz, "
+                    f"AIPS_PLAT_CLK={aips_plat_clk} MHz, "
+                    f"AIPS_SLOW_CLK={aips_slow_clk} MHz. "
+                    "Edits clock_settings (DIV1/DIV2 scale, PLL power-up, CGM MUX0 sel=PHI0) "
+                    "and Mcu config_set (McuPll_0, McuPll_Configuration, "
+                    "McuPll_Parameter PLL params, McuCgm0ClockMux0 divisors)."
+                ),
+            ))
+
+        if add_all_ref:
+            changes.append(PlannedChange(
+                module="mcu",
+                owner="mcu",
+                path="/Mcu/Mcu/McuModuleConfiguration/McuClockSettingConfig_0/McuClockReferencePoint",
+                description=(
+                    "Merge McuClockReferencePoint array: preserve existing reference points "
+                    "and add entries for all selectable S32K344 clocks "
+                    "(CORE_CLK, AIPS_PLAT_CLK, AIPS_SLOW_CLK, FLEXCAN_PE_CLK0_2, "
+                    "FLEXCAN_PE_CLK3_5, EMAC_CLK_RX/TX/TS, QuadSPI_SFCK, QSPI_MEM_CLK, "
+                    "FIRC_CLK, SIRC_CLK, STM0_CLK) not already present by name."
+                ),
+            ))
+
+        if not changes:
+            # Fallback: general clock reference ensure (used by Uart dependency)
+            changes.append(PlannedChange(
+                module="mcu",
+                owner="mcu",
+                path="/Mcu/Mcu/McuModuleConfiguration/McuClockSettingConfig_0",
+                description="Ensure Mcu clock reference is present",
+            ))
+
+        return Plan(changes)
 
     def clock_dependency(self, hw: str) -> PlannedChange:
-        """Return the Mcu-owned clock dependency a consumer (Uart) requires."""
+        """Return the Mcu-owned clock dependency a consumer (Uart) requires.
+
+        The description names the concrete McuClockReferencePoint Name and
+        McuClockFrequencySelect derived from the uart.json instance_irq_clock_map
+        (same source as apply_uart_set), so the plan accurately describes what
+        will be written.  Falls back to a generic description for non-LPUART
+        peripherals or unknown instances.
+        """
+        entry = _load_lpuart_clock_entry(hw)
+        if entry is not None:
+            ref_name = _lpuart_clock_ref_name(hw)
+            clock_select = entry["clock_select"]
+            description = (
+                f"Insert McuClockReferencePoint for {hw}: "
+                f"Name={ref_name}, McuClockFrequencySelect={clock_select}"
+            )
+        else:
+            description = f"Ensure clock reference for {hw}"
         return PlannedChange(
             module="mcu",
             owner="mcu",
             path="/Mcu/Mcu/McuModuleConfiguration/McuClockSettingConfig_0",
-            description=f"Ensure clock reference for {hw}",
+            description=description,
         )

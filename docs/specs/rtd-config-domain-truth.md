@@ -2,8 +2,8 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.3.0 |
-| Date | 2026-06-10 |
+| Version | 0.4.4 |
+| Date | 2026-06-13 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Holds only CROSS-CUTTING truth (the S32DS headless validation flow + gate, and fixture role/usage) and the SOURCING RULE for per-module truth. Per-module valid values, constraints, and dependencies are NOT listed here — they come from each module's `.xdm` and live in that module's provider. |
 
@@ -57,7 +57,9 @@ may carry hand-written enum/constraint/dependency values.
    `autombd-rtd/assets/<vendor>/<family>/<module>/` (e.g. `autombd-rtd/assets/nxp/s32k3/uart/`)
    holding `{valid_values, defaults, constraints, dependencies}`, each item
    traceable to its `.xdm` (record the source path + RTD version). The provider
-   loads this asset (or embeds the constants from it). **The truth lives with the
+   loads this asset at runtime, or — if it embeds the constants — pins them with a
+   code==asset test that fails on drift (a documentation-only asset with no loader
+   and no pin is prohibited; see lessons-learned LL-012). **The truth lives with the
    provider — not in this document.**
 4. **Runtime boundary** — runtime commands read only the committed asset; the
    `.xdm` is never opened at runtime.
@@ -82,9 +84,10 @@ from the pin-mux source workbook
 (development input only — also catalogued in the source-materials reference;
 never read at runtime). It must cover every peripheral signal and carry the
 package as an in-record field, so one file serves all of a family's packages
-(`lqfp100`, `hdqfp172`, `mapbga257`, …). The current `pins.json` is a stub and
-must be rebuilt complete; until then `pin-options` output is unverified and Port
-pin application is gated.
+(`lqfp100`, `hdqfp172`, `mapbga257`, …). The `pins.json` asset is built from that
+workbook by the committed development tool `tools/build_pins_s32k3.py` (2091
+S32K344 signals; byte-verified), and `pin-options` is verified against it.
+Writing a queried pin into a `.mex` (Port apply) is the remaining Port capability.
 
 ## 2. Fixtures — role and usage
 
@@ -102,10 +105,12 @@ docs.
 Worked example — `Uart_Example_S32K344`
 (`tests/fixtures/nxp/ds/s32k3/Uart_Example_S32K344/`): full S32DS project
 (`.project` name `Uart_Example_S32K344` + `.cproject`). Default XML namespace
-`http://mcuxpresso.nxp.com/XSD/mex_configuration_18`; CRLF endings;
-non-canonical XML declaration `<?xml version="1.0" encoding= "UTF-8" ?>` —
-preserve byte-for-byte. Recompute the nearest `quick_selection` carrier at edit
-time.
+`http://mcuxpresso.nxp.com/XSD/mex_configuration_18`; LF (Unix) endings (CRLF
+count 0, LF 2467 — byte-verified); the byte-faithful writer auto-detects the
+file's line ending so insertions derive it from the file and never hardcode a
+line-ending style; non-canonical XML declaration
+`<?xml version="1.0" encoding= "UTF-8" ?>` — preserve byte-for-byte.
+Recompute the nearest `quick_selection` carrier at edit time.
 
 ## 3. S32 ConfigTools headless validation (cross-cutting; verified)
 
@@ -133,20 +138,56 @@ Source: the `com.nxp.swtools.doc.uct` plugin jar
   SLF4J/NLS noise are project-build artifacts, not `.mex` validity.
 
 ### Flows
-- **(A) Project mode (current tool flow, full):** project must be a workspace
-  member, else `Cannot get container for IPath`. Register first
-  (`-application org.eclipse.cdt.managedbuilder.core.headlessbuild -import <project>`),
-  then `-HeadlessTool Peripherals -importProject <project> -sdkPath <sdk>
-  -ShowProblems SEVERE`. The CLI stages an out-of-workspace project in and cleans
-  up.
-- **(B) Standalone `.mex` mode (candidate to simplify; documented, not yet
-  verified here):** `-HeadlessTool Peripherals -Load <mex> -sdkPath <sdk>
-  -ExportSrc <tmp> -ShowProblems SEVERE` — exports generated code to a folder, so
-  it should not need workspace registration. The Tester must confirm it returns
-  clean on a known-good `.mex` and exit 2 / SEVERE on a known-bad one before it
-  replaces flow (A).
+- **(B) Standalone `.mex` mode — VERIFIED, the adopted tool flow:**
+  `-HeadlessTool Peripherals -Load <mex> -sdkPath <sdk> -ExportSrc <tmp>
+  -ShowProblems SEVERE` (with a throwaway `-data <tmp-ws>`; **no** `-ProjectLink`,
+  **no** `-UpdateCode`, **no** registration). `-ExportSrc` writes generated code
+  to a throwaway folder, so the project need not be a workspace member and the
+  run never hits `Cannot get container for IPath`. Confirmed on S32DS 3.6.7
+  against `Uart_Example_S32K344`: known-good → exit `0`, 120 generated files, no
+  `[TOOL] … has the following error`; a known-bad probe (`OsIfUseSystemTimer=true`
+  with an empty `OsIfCounterConfig`) → exit `0` **but** the gate-tripping
+  `SEVERE: [TOOL] The resource "BaseNXP" … has the following error: The number of
+  OsIf Counters must be exactly one …`. This empirically confirms exit `0` alone
+  is insufficient. The CLI validates a throwaway copy so the caller's project is
+  never modified.
+- **(A) Project mode (SUPERSEDED):** registered the project via the CDT headless
+  `-import` application, then `-Load <mex> -ProjectLink <project> -UpdateCode`.
+  The `-import` step routinely exceeded the timeout (exit `124`); the project was
+  then not a workspace member, so `-UpdateCode` failed with repeated
+  `Cannot get container for IPath` and a spurious exit `2` on a pristine fixture.
+  Replaced by (B). Kept here only as the rejected approach.
 - Evidence flags: `-ExportHTML` (report), `-ExportMEX` (tool-normalized `.mex` to
   diff against the input).
+
+## 4. DMA ISR/IRQ names — S32K344 cross-cutting fact
+
+**Source:** Installed-RTD-derived (S32K3 RTD 7.0.1):
+- `Platform.epd` DMATCD IRQ table (IRQn enum values for each DMA Transfer Control
+  Descriptor channel).
+- `Dma_Ip_Irq.c` — the `Dma0_Ch<N>_IRQHandler` ISR function names generated by
+  RTD for each DMA HW channel.
+
+These names are also pinned in `autombd-rtd/assets/nxp/s32k3/uart/uart.json`
+`dma_hw_channel_irq_map` (runtime asset; loaded by the Uart provider, not hardcoded).
+
+**Why here:** DMA ISR names are a cross-cutting concern shared between the Uart
+provider (Platform ISR insertion) and any future DMA-using provider. Recording them
+here allows future maintainers to re-verify the mapping without reopening the RTD
+install.
+
+**S32K344 mapping (DMA HW channel N → DMATCD IRQn / ISR handler):**
+
+| DMA HW Channel | IRQn enum (`Platform.epd`) | ISR handler (`Dma_Ip_Irq.c`) |
+| --- | --- | --- |
+| 0 | `DMATCD0_IRQn` | `Dma0_Ch0_IRQHandler` |
+| 1 | `DMATCD1_IRQn` | `Dma0_Ch1_IRQHandler` |
+
+Pattern: `DMATCD<N>_IRQn` / `Dma0_Ch<N>_IRQHandler` for channel index N.
+
+**Uart DMA usage (RTD-MEX-UART-003):** TX uses DMA HW channel 0 (existing fixture
+`dmaLogicChannel_Type_0`, `HwChId=DMA_IP_HW_CH_0`); RX uses DMA HW channel 1
+(inserted `dmaLogicChannel_Type_1`, `HwChId=DMA_IP_HW_CH_1`).
 
 ## Changelog
 
@@ -155,3 +196,8 @@ Source: the `com.nxp.swtools.doc.uct` plugin jar
 | 2026-06-03 | 0.1.0 | Initial anchor (attempted to register per-module enum facts). |
 | 2026-06-03 | 0.2.0 | Reframed: per-module values/constraints/dependencies are sourced from each `<Module>.xdm` and owned by the provider (not catalogued here); this doc keeps only the cross-cutting S32DS validation flow/gate, fixture facts, and the sourcing rule. |
 | 2026-06-10 | 0.3.0 | Fourth-round review resolution: recorded the exact pin-mux workbook path as the pins.json source (development input only); reframed §2 as fixture role/usage (fixtures grow with module support; Uart_Example_S32K344 kept as the worked example); asset paths updated to `autombd-rtd/assets/`. |
+| 2026-06-11 | 0.4.0 | Verified S32DS **Flow B** (standalone `-Load`/`-ExportSrc`, no registration) on S32DS 3.6.7 and adopted it as the validation flow; marked the registration-based **Flow A** superseded. Flow A's CDT `-import` step timed out (exit 124), so every run failed with `Cannot get container for IPath` and a spurious exit 2 even on a pristine fixture. Recorded the known-good/known-bad evidence and the empirical confirmation that exit 0 alone is insufficient (an invalid OsIf edit returns exit 0 while logging a SEVERE `[TOOL] … has the following error`). |
+| 2026-06-11 | 0.4.1 | Corrected the `Uart_Example_S32K344` fixture line-ending fact: the file has LF (Unix) endings (CRLF count 0, LF 2467 — byte-verified), not CRLF. Added the auto-detect rule: the byte-faithful writer derives line endings from the file and never hardcodes a style. |
+| 2026-06-11 | 0.4.2 | §1 pin-mapping: replaced the stale "pins.json is a stub / must be rebuilt / pin-options unverified" note — the asset is now built from the IOMUX workbook by `tools/build_pins_s32k3.py` (2091 S32K344 signals, verified); Port `.mex` pin application remains the open Port capability. |
+| 2026-06-14 | 0.4.4 | Tightened the asset sourcing rule (step 3) to match the enforced LL-012 discipline: a provider loads the committed asset at runtime, or — if it embeds the constants — pins them with a code==asset test that fails on drift; a documentation-only asset with no loader and no pin is prohibited. |
+| 2026-06-13 | 0.4.3 | §4 added: S32K344 DMA ISR/IRQ cross-cutting fact (`DMATCD<N>_IRQn` / `Dma0_Ch<N>_IRQHandler`) sourced from installed-RTD Platform.epd and Dma_Ip_Irq.c; pinned in uart.json dma_hw_channel_irq_map. LL-017 provenance fix: updated uart.json dma_hw_channel_irq_map._note to credit Platform.epd/Dma_Ip_Irq.c (not the committed fixture). |

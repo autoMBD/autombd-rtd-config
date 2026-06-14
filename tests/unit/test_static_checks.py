@@ -41,7 +41,7 @@
 # Author:      autoMBD <tkung.lqk@foxmail.com>
 # Date:        2026-06-03
 # Version:     0.1.0
-# Description: Unit tests for the Milestone 1 static checks.
+# Description: Unit tests for the static checks.
 # =================================================================================
 
 from rtd_config.backends.s32_mex.document import MexDocument
@@ -109,15 +109,95 @@ def test_stale_flexio_uart_hw_channel_ref_is_blocked(tmp_path):
     assert "stale_flexio_uart_hw_channel_ref" in codes
 
 
-def test_dma_enabled_uart_is_rejected_for_m1(tmp_path):
+def test_dma_enabled_uart_passes_static_check(tmp_path):
+    """DMA mode (RTD-MEX-UART-003) is now supported; a correctly-applied DMA file must not block.
+
+    The former DMA-rejection blocker was removed when DMA mode was
+    implemented.  This test verifies the static checker accepts a DMA-configured
+    file without producing ANY blocker.
+    """
+    from rtd_config.backends.s32_mex.apply import apply_uart_set
+    from rtd_config.intent import Intent
     mex, doc = _load(tmp_path)
+    # Apply a full correct DMA configuration so UartDmaTxChannelRef / UartDmaRxChannelRef
+    # are populated and MclEnableDma=true -- matching the INVALID rule in Uart.xdm.
+    intent = Intent.from_dict({
+        "module": "uart",
+        "action": "set",
+        "payload": {"hw": "LPUART_3", "mode": "dma", "priority": 2},
+    })
+    apply_result = apply_uart_set(doc, intent)
+    assert not apply_result.blocked, [d.to_dict() for d in apply_result.diagnostics]
+    result = run_static_checks(mex, doc)
+    assert result.status != "blocked", (
+        f"A correctly-applied DMA file must not be blocked. Diagnostics: "
+        f"{[d.to_dict() for d in result.diagnostics]}"
+    )
+
+
+def test_dma_broken_missing_refs_is_blocked(tmp_path):
+    """Uart channel with UartInteruptDmaMethod=DMA but empty DMA refs must be blocked.
+
+    Grounded in Uart.xdm INVALID rule: when UartInteruptDmaMethod==LPUART_UART_IP_USING_DMA,
+    UartDmaTxChannelRef and UartDmaRxChannelRef must be non-empty.
+    """
+    mex, doc = _load(tmp_path)
+    # Set the method to DMA (without populating refs -- simulates a hand-broken file)
     for setting in doc.root.iter():
-        if setting.tag.endswith("setting") and setting.attrib.get("name") == "UartDmaEnable":
-            setting.set("value", "true")
+        if (
+            setting.tag.endswith("setting")
+            and setting.attrib.get("name") == "UartInteruptDmaMethod"
+        ):
+            setting.set("value", "LPUART_UART_IP_USING_DMA")
     result = run_static_checks(mex, doc)
     codes = _codes(result)
-    assert result.status == "blocked"
-    assert "dma_not_supported_in_m1" in codes
+    assert result.status == "blocked", (
+        "A DMA-method Uart channel with empty refs must be blocked"
+    )
+    assert "dma_refs_incomplete" in codes, (
+        f"Expected 'dma_refs_incomplete' blocker, got: {codes}"
+    )
+
+
+def test_dma_broken_mcl_not_enabled_is_blocked(tmp_path):
+    """Uart channel with DMA method+refs but MclEnableDma=false must be blocked.
+
+    Grounded in Uart.xdm cross-module rule: DMA transfers require MclEnableDma=true.
+    """
+    from rtd_config.backends.s32_mex.apply import apply_uart_set
+    from rtd_config.intent import Intent
+    mex, doc = _load(tmp_path)
+    # Apply a full correct DMA config first (sets refs + MclEnableDma=true)
+    intent = Intent.from_dict({
+        "module": "uart",
+        "action": "set",
+        "payload": {"hw": "LPUART_3", "mode": "dma", "priority": 2},
+    })
+    apply_uart_set(doc, intent)
+    # Now manually break it by setting MclEnableDma back to false
+    for setting in doc.root.iter():
+        if (
+            setting.tag.endswith("setting")
+            and setting.attrib.get("name") == "MclEnableDma"
+        ):
+            setting.set("value", "false")
+    result = run_static_checks(mex, doc)
+    codes = _codes(result)
+    assert result.status == "blocked", (
+        "DMA configured with MclEnableDma=false must be blocked"
+    )
+    assert "dma_mcl_not_enabled" in codes, (
+        f"Expected 'dma_mcl_not_enabled' blocker, got: {codes}"
+    )
+
+
+def test_interrupt_mode_uart_not_blocked_by_dma_check(tmp_path):
+    """An interrupt-mode Uart channel must not trigger DMA checks (no DMA -> no-op)."""
+    mex, doc = _load(tmp_path)
+    result = run_static_checks(mex, doc)
+    codes = _codes(result)
+    assert "dma_refs_incomplete" not in codes
+    assert "dma_mcl_not_enabled" not in codes
 
 
 def test_duplicate_lpuart_hw_channel_is_flagged(tmp_path):
