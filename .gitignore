@@ -37,6 +37,7 @@ language.settings.xml
 *.stackdump
 __pycache__/
 *.pyc
+.pytest_cache/
 
 # Agent-local/runtime files
 .claude/*

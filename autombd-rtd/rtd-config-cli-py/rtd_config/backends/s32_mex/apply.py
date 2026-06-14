@@ -46,10 +46,11 @@
 
 """Localized, owned edits to an S32 ConfigTools .mex configuration.
 
-Milestone 1 only edits EXISTING module instances; it never creates missing
-modules or a .mex from scratch (reserved for M2). Each provider owns its
-module's settings; cross-module concerns are declared as dependencies in the
-plan, not edited here.
+Providers edit existing module instances and, where a capability requires it,
+create specific declared child elements (e.g. Dio auto-creates a missing
+DioPort container; Mcl/Uart append FlexIO/DMA logic channels) — never whole
+modules from scratch. Each provider owns its module's settings; cross-module
+concerns are declared as dependencies in the plan, not edited here.
 
 Edits are narrow: they locate the existing element and update its owned fields
 in place (attribute edit) or replace a self-closed empty array with a populated
@@ -222,7 +223,7 @@ def apply_uart_set(doc: MexDocument, intent: Intent) -> ApplyResult:
             severity="blocker",
             code="uart_config_set_not_found",
             module="uart",
-            message="No enabled Uart <config_set> found; M1 edits existing instances only.",
+            message="No enabled Uart <config_set> found; the tool edits an existing instance, it does not create the module.",
             details={},
         ))
         return result
@@ -235,7 +236,7 @@ def apply_uart_set(doc: MexDocument, intent: Intent) -> ApplyResult:
             module="uart",
             message=(
                 "No existing Uart channel matches the requested hardware path; "
-                "M1 does not create new channels."
+                "the tool does not create new channels here."
             ),
             details={"hw": hw, "want_flexio": want_flexio},
         ))
@@ -1234,7 +1235,7 @@ def apply_platform_set(doc: MexDocument, intent: Intent) -> ApplyResult:
             severity="blocker",
             code="platform_config_set_not_found",
             module="platform",
-            message="No enabled Platform <config_set> found; M1 edits existing instances only.",
+            message="No enabled Platform <config_set> found; the tool edits an existing instance, it does not create the module.",
             details={},
         ))
         return result
@@ -1247,7 +1248,7 @@ def apply_platform_set(doc: MexDocument, intent: Intent) -> ApplyResult:
             module="platform",
             message=(
                 "No existing PlatformIsrConfig entry matches the requested "
-                "interrupt; M1 does not create interrupt entries."
+                "interrupt; the tool does not create interrupt entries here."
             ),
             details={
                 "requested_isr_name": isr_name,
@@ -2679,7 +2680,7 @@ def apply_dio_set(doc: MexDocument, intent: Intent) -> ApplyResult:
     Intent payload:
       add_channel (str): symbolic DioChannel Name, e.g. 'LED_CTRL'
       pin (str): S32K3 pin signal name, e.g. 'PTA5'
-      direction (str): 'output' (default, only value supported in M1)
+      direction (str): 'output' (default, only value currently supported)
 
     Validation:
       - pin must have direction='gpio' in pins.json (no mux-only peripherals)
@@ -3070,7 +3071,7 @@ def _portpin_name_for_gpio_channel(channel_name: str) -> str:
 # ---------------------------------------------------------------------------
 
 # Supported clock-frequency recipe table, keyed by (core_clk, aips_plat_clk, aips_slow_clk).
-# Only 160/80/40 is supported in Milestone 1. Values grounded in Mcu.xdm and
+# Only 160/80/40 is currently supported. Values grounded in Mcu.xdm and
 # the S32K344 160MHz reference config (FXOSC=16MHz).
 _MCU_SUPPORTED_RECIPES: frozenset = frozenset({
     (160, 80, 40),
@@ -3385,7 +3386,7 @@ def apply_mcu_set(doc: MexDocument, intent: Intent) -> ApplyResult:
             message=(
                 f"Clock combination core={core_clk}/plat={aips_plat_clk}/"
                 f"slow={aips_slow_clk} MHz is not supported. "
-                "Only 160/80/40 MHz is supported in Milestone 1."
+                "Only 160/80/40 MHz is currently supported."
             ),
             details={
                 "core_clk": core_clk,
@@ -3402,7 +3403,7 @@ def apply_mcu_set(doc: MexDocument, intent: Intent) -> ApplyResult:
             severity="blocker",
             code="mcu_config_set_not_found",
             module="mcu",
-            message="No enabled Mcu <config_set> found; M1 edits existing instances only.",
+            message="No enabled Mcu <config_set> found; the tool edits an existing instance, it does not create the module.",
             details={},
         ))
         return result

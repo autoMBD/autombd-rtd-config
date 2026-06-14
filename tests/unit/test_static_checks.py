@@ -41,7 +41,7 @@
 # Author:      autoMBD <tkung.lqk@foxmail.com>
 # Date:        2026-06-03
 # Version:     0.1.0
-# Description: Unit tests for the Milestone 1 static checks.
+# Description: Unit tests for the static checks.
 # =================================================================================
 
 from rtd_config.backends.s32_mex.document import MexDocument

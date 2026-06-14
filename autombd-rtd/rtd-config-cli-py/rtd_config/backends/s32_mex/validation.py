@@ -67,14 +67,29 @@ a deliberately invalid OsIf edit -> the SEVERE ``[TOOL]`` resource error below):
   timeout and produced a spurious exit 2.
 
 Pass condition: ConfigTools exits ``0``, generates at least one source file, AND
-reports no SEVERE ``[TOOL] ... has the following error`` resource problem. Exit
-``0`` alone is NOT sufficient -- ConfigTools returns ``0`` even when it logs a
-SEVERE configuration error (verified: an invalid OsIf edit returned exit 0 while
-logging ``[TOOL] The resource "BaseNXP" ... has the following error: The number
-of OsIf Counters must be exactly one ...``). Conversely, framework noise logged
-at ``严重:``/SEVERE (``Cannot get container``, SerDes ``No script file``, Port
-expression errors, SLF4J/NLS) is not a .mex validity problem and is excluded by
-the ``has the following error`` marker.
+reports no SEVERE tool or resource-constraint problem.  Exit ``0`` alone is NOT
+sufficient -- ConfigTools returns ``0`` even when it logs a SEVERE configuration
+error (verified: an invalid OsIf edit returned exit 0 while logging
+``[TOOL] The resource "BaseNXP" ... has the following error: The number of OsIf
+Counters must be exactly one ...``; an HSE_CLK>120 MHz configuration returned
+exit 0 while emitting ``From Problems view: Tool problem issue: ...``).
+
+The detector flags two classes of real validity errors (see LL-014):
+
+(a) ``[TOOL] ... has the following error`` -- resource-configuration errors
+    emitted by the RTD tool engine (English, even on a localized install).
+(b) ``From Problems view: Tool problem issue: ...`` -- Clocks/Peripherals/Pins
+    resource-constraint violations that ConfigTools exits 0 on and still
+    generates code for; these appear on stdout as ``!MESSAGE From Problems
+    view: ...`` and on stderr as `` SEVERE: From Problems view: ...``; both
+    forms are matched by the substring pair.
+
+Benign framework noise that is deliberately excluded: ``Dependency ... not
+found`` (platform driver wiring), ``Cannot get container for IPath`` (CDT
+project lookup), SerDes ``No script file``, ``Null toolchain project``,
+SLF4J/NLS messages.  None of these contain the ``From Problems view`` +
+``Tool problem issue`` pair, so the new sentinel does not produce false
+positives on known-good runs.
 
 Commands are built as data so they are unit-testable without launching a vendor
 tool. Execution is gated by the caller and the ``RTD_CONFIG_RUN_S32DS_VALIDATION``
@@ -100,13 +115,22 @@ CONFIGTOOLS_APPLICATION = "com.nxp.swtools.framework.application"
 # ConfigTools headless tool that drives RTD peripheral (.mex) configuration.
 DEFAULT_HEADLESS_TOOL = "Peripherals"
 
-# ConfigTools logs real module-configuration errors as SEVERE
-# "[TOOL] The resource ... has the following error" (emitted in English even on a
-# localized install). Everything else logged at SEVERE/严重 on a headless,
-# unregistered run -- "Cannot get container for IPath", SerDes "No script file",
-# Port expression errors, Toolchain/IDE driver-not-found, SLF4J/NLS noise -- is
-# environment noise, not .mex validity, and is deliberately excluded.
+# Sentinel for class (a): ConfigTools logs real module-configuration errors as
+# SEVERE "[TOOL] The resource ... has the following error" (emitted in English
+# even on a localized install).
 _SEVERE_TOOL_MARKER = "has the following error"
+
+# Sentinels for class (b): Clocks/Peripherals/Pins resource-constraint violations
+# are emitted ONLY as "From Problems view: Tool problem issue: ..." (stdout form:
+# "!MESSAGE From Problems view: ..."; stderr/tail form: " SEVERE: From Problems
+# view: ...").  ConfigTools exits 0 and still generates code for these, so the
+# class-(a) sentinel misses them entirely (LL-014).  The PAIR of substrings is
+# the discriminating, false-positive-safe sentinel: known-good runs produce zero
+# lines that contain both markers, while the benign framework noise ("Dependency
+# ... not found", "Cannot get container", SerDes "No script file", "Null toolchain
+# project", SLF4J/NLS) contains neither.
+_PROBLEMS_VIEW_MARKER = "From Problems view"
+_TOOL_PROBLEM_ISSUE_MARKER = "Tool problem issue"
 
 
 # Default parent directories to scan when neither --s32ds-root nor
@@ -312,15 +336,38 @@ def build_validation_command(
 
 
 def find_severe_tool_problems(text: str) -> list[str]:
-    """Return SEVERE ConfigTools resource-configuration problem lines.
+    """Return SEVERE ConfigTools resource-configuration and resource-constraint problem lines.
 
-    These are the real ``.mex`` validity errors (``[TOOL] The resource "X" ...
-    has the following error: ...``). Project-build "Toolchain/IDE project"
-    problems are excluded on purpose.
+    Flags a line if it matches EITHER of two sentinel patterns:
+
+    (a) ``[TOOL]`` AND ``has the following error`` -- the RTD tool-engine
+        resource-configuration errors (``[TOOL] The resource "X" ...
+        has the following error: ...``), emitted in English on any locale.
+
+    (b) ``From Problems view`` AND ``Tool problem issue`` -- the
+        Clocks/Peripherals/Pins resource-constraint violations that
+        ConfigTools exits 0 on and still generates code for (LL-014 bypass).
+        These appear on stdout as ``!MESSAGE From Problems view: Tool problem
+        issue: ...`` and on stderr as `` SEVERE: From Problems view: Tool
+        problem issue: ...``; the substring pair matches both forms and both
+        English and localized (e.g. Chinese) message bodies.
+
+    Still EXCLUDED (benign framework noise that lacks both sentinel pairs):
+    ``Dependency ... not found`` (platform driver wiring), ``Cannot get
+    container for IPath`` (CDT project lookup), SerDes ``No script file``,
+    ``Null toolchain project``, SLF4J/NLS messages.  ``From Problems view:
+    ... target: Toolchain/IDE project`` lines are also excluded because they
+    do not carry ``Tool problem issue``.
+
+    Duplicate stripped lines are deduplicated; order is preserved.
     """
     problems: list[str] = []
     for line in text.splitlines():
-        if "[TOOL]" in line and _SEVERE_TOOL_MARKER in line:
+        is_tool_error = "[TOOL]" in line and _SEVERE_TOOL_MARKER in line
+        is_problems_view = (
+            _PROBLEMS_VIEW_MARKER in line and _TOOL_PROBLEM_ISSUE_MARKER in line
+        )
+        if is_tool_error or is_problems_view:
             stripped = line.strip()
             if stripped not in problems:
                 problems.append(stripped)
@@ -339,10 +386,12 @@ class ValidationOutcome:
 
     @property
     def passed(self) -> bool:
-        """Pass = exit 0 AND code generated AND no SEVERE [TOOL] config error.
+        """Pass = exit 0 AND code generated AND no SEVERE resource problem.
 
         Exit 0 alone is insufficient: ConfigTools returns 0 even when it logs a
-        SEVERE ``[TOOL] ... has the following error`` resource problem, so the
+        SEVERE resource problem — either ``[TOOL] ... has the following error``
+        OR a ``From Problems view: Tool problem issue: ...`` Clocks/Peripherals/
+        Pins constraint violation (see ``find_severe_tool_problems``) — so the
         severe list must be empty. A pass must also have produced at least one
         generated source file (the ``-ExportSrc`` evidence that codegen ran).
         """

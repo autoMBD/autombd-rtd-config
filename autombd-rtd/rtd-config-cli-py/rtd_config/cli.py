@@ -260,7 +260,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--direction",
         default="output",
         choices=["output"],
-        help="Pin direction (default: output). Only 'output' is supported in M1.",
+        help="Pin direction (default: output). Only 'output' is currently supported.",
     )
     dio_set.add_argument("--configure", action="store_true")
     dio_set.add_argument("--backup", action="store_true")

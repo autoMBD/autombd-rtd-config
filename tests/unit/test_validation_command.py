@@ -103,17 +103,114 @@ def test_find_severe_tool_problems_filters_out_environment_noise():
     Everything else ConfigTools logs at SEVERE/严重 on a headless, unregistered
     run -- "Cannot get container", SerDes "No script file", localized framework
     NLS errors -- is environment noise, not .mex validity, and must be excluded.
+
+    Also verifies the real known-good benign lines (from Explorer live runs)
+    that must never be flagged:
+    - "Dependency from Pins/Clocks ... M7_0 not found" (no Tool problem issue pair)
+    - "Cannot get container for IPath" (localized 严重:)
+    - "[TOOL] No script file found" SerDes line (lacks "From Problems view")
+    - "Null toolchain project" warning
     """
     text = "\n".join([
         ' SEVERE: [TOOL] The resource "BaseNXP" ... has the following error: The number of OsIf Counters ... [x]',
         ' SEVERE: From Problems view: ... target: Toolchain/IDE project [y]',
         ' SEVERE: [TOOL] No script file found while trying to recompile ... SerDes Config Tool [z]',
         '严重: Cannot get container for IPath C:/tmp/Uart_Example.mex',
+        # Real known-good benign lines from Explorer live runs (must NOT be flagged):
+        '!MESSAGE Dependency from Pins:PortContainer_0_VS_0 for platform.driver.pins requires configuration M7_0 that was not found in the result of query',
+        ' SEVERE: Dependency from Clocks:BOARD_BootClockRUN for platform.driver.clock requires configuration M7_0 that was not found in the result of query [ValidationEngineImpl.validate]',
+        '严重: Cannot get container for IPath C:/tmp/x.mex',
+        '严重: [TOOL] No script file found while trying to recompile the codegeneration script for SerDes Config Tool',
+        ' WARNING: Null toolchain project for the configuration [ToolchainProjectQuery.query]',
     ])
     problems = find_severe_tool_problems(text)
-    assert len(problems) == 1
+    assert len(problems) == 1, (
+        f"Expected exactly 1 severe problem (the BaseNXP [TOOL] line); "
+        f"got {len(problems)}: {problems}"
+    )
     assert "has the following error" in problems[0]
     assert "BaseNXP" in problems[0]
+
+
+def test_find_severe_tool_problems_flags_problems_view_hse_clk():
+    """'From Problems view: Tool problem issue:' lines are flagged (LL-014).
+
+    HSE_CLK>120 MHz violations exit ConfigTools with code 0 and still generate
+    code, so the existing '[TOOL] ... has the following error' sentinel misses
+    them entirely. The new sentinel pair ('From Problems view' + 'Tool problem
+    issue') catches these in both the !MESSAGE (stdout) and SEVERE: (stderr)
+    forms, and in both English and localized (Chinese) variants.
+    """
+    hse_clk_stdout = (
+        '!MESSAGE From Problems view: Tool problem issue: '
+        '"CORE_CLK is higher than 120 MHz, HSE_CLK must be half of the CORE_CLK", '
+        'origin: Clocks: BOARD_BootClockRUN, target: Clocks, resource: HSE_CLK'
+    )
+    hse_clk_stderr_zh = (
+        ' SEVERE: From Problems view: Tool problem issue: '
+        '"输入频率必须小于或等于： 120 MHz", '
+        'origin: Clocks: BOARD_BootClockRUN, target: Clocks, resource: HSE_CLK'
+        '  [ValidationEngineFactory.lambda$5]'
+    )
+    text = "\n".join([hse_clk_stdout, hse_clk_stderr_zh])
+    problems = find_severe_tool_problems(text)
+    assert len(problems) == 2, (
+        f"Expected 2 flagged problems (stdout + stderr HSE_CLK forms); "
+        f"got {len(problems)}: {problems}"
+    )
+    assert any("CORE_CLK is higher than 120 MHz" in p for p in problems)
+    assert any("输入频率必须小于或等于" in p for p in problems)
+
+
+def test_find_severe_tool_problems_flags_peripherals_and_pins_targets():
+    """'From Problems view: Tool problem issue:' is flagged for any target (LL-014 generality).
+
+    The detector must not be limited to target: Clocks; Peripherals and Pins
+    resource-constraint violations emit the same sentinel pair and must also be caught.
+    """
+    peripherals_line = (
+        '!MESSAGE From Problems view: Tool problem issue: '
+        '"SomePeripheral constraint violated", '
+        'origin: Peripherals: CAN_0, target: Peripherals, resource: CAN_CLOCK'
+    )
+    pins_line = (
+        '!MESSAGE From Problems view: Tool problem issue: '
+        '"Pin mux conflict detected", '
+        'origin: Pins: PTA0, target: Pins, resource: PTA0'
+    )
+    text = "\n".join([peripherals_line, pins_line])
+    problems = find_severe_tool_problems(text)
+    assert len(problems) == 2, (
+        f"Expected 2 flagged problems (Peripherals + Pins targets); "
+        f"got {len(problems)}: {problems}"
+    )
+    assert any("Peripherals" in p and "CAN_CLOCK" in p for p in problems)
+    assert any("Pins" in p and "PTA0" in p for p in problems)
+
+
+def test_validation_outcome_pass_gate_with_problems_view_problem():
+    """A Problems-view severe problem makes passed False even with exit 0 and codegen.
+
+    This confirms the LL-014 bypass is enforced end-to-end: ConfigTools can
+    return exit 0 with generated files AND a 'From Problems view: Tool problem
+    issue:' line, but ValidationOutcome.passed must be False.
+    """
+    problems_view_line = (
+        'From Problems view: Tool problem issue: '
+        '"CORE_CLK is higher than 120 MHz, HSE_CLK must be half of the CORE_CLK", '
+        'origin: Clocks: BOARD_BootClockRUN, target: Clocks, resource: HSE_CLK'
+    )
+    outcome = ValidationOutcome(
+        exit_code=0,
+        severe_problems=[problems_view_line],
+        generated_files=120,
+        command=[],
+        log_path="x",
+    )
+    assert outcome.passed is False, (
+        "A 'From Problems view: Tool problem issue:' severe problem must make "
+        "passed False even when exit_code=0 and generated_files=120"
+    )
 
 
 def test_validation_outcome_pass_gate():

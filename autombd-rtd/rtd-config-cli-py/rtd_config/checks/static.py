@@ -41,14 +41,14 @@
 # Author:      autoMBD <tkung.lqk@foxmail.com>
 # Date:        2026-06-03
 # Version:     0.1.0
-# Description: Milestone 1 static checks for S32 ConfigTools .mex projects.
+# Description: Static checks for S32 ConfigTools .mex projects.
 # =================================================================================
 
 """Fast, vendor-free static checks for S32 ConfigTools .mex projects.
 
 These checks run during development testing and as the first stage of runtime
 verification after a .mex edit. They never launch a vendor tool. The rules
-encode the failure patterns captured in the M1 legacy-skills experience:
+encode failure patterns established during the legacy-skills experience:
 
 - XML well-formedness;
 - single .mex detection;
@@ -59,7 +59,8 @@ encode the failure patterns captured in the M1 legacy-skills experience:
 - missing Mcl FlexIO logic-channel detection;
 - duplicate LPUART hardware channel detection;
 - invalid Uart callback (NULL_PTR / non-C-identifier) detection;
-- Milestone 1 DMA rejection (never partially configure DMA).
+- DMA coherence: a DMA Uart requires Mcl DMA enabled and complete Tx/Rx DMA
+  channel refs (codes dma_mcl_not_enabled / dma_refs_incomplete).
 """
 from __future__ import annotations
 
@@ -408,7 +409,7 @@ def run_static_checks(
     modified_elements: Iterable[ET.Element] | None = None,
     requested_callback: str | None = None,
 ) -> Result:
-    """Run all M1 static checks against a .mex document.
+    """Run all static checks against a .mex document.
 
     Returns a Result with status "blocked" when any blocker diagnostic is
     present, otherwise "passed". Never raises for expected validation failures;

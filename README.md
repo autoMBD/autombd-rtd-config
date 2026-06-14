@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![Python](https://img.shields.io/badge/python-3.11%2B-blue.svg)
 ![Dependencies](https://img.shields.io/badge/deps-stdlib--only-success.svg)
-![Tests](https://img.shields.io/badge/tests-411%20passing-brightgreen.svg)
+![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg)
 ![Backend](https://img.shields.io/badge/backend-S32%20ConfigTools%20.mex-blue.svg)
 ![NXP RTD](https://img.shields.io/badge/NXP%20RTD-7.0.1-blue.svg)
 ![Minimal system](https://img.shields.io/badge/minimal%20system-complete-brightgreen.svg)
@@ -31,7 +31,7 @@ self-contained on another machine or in another agent environment.
 
 ## Status
 
-**Minimal system (roadmap stage 1) — complete.** All seven modules — `Mcu,
+**Minimal system — complete.** All seven modules — `Mcu,
 BaseNXP, Platform, Port, Dio, Mcl, Uart` (equal priority) — are delivered and
 vendor-validated end to end: every E2E acceptance case passes the S32DS gate
 (exit `0`, code generated, no SEVERE `[TOOL]`) with its generated code verified.

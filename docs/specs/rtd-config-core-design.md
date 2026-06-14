@@ -2,7 +2,7 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.6.2 |
+| Version | 0.6.3 |
 | Date | 2026-06-13 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Long-term architecture and goals for the RTD CfgFile CLI. Holds the stable CLI/JSON contract, module-ownership rules, the subagent development workflow, and the documentation map. Domain facts live in domain-truth; the test method lives in the test strategy; E2E cases live in the test-cases catalog; `.mex` pitfalls live in the legacy-skills baseline (references/). |
@@ -23,8 +23,8 @@ This spec deliberately stays at the architecture/contract altitude — it carrie
 no milestone, schedule, or staging information (that lives only in the roadmap
 and the implementation plan). It does not repeat: RTD enum/pin/fixture/S32DS
 facts (see `rtd-config-domain-truth.md`), the test method and E2E cases (see
-`tests/rtd-config-test-strategy.md` and `tests/rtd-config-test-cases.md`), or
-`.mex` editing pitfalls (see `references/rtd-config-legacy-skills-experience.md`).
+`docs/tests/rtd-config-test-strategy.md` and `docs/tests/rtd-config-test-cases.md`),
+or `.mex` editing pitfalls (see `docs/references/rtd-config-legacy-skills-experience.md`).
 General software practice (TDD, stdlib-first,
 structured-diagnostics-not-tracebacks) is assumed of every agent and is not
 respecified here.
@@ -230,9 +230,9 @@ in the test-cases catalog.
 
 ## Tests and acceptance
 
-Defined by `tests/rtd-config-test-strategy.md` (test layers, vendor gate,
+Defined by `docs/tests/rtd-config-test-strategy.md` (test layers, vendor gate,
 acceptance rule, roles); the concrete E2E cases live in
-`tests/rtd-config-test-cases.md` (scheme `RTD-MEX-*`). In short: tests are the
+`docs/tests/rtd-config-test-cases.md` (scheme `RTD-MEX-*`). In short: tests are the
 sole "done" signal; a module is accepted when the deterministic suite, static
 checks, the vendor gate, and its E2E cases (black-box protocol) all
 pass; **every supported module reaches the same validated bar**. Delivery
@@ -303,6 +303,7 @@ flowchart TD
 
 | Date | Version | Description |
 | --- | --- | --- |
+| 2026-06-14 | 0.6.3 | Fixed in-body doc path references that omitted the `docs/` prefix (`tests/…` → `docs/tests/…`, `references/…` → `docs/references/…`) so they match the doc map. |
 | 2026-06-14 | 0.6.2 | Updated the Subagent development workflow + success criteria to the TRUE black-box E2E model: an independent third-party agent CLI (not the embedded subagent, which inherits repo context/filesystem) drives the released skill against the staged fixture, and the Tester independently re-verifies the produced `.mex`. Also dropped the dangling doc-map row + diagram node for the never-created `rtd-config-subagent-validation.md` (the black-box record now lives in the harness + the acceptance report). |
 | 2026-06-13 | 0.6.1 | Added the KPI-monitoring route to the subagent workflow: functional PASS with KPI miss returns to Worker optimization for up to three iterations, then records the true KPI result before Reviewer review. |
 | 2026-06-10 | 0.6.0 | Fourth-round review resolution: unified committed-data terminology and location as **assets** (`autombd-rtd/assets/`); removed milestone/schedule wording from goals, diagram, backends, and acceptance (staging lives only in the roadmap); per-backend vendor validation stated (`.mex` → S32DS, `.xdm` → EB tresos, same gate semantics); added G10 (full RTD surface incl. all driver modules, FreeRTOS, Stacks, CDDs); replaced the capability-table model with the all-legal-edits provider model (capabilities doc removed); context isolation made generic and moved to the Tester's E2E execution; linked source materials; added the documentation map; restored the itemized changelog. |

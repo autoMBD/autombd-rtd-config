@@ -2,7 +2,7 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.12.0 |
+| Version | 0.13.0 |
 | Date | 2026-06-13 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Current pass/fail evidence for the E2E acceptance cases defined in `rtd-config-test-cases.md`. This document is the living status record the catalog points to; the catalog defines the target, this records where the tool actually stands. |
@@ -61,7 +61,7 @@ measured KPI result.
 **Summary: 10 / 10 cases PASS — the seven-module minimal system is COMPLETE**
 (RTD-MEX-DIO-002 added as black-box round-2 hardening). All seven modules
 (Mcu, BaseNXP, Platform, Port, Dio, Mcl, Uart) reach the full acceptance bar:
-deterministic suite (422 tests green), static checks, the S32DS vendor gate
+deterministic suite (467 tests green), static checks, the S32DS vendor gate
 (exit 0 + no SEVERE `[TOOL]` + code generated), AND each E2E case's generated
 code verified to reflect the edit (LL-013). Every case also passed independent
 Reviewer acceptance with its findings closed. The five cross-cutting blockers
@@ -116,6 +116,7 @@ Reviewer), proven against the now-operational gate.
 
 | Date | Version | Description |
 | --- | --- | --- |
+| 2026-06-14 | 0.13.0 | Strengthened the vendor gate (external-review remediation): `validate` now also flags `From Problems view: Tool problem issue:` Clocks/Peripherals/Pins resource violations, closing the LL-014 bypass where an `HSE_CLK>120 MHz` config exit-0'd and false-passed; re-baselined against the real gate (pristine + a valid 160/80/40 config still pass; the HSE_CLK>120 case is now caught). Refreshed the deterministic count to 467. Companion fixes: M1-wording code sweep, doc path/asset-rule corrections, `.gitignore` + README de-stage. |
 | 2026-06-14 | 0.12.0 | RTD-MEX-DIO-002 **PASS**: `dio set --pin PTA30` auto-creates the absent `DioPort_1` container (DioPortId 1, array index 1) then inserts the channel (DioChannelId 14); vendor + codegen verified cold (auto-discovery) on the focused case and the full 5-task combined scenario — `Dio_Cfg.h` has `DioConf_DioChannel_LED_CTRL ((uint16)0x001eU)` and `DioConf_DioPort_DioPort_1 ((uint8)0x01U)`. Added as black-box round-2 hardening (LL-019); deterministic suite 422 green. |
 | 2026-06-13 | 0.11.0 | Added the KPI evidence policy: functionally passing cases that miss KPI return to Worker optimization for up to three iterations; after the third miss, the true KPI result is recorded in this report. |
 | 2026-06-11 | 0.1.0 | Created the acceptance report (the catalog's pass/fail record). Recorded the repaired vendor gate (Flow B, operational + error-detecting + project-safe), the honest 0/9 per-case baseline with each gap, the cross-cutting critical-path blockers, and the sequenced execution plan. |

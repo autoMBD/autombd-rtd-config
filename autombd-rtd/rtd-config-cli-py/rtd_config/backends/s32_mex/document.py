@@ -378,7 +378,7 @@ class MexDocument:
         Edits are surgical: only the targeted attribute's value text or the
         removed attribute is touched, preserving the original quote characters,
         attribute order, and whitespace of everything else. Returns None (force
-        fallback) if an attribute was added, which M1 edits never do.
+        fallback) if an attribute was added, which narrow edits never do.
         """
         tag = self._raw[src.start : src.tag_end + 1].decode("utf-8")
         old = src.attrib

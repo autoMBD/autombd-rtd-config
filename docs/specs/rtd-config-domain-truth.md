@@ -2,7 +2,7 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.4.3 |
+| Version | 0.4.4 |
 | Date | 2026-06-13 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Holds only CROSS-CUTTING truth (the S32DS headless validation flow + gate, and fixture role/usage) and the SOURCING RULE for per-module truth. Per-module valid values, constraints, and dependencies are NOT listed here — they come from each module's `.xdm` and live in that module's provider. |
@@ -57,7 +57,9 @@ may carry hand-written enum/constraint/dependency values.
    `autombd-rtd/assets/<vendor>/<family>/<module>/` (e.g. `autombd-rtd/assets/nxp/s32k3/uart/`)
    holding `{valid_values, defaults, constraints, dependencies}`, each item
    traceable to its `.xdm` (record the source path + RTD version). The provider
-   loads this asset (or embeds the constants from it). **The truth lives with the
+   loads this asset at runtime, or — if it embeds the constants — pins them with a
+   code==asset test that fails on drift (a documentation-only asset with no loader
+   and no pin is prohibited; see lessons-learned LL-012). **The truth lives with the
    provider — not in this document.**
 4. **Runtime boundary** — runtime commands read only the committed asset; the
    `.xdm` is never opened at runtime.
@@ -197,4 +199,5 @@ Pattern: `DMATCD<N>_IRQn` / `Dma0_Ch<N>_IRQHandler` for channel index N.
 | 2026-06-11 | 0.4.0 | Verified S32DS **Flow B** (standalone `-Load`/`-ExportSrc`, no registration) on S32DS 3.6.7 and adopted it as the validation flow; marked the registration-based **Flow A** superseded. Flow A's CDT `-import` step timed out (exit 124), so every run failed with `Cannot get container for IPath` and a spurious exit 2 even on a pristine fixture. Recorded the known-good/known-bad evidence and the empirical confirmation that exit 0 alone is insufficient (an invalid OsIf edit returns exit 0 while logging a SEVERE `[TOOL] … has the following error`). |
 | 2026-06-11 | 0.4.1 | Corrected the `Uart_Example_S32K344` fixture line-ending fact: the file has LF (Unix) endings (CRLF count 0, LF 2467 — byte-verified), not CRLF. Added the auto-detect rule: the byte-faithful writer derives line endings from the file and never hardcodes a style. |
 | 2026-06-11 | 0.4.2 | §1 pin-mapping: replaced the stale "pins.json is a stub / must be rebuilt / pin-options unverified" note — the asset is now built from the IOMUX workbook by `tools/build_pins_s32k3.py` (2091 S32K344 signals, verified); Port `.mex` pin application remains the open Port capability. |
+| 2026-06-14 | 0.4.4 | Tightened the asset sourcing rule (step 3) to match the enforced LL-012 discipline: a provider loads the committed asset at runtime, or — if it embeds the constants — pins them with a code==asset test that fails on drift; a documentation-only asset with no loader and no pin is prohibited. |
 | 2026-06-13 | 0.4.3 | §4 added: S32K344 DMA ISR/IRQ cross-cutting fact (`DMATCD<N>_IRQn` / `Dma0_Ch<N>_IRQHandler`) sourced from installed-RTD Platform.epd and Dma_Ip_Irq.c; pinned in uart.json dma_hw_channel_irq_map. LL-017 provenance fix: updated uart.json dma_hw_channel_irq_map._note to credit Platform.epd/Dma_Ip_Irq.c (not the committed fixture). |

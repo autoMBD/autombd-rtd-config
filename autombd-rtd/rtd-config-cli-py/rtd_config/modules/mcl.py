@@ -41,7 +41,7 @@
 # Author:      autoMBD <tkung.lqk@foxmail.com>
 # Date:        2026-06-03
 # Version:     0.1.0
-# Description: Mcl module provider (FlexIO common resources for M1).
+# Description: Mcl module provider (FlexIO common resources).
 # =================================================================================
 
 from __future__ import annotations
@@ -53,11 +53,11 @@ from rtd_config.plan import Plan, PlannedChange
 class MclProvider:
     """Owns Mcl common resources (FlexIO common + FlexIO logic channels).
 
-    For Milestone 1, FlexIO common resources are owned by Mcl and consumed by
-    Uart. MclEnableFlexioCommon must match real FlexIO common/channel entries.
-    DMA stays deferred. When Mcl content changes, the highest-risk lesson is to
-    strip a stale quick_selection from <config_set name="Mcl"> so ConfigTools
-    does not revert the Mcl tree and misreport a Uart out-of-range error.
+    FlexIO common resources are owned by Mcl and consumed by Uart.
+    MclEnableFlexioCommon must match real FlexIO common/channel entries.
+    When Mcl content changes, the highest-risk lesson is to strip a stale
+    quick_selection from <config_set name="Mcl"> so ConfigTools does not
+    revert the Mcl tree and misreport a Uart out-of-range error.
     """
 
     name = "mcl"
