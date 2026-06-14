@@ -112,7 +112,7 @@ def test_owned_edit_touches_only_changed_lines(tmp_path):
     assert len(changed) <= 20, f"unexpectedly broad diff: {len(changed)} lines"
 
     added = [line for line in changed if line.startswith("+")]
-    # interrupt-only M1: the owned change here is the hardware-channel value
+    # interrupt-only: the owned change here is the hardware-channel value
     # (the fixture's method is already INTERRUPTS, so it is not re-emitted).
     assert any('value="LPUART_0"' in line for line in added)
 

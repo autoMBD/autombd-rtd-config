@@ -112,9 +112,9 @@ def test_stale_flexio_uart_hw_channel_ref_is_blocked(tmp_path):
 def test_dma_enabled_uart_passes_static_check(tmp_path):
     """DMA mode (RTD-MEX-UART-003) is now supported; a correctly-applied DMA file must not block.
 
-    The former ``dma_not_supported_in_m1`` blocker was removed when DMA mode was
+    The former DMA-rejection blocker was removed when DMA mode was
     implemented.  This test verifies the static checker accepts a DMA-configured
-    file without producing ANY blocker -- not just the old dma_not_supported_in_m1 code.
+    file without producing ANY blocker.
     """
     from rtd_config.backends.s32_mex.apply import apply_uart_set
     from rtd_config.intent import Intent

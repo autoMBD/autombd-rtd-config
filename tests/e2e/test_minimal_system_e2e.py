@@ -37,14 +37,14 @@
 # 何权利主张、损害赔偿或其他责任承担责任。
 # =================================================================================
 # Project:     RTD CfgFile CLI <https://github.com/autoMBD/autombd-rtd-config>
-# File:        test_m1_mandatory_minimum.py
+# File:        test_minimal_system_e2e.py
 # Author:      autoMBD <tkung.lqk@foxmail.com>
 # Date:        2026-06-03
 # Version:     0.1.0
-# Description: E2E tests for the M1 mandatory minimum matrix (RTD-M1-MIN-001..008).
+# Description: E2E tests for the minimal-system mandatory minimum matrix.
 # =================================================================================
 
-"""Milestone 1 mandatory minimum test matrix (RTD-M1-MIN-001 .. 008).
+"""Minimal-system mandatory minimum E2E matrix.
 
 Each test drives the public CLI and asserts the JSON contract. Non-vendor
 checks (status, changed modules, static check) always run. Backend S32DS
@@ -104,25 +104,25 @@ def _maybe_validate(project):
     assert payload["validation"]["severe_problems"] == [], payload
 
 
-def test_rtd_m1_min_001_inspect_uart_fixture(tmp_path):
+def test_inspect_uart_fixture(tmp_path):
     project = copy_uart_fixture(tmp_path)
     result = _cli("inspect", "--project", str(project), "--json")
     payload = json.loads(result.stdout)
     assert result.returncode == 0
     assert payload["status"] == "passed"
     assert payload["backend"] == "mex"
-    # The MIN-001 user prompt explicitly asks for chip package (封装); inspect
+    # The inspect user prompt explicitly asks for chip package (封装); inspect
     # must surface the package dimension alongside device/RTD version.
     assert payload["package"] == "default"
     assert payload["device"] == "s32k344"
     assert "Uart" in payload["modules"]
 
 
-# RTD-M1-MIN-002 (LPUART polling) was removed: RTD 7.0.1 has no polling
-# async-method value, so M1 supports interrupt only (see test-strategy doc).
+# LPUART polling was removed: RTD 7.0.1 has no polling async-method value,
+# so only interrupt mode is supported (see test-strategy doc).
 
 
-def test_rtd_m1_min_003_lpuart_interrupt(tmp_path):
+def test_lpuart_interrupt(tmp_path):
     project = copy_uart_fixture(tmp_path)
     result = _configure(project, "LPUART_0", "interrupt", 115200, "PTA15", "PTA16")
     payload = json.loads(result.stdout)
@@ -133,11 +133,11 @@ def test_rtd_m1_min_003_lpuart_interrupt(tmp_path):
     _maybe_validate(project)
 
 
-# RTD-M1-MIN-004 (FlexIO polling) was removed for the same reason as MIN-002:
+# FlexIO polling was removed for the same reason as LPUART polling:
 # polling is not an RTD 7.0.1 .mex async-method value.
 
 
-def test_rtd_m1_min_005_flexio_interrupt(tmp_path):
+def test_flexio_interrupt(tmp_path):
     project = copy_uart_fixture(tmp_path)
     result = _configure(project, "FLEXIO_0", "interrupt", 115200, "PTB0", "PTB1")
     payload = json.loads(result.stdout)
@@ -148,7 +148,7 @@ def test_rtd_m1_min_005_flexio_interrupt(tmp_path):
     _maybe_validate(project)
 
 
-def test_rtd_m1_min_006_pin_options(tmp_path):
+def test_pin_options(tmp_path):
     result = _cli(
         "pin-options",
         "--device", "s32k344",
@@ -162,7 +162,7 @@ def test_rtd_m1_min_006_pin_options(tmp_path):
     assert any(item["peripheral"] == "LPUART_0" for item in payload["options"])
 
 
-def test_rtd_m1_min_007_e2e_lpuart_stack(tmp_path):
+def test_e2e_lpuart_stack(tmp_path):
     project = copy_uart_fixture(tmp_path)
     configure = _configure(project, "LPUART_0", "interrupt", 115200, "PTA15", "PTA16")
     configure_payload = json.loads(configure.stdout)
@@ -179,7 +179,7 @@ def test_rtd_m1_min_007_e2e_lpuart_stack(tmp_path):
     _maybe_validate(project)
 
 
-def test_rtd_m1_min_008_e2e_flexio_stack(tmp_path):
+def test_e2e_flexio_stack(tmp_path):
     project = copy_uart_fixture(tmp_path)
     configure = _configure(project, "FLEXIO_0", "interrupt", 115200, "PTB0", "PTB1")
     configure_payload = json.loads(configure.stdout)
