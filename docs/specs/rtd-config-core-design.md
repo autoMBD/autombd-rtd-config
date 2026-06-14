@@ -5,7 +5,7 @@
 | Version | 0.6.3 |
 | Date | 2026-06-13 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
-| Description | Long-term architecture and goals for the RTD CfgFile CLI. Holds the stable CLI/JSON contract, module-ownership rules, the subagent development workflow, and the documentation map. Domain facts live in domain-truth; the test method lives in the test strategy; E2E cases live in the test-cases catalog; `.mex` pitfalls live in the legacy-skills baseline (references/). |
+| Description | Long-term architecture and goals for the RTD CfgFile CLI. Holds the stable CLI/JSON contract, module-ownership rules, engineering constraints, and the minimal-system definition. Domain facts live in domain-truth; the test method lives in the test strategy; E2E cases live in the test-cases catalog; `.mex` pitfalls live in the legacy-skills baseline (references/). |
 
 ## Overview
 
@@ -20,8 +20,8 @@ The **stable external contract is the CLI and its JSON I/O.** Internal Python is
 free to change behind that boundary.
 
 This spec deliberately stays at the architecture/contract altitude — it carries
-no milestone, schedule, or staging information (that lives only in the roadmap
-and the implementation plan). It does not repeat: RTD enum/pin/fixture/S32DS
+no milestone, schedule, or staging information (that lives only in the roadmap).
+It does not repeat: RTD enum/pin/fixture/S32DS
 facts (see `rtd-config-domain-truth.md`), the test method and E2E cases (see
 `docs/tests/rtd-config-test-strategy.md` and `docs/tests/rtd-config-test-cases.md`),
 or `.mex` editing pitfalls (see `docs/references/rtd-config-legacy-skills-experience.md`).
@@ -72,7 +72,7 @@ every backend; only the vendor tool differs.
 ## Architecture
 
 Modular configuration core behind a CLI shell. Editable diagram:
-`docs/common/figures/rtd-cfgfile-cli-architecture.drawio`.
+`docs/specs/figures/rtd-cfgfile-cli-architecture.drawio`.
 
 ```mermaid
 flowchart LR
@@ -122,6 +122,13 @@ vendor-directory scans. New modules — and non-driver surfaces such as RTD
 FreeRTOS, RTD Stacks, and RTD CDDs (G10) — are added as providers under this
 same architecture.
 
+## Minimal system
+
+The **minimal system** comprises seven modules — `Mcu`, `BaseNXP`, `Platform`,
+`Port`, `Dio`, `Mcl`, `Uart` — at equal priority. Additional modules extend the
+same architecture and provider model. Delivery sequencing lives in
+`docs/roadmaps/rtd-config-roadmap.md`.
+
 ## Assets
 
 Assets are committed, versioned JSON/cache files shipped under the skill's
@@ -144,6 +151,21 @@ Development-time source material (pin-mux Excel, RTD `.xdm`/`.epd`, ConfigTools
 examples, validation references) is catalogued in
 [`rtd-config-source-materials.md`](../references/rtd-config-source-materials.md)
 and is used only to *build* assets.
+
+**Asset build sequence** — every module delivery runs these steps before a
+module is considered done:
+
+1. **Ground truth.** Extract the module's valid values, numeric ranges/defaults,
+   constraint rules, and cross-module dependencies from its `<Module>.xdm`;
+   confirm fixture state and the exact vendor-validation command (domain-truth
+   §1/§3). Never invent a value.
+2. **Asset.** Emit or refresh the committed per-module asset under
+   `autombd-rtd/assets/<vendor>/<family>/<module>/`, each item traceable to its
+   `.xdm` source path and RTD version.
+3. **Provider (TDD-first).** Implement or extend the module provider against
+   that asset: ownership-bounded edits only, narrow byte-faithful `.mex` writes,
+   structured diagnostics, supporting the module's full legal editable surface
+   (G10).
 
 ## Intent and commands
 
@@ -188,37 +210,6 @@ For `.mex`, the exact S32DS command, exit codes, and the
 **exit-0-AND-no-SEVERE-`[TOOL]` pass gate** are defined once in domain-truth §3.
 Static and vendor stages share one result model but stay separate steps.
 
-## Subagent development workflow
-
-The product is built by an autonomous loop of four roles (`.claude/agents/`).
-`main agent → Explorer → Worker → Tester → main agent` is one iteration:
-
-- **Explorer** sources per-module truth from the module's `<Module>.xdm` into its
-  committed provider asset (domain-truth §1), and confirms fixture state + the
-  exact vendor-validation command.
-- **Worker** implements one scoped capability TDD-first against that truth,
-  inventing nothing.
-- **Tester** runs the convergence gate: the deterministic suite, vendor
-  validation, and the E2E acceptance cases, and records KPI evidence for each
-  case. **E2E is a true black box**: an independent third-party agent CLI (not the
-  embedded subagent) sees only the deployed skill, the case's prompt, and the
-  staged fixture — never this repository. The embedded subagent is not a valid
-  black box because it inherits this repository's context and filesystem; the
-  Tester independently re-verifies the agent-produced `.mex` with the vendor gate.
-- The main agent routes on the result: **functional fail → next iteration
-  (Explorer); functional pass with KPI miss → Worker KPI optimization, capped at
-  three optimization iterations for the same case; functional pass with KPI
-  pass, or still-missed KPI after the third optimization iteration → record the
-  true KPI result and dispatch Reviewer**. The **Reviewer** (read-only, only
-  after the functional gate is green)
-  reviews the non-test requirements — domain values vs the `.xdm`, uniform
-  header / missed skill triggers, ownership/boundaries, test adequacy, diff
-  hygiene — and appends a **lessons-learned** entry
-  (`rtd-config-lessons-learned.md`).
-
-Tests are the convergence signal; the full loop is specified in the test
-strategy.
-
 ## Fixtures
 
 Real vendor projects grouped
@@ -231,15 +222,12 @@ in the test-cases catalog.
 ## Tests and acceptance
 
 Defined by `docs/tests/rtd-config-test-strategy.md` (test layers, vendor gate,
-acceptance rule, roles); the concrete E2E cases live in
+acceptance rule); the concrete E2E cases live in
 `docs/tests/rtd-config-test-cases.md` (scheme `RTD-MEX-*`). In short: tests are the
 sole "done" signal; a module is accepted when the deterministic suite, static
 checks, the vendor gate, and its E2E cases (black-box protocol) all
 pass; **every supported module reaches the same validated bar**. Delivery
-staging lives in the roadmap. KPIs are monitored during E2E execution: KPI
-misses trigger Worker optimization for up to three iterations, then the final
-KPI result is recorded honestly. Timing targets: 3 min focused / 5 min E2E /
-10 min intervention.
+staging lives in the roadmap.
 
 ## Success criteria
 
@@ -252,57 +240,37 @@ KPI result is recorded honestly. Timing targets: 3 min focused / 5 min E2E /
   scans;
 - static and vendor diagnostics are actionable;
 - **every supported module passes the vendor gate** (for `.mex`: exit 0 + no
-  SEVERE `[TOOL]`) **and its E2E cases**; focused validation meets the 3-minute
-  KPI or the KPI result is recorded after the capped optimization loop.
+  SEVERE `[TOOL]`) **and its E2E cases**.
 
-## Documentation map
+## Engineering constraints
 
-How the project's documents relate (who defines what, who references whom).
-Staging/scheduling exists **only** in the roadmap; specs stay milestone-free.
+The following constraints apply to all current and future development work on
+this project:
 
-| Document | Role | References |
-| --- | --- | --- |
-| `README.md` | Entry point: status, quick start, layout | core design, test strategy, test cases, roadmap |
-| `AGENTS.md` | Agent charter: orchestrator duties, roles, boundaries | domain-truth, lessons-learned, test cases |
-| `autombd-rtd/SKILL.md` | Released Agent Skill: how an agent drives the public CLI | (self-contained; ships with `assets/` + CLI) |
-| `docs/specs/rtd-config-core-design.md` | **This spec**: architecture, contract, goals, doc map | domain-truth, test strategy, test cases, source materials, legacy skills |
-| `docs/specs/rtd-config-domain-truth.md` | Per-module truth sourcing rule; vendor validation flow + gate; fixture role | source materials |
-| `docs/references/rtd-config-source-materials.md` | Catalog of development-time inputs (Excel, `.xdm`, vendor docs) | — |
-| `docs/references/rtd-config-legacy-skills-experience.md` | Pre-project `.mex` editing experience baseline | — |
-| `docs/tests/rtd-config-test-strategy.md` | Test method: layers, gate, acceptance rule, roles, hygiene | domain-truth, test cases |
-| `docs/tests/rtd-config-test-cases.md` | E2E acceptance case catalog (`RTD-MEX-*`) + black-box protocol | test strategy, domain-truth, fixtures |
-| `docs/tests/rtd-config-acceptance-report.md` | Recorded acceptance evidence and current status (incl. black-box runs) | test cases, test strategy |
-| `docs/plans/rtd-cfgfile-cli-implementation-plan.md` | The module-by-module delivery framework | core design, test strategy, test cases, roadmap |
-| `docs/roadmaps/rtd-config-roadmap.md` | **The only place stages live**: the basic delivery route | — |
-| `docs/common/rtd-config-core-comments-tracking.md` | Review-comment resolutions across rounds | OBSOLETE archives |
-| `docs/common/rtd-config-lessons-learned.md` | Reviewer's running lessons log | — |
-| `docs/common/figures/` | Editable architecture figures (drawio + spec) | — |
-| `docs/OBSOLETE_NEVER_TOUCH!!!/` | Frozen review archives — never a requirements source | — |
-| `.claude/agents/*.md` | Explorer / Worker / Tester / Reviewer role definitions | AGENTS.md, domain-truth |
+- **stdlib-only Python runtime**; committed assets are the only runtime data —
+  no Excel, raw `.xdm`/`.epd`, deprecated skills, or RTD install scans at
+  runtime.
+- **Narrow, byte-faithful `.mex` writes**: a no-edit write is byte-identical; an
+  owned edit touches only changed lines; no edits outside module ownership.
+- **Never invent vendor values**; diagnostics instead of tracebacks.
+- **The released deliverable** is the self-contained `autombd-rtd/` Agent Skill
+  (`SKILL.md` + launcher + `assets/` + bundled CLI).
 
-```mermaid
-flowchart TD
-  README["README.md"] --> CORE["core-design (this spec)"]
-  AGENTS["AGENTS.md"] --> CORE
-  CORE --> DT["domain-truth"]
-  CORE --> TS["test-strategy"]
-  CORE --> SM["source-materials"]
-  CORE --> LSK["legacy-skills-experience"]
-  TS --> TC["test-cases (E2E, RTD-MEX-*)"]
-  TC --> DT
-  AR["acceptance-report"] --> TC
-  PLAN["implementation-plan"] --> CORE
-  PLAN --> TS
-  PLAN --> RM["roadmap (stages live ONLY here)"]
-  CT["comments-tracking"] -.archives.-> OBS["OBSOLETE_NEVER_TOUCH!!!"]
-  ROLES[".claude/agents/"] --> AGENTS
-  SKILL["autombd-rtd/SKILL.md + assets/ + CLI"] -. released deliverable .-> TC
-```
+### Development release boundary
+
+Development source material such as Excel workbooks, raw RTD package
+descriptors, local investigation notes, and installed RTD directory scans may
+be used to build runtime assets, but must not become runtime dependencies of
+the released RTD CfgFile CLI. Runtime behavior must use committed, versioned
+assets such as JSON/cache files, module manifests, pin mappings, schema
+constraints, and validation profiles. Vendor validation tools may use their own
+configured installation environment internally.
 
 ## Changelog
 
 | Date | Version | Description |
 | --- | --- | --- |
+| 2026-06-15 | 0.7.0 | Issue #7 documentation reorganization: stripped agent-discipline content (Subagent development workflow section, Documentation map section, KPI-cap/timing sentences from Tests and acceptance and Success criteria); folded content from `rtd-cfgfile-cli-implementation-plan.md` (minimal-system definition, asset build sequence steps 1–3, engineering constraints + development release boundary); updated figures path reference to `docs/specs/figures/`; updated header Description. |
 | 2026-06-14 | 0.6.3 | Fixed in-body doc path references that omitted the `docs/` prefix (`tests/…` → `docs/tests/…`, `references/…` → `docs/references/…`) so they match the doc map. |
 | 2026-06-14 | 0.6.2 | Updated the Subagent development workflow + success criteria to the TRUE black-box E2E model: an independent third-party agent CLI (not the embedded subagent, which inherits repo context/filesystem) drives the released skill against the staged fixture, and the Tester independently re-verifies the produced `.mex`. Also dropped the dangling doc-map row + diagram node for the never-created `rtd-config-subagent-validation.md` (the black-box record now lives in the harness + the acceptance report). |
 | 2026-06-13 | 0.6.1 | Added the KPI-monitoring route to the subagent workflow: functional PASS with KPI miss returns to Worker optimization for up to three iterations, then records the true KPI result before Reviewer review. |
@@ -318,3 +286,8 @@ flowchart TD
 | 2026-05-30 | 0.2.1 | Standardized document metadata and added changelog. |
 | 2026-05-30 | 0.2.0 | Integrated second-round review updates and Agent Skills architecture. |
 | 2026-05-30 | 0.1.0 | Created initial RTD configuration core design. |
+| 2026-06-14 | impl-plan 0.2.2 | (Merged from rtd-cfgfile-cli-implementation-plan.md) Aligned the §5 E2E-acceptance step with the TRUE black-box protocol: cases pass via the `tools/blackbox_e2e.py` harness driving an independent third-party agent CLI (Codex now; extensible) against the deployed skill + fixture only — the embedded subagent is not a valid black box. |
+| 2026-06-13 | impl-plan 0.2.1 | (Merged from rtd-cfgfile-cli-implementation-plan.md) Added the KPI-monitoring and capped Worker optimization loop to the module delivery checklist and references. |
+| 2026-06-10 | impl-plan 0.2.0 | (Merged from rtd-cfgfile-cli-implementation-plan.md) Fourth-round review resolution: rewrote as a milestone-agnostic, module-by-module implementation plan (one fixed framework; the first seven modules form the minimal system and land together; later modules are added on user instruction). Removed the historical Milestone-1 task recipes (archived in `docs/OBSOLETE_NEVER_TOUCH!!!/fourth-review/`); renamed the document from `rtd-cfgfile-cli-milestone1-implementation-plan.md`. |
+| 2026-06-02 | impl-plan 0.1.1 | (Merged from rtd-cfgfile-cli-implementation-plan.md) Added M1 legacy-skills experience baseline and quick-selection requirements to document core, static checks, and acceptance. |
+| 2026-06-02 | impl-plan 0.1.0 | (Merged from rtd-cfgfile-cli-implementation-plan.md) Created Milestone 1 implementation plan from active RTD CfgFile CLI specs, roadmap, fixture layout, and test strategy. |

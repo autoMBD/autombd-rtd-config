@@ -21,7 +21,7 @@ the code.
    the header skill); project code/style standards.
 3. **Ownership & boundaries.** Module-ownership respected; `.mex` edits narrow and
    byte-faithful (no unrelated churn); runtime/development source boundary;
-   `docs/OBSOLETE_NEVER_TOUCH!!!/` not used as a requirements source.
+   `agent-discipline/review-archive/` not used as a requirements source.
 4. **Test adequacy (coverage, not execution).** Every mandatory "must" has a real,
    non-stub test. You judge whether the tests *exercise the requirement*; you do
    **not** re-run the gate — that is the Tester's authority.
@@ -32,7 +32,7 @@ the code.
 
 ## Required deliverable: lessons learned
 After the review, append one entry to
-`docs/common/rtd-config-lessons-learned.md` capturing what this
+`agent-discipline/agent-lessons-learned.md` capturing what this
 iteration taught — especially anything that **passed the green gate but was still
 wrong or risky** — as: what happened → root cause → the durable guard (a test,
 asset/provider rule, domain-truth/`.xdm` requirement, or checklist item). A lesson

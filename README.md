@@ -112,7 +112,8 @@ autombd-rtd/                 # ← the deliverable: an installable Agent Skill b
   rtd-config-cli-py/rtd_config/    #   bundled stdlib-only Python CLI
 tests/                       # deterministic suite — the convergence gate
   fixtures/nxp/<ds|eb>/<family>/<project>/   #   real vendor project fixtures (ds = S32DS, eb = EB tresos)
-docs/                        # specs, tests, plans, roadmaps, references, common, OBSOLETE archive
+docs/                        # specs, tests, roadmaps, references — development documentation only
+agent-discipline/            # agent charter, lessons learned, review records, governance
 .claude/agents/              # Worker / Reviewer / Explorer / Tester subagent roles
 .claude/skills/              # common authoring skills (uniform file header, …)
 pyproject.toml               # pytest configuration + project metadata
@@ -120,14 +121,10 @@ pyproject.toml               # pytest configuration + project metadata
 
 ## Development workflow
 
-The product is built by an autonomous agent loop —
-`main → Explorer → Worker → Tester → main` — where **tests are the sole functional
-convergence signal**. The Tester also records per-case KPI evidence; a functional
-PASS with a KPI miss returns to the Worker for up to three optimization
-iterations, then records the true KPI result. On a green functional gate the
-**Reviewer** performs non-test acceptance review and appends a
-[lessons-learned](docs/common/rtd-config-lessons-learned.md) entry. Roles live in
-[`.claude/agents/`](.claude/agents/); the charter is [`AGENTS.md`](AGENTS.md).
+The product is built by an autonomous agent loop; roles and the iteration
+protocol live in [`AGENTS.md`](AGENTS.md). The
+[lessons-learned log](agent-discipline/agent-lessons-learned.md) records what
+each iteration taught.
 
 ```bash
 python -m pytest -q          # deterministic gate
@@ -135,14 +132,27 @@ python -m pytest -q          # deterministic gate
 
 ## Documentation
 
+**Development documentation** (`docs/` — engineering content; agent-agnostic):
+
 | Doc | Purpose |
 | --- | --- |
-| [Core design](docs/specs/rtd-config-core-design.md) | Architecture + CLI/JSON contract |
+| [Core design](docs/specs/rtd-config-core-design.md) | Architecture + CLI/JSON contract + engineering constraints |
 | [Domain truth & validation](docs/specs/rtd-config-domain-truth.md) | RTD enum sourcing rule + verified S32DS flow |
-| [Test strategy](docs/tests/rtd-config-test-strategy.md) | The convergence contract: layers, vendor gate, acceptance rule, roles, KPI loop |
-| [E2E test cases](docs/tests/rtd-config-test-cases.md) | The E2E acceptance case catalog (`RTD-MEX-*`, isolated protocol, KPI) |
-| [Implementation plan](docs/plans/rtd-cfgfile-cli-implementation-plan.md) | The module-by-module delivery framework |
+| [Test strategy](docs/tests/rtd-config-test-strategy.md) | The convergence contract: layers, vendor gate, acceptance rule |
+| [E2E test cases](docs/tests/rtd-config-test-cases.md) | The E2E acceptance case catalog (`RTD-MEX-*`) |
+| [Acceptance report](docs/tests/rtd-config-acceptance-report.md) | Current pass/fail evidence for E2E cases |
 | [Roadmap](docs/roadmaps/rtd-config-roadmap.md) | The staged delivery route (stages live only here) |
+| [Source materials](docs/references/rtd-config-source-materials.md) | Development-time inputs for asset building |
+
+**Agent discipline** (process and governance):
+
+| Doc | Purpose |
+| --- | --- |
+| [`AGENTS.md`](AGENTS.md) | Agent charter: orchestrator duties, roles, iteration loop |
+| [`.claude/agents/`](.claude/agents/) | Explorer / Worker / Tester / Reviewer role definitions |
+| [Owner review comments](agent-discipline/owner-review-comments.md) | Review-comment resolutions across rounds |
+| [Agent lessons learned](agent-discipline/agent-lessons-learned.md) | Reviewer's running lessons log |
+| [Documentation governance](agent-discipline/documentation-governance.md) | Governance rules + authoritative documentation map |
 
 ## License
 

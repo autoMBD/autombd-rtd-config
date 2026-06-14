@@ -50,10 +50,10 @@ may carry hand-written enum/constraint/dependency values.
 
 1. **Input** — the module descriptor `<Module>.xdm` (development source; never
    read at runtime).
-2. **Extract** (Explorer) — from the `.xdm`: enumeration domains; numeric ranges
+2. **Extract** — from the `.xdm`: enumeration domains; numeric ranges
    and defaults; constraint rules (the `INVALID` / `EDITABLE` / `ENABLE` XPath
    expressions); and cross-module reference dependencies (`v:ref` targets).
-3. **Emit** (Worker) — a committed, versioned per-module asset under
+3. **Emit** — a committed, versioned per-module asset under
    `autombd-rtd/assets/<vendor>/<family>/<module>/` (e.g. `autombd-rtd/assets/nxp/s32k3/uart/`)
    holding `{valid_values, defaults, constraints, dependencies}`, each item
    traceable to its `.xdm` (record the source path + RTD version). The provider
@@ -63,8 +63,8 @@ may carry hand-written enum/constraint/dependency values.
    provider — not in this document.**
 4. **Runtime boundary** — runtime commands read only the committed asset; the
    `.xdm` is never opened at runtime.
-5. **Verify** — the Tester proves provider edits built from these values pass the
-   S32DS gate (§3); the Reviewer cross-checks the asset against the `.xdm`.
+5. **Verify** — provider edits built from these values are proven to pass the
+   S32DS gate (§3), and the asset is cross-checked against the `.xdm`.
 
 **Do not transcribe per-module values into this document.** When a provider needs
 a value/constraint/dependency it comes from that module's asset, traceable to its
@@ -201,3 +201,4 @@ Pattern: `DMATCD<N>_IRQn` / `Dma0_Ch<N>_IRQHandler` for channel index N.
 | 2026-06-11 | 0.4.2 | §1 pin-mapping: replaced the stale "pins.json is a stub / must be rebuilt / pin-options unverified" note — the asset is now built from the IOMUX workbook by `tools/build_pins_s32k3.py` (2091 S32K344 signals, verified); Port `.mex` pin application remains the open Port capability. |
 | 2026-06-14 | 0.4.4 | Tightened the asset sourcing rule (step 3) to match the enforced LL-012 discipline: a provider loads the committed asset at runtime, or — if it embeds the constants — pins them with a code==asset test that fails on drift; a documentation-only asset with no loader and no pin is prohibited. |
 | 2026-06-13 | 0.4.3 | §4 added: S32K344 DMA ISR/IRQ cross-cutting fact (`DMATCD<N>_IRQn` / `Dma0_Ch<N>_IRQHandler`) sourced from installed-RTD Platform.epd and Dma_Ip_Irq.c; pinned in uart.json dma_hw_channel_irq_map. LL-017 provenance fix: updated uart.json dma_hw_channel_irq_map._note to credit Platform.epd/Dma_Ip_Irq.c (not the committed fixture). |
+| 2026-06-15 | 0.5.0 | Issue #7 reorganization: de-agented the §1 sourcing-rule steps — removed the Explorer/Worker/Tester/Reviewer role names from steps 2/3/5 so the spec reads as agent-agnostic process; the development roles remain canonical in AGENTS.md. |

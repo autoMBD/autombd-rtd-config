@@ -11,9 +11,8 @@
 
 This roadmap records the delivery order. It intentionally lives outside the
 spec so the spec can remain a stable description of the project goal and
-architecture. Modules are added one by one under the same development framework
-(`docs/plans/rtd-cfgfile-cli-implementation-plan.md`); this document only says
-**what comes when**.
+architecture. Modules are added one by one under the same development framework;
+this document only says **what comes when**.
 
 ## Route
 
@@ -35,3 +34,4 @@ architecture. Modules are added one by one under the same development framework
 | 2026-05-30 | 0.1.2 | Formatted document metadata and changelog as tables. |
 | 2026-05-30 | 0.1.1 | Standardized document metadata and added changelog. |
 | 2026-05-30 | 0.1.0 | Created staged RTD CfgFile CLI roadmap. |
+| 2026-06-15 | 0.4.1 | Issue #7 reorganization: removed parenthetical pointer to the deleted implementation-plan from the Purpose paragraph. |

@@ -47,7 +47,7 @@ rechecked before being generalized to other RTD versions or device families.
 ## Mandatory Development Rules
 
 These rules must be reflected in implementation, tests, diagnostics, and
-subagent validation.
+validation.
 
 | Rule | Requirement |
 | --- | --- |

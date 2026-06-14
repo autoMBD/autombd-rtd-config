@@ -5,7 +5,7 @@
 | Version | 0.9.0 |
 | Date | 2026-06-13 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
-| Description | The convergence contract for the RTD CfgFile CLI agent development workflow. Tests — deterministic, static, vendor validation, and isolated E2E acceptance — are the SOLE criterion for functional "done"; KPI misses trigger the capped Worker optimization loop and must be recorded honestly. Defines the test layers, the vendor gate, the acceptance rule, KPI handling, and the subagent roles; the concrete E2E cases live in `rtd-config-test-cases.md`. |
+| Description | The convergence contract for the RTD CfgFile CLI. Tests — deterministic, static, vendor validation, and isolated E2E acceptance — are the SOLE criterion for functional "done". Defines the test layers, the vendor gate, and the acceptance rule; the concrete E2E cases live in `rtd-config-test-cases.md`. |
 
 ## 1. Principle: tests are the only convergence signal
 
@@ -35,16 +35,14 @@ here.
    domain-truth §3. **Pass gate = exit code `0` AND no SEVERE `[TOOL]` resource
    problem.** Exit 0 alone is not a pass.
 4. **Isolated E2E acceptance cases** — the cases in `rtd-config-test-cases.md`,
-   executed as a **true black box** by the `tools/blackbox_e2e.py` harness: it
+   executed as a **true black box** via the `tools/blackbox_e2e.py` harness: it
    deploys the released `autombd-rtd` skill into a fresh temp dir, copies the
-   case fixture, and drives an **independent third-party agent CLI** (Codex now;
-   extensible registry), sandboxed to the temp dir, that sees only the deployed
-   skill + fixture + the case's prompt — never this repository. The embedded
-   subagent is **not** a valid black box (it inherits repo context + filesystem).
+   case fixture, and exercises the deployed skill in isolation (sandboxed to the
+   temp dir), seeing only the deployed skill + fixture + the case's prompt —
+   never this repository.
    Pass requires the case's criteria, the vendor gate, and successful code
-   generation; the Tester **independently re-runs `validate`** on the
-   agent-produced `.mex` (it does not trust the agent's self-report) and records
-   the case's KPI result.
+   generation; `validate` is independently re-run on the produced `.mex` (an
+   independent re-check, not a self-reported result), and the KPI result is recorded.
 
 ## 3. Acceptance rule
 
@@ -55,58 +53,15 @@ A module or feature is **accepted** only when ALL hold:
 - its vendor validation passes the §2.3 gate;
 - **its E2E case(s) pass under the §2.4 black-box protocol.**
 
-KPI is monitored alongside the functional gate. If a case is functionally green
-but misses its KPI, the main agent routes it back to the Worker for KPI
-optimization. The Worker may improve command ergonomics, diagnostics,
-asset-driven defaults, planning clarity, or performance, but must not weaken any
-functional check. The same case gets at most **three KPI-optimization
-iterations**. If the KPI still misses after the third optimization iteration,
-the Tester records the true KPI result in the acceptance evidence and the case
-may proceed as functionally accepted.
+Each case also carries a KPI (an ergonomics/performance target) measured
+alongside the functional gate. A KPI miss never weakens or blocks functional
+acceptance; the measured KPI result is recorded in the acceptance evidence.
 
 All supported modules are **equal priority** and reach the same validated bar.
 The minimal system (the first seven modules) is accepted only when every one of
 them reaches this bar; delivery staging is recorded in the roadmap, not here.
 
-## 4. Subagent roles in the convergence loop
-
-`main agent → Explorer → Worker → Tester → main agent` is one iteration (roles
-defined in `.claude/agents/`):
-
-1. **Explorer** sources the per-module truth a case needs from the module's
-   `<Module>.xdm` (valid values, constraints, dependencies) into its committed
-   provider asset, and confirms fixture state and the exact vendor command.
-2. **Worker** implements the capability TDD-first against that grounded truth,
-   never inventing values.
-3. **Tester** runs the gate: the deterministic suite, vendor validation, and the
-   E2E acceptance cases — reporting per-module PASS/FAIL with exit code +
-   SEVERE count and KPI evidence. **E2E is a true black box** (§2.4): the
-   `tools/blackbox_e2e.py` harness drives an independent third-party agent CLI
-   (Codex now; extensible) against the deployed skill + fixture only — never this
-   repository, and never the embedded subagent (which inherits repo context). The
-   Tester independently re-verifies the agent-produced `.mex` with the vendor
-   gate.
-
-The main agent routes on the Tester's result: **functional fail → next iteration
-(back to Explorer); functional pass with KPI miss → Worker KPI optimization
-(maximum three optimization iterations for the same case); functional pass with
-KPI pass, or still-missed KPI after the third optimization iteration → record
-the true KPI result and dispatch the Reviewer** for non-test acceptance — domain
-values vs the `<Module>.xdm`, uniform header / missed skill triggers,
-ownership/boundaries, test adequacy, diff hygiene — after which the Reviewer
-appends a lessons-learned entry (`rtd-config-lessons-learned.md`). The Reviewer
-reads the repository (it reviews the diff); it runs only after the functional
-gate is green and does not re-run the gate.
-
-KPIs: per-case budgets live in the case table (`rtd-config-test-cases.md`, 1–3
-min, **excluding** validation runtime); the black-box harness sets the
-third-party agent's timeout to **3× the max catalog KPI** so S32DS validation
-fits. KPI evidence must include the measured elapsed time, whether the case used
-one edit attempt or required rework, the optimization-iteration count, and the
-final KPI status (`pass`, `miss`, or `miss-after-3`). The executed black-box
-rounds are driven by `tools/blackbox_e2e.py`.
-
-## 5. Test cases (separate document)
+## 4. Test cases (separate document)
 
 The concrete E2E acceptance cases this strategy gates are maintained in
 [`rtd-config-test-cases.md`](rtd-config-test-cases.md) — format
@@ -117,7 +72,7 @@ all surrounding catalog text, scenario names, KPI descriptions, and pass
 criteria are English. New modules add their cases there; staging lives in the
 roadmap.
 
-## 6. Test hygiene (enforced by the Reviewer)
+## 5. Test hygiene
 
 - Every mandatory "must" in the specs maps to at least one deterministic test.
 - No test asserts against a stub or fabricated value; if the underlying asset is
@@ -127,9 +82,6 @@ roadmap.
   the production gap.
 - Vendor results are recorded with the exact exit code and SEVERE `[TOOL]`
   count, never summarized as "passed" without that evidence.
-- KPI results are recorded honestly. A KPI miss does not become a functional
-  failure after the third optimization attempt, and it must not be hidden by
-  rewording the case KPI.
 
 ## Changelog
 
@@ -146,3 +98,5 @@ roadmap.
 | 2026-05-30 | 0.2.1 | Formatted document metadata and changelog as tables. |
 | 2026-05-30 | 0.2.0 | Clarified independent subagent validation scope. |
 | 2026-05-30 | 0.1.0 | Created RTD CfgFile CLI test strategy. |
+| 2026-06-15 | 1.0.0 | Issue #7 reorganization: deleted §4 Subagent roles in the convergence loop (agent-discipline, already canonical in AGENTS.md); removed the KPI-honesty/3rd-attempt bullet from §5 Test hygiene (agent-discipline, already in AGENTS.md); renumbered remaining sections; updated header Description to drop role/loop wording. |
+| 2026-06-15 | 1.0.1 | Issue #7 follow-up: abstracted §2.4 to drop the agent-driver specifics (third-party agent CLI / Codex / "agent self-report") — the paragraph still names the isolated black-box harness flow, with the driver detail canonical in AGENTS.md; trimmed §3 to keep the KPI as a measured metric while removing the capped optimization-loop process (agent-discipline). |
