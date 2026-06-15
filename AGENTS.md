@@ -147,7 +147,31 @@ exposes a systemic issue.
 
 ## Documentation discipline
 
-`docs/` is development documentation only — self-contained and agent-agnostic,
-with no agent-discipline content and no pointers to agent-discipline docs.
-Agent-discipline rules and the documentation-governance rules live under
-`agent-discipline/` (see `agent-discipline/documentation-governance.md`).
+Project documentation is split into two physically separated categories, and the
+agent respects the boundary in both directions:
+
+- **Category A — development documentation (`docs/`)**: pure project/engineering
+  content — architecture and contract (`specs/`), the test method and cases
+  (`tests/`), delivery staging (`roadmaps/`), and development inputs
+  (`references/`). Self-contained and agent-agnostic: **no** agent-discipline
+  content and **no** pointers to Category B, so a developer can work from `docs/`
+  alone, with or without an agent.
+- **Category B — agent discipline**: how the agent system operates — this charter
+  (`AGENTS.md`), the role definitions (`.claude/agents/`), and the charter's
+  supplements (`agent-discipline/`: the lessons log, the owner's review-comment
+  tracker, the documentation-governance rules, and the read-only review archive).
+  Category B **may** reference Category A; Category A must never reference B.
+
+Usage rules:
+
+- **Ground domain facts, never invent them** — enum/pin/ID values come from
+  `docs/specs/rtd-config-domain-truth.md` and each `<Module>.xdm`.
+- **Specs stay agent-free and milestone-free** — staging lives only in the
+  roadmap.
+- **Changelogs are append-only**; `agent-discipline/review-archive/` is read-only
+  and never a requirements source.
+- The Reviewer appends to `agent-discipline/agent-lessons-learned.md`; the owner's
+  comments are tracked in `agent-discipline/owner-review-comments.md`.
+
+The per-document map and full authoring rules are in
+`agent-discipline/documentation-governance.md`.
