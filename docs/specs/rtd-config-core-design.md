@@ -2,8 +2,8 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.6.3 |
-| Date | 2026-06-13 |
+| Version | 0.7.0 |
+| Date | 2026-06-15 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Long-term architecture and goals for the RTD CfgFile CLI. Holds the stable CLI/JSON contract, module-ownership rules, engineering constraints, and the minimal-system definition. Domain facts live in domain-truth; the test method lives in the test strategy; E2E cases live in the test-cases catalog. |
 

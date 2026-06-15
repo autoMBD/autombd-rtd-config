@@ -2,8 +2,8 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.9.0 |
-| Date | 2026-06-13 |
+| Version | 1.0.1 |
+| Date | 2026-06-15 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | The convergence contract for the RTD CfgFile CLI. Tests — deterministic, static, vendor validation, and isolated E2E acceptance — are the SOLE criterion for functional "done". Defines the test layers, the vendor gate, and the acceptance rule; the concrete E2E cases live in `rtd-config-test-cases.md`. |
 
