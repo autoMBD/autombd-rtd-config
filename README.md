@@ -127,6 +127,7 @@ protocol live in [`AGENTS.md`](AGENTS.md). The
 each iteration taught.
 
 ```bash
+python tools/agent_env_check.py --json
 python -m pytest -q          # deterministic gate
 ```
 

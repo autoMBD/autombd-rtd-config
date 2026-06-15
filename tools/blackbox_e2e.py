@@ -262,8 +262,31 @@ def build_prompt(case: Case, skill_md_path: Path, project_dir: Path) -> str:
 # Agent runners
 # ---------------------------------------------------------------------------
 
+def _load_agent_env_check():
+    """Load the sibling environment-cache helper without packaging assumptions."""
+    module_path = Path(__file__).resolve().parent / "agent_env_check.py"
+    spec = importlib.util.spec_from_file_location("agent_env_check", module_path)
+    if spec is None or spec.loader is None:
+        return None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _cached_codex_path() -> str | None:
+    """Return a verified cached Codex path, if this checkout has one."""
+    helper = _load_agent_env_check()
+    if helper is None:
+        return None
+    state_file = helper.default_state_file(REPO_ROOT)
+    return helper.cached_executable_path(state_file, "codex_cli")
+
+
 def _find_codex() -> str:
     """Return the path to the codex executable, or raise RuntimeError."""
+    path = _cached_codex_path()
+    if path is not None:
+        return path
     path = shutil.which("codex")
     if path is None:
         path = shutil.which("codex.cmd")

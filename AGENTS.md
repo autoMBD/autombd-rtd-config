@@ -67,6 +67,28 @@ needed for that task. Subagents must not be asked to infer hidden main-agent
 state, and their results must be reviewed against the active repository
 documents before being accepted.
 
+## Agent Session Bootstrap
+
+At the start of a new project session, the main agent checks the local
+agent-environment cache before probing tools:
+
+```bash
+python tools/agent_env_check.py --json
+```
+
+The dependency inventory and cache policy live in
+`agent-discipline/agent-environment.md`. The check records local verification
+credentials under `.agent-state/environment-verification.json`, which is ignored
+by Git. The file stores non-secret evidence only: paths, versions, status,
+timestamps, and preparation instructions. It must not store tokens, passwords,
+or copied authorization material.
+
+If a required dependency is blocked, the agent reports the `prepare`
+instruction from the check output instead of repeatedly attempting the same
+tool/auth probe. For authorization-sensitive tools such as GitHub CLI or Codex,
+authentication is a first-session or explicit `--refresh` activity; later
+sessions reuse a cached `passed` result when the tool path still exists.
+
 ## Subagent Roles and Collaboration
 
 The orchestrator dispatches four specialized subagents defined in

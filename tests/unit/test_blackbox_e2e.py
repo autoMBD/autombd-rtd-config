@@ -528,6 +528,16 @@ class TestRunCodex:
         assert captured["argv"][0] == r"C:\npm\codex.cmd"
         assert result.exit_code == 0
 
+    def test_cached_codex_path_wins_without_path_probe(self, tmp_path):
+        """A verified environment cache avoids repeating PATH discovery."""
+        mod = load_module()
+        cached = str(tmp_path / "codex.exe")
+        Path(cached).write_text("", encoding="utf-8")
+
+        with patch.object(mod, "_cached_codex_path", return_value=cached), \
+             patch("shutil.which", side_effect=AssertionError("PATH probe should not run")):
+            assert mod._find_codex() == cached
+
 
 # ---------------------------------------------------------------------------
 # 5. Pipeline integration: wiring test (no real codex or S32DS)

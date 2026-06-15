@@ -40,6 +40,7 @@ __pycache__/
 .pytest_cache/
 
 # Agent-local/runtime files
+.agent-state/
 .claude/*
 # Exception: version-control the project subagent roles
 # (Worker/Reviewer/Explorer/Tester); keep other .claude content local-only.
