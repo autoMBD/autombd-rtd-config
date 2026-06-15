@@ -5,7 +5,7 @@
 | Version | 0.6.3 |
 | Date | 2026-06-13 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
-| Description | Long-term architecture and goals for the RTD CfgFile CLI. Holds the stable CLI/JSON contract, module-ownership rules, engineering constraints, and the minimal-system definition. Domain facts live in domain-truth; the test method lives in the test strategy; E2E cases live in the test-cases catalog; `.mex` pitfalls live in the legacy-skills baseline (references/). |
+| Description | Long-term architecture and goals for the RTD CfgFile CLI. Holds the stable CLI/JSON contract, module-ownership rules, engineering constraints, and the minimal-system definition. Domain facts live in domain-truth; the test method lives in the test strategy; E2E cases live in the test-cases catalog. |
 
 ## Overview
 
@@ -22,9 +22,8 @@ free to change behind that boundary.
 This spec deliberately stays at the architecture/contract altitude — it carries
 no milestone, schedule, or staging information (that lives only in the roadmap).
 It does not repeat: RTD enum/pin/fixture/S32DS
-facts (see `rtd-config-domain-truth.md`), the test method and E2E cases (see
-`docs/tests/rtd-config-test-strategy.md` and `docs/tests/rtd-config-test-cases.md`),
-or `.mex` editing pitfalls (see `docs/references/rtd-config-legacy-skills-experience.md`).
+facts (see `rtd-config-domain-truth.md`), or the test method and E2E cases (see
+`docs/tests/rtd-config-test-strategy.md` and `docs/tests/rtd-config-test-cases.md`).
 General software practice (TDD, stdlib-first,
 structured-diagnostics-not-tracebacks) is assumed of every agent and is not
 respecified here.
@@ -106,9 +105,9 @@ Backend-specific; for `.mex` it must: parse and build only the indexes a command
 needs; provide setting/container lookup + upsert; strip conflicting
 `quick_selection` from modified elements; perform **narrow, byte-faithful
 writes** (a no-edit write reproduces the file byte-for-byte; an owned edit
-touches only changed lines); and surface diagnostics, never tracebacks. Concrete
-`.mex` pitfalls and rules are in the legacy-skills baseline; RTD field/enum facts
-are in domain-truth. The `.xdm` backend reuses these concepts with its own writer.
+touches only changed lines); and surface diagnostics, never tracebacks. RTD
+field/enum facts are in domain-truth. The `.xdm` backend reuses these concepts
+with its own writer.
 
 ## Module providers and the editable surface
 
@@ -234,7 +233,7 @@ staging lives in the roadmap.
 - core CLI commands return stable JSON; shortcuts normalize to one pipeline;
 - companion skills guide agents without private implementation details;
 - backend document cores configure projects through structured, narrow,
-  byte-faithful edits following the legacy-skills baseline and domain-truth;
+  byte-faithful edits following domain-truth;
 - providers preserve ownership; cross-module dependencies are explicit in plans;
 - constraints/enums/pins come from committed assets, not ad hoc code or vendor
   scans;

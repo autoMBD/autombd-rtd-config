@@ -2,10 +2,10 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.2.8 |
+| Version | 0.3.0 |
 | Date | 2026-06-15 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
-| Description | Running log of lessons captured during the agent development loop. The **Reviewer** appends one entry per accepted iteration (after the Tester's gate is green) so recurring failure modes become permanent guards. This is distinct from the legacy-skills baseline (which captures pre-project `.mex` experience). |
+| Description | Running log of lessons for the RTD CfgFile CLI. Opens with the **Legacy skills baseline** (pre-project `.mex` exploration, condensed) followed by **Entries** — one per accepted agent iteration, appended by the **Reviewer** after the Tester's gate is green, so recurring failure modes become permanent guards. |
 
 ## How this log is used
 
@@ -17,6 +17,72 @@
   Worker convention. A lesson without a guard is not done.
 - Keep entries short and factual: what happened → root cause → the guard that
   prevents recurrence. Newest first.
+
+## Legacy skills baseline (pre-project `.mex` exploration)
+
+Condensed from pre-project exploration of the deprecated S32K3 RTD 7.0.1 config
+skills (`autombd-skills/skills/rtd-config/*`, plus the shared-validation and
+minimal-`.mex` reference skills) — development reference only, never a runtime
+dependency. These `.mex` editing lessons predate the agent loop and seed the
+rules now enforced in the providers, the backend document core, the static
+checks, and the domain-truth validation flow. Version-sensitive to S32K3
+RTD 7.0.1; recheck before generalizing to other RTD versions or device families.
+
+- **LSK-1 — `quick_selection` is not harmless metadata (highest-risk lesson).**
+  If an element carrying `quick_selection` is edited without removing that
+  marker, S32 ConfigTools can treat it as a default-template selection and
+  revert the subtree, discard generated-file entries, or report the failure in
+  another module. Canonical trap: leaving `quick_selection` on
+  `<config_set name="Mcl">` while enabling FlexIO common / adding FlexIO logic
+  channels makes ConfigTools revert the Mcl tree and surface it as a *Uart*
+  out-of-range error — so the first diagnosis step is checking Mcl
+  `quick_selection`, not Uart fields. Guard: the backend "mark modified" strips
+  `quick_selection` from the modified element and the nearest carrying ancestor,
+  keeping it only on byte-identical untouched elements (enforced in `apply.py`
+  plus unit/fixture tests; see also LL-013).
+- **LSK-2 — Narrow, ownership-bounded, byte-faithful edits.** Inspect and edit
+  only the regions a command requires; a no-edit write reproduces the file
+  byte-for-byte. Each provider writes only its owned module area; cross-module
+  needs are explicit dependency requests. Preserve unrelated UUIDs, dependency
+  entries, component order, localized labels, and project links. Never
+  hand-minimize `generated_project_files` — let ConfigTools refresh them after
+  coherent edits; review the post-validation `.mex` diff for metadata churn.
+- **LSK-3 — The backend document core owns XML safety, not each provider.** The
+  core provides targeted module/config-set lookup, setting/container
+  lookup+upsert, mark-modified (with `quick_selection` clearing), narrow writes,
+  generated-UUID support, and diagnostics (missing instance, duplicate
+  names/IDs, invalid/stale refs, quick-selection conflicts). Providers describe
+  *what* changes; the core applies consistent XML behavior.
+- **LSK-4 — Runtime uses committed assets, never dev source material.** Do not
+  load deprecated skills, Excel workbooks, raw RTD descriptors, or installed-RTD
+  scans at runtime; convert needed facts into committed, versioned assets. (Now
+  the spec's development release boundary.)
+- **LSK-5 — Validation rigor: the vendor gate, not compilation.** Run static
+  checks first, then S32DS/S32 ConfigTools headless validation; compilation is
+  not proof of `.mex` validity. The pass gate is ConfigTools exit `0` **and** no
+  SEVERE `[TOOL] … has the following error` — exit `0` alone is insufficient (it
+  returns `0` even with SEVERE config errors). The concrete, live-verified
+  S32DS 3.6.7 headless flow is recorded in
+  [`rtd-config-domain-truth.md`](../docs/specs/rtd-config-domain-truth.md) §3.
+- **LSK-6 — Module ownership map (cross-module needs are explicit).** Mcu owns
+  clocks/modes (Uart + FlexIO depend on valid clock refs); BaseNXP/OsIf
+  underpins Uart timeout (a bare-metal system timer takes an Mcu clock ref *or*
+  an explicit frequency, not both); Platform owns IRQ entries (exact source,
+  priority, handler or `NULL_PTR`, enable, partition/core); Port is a *generic*
+  pin-mux/electrical service (not Uart-bound; preserve `UnTouchedPortPin` /
+  `UntouchedIMCR`); Dio owns logical channel IDs while Port owns the pad; Mcl
+  owns FlexIO common + DMA logic channels consumed by Uart; Uart owns channels
+  and the refs into the above.
+- **LSK-7 — RTD 7.0.1 driver facts (version-sensitive).** Async method is
+  INTERRUPTS or DMA only — *polling is not a valid value*; DMA must be coherent
+  across Mcl and Uart (a DMA method requires matching Mcl DMA logic channels and
+  Uart Tx/Rx refs — never partial); `UartChannelId` equals the channel array
+  index; LPUART hardware instances are unique across active channels; a FlexIO
+  `UartHwChannelRef` must point to an existing Mcl FlexIO logic channel; FlexIO
+  Uart word length is constrained to 8 bits; a Uart callback must be a valid C
+  identifier (`NULL_PTR` rejected). Enforced in `checks/static.py` and the
+  provider asset domains; the authoritative enum/pin/range source is each
+  `<Module>.xdm` via domain-truth.
 
 ## Entries
 
@@ -68,3 +134,5 @@
 | 2026-06-14 | 0.2.6 | Added LL-020 (the in-repo "isolated E2E" was run by the EMBEDDED subagent — fresh-context but NOT a clean environment: it inherits repo `CLAUDE.md`/`AGENTS.md` + filesystem and can peek, giving false black-box confidence; real release gaps shipped GREEN and were caught only by manual third-party-agent runs — LL-018 SKILL.md, LL-019 DIO). Root cause: conflating "fresh context" with "true black box". Durable guard: the new `tools/blackbox_e2e.py` harness (Codex-proven, registry-extensible; deploy skill + copy fixture + STDIN prompt + 3×-max-KPI timeout, keeps workdir on failure) is now the MANDATED E2E mechanism, the embedded subagent is explicitly NOT a valid black box (codified across tester.md/AGENTS.md/test-strategy/test-cases/core-design/plan), and the Tester independently re-runs the vendor gate on the agent-produced `.mex` (triple-confirm; never trusts the agent self-report). Unit-pinned by `tests/unit/test_blackbox_e2e.py`; deterministic suite 423→464. |
 | 2026-06-14 | 0.2.7 | Added LL-021 (an EXTERNAL cold-agent review — Codex — over the whole repo caught what the green in-repo gate could not: the LL-014(b)-DEFERRED gate gap where the automated `validate` severe filter was strictly weaker than the manual Tester Problems-view scan, so an HSE_CLK>120 MHz clock violation exit-0'd + false-passed — CRITICAL once the LL-020 black-box harness made BOTH the agent's `validate` and the Tester's re-gate use the weaker filter; plus accumulated in-repo-invisible staleness — `M1`/`Milestone 1` wording incl. 2 factually-wrong docstrings, a drift-prone hardcoded test-count badge, doc-path errors, a spec-vs-LL-012 asset-rule conflict. Root cause: "consider/deferred" guards silently rot and a compensating manual control was automated away without re-checking its coverage; an in-repo team is blind to its own staleness. Durable guard: the broadened detector makes the automated gate == the manual bar — re-baselined on the real gate (pristine + valid 160/80/40 pass, no false positive; HSE_CLK>120 now caught with passed=False despite exit 0 + 120 files), pinned by real-line tests; README badge de-numbered to stop count drift; domain-truth tightened to the LL-012 discipline; and PERIODIC EXTERNAL/COLD REVIEW adopted as a standing practice — the LL-020 black-box principle applied to code/doc review). |
 | 2026-06-15 | 0.2.8 | Issue #7 reorganization: moved from `docs/common/rtd-config-lessons-learned.md` to `agent-discipline/agent-lessons-learned.md`. |
+| 2026-06-15 | 0.2.9 | Added LL-022 (issue #7 doc reorganization: two content-governance defects a green gate cannot see — a diff-scoped purity sweep missing a pre-existing residual, and folded plan content reintroducing ordering wording into a spec — both fixed; guards: repo-wide purity sweep, spec-altitude lint, headerless-`.md` convention). |
+| 2026-06-15 | 0.3.0 | Issue #7 review: absorbed the deprecated legacy-skills `.mex` experience (formerly `docs/references/rtd-config-legacy-skills-experience.md`) into a new `## Legacy skills baseline` section (condensed to LSK-1..7) before `## Entries`, per owner direction that it is pre-project lessons rather than development documentation; deleted the standalone file and swept its references (core-design, source-materials, documentation-governance doc map). |

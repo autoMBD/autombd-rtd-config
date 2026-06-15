@@ -80,7 +80,7 @@ paths are relative to the repository root.
 
 | Document | Role | References |
 | --- | --- | --- |
-| `docs/specs/rtd-config-core-design.md` | Long-term architecture, CLI/JSON contract, goals, engineering constraints, minimal-system definition | domain-truth, test strategy, test cases, source materials, legacy skills |
+| `docs/specs/rtd-config-core-design.md` | Long-term architecture, CLI/JSON contract, goals, engineering constraints, minimal-system definition | domain-truth, test strategy, test cases, source materials |
 | `docs/specs/rtd-config-domain-truth.md` | Per-module truth sourcing rule; vendor validation flow + gate; fixture role | source materials |
 | `docs/specs/figures/` | Editable architecture figures (drawio + spec) | — |
 | `docs/tests/rtd-config-test-strategy.md` | Test method: layers, gate, acceptance rule, hygiene | domain-truth, test cases |
@@ -88,7 +88,6 @@ paths are relative to the repository root.
 | `docs/tests/rtd-config-acceptance-report.md` | Recorded acceptance evidence and current status | test cases, test strategy |
 | `docs/roadmaps/rtd-config-roadmap.md` | **The only place stages live**: the basic delivery route | — |
 | `docs/references/rtd-config-source-materials.md` | Catalog of development-time inputs (Excel, `.xdm`, vendor docs) | — |
-| `docs/references/rtd-config-legacy-skills-experience.md` | Pre-project `.mex` editing experience baseline | — |
 
 ### Category B: Agent discipline
 
@@ -119,7 +118,6 @@ flowchart TD
   CORE --> DT
   CORE --> TS["docs/tests/test-strategy"]
   CORE --> SM["docs/references/source-materials"]
-  CORE --> LSK["docs/references/legacy-skills"]
   TS --> TC
   TC --> DT
   AR["docs/tests/acceptance-report"] --> TC
