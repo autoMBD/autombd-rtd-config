@@ -2,8 +2,8 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.4.0 |
-| Date | 2026-06-10 |
+| Version | 0.4.1 |
+| Date | 2026-06-15 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | The basic delivery route for the RTD CfgFile CLI. This is the only document that describes stages; specs stay milestone-free. No technical detail here — capabilities are defined by the core design, cases by the test-cases catalog. |
 

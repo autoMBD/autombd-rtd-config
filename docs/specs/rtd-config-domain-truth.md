@@ -2,8 +2,8 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.4.4 |
-| Date | 2026-06-13 |
+| Version | 0.5.0 |
+| Date | 2026-06-15 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Holds only CROSS-CUTTING truth (the S32DS headless validation flow + gate, and fixture role/usage) and the SOURCING RULE for per-module truth. Per-module valid values, constraints, and dependencies are NOT listed here — they come from each module's `.xdm` and live in that module's provider. |
 

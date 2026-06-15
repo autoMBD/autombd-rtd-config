@@ -2,8 +2,8 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.3.3 |
-| Date | 2026-06-13 |
+| Version | 0.4.0 |
+| Date | 2026-06-15 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | The E2E acceptance test cases for the RTD CfgFile CLI (`.mex` backend, scheme `RTD-MEX-*`). Each case targets a real vendor-validated edit. Unit/integration coverage lives in the deterministic pytest suite and is governed by the test strategy, not listed here. |
 

@@ -2,8 +2,8 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.13.0 |
-| Date | 2026-06-13 |
+| Version | 0.16.0 |
+| Date | 2026-06-15 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Current pass/fail evidence for the E2E acceptance cases defined in `rtd-config-test-cases.md`. This document is the living status record the catalog points to; the catalog defines the target, this records where the tool actually stands. |
 
@@ -36,24 +36,27 @@ criteria met). KPI is monitored separately.
 
 ## 2. Per-case status
 
-All cases use the fixture `Uart_Example_S32K344`. Status legend: **PASS** (vendor
-gate green under isolation), **FAIL** (capability missing), **BLOCKED** (depends
-on an unbuilt asset). New evidence entries must also record KPI status. Historic
-entries below predate the explicit KPI-evidence policy unless a row states a
-measured KPI result.
+All cases use the fixture `Uart_Example_S32K344`. The **Status** column is the
+functional acceptance signal — legend: **PASS** (vendor gate green under
+isolation), **FAIL** (capability missing), **BLOCKED** (depends on an unbuilt
+asset). The **KPI** column records each case's measured KPI result against its
+catalog budget (`pass`/`miss`, with the edit-attempt count and the
+validation-excluded time); a case not yet exercised under the black-box protocol
+reads *Not yet measured*, and a KPI `miss` never weakens the functional **PASS**.
+The detailed per-case implementation evidence is preserved in the changelog below.
 
-| ID | Module | Status | Gap to PASS |
+| ID | Module | Status | KPI |
 | --- | --- | --- | --- |
-| RTD-MEX-MCU-001 | MCU | **PASS** | `mcu set --core-clk 160 --aips-plat-clk 80 --aips-slow-clk 40 --add-all-clock-reference-points`: configures the PLL (FXOSC 16MHz → VCO 960 → PHI0 160) + MC_CGM dividers (CORE/1, AIPS_PLAT/2, AIPS_SLOW/4, HSE/2), sets McuNoPll=false + the McuPll0UnderMcuControl mirror, and **merges** the Clock Reference Points (preserves LPUART3_CLK/FLEXIO_CLK + adds 13 selectable clocks → 15). Vendor gate green incl. the comprehensive Problems-view scan (no HSE_CLK>120MHz); generated `Clock_Ip_PBcfg.c` has CORE_CLK=160000000U / AIPS_PLAT=80000000U / AIPS_SLOW=40000000U. Took 3 refine iterations driven by the vendor gate. |
-| RTD-MEX-BASENXP-001 | BaseNXP | **PASS** | `basenxp set --enable-system-timer`: sets `OsIfUseSystemTimer=true` and **inserts** one `OsIfCounterConfig` whose `OsIfSystemTimerClockRef` references the Mcu `FLEXIO_CLK` (CORE_CLK) reference point, with `OsIfSystemTimerClockFreq` an empty array (both are ArraySettings — scalar freq is rejected). Vendor gate green (exit 0, 120 files, no severe), 14-line narrow edit. Drove the byte-faithful element-insertion writer. |
-| RTD-MEX-PLATFORM-001 | Platform | **PASS** | `platform set --peripheral LPUART_3 --priority 2`: `IsrPriority` 0→2 on the existing `LPUART3_IRQn` entry, kept enabled with its ISR (`LPUART_UART_IP_3_IRQHandler`) registered, FLEXIO entry untouched. Vendor gate green (exit 0, 120 generated files, no severe). |
-| RTD-MEX-PORT-001 | Port | **PASS** | `port set --peripheral LPUART_0 --tx PTA27 --rx PTA28`: validates pins against pins.json (rejects illegal pins), then inserts BOTH representations — the `<pin>` header (`lpuart0_tx`@M2 + `direction=OUTPUT`; `lpuart0_rx`@N2) and the Port `PortPin` structs (`Lpuart0_Tx`/`Lpuart0_Rx`, next `PortPinId`). Vendor gate green (exit 0, 120 files, no severe); generated `Siul2_Port_Ip_PBcfg.c` confirms PTA27 ALT4/TX + PTA28 IMCR/RX. |
-| RTD-MEX-DIO-001 | Dio | **PASS** | `dio set --add-channel LED_CTRL --pin PTA5` (cross-module Dio+Port): inserts the DioChannel (`DioChannelId`=mscr%16=5 in DioPort_0) AND the Port GPIO pin (`<pin>` SIUL2 gpio,5 OUTPUT + PortPin struct), clearing the Dio `config_set` `quick_selection` so codegen emits the channel. Vendor gate green; generated `Dio_Cfg.h` has `DioConf_DioChannel_LED_CTRL ((uint16)0x0005U)` and SIUL2 configures PTA5 as GPIO output. |
-| RTD-MEX-DIO-002 | Dio | **PASS** | `dio set --add-channel LED_CTRL --pin PTA30` on a pin whose DioPort container is ABSENT: **auto-creates `DioPort_1`** (DioPortId=1, array index 1 — the struct name/`Name` use the array index, `DioPortId` is computed `mscr//16`) then inserts the channel (`DioChannelId`=mscr%16=14), clearing the Dio `config_set` `quick_selection`. Vendor gate green under isolation (exit 0, 120 files, no severe); generated `Dio_Cfg.h` has `DioConf_DioChannel_LED_CTRL ((uint16)0x001eU)` and `DioConf_DioPort_DioPort_1 ((uint8)0x01U)`. Proven cold (auto-discovery) on the focused case AND the full 5-task combined scenario (LL-019). |
-| RTD-MEX-MCL-001 | Mcl | **PASS** | `mcl set --add-flexio-logic-channel FLEXIO_UART_CH0`: appends a third `FlexioMclLogicChannels` struct with a dynamically-computed unique `FlexioMclChannelId=CHANNEL_2`/`FlexioMclPinId=PIN_2` (referenceable as `/Mcl/Mcl/MclConfig/FlexioCommon_0/FLEXIO_UART_CH0`); existing UART_TX/UART_RX untouched. Vendor gate green (exit 0, 120 files, no severe), 9-line narrow edit. |
-| RTD-MEX-UART-001 | UART | **PASS** | `uart set --hw LPUART_8 --baud 921600 --parity none --stop-bits 1 --word-length 8 --callback Autombd_UartCallback --priority 2`: edits the channel (incl. UartClockRef→LPUART8_CLK) + module callback, AND orchestrates the cross-module deps — inserts the Platform ISR (`LPUART8_IRQn`/`LPUART_UART_IP_8_IRQHandler`/prio 2) and the Mcu clock ref (`LPUART8_CLK`→AIPS_PLAT_CLK). `changed_modules=[uart,platform,mcu]`. Vendor + 3-module codegen verified (HW channel 8U/921600/Autombd_UartCallback; LPUART8 ISR; LPUART8_CLK). Instance→IRQ/handler/clock map computed (anti-hardcode tested). |
-| RTD-MEX-UART-002 | UART | **PASS** | `uart add-flexio-channel --baud 921600`: creates 2 MCL FlexIO logic channels (UART2_TX/CHANNEL_2, UART2_RX/CHANNEL_3) + 2 FlexIO Uart channels (UartChannelId 3/4, FLEXIO_IP, bitCount 8, interrupt, the `UartHwChannelRef`s matching the new MCL names) + module callback; ensures the shared `FLEXIO_IRQn`/`FLEXIO_CLK` (idempotent). Vendor + end-to-end codegen verified (`MCL_FLEXIOCOMMON_0_UART2_TX=CHANNEL_2`; FlexIO channel configs reference them; callback present). `changed_modules=[uart,mcl]`. |
-| RTD-MEX-UART-003 | UART | **PASS** | `uart set --hw LPUART_3 --mode dma --callback Autombd_UartCallback`: the new DMA capability — Uart `UartInteruptDmaMethod=USING_DMA` + `UartDmaEnable` + Tx/Rx refs to MCL DMA channels + callback; MCL `MclEnableDma` + activate `dmaLogicChannel_Type_0` (TX) + add `_1` (RX) with `enDmaRequest`/`enDmaMajorInterrupt`; Platform `DMATCD0/1_IRQn`→`Dma0_Ch0/1_IRQHandler`. Vendor + 4-module codegen verified (built with no end-to-end vendor example; S32DS gate the authority). `changed_modules=[uart,mcl,platform]`. `_check_dma` now enforces the DMA INVALID rule. |
+| RTD-MEX-MCU-001 | MCU | **PASS** | **PASS** — 1 edit attempt, validation-excluded 96 s ≤ 2 min budget (black-box, 2026-06-15) |
+| RTD-MEX-BASENXP-001 | BaseNXP | **PASS** | Not yet measured |
+| RTD-MEX-PLATFORM-001 | Platform | **PASS** | Not yet measured |
+| RTD-MEX-PORT-001 | Port | **PASS** | Not yet measured |
+| RTD-MEX-DIO-001 | Dio | **PASS** | Not yet measured |
+| RTD-MEX-DIO-002 | Dio | **PASS** | Not yet measured |
+| RTD-MEX-MCL-001 | Mcl | **PASS** | Not yet measured |
+| RTD-MEX-UART-001 | UART | **PASS** | Not yet measured |
+| RTD-MEX-UART-002 | UART | **PASS** | Not yet measured |
+| RTD-MEX-UART-003 | UART | **PASS** | Not yet measured |
 
 **Summary: 10 / 10 cases PASS — the seven-module minimal system is COMPLETE**
 (RTD-MEX-DIO-002 added as black-box round-2 hardening). All seven modules
@@ -127,3 +130,5 @@ now-operational gate.
 | 2026-06-13 | 0.10.0 | RTD-MEX-UART-003 **PASS** (9/9 — minimal system COMPLETE): developed the DMA capability (Uart DMA method + Tx/Rx refs + MCL DMA channels/instance + Platform DMATCD ISRs); vendor + 4-module codegen verified; `_check_dma` now enforces the DMA INVALID rule (LL-017). All seven modules accepted: deterministic (389), static, vendor gate, and per-case codegen all green; every case Reviewer-approved. All five cross-cutting blockers resolved. |
 | 2026-06-15 | 0.14.0 | Issue #7 reorganization: removed KPI-cap clause from §1 (agent-discipline, already canonical in AGENTS.md); removed pointer to deleted implementation-plan from §4 execution-plan text. |
 | 2026-06-15 | 0.14.1 | Issue #7 follow-up: de-agented the §1 KPI-evidence-policy row — dropped the `miss-after-3` status value and the optimization-iteration count (the capped optimization loop is agent-discipline, canonical in AGENTS.md); KPI status is recorded as `pass`/`miss`. |
+| 2026-06-15 | 0.15.0 | Recorded the first **measured KPI** result (RTD-MEX-MCU-001): functional PASS with **KPI PASS** — a cold Codex agent driving the released skill applied 1 edit attempt and finished the non-validation work in 96 s ≤ the 2 min budget; independently re-verified on the vendor gate (exit 0, 0 SEVERE, 120 files, codegen 160/80/40). KPI was reconstructed from the black-box agent's session log (edit-attempt count + validation-excluded time). Synced the stale header `Version` (was 0.13.0, behind the 0.14.x rows) to the current 0.15.0. |
+| 2026-06-15 | 0.16.0 | Restructured the §2 per-case table: replaced the now-obsolete **Gap to PASS** column (all 10 cases are PASS, so there is no gap) with a **KPI** column for recording each case's measured KPI result. MCU-001 carries its measured result (**PASS** — 1 edit, 96 s ≤ 2 min); the other nine read *Not yet measured*. The per-case implementation evidence the old column held is preserved in this changelog (each case's PASS row). |
