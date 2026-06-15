@@ -356,7 +356,8 @@ class TestRunCodex:
 
         fake_codex = str(tmp_path / "codex")
 
-        with patch("shutil.which", return_value=fake_codex), \
+        with patch.object(mod, "_cached_codex_path", return_value=None), \
+             patch("shutil.which", return_value=fake_codex), \
              patch("subprocess.run", side_effect=fake_run):
             result = mod.run_codex(
                 prompt="hello agent",
@@ -459,7 +460,8 @@ class TestRunCodex:
     def test_codex_not_found_raises_clear_error(self, tmp_path):
         mod = load_module()
 
-        with patch("shutil.which", return_value=None):
+        with patch.object(mod, "_cached_codex_path", return_value=None), \
+             patch("shutil.which", return_value=None):
             with pytest.raises((RuntimeError, SystemExit, FileNotFoundError)) as exc_info:
                 mod.run_codex(
                     prompt="test",
@@ -516,7 +518,8 @@ class TestRunCodex:
                 return r"C:\npm\codex.cmd"
             return None
 
-        with patch("shutil.which", side_effect=fake_which), \
+        with patch.object(mod, "_cached_codex_path", return_value=None), \
+             patch("shutil.which", side_effect=fake_which), \
              patch("subprocess.run", side_effect=fake_run):
             result = mod.run_codex(
                 prompt="test",
@@ -994,7 +997,8 @@ class TestIssue2CmdFallback:
             # cmd /c fallback succeeds.
             return self._fake_completed(stdout="fallback ok")
 
-        with patch("shutil.which", return_value=codex_cmd_path), \
+        with patch.object(mod, "_cached_codex_path", return_value=None), \
+             patch("shutil.which", return_value=codex_cmd_path), \
              patch("subprocess.run", side_effect=fake_run), \
              patch.object(_sys, "platform", "win32"):
             result = mod.run_codex(

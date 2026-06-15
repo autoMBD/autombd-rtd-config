@@ -247,3 +247,68 @@ def test_main_uses_cache_on_second_run(tmp_path, capsys):
     assert second == 0
     assert calls == ["called"]
     assert payload["dependencies"]["git"]["source"] == "cache"
+
+
+def test_codex_agent_uses_github_app_connector_not_github_cli(tmp_path):
+    mod = load_module()
+
+    deps = mod.build_dependencies(tmp_path, agent="codex")
+
+    keys = {dep.key for dep in deps}
+    assert "github_app_connector" in keys
+    assert "github_cli" not in keys
+
+
+def test_non_codex_agent_uses_github_cli_status_check(tmp_path):
+    mod = load_module()
+
+    deps = mod.build_dependencies(tmp_path, agent="claude")
+
+    keys = {dep.key for dep in deps}
+    assert "github_cli" in keys
+    assert "github_app_connector" not in keys
+
+
+def test_user_confirmation_satisfies_non_codex_github_cli_auth(tmp_path, capsys):
+    mod = load_module()
+    state_file = tmp_path / ".agent-state" / "environment-verification.json"
+    calls = []
+
+    def probe_should_not_run():
+        calls.append("called")
+        return mod.CheckResult("github_cli", "blocked", "unexpected", "")
+
+    dep = mod.Dependency(
+        key="github_cli",
+        label="GitHub CLI",
+        required=True,
+        interactive_auth=True,
+        prepare="Run gh auth status -h github.com.",
+        probe=probe_should_not_run,
+    )
+
+    exit_code = mod.main(
+        [
+            "--repo-root",
+            str(tmp_path),
+            "--state-file",
+            str(state_file),
+            "--agent",
+            "claude",
+            "--confirm-github-cli-auth",
+            "T哥 confirmed gh auth status passed in desktop PowerShell",
+            "--json",
+        ],
+        dependencies=(dep,),
+        now=lambda: "2026-06-16T01:00:00Z",
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    stored = json.loads(state_file.read_text(encoding="utf-8"))
+    github_cli = payload["dependencies"]["github_cli"]
+    assert exit_code == 0
+    assert calls == []
+    assert github_cli["status"] == "passed"
+    assert github_cli["source"] == "user_confirmation"
+    assert "desktop PowerShell" in github_cli["detail"]
+    assert stored["dependencies"]["github_cli"]["source"] == "user_confirmation"

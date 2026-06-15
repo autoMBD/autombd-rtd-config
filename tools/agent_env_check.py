@@ -63,6 +63,9 @@ STATE_FILE = "environment-verification.json"
 STATUS_PASSED = "passed"
 STATUS_BLOCKED = "blocked"
 STATUS_WARNING = "warning"
+AGENT_CODEX = "codex"
+AGENT_CLAUDE = "claude"
+AGENT_OTHER = "other"
 
 
 @dataclass(frozen=True)
@@ -157,13 +160,30 @@ def verify_dependencies(
     dependencies: tuple[Dependency, ...],
     state_file: Path,
     refresh: bool,
+    confirmations: Mapping[str, str] | None = None,
     now: Callable[[], str] = utc_now,
 ) -> dict:
     state = load_state(state_file)
     stored = state.setdefault("dependencies", {})
     report_dependencies: dict[str, dict] = {}
+    confirmations = confirmations or {}
 
     for dependency in dependencies:
+        confirmation = confirmations.get(dependency.key)
+        if confirmation:
+            checked_at = now()
+            result = CheckResult(
+                key=dependency.key,
+                status=STATUS_PASSED,
+                summary=f"{dependency.label} verified by user confirmation",
+                detail=confirmation,
+                metadata={"confirmation": confirmation},
+            )
+            entry = _entry_from_result(dependency, result, checked_at, "user_confirmation")
+            stored[dependency.key] = entry
+            report_dependencies[dependency.key] = entry
+            continue
+
         cached = stored.get(dependency.key)
         if (
             not refresh
@@ -250,7 +270,7 @@ def probe_github_cli() -> CheckResult:
     if path is None:
         return CheckResult("github_cli", STATUS_BLOCKED, "GitHub CLI not found on PATH")
     version = _run([path, "--version"])
-    auth = _run([path, "auth", "status"])
+    auth = _run([path, "auth", "status", "-h", "github.com"])
     version_line = (version.stdout or version.stderr).strip().splitlines()[0] if (version.stdout or version.stderr).strip() else path
     if auth.returncode != 0:
         detail = (auth.stderr or auth.stdout).strip()
@@ -266,6 +286,15 @@ def probe_github_cli() -> CheckResult:
         STATUS_PASSED,
         f"{version_line}; authenticated",
         metadata={"path": path, "version": version_line},
+    )
+
+
+def probe_github_app_connector() -> CheckResult:
+    return CheckResult(
+        "github_app_connector",
+        STATUS_PASSED,
+        "Codex uses the GitHub App connector; GitHub CLI authentication is not required",
+        metadata={"connector": "GitHub App", "agent": AGENT_CODEX},
     )
 
 
@@ -333,7 +362,40 @@ def make_reference_materials_probe(repo_root: Path) -> Callable[[], CheckResult]
     return probe
 
 
-def build_dependencies(repo_root: Path) -> tuple[Dependency, ...]:
+def make_github_dependency(agent: str) -> Dependency:
+    if agent == AGENT_CODEX:
+        return Dependency(
+            key="github_app_connector",
+            label="GitHub App connector",
+            required=True,
+            interactive_auth=False,
+            prepare="Use the installed Codex GitHub App connector for issue, PR, and repository operations.",
+            probe=probe_github_app_connector,
+        )
+    return Dependency(
+        key="github_cli",
+        label="GitHub CLI",
+        required=True,
+        interactive_auth=True,
+        prepare=(
+            "Run gh auth status -h github.com in the target agent environment. "
+            "If it cannot return a usable result, ask the user to complete "
+            "gh auth login -h github.com and provide an OK confirmation, then "
+            "rerun this check with --confirm-github-cli-auth <confirmation>."
+        ),
+        probe=probe_github_cli,
+    )
+
+
+def normalize_agent(agent: str) -> str:
+    normalized = agent.lower()
+    if normalized not in (AGENT_CODEX, AGENT_CLAUDE, AGENT_OTHER):
+        raise ValueError(f"unsupported agent {agent!r}; expected codex, claude, or other")
+    return normalized
+
+
+def build_dependencies(repo_root: Path, agent: str = AGENT_CODEX) -> tuple[Dependency, ...]:
+    agent = normalize_agent(agent)
     return (
         Dependency(
             key="python",
@@ -351,14 +413,7 @@ def build_dependencies(repo_root: Path) -> tuple[Dependency, ...]:
             prepare="Install Git and ensure git is on PATH.",
             probe=probe_git,
         ),
-        Dependency(
-            key="github_cli",
-            label="GitHub CLI",
-            required=True,
-            interactive_auth=True,
-            prepare="Install GitHub CLI and run gh auth login -h github.com.",
-            probe=probe_github_cli,
-        ),
+        make_github_dependency(agent),
         Dependency(
             key="codex_cli",
             label="Third-party agent CLI: Codex",
@@ -393,6 +448,19 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--repo-root", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--state-file", type=Path)
     parser.add_argument("--refresh", action="store_true", help="ignore cached passes and probe again")
+    parser.add_argument(
+        "--agent",
+        choices=(AGENT_CODEX, AGENT_CLAUDE, AGENT_OTHER),
+        default=AGENT_CODEX,
+        help="agent environment to verify; Codex uses the GitHub App connector instead of GitHub CLI",
+    )
+    parser.add_argument(
+        "--confirm-github-cli-auth",
+        help=(
+            "non-Codex fallback: user confirmation that gh auth status -h "
+            "github.com passed in the target agent environment"
+        ),
+    )
     parser.add_argument("--json", action="store_true", help="emit the full JSON report")
     return parser
 
@@ -422,12 +490,16 @@ def main(
     args = build_parser().parse_args(argv)
     repo_root = args.repo_root.resolve()
     state_file = args.state_file or default_state_file(repo_root)
-    deps = dependencies if dependencies is not None else build_dependencies(repo_root)
+    deps = dependencies if dependencies is not None else build_dependencies(repo_root, agent=args.agent)
+    confirmations = {}
+    if args.confirm_github_cli_auth:
+        confirmations["github_cli"] = args.confirm_github_cli_auth
     report = verify_dependencies(
         repo_root=repo_root,
         dependencies=deps,
         state_file=state_file,
         refresh=args.refresh,
+        confirmations=confirmations,
         now=now,
     )
     if args.json:

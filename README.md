@@ -131,6 +131,10 @@ python tools/agent_env_check.py --json
 python -m pytest -q          # deterministic gate
 ```
 
+The environment check defaults to the Codex profile, which uses the GitHub App
+connector instead of GitHub CLI authentication. Other agents should pass
+`--agent claude` or `--agent other`.
+
 ## Documentation
 
 **Development documentation** (`docs/` — engineering content; agent-agnostic):

@@ -83,11 +83,25 @@ by Git. The file stores non-secret evidence only: paths, versions, status,
 timestamps, and preparation instructions. It must not store tokens, passwords,
 or copied authorization material.
 
+Codex uses the GitHub App connector for GitHub issue, PR, and repository work,
+so the Codex bootstrap does **not** validate GitHub CLI authentication. Other
+agent profiles run:
+
+```bash
+python tools/agent_env_check.py --agent claude --json
+```
+
+For non-Codex agents, GitHub CLI verification is `gh auth status -h github.com`.
+If the agent cannot obtain a usable result, it asks the user to complete
+`gh auth login -h github.com` in their own terminal and provide a short OK
+confirmation. That confirmation is recorded with
+`--confirm-github-cli-auth` as the local verification credential.
+
 If a required dependency is blocked, the agent reports the `prepare`
 instruction from the check output instead of repeatedly attempting the same
-tool/auth probe. For authorization-sensitive tools such as GitHub CLI or Codex,
-authentication is a first-session or explicit `--refresh` activity; later
-sessions reuse a cached `passed` result when the tool path still exists.
+tool/auth probe. Authorization-sensitive checks are first-session or explicit
+`--refresh` activities; later sessions reuse a cached `passed` result when the
+tool path or confirmation remains valid.
 
 ## Subagent Roles and Collaboration
 
