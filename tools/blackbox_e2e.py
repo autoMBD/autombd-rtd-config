@@ -39,14 +39,17 @@
 # Project:     RTD CfgFile CLI <https://github.com/autoMBD/autombd-rtd-config>
 # File:        blackbox_e2e.py
 # Author:      autoMBD <tkung.lqk@foxmail.com>
-# Date:        2026-06-14
-# Version:     0.1.0
+# Date:        2026-06-15
+# Version:     0.2.0
 # Description: True black-box isolated E2E harness that drives a third-party
 #              agent CLI (Codex; others via registry) to exercise the released
 #              autombd-rtd skill. A Tester uses this to run an E2E case as a
 #              genuine black box: fresh temp dir, deployed skill, copied fixture,
 #              and the agent sees only skill + fixture + the case's Subagent
-#              Prompt — never this repo or any prior context.
+#              Prompt — never this repo or any prior context. The summary also
+#              carries first-class KPI evidence (edit-attempt count and
+#              validation-excluded time), derived from the codex session log
+#              that the run's `session id:` banner pins deterministically.
 # =================================================================================
 
 from __future__ import annotations
@@ -54,6 +57,7 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -61,6 +65,7 @@ import sys
 import tempfile
 import time
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable
 
@@ -92,6 +97,9 @@ class RunResult:
     stdout: str
     stderr: str
     elapsed_s: float
+    # The agent session id (e.g. codex's `session id:` banner), used to locate
+    # the session log for KPI extraction. None when the runner exposes none.
+    session_id: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -267,6 +275,24 @@ def _find_codex() -> str:
     return path
 
 
+# `codex exec` prints a startup banner line `session id: <uuid>` to stderr.
+# Capturing it lets the KPI extractor pin the exact rollout log deterministically
+# instead of guessing "the newest session", which is fragile when several runs
+# land in the same day/minute.
+_SESSION_ID_RE = re.compile(
+    r"session id:\s*"
+    r"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
+)
+
+
+def _extract_session_id(stderr: str) -> str | None:
+    """Return the codex session UUID from the stderr banner, or None if absent."""
+    if not stderr:
+        return None
+    match = _SESSION_ID_RE.search(stderr)
+    return match.group(1) if match else None
+
+
 def run_codex(
     prompt: str,
     workdir: Path,
@@ -309,15 +335,19 @@ def run_codex(
             stdout=completed.stdout or "",
             stderr=completed.stderr or "",
             elapsed_s=elapsed,
+            session_id=_extract_session_id(completed.stderr or ""),
         )
     except subprocess.TimeoutExpired as exc:
         elapsed = time.monotonic() - t_start
+        stdout_text = exc.stdout if isinstance(exc.stdout, str) else (exc.stdout or b"").decode(errors="replace")
+        stderr_text = exc.stderr if isinstance(exc.stderr, str) else (exc.stderr or b"").decode(errors="replace")
         return RunResult(
             exit_code=-1,
             timed_out=True,
-            stdout=exc.stdout if isinstance(exc.stdout, str) else (exc.stdout or b"").decode(errors="replace"),
-            stderr=exc.stderr if isinstance(exc.stderr, str) else (exc.stderr or b"").decode(errors="replace"),
+            stdout=stdout_text,
+            stderr=stderr_text,
             elapsed_s=elapsed,
+            session_id=_extract_session_id(stderr_text),
         )
     except (FileNotFoundError, OSError):
         # The primary path above is proven on the target machine.  On some
@@ -340,6 +370,7 @@ def run_codex(
                 stdout=completed.stdout or "",
                 stderr=completed.stderr or "",
                 elapsed_s=elapsed,
+                session_id=_extract_session_id(completed.stderr or ""),
             )
         raise
 
@@ -364,6 +395,167 @@ def get_runner(agent: str) -> Callable[..., RunResult]:
             f"unsupported agent {agent!r}; supported agents are: {supported}"
         )
     return runner
+
+
+# ---------------------------------------------------------------------------
+# Session KPI extraction
+# ---------------------------------------------------------------------------
+#
+# The per-case KPI has two measurable parts: (a) the edit-attempt count and
+# (b) the time EXCLUDING validation runtime.  The harness's own ``elapsed_s`` is
+# wall-clock that INCLUDES the agent's own ``validate`` (S32DS) calls, so it
+# cannot serve as the KPI.  These helpers reconstruct both metrics from the
+# codex session rollout JSONL (per-event ms timestamps + the exact commands the
+# agent ran).  Detection is module-agnostic and ``--json``-independent:
+#   - an *edit attempt* is any skill command carrying the universal
+#     ``--configure`` apply flag (the dry-run ``plan`` variant lacks it);
+#   - a *validation run* is any ``validate`` subcommand invocation.
+
+#: Word-boundary match for the ``validate`` subcommand verb.
+_VALIDATE_RE = re.compile(r"\bvalidate\b")
+
+
+def _default_codex_home() -> Path:
+    """Return the codex home dir (``$CODEX_HOME`` or ``~/.codex``)."""
+    env = os.environ.get("CODEX_HOME")
+    return Path(env) if env else Path.home() / ".codex"
+
+
+def find_codex_session_file(session_id: str, codex_home: Path | None = None) -> Path | None:
+    """Locate the rollout JSONL for *session_id* under the codex sessions tree.
+
+    Codex writes ``<codex_home>/sessions/YYYY/MM/DD/rollout-<ts>-<uuid>.jsonl``;
+    the UUID is embedded in the filename, so we glob by it for a deterministic
+    lookup.  If several match (should not happen — UUIDs are unique) the newest
+    by mtime wins.  Returns None when nothing matches or *session_id* is falsy.
+    """
+    if not session_id:
+        return None
+    home = codex_home if codex_home is not None else _default_codex_home()
+    matches = sorted(
+        home.glob(f"sessions/**/rollout-*{session_id}*.jsonl"),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )
+    return matches[0] if matches else None
+
+
+def _parse_iso(ts: str) -> datetime | None:
+    """Parse an ISO-8601 timestamp (``...Z`` or offset) into a datetime, or None."""
+    try:
+        return datetime.fromisoformat(ts.replace("Z", "+00:00"))
+    except (ValueError, AttributeError):
+        return None
+
+
+def _command_of(payload: dict[str, Any]) -> str:
+    """Best-effort shell-command string from a ``function_call`` payload.
+
+    Codex stores the command in ``arguments`` as a JSON string ``{"command":
+    "..."}``; fall back to the raw ``arguments`` / ``command`` field if it is not
+    JSON (so detection never depends on a particular serialisation).
+    """
+    args = payload.get("arguments")
+    if isinstance(args, str):
+        try:
+            parsed = json.loads(args)
+        except json.JSONDecodeError:
+            return args
+        if isinstance(parsed, dict) and "command" in parsed:
+            return str(parsed["command"])
+        return args
+    cmd = payload.get("command")
+    return str(cmd) if cmd is not None else ""
+
+
+def compute_session_kpi(session_path: Path) -> dict[str, Any]:
+    """Derive per-case KPI evidence from a codex rollout JSONL.
+
+    Returns a dict with:
+      - ``edit_attempts`` — number of mutating skill invocations (commands
+        carrying ``--configure``; the dry-run ``plan`` is correctly excluded);
+      - ``validate_runs_s`` — per-call durations of ``validate`` (S32DS) commands;
+      - ``total_span_s`` — ``task_started``→``task_complete`` span, falling back
+        to first ``function_call`` → last ``function_call_output`` when the task
+        markers are absent (e.g. a truncated/timed-out session);
+      - ``validation_excluded_s`` — ``total_span_s`` minus the sum of
+        ``validate_runs_s`` (the KPI metric: intent/planning/impl/edit time with
+        validation runtime removed);
+      - ``commands`` — a compact per-call timeline for auditability.
+    """
+    calls: dict[Any, dict[str, Any]] = {}
+    ts_start: str | None = None
+    ts_end: str | None = None
+
+    with session_path.open(encoding="utf-8") as handle:
+        for line in handle:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                obj = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            payload = obj.get("payload")
+            if not isinstance(payload, dict):
+                continue
+            ptype = payload.get("type", "")
+            ts = obj.get("timestamp")
+            if ptype == "task_started":
+                ts_start = ts
+            elif ptype == "task_complete":
+                ts_end = ts
+            elif ptype == "function_call":
+                entry = calls.setdefault(payload.get("call_id"), {})
+                entry["call_ts"] = ts
+                entry["command"] = _command_of(payload)
+            elif ptype == "function_call_output":
+                calls.setdefault(payload.get("call_id"), {})["out_ts"] = ts
+
+    commands: list[dict[str, Any]] = []
+    edit_attempts = 0
+    validate_runs: list[float] = []
+    call_times: list[datetime] = []
+    out_times: list[datetime] = []
+
+    for entry in calls.values():
+        command = entry.get("command", "")
+        call_dt = _parse_iso(entry.get("call_ts") or "")
+        out_dt = _parse_iso(entry.get("out_ts") or "")
+        duration = (out_dt - call_dt).total_seconds() if (call_dt and out_dt) else None
+        is_edit = "--configure" in command
+        is_validate = bool(_VALIDATE_RE.search(command))
+        if is_edit:
+            edit_attempts += 1
+        if is_validate and duration is not None:
+            validate_runs.append(round(duration, 2))
+        if call_dt:
+            call_times.append(call_dt)
+        if out_dt:
+            out_times.append(out_dt)
+        commands.append({
+            "command": command[:200],
+            "duration_s": round(duration, 2) if duration is not None else None,
+            "is_edit": is_edit,
+            "is_validate": is_validate,
+        })
+
+    start_dt = _parse_iso(ts_start or "") or (min(call_times) if call_times else None)
+    end_dt = _parse_iso(ts_end or "") or (max(out_times) if out_times else None)
+    total_span_s = (
+        round((end_dt - start_dt).total_seconds(), 2) if (start_dt and end_dt) else None
+    )
+    validation_excluded_s = (
+        round(total_span_s - sum(validate_runs), 2) if total_span_s is not None else None
+    )
+
+    return {
+        "edit_attempts": edit_attempts,
+        "validate_runs_s": validate_runs,
+        "total_span_s": total_span_s,
+        "validation_excluded_s": validation_excluded_s,
+        "commands": commands,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -480,6 +672,24 @@ def run_pipeline(
     blackbox_result = _extract_blackbox_result(run_result.stdout)
     mex_path = _find_mex(project_dir)
 
+    # 6b. KPI evidence — locate the codex session log (deterministically, via the
+    # session id the runner captured) and derive the per-case KPI.  Best-effort:
+    # the run already succeeded, so a missing/garbled session must not fail it —
+    # but the reason is recorded (never silently swallowed).
+    session_id = run_result.session_id
+    session_path: str | None = None
+    kpi: dict[str, Any] | None = None
+    if session_id:
+        try:
+            located = find_codex_session_file(session_id)
+            if located is not None:
+                session_path = str(located)
+                kpi = compute_session_kpi(located)
+            else:
+                kpi = {"error": f"no session log found for session id {session_id}"}
+        except OSError as exc:
+            kpi = {"error": f"session KPI extraction failed: {exc}"}
+
     # 7. Summary
     summary: dict[str, Any] = {
         "case": case.id,
@@ -493,6 +703,9 @@ def run_pipeline(
         "timed_out": run_result.timed_out,
         "exit_code": run_result.exit_code,
         "blackbox_result": blackbox_result,
+        "session_id": session_id,
+        "session_path": session_path,
+        "kpi": kpi,
         "log_path": str(log_path),
     }
 

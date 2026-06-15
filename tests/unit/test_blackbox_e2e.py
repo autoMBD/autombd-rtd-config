@@ -1146,3 +1146,266 @@ class TestIssue4ScenarioInSummary:
 
         serialised = json.loads(json.dumps(summary))
         assert serialised["scenario"] == "Modify MCU clock configuration"
+
+
+# ---------------------------------------------------------------------------
+# 7. Session id capture + KPI extraction (v0.2.0)
+# ---------------------------------------------------------------------------
+
+class TestExtractSessionId:
+    def test_extracts_uuid_from_banner(self):
+        mod = load_module()
+        stderr = (
+            "OpenAI Codex v0.139.0\n"
+            "--------\n"
+            "session id: 019ecb9d-deeb-7bd3-a779-e10d4066d570\n"
+            "--------\n"
+        )
+        assert mod._extract_session_id(stderr) == "019ecb9d-deeb-7bd3-a779-e10d4066d570"
+
+    def test_returns_none_when_absent(self):
+        mod = load_module()
+        assert mod._extract_session_id("no banner here\nmodel: gpt-5.5\n") is None
+
+    def test_returns_none_on_empty(self):
+        mod = load_module()
+        assert mod._extract_session_id("") is None
+
+
+class TestRunCodexCapturesSessionId:
+    def _fake_completed(self, stdout="done", stderr=""):
+        result = MagicMock()
+        result.returncode = 0
+        result.stdout = stdout
+        result.stderr = stderr
+        return result
+
+    def test_session_id_captured_from_stderr_banner(self, tmp_path):
+        mod = load_module()
+        completed = self._fake_completed(
+            stderr="OpenAI Codex\nsession id: 019ecb9d-deeb-7bd3-a779-e10d4066d570\n"
+        )
+        with patch("shutil.which", return_value="/usr/bin/codex"), \
+             patch("subprocess.run", return_value=completed):
+            result = mod.run_codex(
+                prompt="x", workdir=tmp_path, timeout_s=60, sandbox="workspace-write"
+            )
+        assert result.session_id == "019ecb9d-deeb-7bd3-a779-e10d4066d570"
+
+    def test_session_id_none_when_no_banner(self, tmp_path):
+        mod = load_module()
+        with patch("shutil.which", return_value="/usr/bin/codex"), \
+             patch("subprocess.run", return_value=self._fake_completed(stderr="")):
+            result = mod.run_codex(
+                prompt="x", workdir=tmp_path, timeout_s=60, sandbox="workspace-write"
+            )
+        assert result.session_id is None
+
+    def test_session_id_captured_on_timeout(self, tmp_path):
+        """A timed-out run still yields the session id from partial stderr."""
+        mod = load_module()
+        exc = subprocess.TimeoutExpired(cmd=["codex"], timeout=10)
+        exc.stdout = "partial"
+        exc.stderr = "session id: 019ecb9d-deeb-7bd3-a779-e10d4066d570\n"
+        with patch("shutil.which", return_value="/usr/bin/codex"), \
+             patch("subprocess.run", side_effect=exc):
+            result = mod.run_codex(
+                prompt="x", workdir=tmp_path, timeout_s=10, sandbox="workspace-write"
+            )
+        assert result.timed_out is True
+        assert result.session_id == "019ecb9d-deeb-7bd3-a779-e10d4066d570"
+
+
+class TestFindCodexSessionFile:
+    def _seed_session(self, codex_home, session_id, ts="2026-06-15T22-09-41"):
+        sub = codex_home / "sessions" / "2026" / "06" / "15"
+        sub.mkdir(parents=True, exist_ok=True)
+        f = sub / f"rollout-{ts}-{session_id}.jsonl"
+        f.write_text("{}", encoding="utf-8")
+        return f
+
+    def test_finds_session_by_embedded_uuid(self, tmp_path):
+        mod = load_module()
+        sid = "019ecb9d-deeb-7bd3-a779-e10d4066d570"
+        expected = self._seed_session(tmp_path, sid)
+        # decoy with a different uuid must not be returned
+        self._seed_session(tmp_path, "00000000-0000-0000-0000-000000000000")
+        assert mod.find_codex_session_file(sid, codex_home=tmp_path) == expected
+
+    def test_returns_none_when_missing(self, tmp_path):
+        mod = load_module()
+        assert mod.find_codex_session_file("absent-id", codex_home=tmp_path) is None
+
+    def test_returns_none_on_empty_id(self, tmp_path):
+        mod = load_module()
+        assert mod.find_codex_session_file("", codex_home=tmp_path) is None
+
+
+# A synthetic rollout that mirrors the real codex schema: task markers, a read,
+# a dry-run plan (mcu set WITHOUT --configure), one mutating edit (--configure),
+# and a 120 s validate.  Span 14:00:00 -> 14:02:30 = 150 s; validate 120 s;
+# validation-excluded 30 s; edit attempts 1.
+_KPI_EVENTS = [
+    {"timestamp": "2026-06-15T14:00:00.000Z", "payload": {"type": "task_started"}},
+    {"timestamp": "2026-06-15T14:00:02.000Z", "payload": {"type": "function_call", "call_id": "c0", "arguments": json.dumps({"command": "Get-Content .\\SKILL.md"})}},
+    {"timestamp": "2026-06-15T14:00:03.000Z", "payload": {"type": "function_call_output", "call_id": "c0"}},
+    {"timestamp": "2026-06-15T14:00:08.000Z", "payload": {"type": "function_call", "call_id": "c1", "arguments": json.dumps({"command": "python skill mcu set --core-clk 160 --json"})}},
+    {"timestamp": "2026-06-15T14:00:09.000Z", "payload": {"type": "function_call_output", "call_id": "c1"}},
+    {"timestamp": "2026-06-15T14:00:10.000Z", "payload": {"type": "function_call", "call_id": "c2", "arguments": json.dumps({"command": "python skill mcu set --core-clk 160 --configure --json"})}},
+    {"timestamp": "2026-06-15T14:00:11.000Z", "payload": {"type": "function_call_output", "call_id": "c2"}},
+    {"timestamp": "2026-06-15T14:00:20.000Z", "payload": {"type": "function_call", "call_id": "c3", "arguments": json.dumps({"command": "python skill validate --json"})}},
+    {"timestamp": "2026-06-15T14:02:20.000Z", "payload": {"type": "function_call_output", "call_id": "c3"}},
+    {"timestamp": "2026-06-15T14:02:30.000Z", "payload": {"type": "task_complete"}},
+]
+
+
+def _write_session(path, events):
+    path.write_text("\n".join(json.dumps(e) for e in events), encoding="utf-8")
+    return path
+
+
+class TestComputeSessionKpi:
+    def test_edit_attempts_counts_only_configure(self, tmp_path):
+        mod = load_module()
+        sp = _write_session(tmp_path / "s.jsonl", _KPI_EVENTS)
+        kpi = mod.compute_session_kpi(sp)
+        # the plan (no --configure) must NOT count; only the --configure edit does
+        assert kpi["edit_attempts"] == 1
+
+    def test_validate_runs_and_excluded_time(self, tmp_path):
+        mod = load_module()
+        sp = _write_session(tmp_path / "s.jsonl", _KPI_EVENTS)
+        kpi = mod.compute_session_kpi(sp)
+        assert kpi["validate_runs_s"] == [120.0]
+        assert kpi["total_span_s"] == 150.0
+        assert kpi["validation_excluded_s"] == 30.0
+
+    def test_commands_timeline_flags(self, tmp_path):
+        mod = load_module()
+        sp = _write_session(tmp_path / "s.jsonl", _KPI_EVENTS)
+        kpi = mod.compute_session_kpi(sp)
+        by_edit = [c for c in kpi["commands"] if c["is_edit"]]
+        by_validate = [c for c in kpi["commands"] if c["is_validate"]]
+        assert len(by_edit) == 1 and "--configure" in by_edit[0]["command"]
+        assert len(by_validate) == 1 and "validate" in by_validate[0]["command"]
+
+    def test_falls_back_to_call_span_without_task_markers(self, tmp_path):
+        """No task_started/complete -> span = first call ts -> last output ts."""
+        mod = load_module()
+        events = [e for e in _KPI_EVENTS if e["payload"]["type"] not in ("task_started", "task_complete")]
+        sp = _write_session(tmp_path / "s.jsonl", events)
+        kpi = mod.compute_session_kpi(sp)
+        # first call 14:00:02 -> last output 14:02:20 = 138 s; validate 120 s -> 18 s
+        assert kpi["total_span_s"] == 138.0
+        assert kpi["validation_excluded_s"] == 18.0
+        assert kpi["edit_attempts"] == 1
+
+    def test_skips_malformed_lines(self, tmp_path):
+        mod = load_module()
+        sp = tmp_path / "s.jsonl"
+        sp.write_text(
+            "not json\n" + "\n".join(json.dumps(e) for e in _KPI_EVENTS) + "\n{bad}\n",
+            encoding="utf-8",
+        )
+        kpi = mod.compute_session_kpi(sp)
+        assert kpi["edit_attempts"] == 1
+        assert kpi["validate_runs_s"] == [120.0]
+
+
+class TestPipelineKpiWiring:
+    def _make_fake_case(self, mod):
+        return mod.Case(
+            id="RTD-MEX-MCU-001",
+            scenario="Modify MCU clock",
+            prompt="修改MCU配置",
+            fixture="tests/fixtures/nxp/ds/s32k3/Uart_Example_S32K344",
+            kpi_minutes=2,
+        )
+
+    def _fake_deploy(self):
+        from types import SimpleNamespace
+
+        def deploy(repo_root_arg, workdir_arg, agents):
+            skill_dir = workdir_arg / ".agents" / "skills" / "autombd-rtd"
+            skill_dir.mkdir(parents=True, exist_ok=True)
+            (skill_dir / "SKILL.md").write_text(
+                "---\nname: autombd-rtd\nversion: 0.1.0\n---\n", encoding="utf-8"
+            )
+            return (SimpleNamespace(agent="codex", destination=skill_dir),)
+
+        return deploy
+
+    def test_summary_includes_session_and_kpi(self, tmp_path):
+        mod = load_module()
+        repo_root = Path(__file__).resolve().parents[2]
+
+        def fake_runner(prompt, workdir, timeout_s, sandbox):
+            return mod.RunResult(
+                exit_code=0, timed_out=False, stdout="", stderr="",
+                elapsed_s=277.0, session_id="019ecb9d-deeb-7bd3-a779-e10d4066d570",
+            )
+
+        fake_kpi = {
+            "edit_attempts": 1, "validate_runs_s": [120.0, 55.8],
+            "total_span_s": 272.0, "validation_excluded_s": 96.2, "commands": [],
+        }
+        fake_session = tmp_path / "rollout.jsonl"
+        fake_session.write_text("{}", encoding="utf-8")
+
+        with patch.object(mod, "find_codex_session_file", return_value=fake_session), \
+             patch.object(mod, "compute_session_kpi", return_value=fake_kpi):
+            summary = mod.run_pipeline(
+                case=self._make_fake_case(mod), agent="codex",
+                sandbox="workspace-write", timeout_s=540, repo_root=repo_root,
+                temp_base=tmp_path, deploy_fn=self._fake_deploy(),
+                runner_fn=fake_runner, keep=True,
+            )
+
+        assert summary["session_id"] == "019ecb9d-deeb-7bd3-a779-e10d4066d570"
+        assert summary["session_path"] == str(fake_session)
+        assert summary["kpi"] == fake_kpi
+        # still fully JSON-serialisable
+        json.dumps(summary)
+
+    def test_summary_kpi_none_when_no_session_id(self, tmp_path):
+        mod = load_module()
+        repo_root = Path(__file__).resolve().parents[2]
+
+        def fake_runner(prompt, workdir, timeout_s, sandbox):
+            return mod.RunResult(
+                exit_code=0, timed_out=False, stdout="", stderr="", elapsed_s=1.0
+            )
+
+        # find_codex_session_file must NOT be called when there is no session id
+        with patch.object(mod, "find_codex_session_file", side_effect=AssertionError("should not be called")):
+            summary = mod.run_pipeline(
+                case=self._make_fake_case(mod), agent="codex",
+                sandbox="workspace-write", timeout_s=60, repo_root=repo_root,
+                temp_base=tmp_path, deploy_fn=self._fake_deploy(),
+                runner_fn=fake_runner, keep=True,
+            )
+
+        assert summary["session_id"] is None
+        assert summary["session_path"] is None
+        assert summary["kpi"] is None
+
+    def test_summary_records_error_when_session_not_found(self, tmp_path):
+        mod = load_module()
+        repo_root = Path(__file__).resolve().parents[2]
+
+        def fake_runner(prompt, workdir, timeout_s, sandbox):
+            return mod.RunResult(
+                exit_code=0, timed_out=False, stdout="", stderr="",
+                elapsed_s=1.0, session_id="missing-session",
+            )
+
+        with patch.object(mod, "find_codex_session_file", return_value=None):
+            summary = mod.run_pipeline(
+                case=self._make_fake_case(mod), agent="codex",
+                sandbox="workspace-write", timeout_s=60, repo_root=repo_root,
+                temp_base=tmp_path, deploy_fn=self._fake_deploy(),
+                runner_fn=fake_runner, keep=True,
+            )
+
+        assert summary["session_path"] is None
+        assert "missing-session" in summary["kpi"]["error"]
