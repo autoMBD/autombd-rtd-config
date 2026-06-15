@@ -10,19 +10,19 @@
 This file tracks how the user's inline `REVIEW` comments were resolved. The
 reviewed draft with comments preserved in context is archived at:
 
-`docs/OBSOLETE_NEVER_TOUCH!!!/rtd-config-core-design.reviewed.md`
+`agent-discipline/review-archive/rtd-config-core-design.reviewed.md`
 
 Second-round reviewed drafts are archived under:
 
-`docs/OBSOLETE_NEVER_TOUCH!!!/second-review/`
+`agent-discipline/review-archive/second-review/`
 
 Third-round reviewed drafts are archived under:
 
-`docs/OBSOLETE_NEVER_TOUCH!!!/third-review/`
+`agent-discipline/review-archive/third-review/`
 
 Fourth-round reviewed drafts (8 documents, comments C66–C84) are archived under:
 
-`docs/OBSOLETE_NEVER_TOUCH!!!/fourth-review/`
+`agent-discipline/review-archive/fourth-review/`
 
 ## Tracking Table
 
@@ -132,3 +132,4 @@ workflow as that process becomes concrete.
 | 2026-05-30 | 0.2.1 | Removed dates from documentation filenames and updated tracking. |
 | 2026-05-30 | 0.2.0 | Added second-round review tracking records. |
 | 2026-05-30 | 0.1.0 | Created review comment tracking table. |
+| 2026-06-15 | 0.6.0 | Issue #7 reorganization: moved from `docs/common/rtd-config-core-comments-tracking.md` to `agent-discipline/owner-review-comments.md`; updated all archive path references from `docs/OBSOLETE_NEVER_TOUCH!!!/` to `agent-discipline/review-archive/`. |

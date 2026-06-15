@@ -62,7 +62,7 @@ the path into runtime code.
 | S32K3 RTD module `.xdm` files | `C:\NXP\S32DS.3.6.7\S32DS\software\PlatformSDK_S32K3\RTD\<ModulePackage>\config\<Module>.xdm` | Build module schema and constraints | Development input only |
 | Uart RTD descriptor example | `C:\NXP\S32DS.3.6.7\S32DS\software\PlatformSDK_S32K3\RTD\Uart_TS_T40D34M70I1R0\config\Uart.xdm` | Build Uart schema and constraints | Development input only |
 | S32DS ConfigTools projects | `tests/fixtures/nxp/<backend>/<family>/<project>/` | Build and validate fixtures | Current Uart fixture: `tests/fixtures/nxp/ds/s32k3/Uart_Example_S32K344/`; keep generated/build artifacts out |
-| Deprecated rtd-config skills | `D:\WorkSpace\ExploreSpace\autombd-skills\skills\rtd-config` | Extract prior `.mex` editing experience for the `.mex` implementation | Development input only; summarized into `docs/references/rtd-config-legacy-skills-experience.md`; never load at runtime |
+| Deprecated rtd-config skills | `D:\WorkSpace\ExploreSpace\autombd-skills\skills\rtd-config` | Extract prior `.mex` editing experience for the `.mex` implementation | Development input only; `.mex` editing experience extracted to seed the implementation rules; never load at runtime |
 
 ## Data Preparation Rule
 

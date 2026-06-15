@@ -98,7 +98,7 @@ values).
   code standards, ownership/boundaries, test adequacy (coverage, not
   execution), and diff hygiene. It reads the repository (it reviews the diff)
   and appends a **lessons-learned** entry to
-  `docs/common/rtd-config-lessons-learned.md`.
+  `agent-discipline/agent-lessons-learned.md`.
 
 **Iteration loop:** `main agent → Explorer → Worker → Tester → main agent` is one
 iteration. The main agent reads the Tester's result and routes:
@@ -145,30 +145,33 @@ exposes a systemic issue.
   continue up to 10 minutes to expose useful problem evidence; after 10
   minutes, the main agent intervenes and collects issue information.
 
-## Development Release Boundary
+## Documentation discipline
 
-- Development source material such as Excel workbooks, raw RTD package
-  descriptors, local investigation notes, and installed RTD directory scans may
-  be used to build runtime assets, but must not become runtime dependencies of
-  the released RTD CfgFile CLI.
-- Runtime behavior must use committed, versioned assets such as JSON/cache
-  files, module manifests, pin mappings, schema constraints, and validation
-  profiles.
-- Vendor validation tools may use their own configured installation
-  environment internally. The current computer is configured for the required
-  vendor validation flow.
+Project documentation is split into two physically separated categories, and the
+agent respects the boundary in both directions:
 
-## Documentation Boundary
+- **Category A — development documentation (`docs/`)**: pure project/engineering
+  content — architecture and contract (`specs/`), the test method and cases
+  (`tests/`), delivery staging (`roadmaps/`), and development inputs
+  (`references/`). Self-contained and agent-agnostic: **no** agent-discipline
+  content and **no** pointers to Category B, so a developer can work from `docs/`
+  alone, with or without an agent.
+- **Category B — agent discipline**: how the agent system operates — this charter
+  (`AGENTS.md`), the role definitions (`.claude/agents/`), and the charter's
+  supplements (`agent-discipline/`: the lessons log, the owner's review-comment
+  tracker, the documentation-governance rules, and the read-only review archive).
+  Category B **may** reference Category A; Category A must never reference B.
 
-- The official tool name in active documentation is RTD CfgFile CLI.
-- **Specs stay at the architecture altitude.** Documents under `docs/specs/`
-  (including their diagrams and goal tables) must not reference a specific
-  milestone, stage, schedule, or time-plan wording such as "first/later/M1".
-  Delivery staging lives only in `docs/roadmaps/rtd-config-roadmap.md`; the
-  execution framework lives in the implementation plan. This rule exists
-  because milestone wording repeatedly leaked into specs across review rounds.
-- Changelogs are append-only history: never merge, collapse, or summarize
-  existing changelog rows.
-- Files under `docs/OBSOLETE_NEVER_TOUCH!!!/` are review archives only.
-  They are unavailable as requirements sources and must not be read to infer
-  current behavior, scope, terminology, or acceptance criteria.
+Usage rules:
+
+- **Ground domain facts, never invent them** — enum/pin/ID values come from
+  `docs/specs/rtd-config-domain-truth.md` and each `<Module>.xdm`.
+- **Specs stay agent-free and milestone-free** — staging lives only in the
+  roadmap.
+- **Changelogs are append-only**; `agent-discipline/review-archive/` is read-only
+  and never a requirements source.
+- The Reviewer appends to `agent-discipline/agent-lessons-learned.md`; the owner's
+  comments are tracked in `agent-discipline/owner-review-comments.md`.
+
+The per-document map and full authoring rules are in
+`agent-discipline/documentation-governance.md`.

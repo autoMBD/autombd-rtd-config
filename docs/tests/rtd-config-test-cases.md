@@ -5,56 +5,18 @@
 | Version | 0.3.3 |
 | Date | 2026-06-13 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
-| Description | The E2E acceptance test cases for the RTD CfgFile CLI (`.mex` backend, scheme `RTD-MEX-*`). Each case is executed as a true black box by the `tools/blackbox_e2e.py` harness driving an independent third-party agent CLI (Codex now; extensible) that sees nothing of this repository — only the deployed `autombd-rtd` skill/CLI, the case's prompt, and the test fixture. Unit/integration coverage lives in the deterministic pytest suite and is governed by the test strategy, not listed here. |
+| Description | The E2E acceptance test cases for the RTD CfgFile CLI (`.mex` backend, scheme `RTD-MEX-*`). Each case targets a real vendor-validated edit. Unit/integration coverage lives in the deterministic pytest suite and is governed by the test strategy, not listed here. |
 
 > **Governed by [`rtd-config-test-strategy.md`](rtd-config-test-strategy.md)**
-> (test layers, the vendor pass gate — exit `0` AND no SEVERE `[TOOL]` —, the
-> acceptance rule, roles, KPI monitoring and KPI-optimization loop). Per-module facts a case exercises (valid
-> values, constraints, dependencies) come from each `<Module>.xdm` via its
-> provider asset; cross-cutting fixture and S32DS-command facts live in
+> (test layers, the vendor pass gate — exit `0` AND no SEVERE `[TOOL]` —, and
+> the acceptance rule). Per-module facts a case exercises (valid values,
+> constraints, dependencies) come from each `<Module>.xdm` via its provider
+> asset; cross-cutting fixture and S32DS-command facts live in
 > [`../specs/rtd-config-domain-truth.md`](../specs/rtd-config-domain-truth.md).
 > New modules add their cases here in the same format; delivery staging lives in
 > the [roadmap](../roadmaps/rtd-config-roadmap.md).
 
-## 1. Execution protocol — true black box via a third-party agent CLI
-
-E2E cases prove the **released skill** works in a cold environment, driven by a
-genuinely independent agent that sees nothing of this repository. The harness
-`tools/blackbox_e2e.py` runs the protocol; the **embedded subagent is NOT a
-valid black box** (it inherits this repo's `CLAUDE.md`/`AGENTS.md` and its
-filesystem, so it can peek), which is why a separate third-party agent CLI is
-required.
-
-1. The harness creates a dedicated temporary directory outside this repository.
-2. It deploys the released `autombd-rtd/` skill into the temp dir via
-   `tools/deploy_rtd_skill.py` (`SKILL.md`, the `__main__.py` launcher,
-   `assets/`, and the bundled CLI under `rtd-config-cli-py/`), and copies the
-   case's test fixture project beside it.
-3. It drives an **independent third-party agent CLI** — **Codex** today
-   (`codex exec`, sandboxed to the temp dir); the runner registry is extensible
-   to other agents — whose entire input is the case's **Subagent Prompt** plus a
-   structured-result suffix, with a timeout of **3× the max catalog KPI** (so
-   S32DS validation, which the per-case KPI excludes, still fits).
-4. The agent satisfies the prompt using only the deployed skill and its CLI
-   (`python <skill-dir> <command>`); it never sees this repository or any prior
-   context.
-5. Evidence required for functional PASS: the case's **Pass criteria**, the
-   vendor gate (ConfigTools exit `0` **and** no SEVERE `[TOOL] … has the
-   following error` problem), and successful code generation (Flow B
-   `-ExportSrc`, domain-truth §3). The Tester does **not** trust the agent's
-   self-reported result — it independently re-runs `validate` on the
-   agent-produced `.mex` from the trusted environment, and on failure/timeout
-   collects the agent's full trace (the kept workdir `_blackbox_run.log` and the
-   agent session) for root-cause analysis.
-6. KPI evidence is mandatory for every case. If functional validation passes but
-   the KPI is missed, the main agent returns the case to the Worker for KPI
-   optimization. The same case gets at most three KPI-optimization iterations.
-   After the third KPI miss, the Tester records the true KPI result and the case
-   may proceed with its functional PASS evidence.
-7. The case table's `Subagent Prompt` cells may stay in Chinese because they are
-   the exact user-facing prompts; all other catalog text is English.
-
-## 2. Test cases
+## 1. Test cases
 
 All cases use the fixture `tests/fixtures/nxp/ds/s32k3/Uart_Example_S32K344/`
 (staged into the temporary directory per §1).
@@ -72,7 +34,7 @@ All cases use the fixture `tests/fixtures/nxp/ds/s32k3/Uart_Example_S32K344/`
 | RTD-MEX-UART-002 | UART | Add new Uart channel configuration | 新增一个基于FlexIO的UART通道，包含Tx和Rx，通讯参数为8bit、921600波特率、无校验位、停止位1bit，使能中断模式，回调函数Autombd_UartCallback | `tests/fixtures/nxp/ds/s32k3/Uart_Example_S32K344` | One edit attempt is sufficient for functional validation; excluding validation runtime, intent analysis, planning, implementation, and file editing finish within 1 min. | Platform enables and registers the correct ISR (interrupt mode is global, so both LPUART and FlexIO require enabled/configured ISRs), priority is set, Mcl creates and references the correct FlexIO logic channel, the MCU reference clock is correct, S32DS validation passes, and code generation succeeds. |
 | RTD-MEX-UART-003 | UART | Configure Uart channel DMA mode | 修改已有的Uart通道，使能DMA模式，使能中断，回调函数Autombd_UartCallback | `tests/fixtures/nxp/ds/s32k3/Uart_Example_S32K344` | One edit attempt is sufficient for functional validation; excluding validation runtime, intent analysis, planning, implementation, and file editing finish within 3 min. | Platform enables and registers the correct ISR (in DMA mode, the interrupt is produced by DMA), priority is set, Mcl configures the correct DMA channel and instance, the MCU reference clock is correct, S32DS validation passes, and code generation succeeds. |
 
-## 3. Case status and dependencies
+## 2. Case status and dependencies
 
 The catalog defines the **acceptance target**; current pass/fail evidence is
 recorded in [`rtd-config-acceptance-report.md`](rtd-config-acceptance-report.md),
@@ -97,3 +59,4 @@ capability dependencies that once gated these cases are now resolved:
 | 2026-06-10 | 0.2.0 | Fourth-round review resolution: restructured to E2E-only cases in the format ID/Module/Scenario/Subagent Prompt/Test fixture/Pass criteria (scheme `RTD-MEX-*`); seeded with the reviewer's MCU clock and three UART cases (incl. DMA) and extended to all seven minimal-system modules; added the fully-isolated subagent execution protocol; renamed the document from `rtd-config-m1-test-cases.md` (m1 dropped from all doc names). |
 | 2026-06-11 | 0.2.1 | Corrected the PASS evidence step to the verified Flow B `-ExportSrc` code generation (was `-UpdateCode`, which belonged to the superseded registration flow); aligned the SEVERE marker wording with domain-truth §3. Added the companion [`rtd-config-acceptance-report.md`](rtd-config-acceptance-report.md) as the living pass/fail record. |
 | 2026-06-06 | 0.1.0 | Extracted the M1 mandatory matrix, scope guards, and out-of-scope list from `rtd-config-test-strategy.md` v0.5.0 into this standalone, per-milestone test-cases document. |
+| 2026-06-15 | 0.4.0 | Issue #7 reorganization: deleted §1 Execution protocol (agent-discipline / black-box harness protocol, already canonical in AGENTS.md); renumbered remaining sections; updated header Description and the Governed-by preamble to pure product terms. |

@@ -8,9 +8,9 @@
 | Description | Current pass/fail evidence for the E2E acceptance cases defined in `rtd-config-test-cases.md`. This document is the living status record the catalog points to; the catalog defines the target, this records where the tool actually stands. |
 
 > **Governed by [`rtd-config-test-cases.md`](rtd-config-test-cases.md)** (the case
-> catalog and isolation protocol) and
+> catalog) and
 > [`rtd-config-test-strategy.md`](rtd-config-test-strategy.md) (layers, the vendor
-> pass gate, roles, KPI monitoring). Per-module truth comes from each
+> pass gate, acceptance rule, KPI handling). Per-module truth comes from each
 > `<Module>.xdm`; the cross-cutting S32DS flow/gate lives in
 > [`../specs/rtd-config-domain-truth.md`](../specs/rtd-config-domain-truth.md).
 
@@ -18,17 +18,14 @@
 
 The functional gate is the **sole acceptance signal** for an E2E case (exit `0`,
 code generated, no SEVERE `[TOOL] … has the following error`, and the case pass
-criteria met). KPI is monitored separately. If the functional gate passes but
-KPI misses, the case returns to the Worker for KPI optimization, capped at three
-optimization iterations; after the third KPI miss, this report records the true
-KPI result and the case may proceed with its functional PASS evidence.
+criteria met). KPI is monitored separately.
 
 | Item | Status | Evidence |
 | --- | --- | --- |
 | S32DS headless validation operational | **OPERATIONAL (fixed 2026-06-11)** | Flow B verified on S32DS 3.6.7; pristine `Uart_Example_S32K344` → exit `0`, 120 generated files, `severe_problems: []` via `python -m rtd_config validate`. |
 | Pass gate detects real errors | **VERIFIED** | Known-bad probe (`OsIfUseSystemTimer=true`, empty `OsIfCounterConfig`) → SEVERE `[TOOL] The resource "BaseNXP" … has the following error: The number of OsIf Counters must be exactly one …`; gate returns `passed=false`. |
 | Caller project safety | **VERIFIED** | After validation the caller's `.mex` is byte-identical (validation runs on a throwaway copy). |
-| KPI evidence policy | **DEFINED (2026-06-13)** | Each isolated case records elapsed time, edit-attempt count, KPI status (`pass`, `miss`, or `miss-after-3`), optimization-iteration count, and final disposition. |
+| KPI evidence policy | **DEFINED (2026-06-13)** | Each isolated case records elapsed time, edit-attempt count, KPI status (`pass` or `miss`), and final disposition. |
 
 > **Why this matters:** before the fix, the gate failed on *every* input — the
 > registration step timed out, so a pristine fixture returned exit `2`. The
@@ -64,7 +61,7 @@ measured KPI result.
 deterministic suite (467 tests green), static checks, the S32DS vendor gate
 (exit 0 + no SEVERE `[TOOL]` + code generated), AND each E2E case's generated
 code verified to reflect the edit (LL-013). Every case also passed independent
-Reviewer acceptance with its findings closed. The five cross-cutting blockers
+non-test acceptance review with all findings closed. The five cross-cutting blockers
 (element insertion, cross-module orchestration, `pins.json`, DMA, CLI surface)
 are all resolved.
 
@@ -93,9 +90,8 @@ These unblock multiple cases and should land before/with per-module work:
 
 ## 4. Execution plan
 
-Each module runs the per-module delivery checklist in
-`docs/plans/rtd-cfgfile-cli-implementation-plan.md` (Explorer → Worker → Tester →
-Reviewer), proven against the now-operational gate.
+Each module runs the per-module delivery checklist, proven against the
+now-operational gate.
 
 | Step | Work | Unblocks |
 | --- | --- | --- |
@@ -129,3 +125,5 @@ Reviewer), proven against the now-operational gate.
 | 2026-06-12 | 0.8.0 | RTD-MEX-UART-001 **PASS** (7/9): `uart set` (3-module orchestration) edits the LPUART_8 channel + module callback and inserts the Platform ISR + Mcu clock ref; vendor + 3-module codegen verified (converged on the first vendor run). Established LL-015 (narrowness-bound discipline as orchestration grows). All 7 modules now have an accepted capability; remaining UART-002 (FlexIO channel creation) + UART-003 (DMA). |
 | 2026-06-13 | 0.9.0 | RTD-MEX-UART-002 **PASS** (8/9): `uart add-flexio-channel` creates a FlexIO Tx+Rx Uart channel pair + their MCL logic channels with consistent references + module callback; vendor + end-to-end codegen verified (converged first vendor run). LL-016 ended the recurring documentation-only-asset pattern (FlexIO asset keys now loaded/pinned). Marked plan step 10 done. Only UART-003 (DMA) remains. |
 | 2026-06-13 | 0.10.0 | RTD-MEX-UART-003 **PASS** (9/9 — minimal system COMPLETE): developed the DMA capability (Uart DMA method + Tx/Rx refs + MCL DMA channels/instance + Platform DMATCD ISRs); vendor + 4-module codegen verified; `_check_dma` now enforces the DMA INVALID rule (LL-017). All seven modules accepted: deterministic (389), static, vendor gate, and per-case codegen all green; every case Reviewer-approved. All five cross-cutting blockers resolved. |
+| 2026-06-15 | 0.14.0 | Issue #7 reorganization: removed KPI-cap clause from §1 (agent-discipline, already canonical in AGENTS.md); removed pointer to deleted implementation-plan from §4 execution-plan text. |
+| 2026-06-15 | 0.14.1 | Issue #7 follow-up: de-agented the §1 KPI-evidence-policy row — dropped the `miss-after-3` status value and the optimization-iteration count (the capped optimization loop is agent-discipline, canonical in AGENTS.md); KPI status is recorded as `pass`/`miss`. |
