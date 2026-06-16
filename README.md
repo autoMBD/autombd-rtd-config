@@ -127,15 +127,13 @@ protocol live in [`AGENTS.md`](AGENTS.md). The
 each iteration taught.
 
 ```bash
-python tools/agent_env_check.py bootstrap --json
-python tools/agent_env_check.py require python.tests --json
 python -m pytest -q          # deterministic gate
 ```
 
-The environment check defaults to the Codex profile, which uses the GitHub App
-connector instead of GitHub CLI authentication. Bootstrap reads cache only;
-`require <capability>` verifies tools on demand. Other agents should pass
-`--agent claude` or `--agent other`.
+Agent operating discipline lives in `AGENTS.md`. External tools, installed
+environments, connectors, and development source materials are remembered through
+the lightweight `external-dependency-memory` skill and the ignored local cache
+under `.agent-state/`.
 
 ## Documentation
 

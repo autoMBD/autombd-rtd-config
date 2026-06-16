@@ -67,51 +67,15 @@ needed for that task. Subagents must not be asked to infer hidden main-agent
 state, and their results must be reviewed against the active repository
 documents before being accepted.
 
-## Agent Session Bootstrap
+## External Dependency Memory
 
-At the start of a new project session, the main agent reads the local
-agent-environment cache and capability inventory without probing tools:
-
-```bash
-python tools/agent_env_check.py bootstrap --json
-```
-
-The dependency inventory and cache policy live in
-`agent-discipline/agent-environment.md`. The check records local verification
-credentials under `.agent-state/environment-verification.json`, which is ignored
-by Git. The file stores non-secret evidence only: paths, versions, status,
-timestamps, and preparation instructions. It must not store tokens, passwords,
-or copied authorization material.
-
-Codex uses the GitHub App connector for GitHub issue, PR, and repository work,
-so the Codex bootstrap does **not** validate GitHub CLI authentication. It also
-does not validate unused tools such as S32DS or the black-box runner. A tool is
-verified only when the current task requires its capability, for example:
-
-```bash
-python tools/agent_env_check.py require github.pr_write --json
-python tools/agent_env_check.py require s32ds.validation --json
-python tools/agent_env_check.py require blackbox_e2e --json
-```
-
-Other agent profiles run bootstrap and require commands with their profile:
-
-```bash
-python tools/agent_env_check.py bootstrap --agent claude --json
-python tools/agent_env_check.py require github.pr_write --agent claude --json
-```
-
-For non-Codex agents, GitHub CLI verification is `gh auth status -h github.com`.
-If the agent cannot obtain a usable result, it asks the user to complete
-`gh auth login -h github.com` in their own terminal and provide a short OK
-confirmation. That confirmation is recorded with
-`--confirm-github-cli-auth` as the local verification credential.
-
-If a required dependency is blocked, the agent reports the `prepare`
-instruction from the check output instead of repeatedly attempting the same
-tool/auth probe. Authorization-sensitive checks are first-session or explicit
-`--refresh` activities; later sessions reuse a cached `passed` result when the
-tool path or confirmation remains valid.
+When a task may depend on tools, installed environments, connectors, or source
+materials outside this repository, use the
+`agent-discipline/skills/external-dependency-memory/SKILL.md` skill before
+rechecking them. The skill reuses and updates the ignored local cache at
+`.agent-state/external-dependencies.json`; the cache stores only non-secret
+availability evidence. Known source-material locations remain governed by
+`docs/references/rtd-config-source-materials.md`.
 
 ## Subagent Roles and Collaboration
 

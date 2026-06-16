@@ -65,3 +65,15 @@ def test_rtd_config_skill_documents_public_cli_and_module_surface():
     assert "dma_not_supported_in_m1" not in skill
     # Active docs stay milestone-free; guard against regression to M1 wording.
     assert "Milestone 1" not in skill
+
+
+def test_external_dependency_memory_skill_is_lightweight_contract():
+    skill_path = Path("agent-discipline/skills/external-dependency-memory/SKILL.md")
+    skill = skill_path.read_text(encoding="utf-8")
+
+    assert "name: external-dependency-memory" in skill
+    assert ".agent-state/external-dependencies.json" in skill
+    assert "docs/references/rtd-config-source-materials.md" in skill
+    assert "Never record tokens" in skill
+    assert "tools/agent_env_check.py" not in skill
+    assert "environment-verification.json" not in skill
