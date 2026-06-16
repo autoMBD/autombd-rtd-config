@@ -830,6 +830,29 @@ class TestPipelineWiring:
 
 
 # ---------------------------------------------------------------------------
+# 5b. Deploy-module loader: _load_deploy_module (issue #13 regression guard)
+# ---------------------------------------------------------------------------
+#
+# Every pipeline test above injects ``deploy_fn``, so the REAL default deploy
+# path — ``_default_deploy`` -> ``_load_deploy_module``, which resolves
+# ``tools/deploy_rtd_skill.py`` via ``importlib.util`` — is never exercised by
+# them.  When the ``import importlib.util`` line was dropped (the issue #12
+# import reshuffle), every test still passed while ``python tools/blackbox_e2e.py``
+# died at runtime with ``NameError: name 'importlib' is not defined`` on the
+# first real deploy.  This test drives the real loader so the import can never
+# regress unnoticed again.
+
+class TestLoadDeployModule:
+    def test_load_deploy_module_imports_real_deploy(self):
+        """_load_deploy_module must load tools/deploy_rtd_skill.py through
+        importlib.util (no NameError) and expose a callable ``deploy``."""
+        mod = load_module()
+        deploy_mod = mod._load_deploy_module()
+        assert hasattr(deploy_mod, "deploy"), "deploy_rtd_skill must expose deploy()"
+        assert callable(deploy_mod.deploy)
+
+
+# ---------------------------------------------------------------------------
 # 6. New targeted tests for the four cleanup items
 # ---------------------------------------------------------------------------
 
