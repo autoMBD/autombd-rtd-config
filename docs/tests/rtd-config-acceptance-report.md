@@ -2,8 +2,8 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.16.0 |
-| Date | 2026-06-15 |
+| Version | 0.17.0 |
+| Date | 2026-06-17 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Current pass/fail evidence for the E2E acceptance cases defined in `rtd-config-test-cases.md`. This document is the living status record the catalog points to; the catalog defines the target, this records where the tool actually stands. |
 
@@ -48,7 +48,7 @@ The detailed per-case implementation evidence is preserved in the changelog belo
 | ID | Module | Status | KPI |
 | --- | --- | --- | --- |
 | RTD-MEX-MCU-001 | MCU | **PASS** | **PASS** — 1 edit attempt, validation-excluded 96 s ≤ 2 min budget (black-box, 2026-06-15) |
-| RTD-MEX-BASENXP-001 | BaseNXP | **PASS** | Not yet measured |
+| RTD-MEX-BASENXP-001 | BaseNXP | **PASS** | **MISS** — 1 edit attempt, validation-excluded 134 s > 1 min budget (black-box, 2026-06-17) |
 | RTD-MEX-PLATFORM-001 | Platform | **PASS** | Not yet measured |
 | RTD-MEX-PORT-001 | Port | **PASS** | Not yet measured |
 | RTD-MEX-DIO-001 | Dio | **PASS** | Not yet measured |
@@ -132,3 +132,4 @@ now-operational gate.
 | 2026-06-15 | 0.14.1 | Issue #7 follow-up: de-agented the §1 KPI-evidence-policy row — dropped the `miss-after-3` status value and the optimization-iteration count (the capped optimization loop is agent-discipline, canonical in AGENTS.md); KPI status is recorded as `pass`/`miss`. |
 | 2026-06-15 | 0.15.0 | Recorded the first **measured KPI** result (RTD-MEX-MCU-001): functional PASS with **KPI PASS** — a cold Codex agent driving the released skill applied 1 edit attempt and finished the non-validation work in 96 s ≤ the 2 min budget; independently re-verified on the vendor gate (exit 0, 0 SEVERE, 120 files, codegen 160/80/40). KPI was reconstructed from the black-box agent's session log (edit-attempt count + validation-excluded time). Synced the stale header `Version` (was 0.13.0, behind the 0.14.x rows) to the current 0.15.0. |
 | 2026-06-15 | 0.16.0 | Restructured the §2 per-case table: replaced the now-obsolete **Gap to PASS** column (all 10 cases are PASS, so there is no gap) with a **KPI** column for recording each case's measured KPI result. MCU-001 carries its measured result (**PASS** — 1 edit, 96 s ≤ 2 min); the other nine read *Not yet measured*. The per-case implementation evidence the old column held is preserved in this changelog (each case's PASS row). |
+| 2026-06-17 | 0.17.0 | Recorded the measured KPI for **RTD-MEX-BASENXP-001** (issue #13 back-fill). Functional **PASS** re-confirmed under the TRUE black-box protocol — an independent vendor-gate re-run on the agent-produced `.mex` returned exit 0, 120 generated files, 0 SEVERE, with `OsIfUseSystemTimer=true` and exactly one `OsIfCounterConfig` referencing the Mcu `FLEXIO_CLK` (CORE_CLK) point (OsIf codegen emitted). **KPI: MISS** — 1 edit attempt (meets the single-attempt expectation), but validation-excluded time 134 s > the 1 min budget (total span ≈ 290 s, of which the S32DS `validate` runtime of 156 s is excluded per policy; the remaining cold-agent intent-analysis/planning/edit overhead dominates). Per the KPI policy the miss is recorded as-is and does not weaken the functional PASS. |
