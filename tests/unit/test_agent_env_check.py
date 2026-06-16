@@ -196,6 +196,8 @@ def test_main_emits_json_report_and_nonzero_when_required_blocked(tmp_path, caps
 
     exit_code = mod.main(
         [
+            "require",
+            "blackbox_e2e",
             "--repo-root",
             str(tmp_path),
             "--state-file",
@@ -231,13 +233,13 @@ def test_main_uses_cache_on_second_run(tmp_path, capsys):
     )
 
     first = mod.main(
-        ["--repo-root", str(tmp_path), "--state-file", str(state_file), "--json"],
+        ["require", "git.push", "--repo-root", str(tmp_path), "--state-file", str(state_file), "--json"],
         dependencies=(dep,),
         now=lambda: "2026-06-15T01:00:00Z",
     )
     capsys.readouterr()
     second = mod.main(
-        ["--repo-root", str(tmp_path), "--state-file", str(state_file), "--json"],
+        ["require", "git.push", "--repo-root", str(tmp_path), "--state-file", str(state_file), "--json"],
         dependencies=(dep,),
         now=lambda: "2026-06-15T01:01:00Z",
     )
@@ -247,6 +249,152 @@ def test_main_uses_cache_on_second_run(tmp_path, capsys):
     assert second == 0
     assert calls == ["called"]
     assert payload["dependencies"]["git"]["source"] == "cache"
+
+
+def test_bootstrap_does_not_probe_missing_dependencies(tmp_path, capsys):
+    mod = load_module()
+    state_file = tmp_path / ".agent-state" / "environment-verification.json"
+    calls = []
+
+    def probe_should_not_run():
+        calls.append("called")
+        return mod.CheckResult("s32ds", "blocked", "unexpected", "")
+
+    dep = mod.Dependency(
+        key="s32ds",
+        label="S32DS",
+        required=True,
+        interactive_auth=False,
+        prepare="Install S32DS.",
+        probe=probe_should_not_run,
+    )
+
+    exit_code = mod.main(
+        [
+            "bootstrap",
+            "--repo-root",
+            str(tmp_path),
+            "--state-file",
+            str(state_file),
+            "--json",
+        ],
+        dependencies=(dep,),
+        now=lambda: "2026-06-16T02:00:00Z",
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    assert exit_code == 0
+    assert calls == []
+    assert payload["status"] == "passed"
+    assert payload["dependencies"]["s32ds"]["status"] == "unknown"
+    assert payload["dependencies"]["s32ds"]["source"] == "not_required"
+
+
+def test_require_checks_only_requested_capability_dependencies(tmp_path, capsys):
+    mod = load_module()
+    state_file = tmp_path / ".agent-state" / "environment-verification.json"
+    calls = []
+
+    def python_probe():
+        calls.append("python")
+        return mod.CheckResult("python", "passed", "Python ok", "")
+
+    def s32ds_probe():
+        calls.append("s32ds")
+        return mod.CheckResult("s32ds", "passed", "S32DS ok", "")
+
+    python_dep = mod.Dependency(
+        key="python",
+        label="Python",
+        required=True,
+        interactive_auth=False,
+        prepare="Install Python.",
+        probe=python_probe,
+    )
+    s32ds_dep = mod.Dependency(
+        key="s32ds",
+        label="S32DS",
+        required=True,
+        interactive_auth=False,
+        prepare="Install S32DS.",
+        probe=s32ds_probe,
+    )
+
+    exit_code = mod.main(
+        [
+            "require",
+            "python.tests",
+            "--repo-root",
+            str(tmp_path),
+            "--state-file",
+            str(state_file),
+            "--json",
+        ],
+        dependencies=(python_dep, s32ds_dep),
+        now=lambda: "2026-06-16T02:00:00Z",
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    assert exit_code == 0
+    assert calls == ["python"]
+    assert set(payload["dependencies"]) == {"python"}
+    assert payload["capability"] == "python.tests"
+
+
+def test_legacy_no_subcommand_defaults_to_bootstrap(tmp_path, capsys):
+    mod = load_module()
+    calls = []
+
+    def probe_should_not_run():
+        calls.append("called")
+        return mod.CheckResult("python", "passed", "unexpected", "")
+
+    dep = mod.Dependency(
+        key="python",
+        label="Python",
+        required=True,
+        interactive_auth=False,
+        prepare="Install Python.",
+        probe=probe_should_not_run,
+    )
+
+    exit_code = mod.main(
+        ["--repo-root", str(tmp_path), "--state-file", str(tmp_path / "state.json"), "--json"],
+        dependencies=(dep,),
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    assert exit_code == 0
+    assert calls == []
+    assert payload["command"] == "bootstrap"
+
+
+def test_check_all_keeps_explicit_eager_validation(tmp_path, capsys):
+    mod = load_module()
+    calls = []
+
+    def probe():
+        calls.append("called")
+        return mod.CheckResult("python", "passed", "Python ok", "")
+
+    dep = mod.Dependency(
+        key="python",
+        label="Python",
+        required=True,
+        interactive_auth=False,
+        prepare="Install Python.",
+        probe=probe,
+    )
+
+    exit_code = mod.main(
+        ["check-all", "--repo-root", str(tmp_path), "--state-file", str(tmp_path / "state.json"), "--json"],
+        dependencies=(dep,),
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    assert exit_code == 0
+    assert calls == ["called"]
+    assert payload["command"] == "check-all"
 
 
 def test_codex_agent_uses_github_app_connector_not_github_cli(tmp_path):
@@ -289,6 +437,8 @@ def test_user_confirmation_satisfies_non_codex_github_cli_auth(tmp_path, capsys)
 
     exit_code = mod.main(
         [
+            "require",
+            "github.pr_write",
             "--repo-root",
             str(tmp_path),
             "--state-file",

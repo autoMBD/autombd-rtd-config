@@ -63,9 +63,13 @@ STATE_FILE = "environment-verification.json"
 STATUS_PASSED = "passed"
 STATUS_BLOCKED = "blocked"
 STATUS_WARNING = "warning"
+STATUS_UNKNOWN = "unknown"
 AGENT_CODEX = "codex"
 AGENT_CLAUDE = "claude"
 AGENT_OTHER = "other"
+COMMAND_BOOTSTRAP = "bootstrap"
+COMMAND_REQUIRE = "require"
+COMMAND_CHECK_ALL = "check-all"
 
 
 @dataclass(frozen=True)
@@ -155,6 +159,64 @@ def _entry_from_result(
     }
 
 
+def _unknown_entry(dependency: Dependency) -> dict:
+    return {
+        "label": dependency.label,
+        "required": dependency.required,
+        "interactive_auth": dependency.interactive_auth,
+        "status": STATUS_UNKNOWN,
+        "summary": "Not verified; no current task requires this capability",
+        "detail": "",
+        "prepare": dependency.prepare,
+        "checked_at": None,
+        "source": "not_required",
+        "metadata": {},
+    }
+
+
+def summarize_entries(entries: Mapping[str, Mapping[str, object]]) -> dict:
+    blocked_required = [
+        key
+        for key, entry in entries.items()
+        if entry.get("required") and entry.get("status") == STATUS_BLOCKED
+    ]
+    return {
+        "total": len(entries),
+        "passed": sum(1 for entry in entries.values() if entry["status"] == STATUS_PASSED),
+        "blocked": len(blocked_required),
+        "warnings": sum(1 for entry in entries.values() if entry["status"] == STATUS_WARNING),
+        "unknown": sum(1 for entry in entries.values() if entry["status"] == STATUS_UNKNOWN),
+    }
+
+
+def bootstrap_environment(
+    repo_root: Path,
+    dependencies: tuple[Dependency, ...],
+    state_file: Path,
+) -> dict:
+    state = load_state(state_file)
+    stored = state.setdefault("dependencies", {})
+    report_dependencies: dict[str, dict] = {}
+    for dependency in dependencies:
+        cached = stored.get(dependency.key)
+        if isinstance(cached, dict) and cached.get("status") == STATUS_PASSED:
+            entry = dict(cached)
+            entry["source"] = "cache"
+            report_dependencies[dependency.key] = entry
+        else:
+            report_dependencies[dependency.key] = _unknown_entry(dependency)
+    return {
+        "status": STATUS_PASSED,
+        "command": COMMAND_BOOTSTRAP,
+        "schema_version": SCHEMA_VERSION,
+        "repo_root": str(repo_root),
+        "state_file": str(state_file),
+        "summary": summarize_entries(report_dependencies),
+        "blocked_required": [],
+        "dependencies": report_dependencies,
+    }
+
+
 def verify_dependencies(
     repo_root: Path,
     dependencies: tuple[Dependency, ...],
@@ -202,17 +264,12 @@ def verify_dependencies(
         report_dependencies[dependency.key] = entry
 
     save_state(state_file, state)
+    summary = summarize_entries(report_dependencies)
     blocked_required = [
         key
         for key, entry in report_dependencies.items()
-        if entry.get("required") and entry.get("status") != STATUS_PASSED
+        if entry.get("required") and entry.get("status") == STATUS_BLOCKED
     ]
-    summary = {
-        "total": len(report_dependencies),
-        "passed": sum(1 for entry in report_dependencies.values() if entry["status"] == STATUS_PASSED),
-        "blocked": len(blocked_required),
-        "warnings": sum(1 for entry in report_dependencies.values() if entry["status"] == STATUS_WARNING),
-    }
     return {
         "status": STATUS_PASSED if not blocked_required else STATUS_BLOCKED,
         "schema_version": SCHEMA_VERSION,
@@ -394,6 +451,36 @@ def normalize_agent(agent: str) -> str:
     return normalized
 
 
+def capability_dependency_keys(capability: str, agent: str) -> tuple[str, ...]:
+    agent = normalize_agent(agent)
+    github_key = "github_app_connector" if agent == AGENT_CODEX else "github_cli"
+    capabilities: dict[str, tuple[str, ...]] = {
+        "python.tests": ("python",),
+        "git.push": ("git",),
+        "github.pr_write": (github_key,),
+        "github.issue_read": (github_key,),
+        "github.actions": (github_key,),
+        "s32ds.validation": ("s32ds",),
+        "blackbox_e2e": ("codex_cli", "s32ds"),
+        "repo.references": ("reference_materials",),
+    }
+    if capability not in capabilities:
+        raise ValueError(
+            f"unsupported capability {capability!r}; expected one of: "
+            f"{', '.join(sorted(capabilities))}"
+        )
+    return capabilities[capability]
+
+
+def select_dependencies_for_capability(
+    dependencies: tuple[Dependency, ...],
+    capability: str,
+    agent: str,
+) -> tuple[Dependency, ...]:
+    keys = set(capability_dependency_keys(capability, agent))
+    return tuple(dependency for dependency in dependencies if dependency.key in keys)
+
+
 def build_dependencies(repo_root: Path, agent: str = AGENT_CODEX) -> tuple[Dependency, ...]:
     agent = normalize_agent(agent)
     return (
@@ -443,8 +530,16 @@ def build_dependencies(repo_root: Path, agent: str = AGENT_CODEX) -> tuple[Depen
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Verify and cache project agent-session dependencies."
+        description="Resolve and cache project agent-session capabilities."
     )
+    parser.add_argument(
+        "command",
+        nargs="?",
+        choices=(COMMAND_BOOTSTRAP, COMMAND_REQUIRE, COMMAND_CHECK_ALL),
+        default=COMMAND_BOOTSTRAP,
+        help="bootstrap reads cache only; require verifies one capability; check-all probes every dependency",
+    )
+    parser.add_argument("capability", nargs="?")
     parser.add_argument("--repo-root", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--state-file", type=Path)
     parser.add_argument("--refresh", action="store_true", help="ignore cached passes and probe again")
@@ -494,14 +589,49 @@ def main(
     confirmations = {}
     if args.confirm_github_cli_auth:
         confirmations["github_cli"] = args.confirm_github_cli_auth
-    report = verify_dependencies(
-        repo_root=repo_root,
-        dependencies=deps,
-        state_file=state_file,
-        refresh=args.refresh,
-        confirmations=confirmations,
-        now=now,
-    )
+    try:
+        if args.command == COMMAND_BOOTSTRAP:
+            report = bootstrap_environment(
+                repo_root=repo_root,
+                dependencies=deps,
+                state_file=state_file,
+            )
+        elif args.command == COMMAND_REQUIRE:
+            if not args.capability:
+                raise ValueError("require needs a capability, e.g. require github.pr_write")
+            selected = select_dependencies_for_capability(deps, args.capability, args.agent)
+            report = verify_dependencies(
+                repo_root=repo_root,
+                dependencies=selected,
+                state_file=state_file,
+                refresh=args.refresh,
+                confirmations=confirmations,
+                now=now,
+            )
+            report["command"] = COMMAND_REQUIRE
+            report["capability"] = args.capability
+        else:
+            report = verify_dependencies(
+                repo_root=repo_root,
+                dependencies=deps,
+                state_file=state_file,
+                refresh=args.refresh,
+                confirmations=confirmations,
+                now=now,
+            )
+            report["command"] = COMMAND_CHECK_ALL
+    except ValueError as exc:
+        report = {
+            "status": STATUS_BLOCKED,
+            "command": args.command,
+            "schema_version": SCHEMA_VERSION,
+            "repo_root": str(repo_root),
+            "state_file": str(state_file),
+            "summary": {"total": 0, "passed": 0, "blocked": 1, "warnings": 0, "unknown": 0},
+            "blocked_required": ["capability"],
+            "diagnostics": [{"severity": "blocker", "message": str(exc)}],
+            "dependencies": {},
+        }
     if args.json:
         print(json.dumps(report, ensure_ascii=False, indent=2))
     else:

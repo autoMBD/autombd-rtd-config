@@ -69,11 +69,11 @@ documents before being accepted.
 
 ## Agent Session Bootstrap
 
-At the start of a new project session, the main agent checks the local
-agent-environment cache before probing tools:
+At the start of a new project session, the main agent reads the local
+agent-environment cache and capability inventory without probing tools:
 
 ```bash
-python tools/agent_env_check.py --json
+python tools/agent_env_check.py bootstrap --json
 ```
 
 The dependency inventory and cache policy live in
@@ -84,11 +84,21 @@ timestamps, and preparation instructions. It must not store tokens, passwords,
 or copied authorization material.
 
 Codex uses the GitHub App connector for GitHub issue, PR, and repository work,
-so the Codex bootstrap does **not** validate GitHub CLI authentication. Other
-agent profiles run:
+so the Codex bootstrap does **not** validate GitHub CLI authentication. It also
+does not validate unused tools such as S32DS or the black-box runner. A tool is
+verified only when the current task requires its capability, for example:
 
 ```bash
-python tools/agent_env_check.py --agent claude --json
+python tools/agent_env_check.py require github.pr_write --json
+python tools/agent_env_check.py require s32ds.validation --json
+python tools/agent_env_check.py require blackbox_e2e --json
+```
+
+Other agent profiles run bootstrap and require commands with their profile:
+
+```bash
+python tools/agent_env_check.py bootstrap --agent claude --json
+python tools/agent_env_check.py require github.pr_write --agent claude --json
 ```
 
 For non-Codex agents, GitHub CLI verification is `gh auth status -h github.com`.

@@ -127,12 +127,14 @@ protocol live in [`AGENTS.md`](AGENTS.md). The
 each iteration taught.
 
 ```bash
-python tools/agent_env_check.py --json
+python tools/agent_env_check.py bootstrap --json
+python tools/agent_env_check.py require python.tests --json
 python -m pytest -q          # deterministic gate
 ```
 
 The environment check defaults to the Codex profile, which uses the GitHub App
-connector instead of GitHub CLI authentication. Other agents should pass
+connector instead of GitHub CLI authentication. Bootstrap reads cache only;
+`require <capability>` verifies tools on demand. Other agents should pass
 `--agent claude` or `--agent other`.
 
 ## Documentation
