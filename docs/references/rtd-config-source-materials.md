@@ -14,17 +14,13 @@ present.
 
 ## Reference Materials
 
-Known reference material types are listed here for traceability. This document
-must not contain machine-specific absolute paths. Concrete local locations are
-checkout facts, not project specification. When local tooling needs a path,
-first check the project-local ignored external-dependency cache. If the entry is
-absent or stale, ask the user for the location and cache only the non-secret
-availability evidence.
+Known reference material types are listed here for traceability. Concrete local locations are
+checkout facts, not project specification.
 
-| Reference material | What it is | How to locate | Role | Cache hint |
-| --- | --- | --- | --- | --- |
-| S32K344/S32K324/S32K314 IOMUX workbook | Vendor spreadsheet describing package pins, pad functions, alternate functions, and peripheral signal routing for the S32K3 devices used by this project. | Ask the user for the vendor workbook location, or reuse cached local evidence if present. | Source for building and reviewing committed S32K3 pin mapping data such as `pins.json`. | Cache the local workbook path as `source.s32k3_iomux_workbook` when used. |
-| S32K3 RTD module `.xdm` files | Vendor XML descriptor files shipped with the S32K3 RTD package; each module descriptor defines configuration containers, parameters, references, enums, defaults, and constraints used by S32 ConfigTools. | Locate from the user-provided S32DS/RTD installation root, or reuse cached local evidence if present. Ask the user if the S32DS/RTD root is unknown. | Source for building and reviewing committed module schema, constraint, enum, and reference cache data. | Cache the S32DS/RTD root as `env.s32ds_root` and descriptor evidence as `source.s32k3_rtd_xdm` when used. |
+| Reference material | What it is | How to locate | Role |
+| --- | --- | --- | --- |
+| S32K344/S32K324/S32K314 IOMUX workbook | Vendor spreadsheet describing package pins, pad functions, alternate functions, and peripheral signal routing for the S32K3 devices used by this project. | Ask the user for the vendor workbook location. | Source for building and reviewing committed S32K3 pin mapping data such as `pins.json`. |
+| S32K3 RTD module `.xdm` files | Vendor XML descriptor files shipped with the S32K3 RTD package; each module descriptor defines configuration containers, parameters, references, enums, defaults, and constraints used by S32 ConfigTools. | Locate from the user-provided S32DS/RTD installation root: `{S32DS-ROOT}\S32DS\software\PlatformSDK_S32K3\RTD\<ModulePackage>\config\<Module>.xdm`. For example UART: `C:\NXP\S32DS.3.6.7\S32DS\software\PlatformSDK_S32K3\RTD\Uart_TS_T40D34M70I1R0\config\Uart.xdm` | Source for building and reviewing committed module schema, constraint, enum, and reference cache data. |
 
 ## Data Preparation Rule
 
