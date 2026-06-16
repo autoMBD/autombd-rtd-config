@@ -528,7 +528,6 @@ class TestRunCodex:
         assert captured["argv"][0] == r"C:\npm\codex.cmd"
         assert result.exit_code == 0
 
-
 # ---------------------------------------------------------------------------
 # 5. Pipeline integration: wiring test (no real codex or S32DS)
 # ---------------------------------------------------------------------------

@@ -130,6 +130,11 @@ each iteration taught.
 python -m pytest -q          # deterministic gate
 ```
 
+Agent operating discipline lives in `AGENTS.md`. External tools, installed
+environments, connectors, and development source materials are remembered through
+the lightweight `external-dependency-memory` skill and the ignored local cache
+under `.agent-state/`.
+
 ## Documentation
 
 **Development documentation** (`docs/` — engineering content; agent-agnostic):
