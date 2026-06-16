@@ -69,19 +69,31 @@ documents before being accepted.
 
 ## External Dependency Memory
 
-When a task may depend on tools, installed environments, connectors, or
-materials outside this repository, use
-`agent-discipline/skills/external-dependency-memory/SKILL.md` before repeating
-checks or asking the user. The agent should first read the ignored local cache
-at `.agent-state/external-dependencies.json`, then actively locate any missing
-dependency from project context and relevant reference documents. Ask the user
-only when the dependency cannot be found safely.
+Use `agent-discipline/skills/external-dependency-memory/SKILL.md` and the
+ignored local cache `.agent-state/external-dependencies.json` for external
+tools, installed environments, connectors, and reference materials used by this
+project. The cache stores local, non-secret availability evidence so agents do
+not repeat the same checks across conversations.
 
-After an external dependency is found, confirmed unavailable, or supplied by
-the user, update the local cache with concise non-secret evidence so later
-agents can reuse it. Do not put machine-specific paths, credentials, or cache
-workflow details into `docs/`; keep `docs/references/` as project reference
-material, not local environment state.
+Before using any external dependency, read the cache first. If a valid entry is
+present, reuse it. If the entry is missing, stale, or contradicted by the task,
+resolve the dependency once and update the cache with concise evidence. Never
+store tokens, passwords, copied credential output, or broad command logs.
+
+S32 Design Studio (S32DS) is the project's explicit external tool dependency
+for vendor validation. If an S32DS root is needed and no valid cache entry
+exists, do not scan broad local directories. Ask the user for the S32DS
+installation root, then cache the confirmed root as non-secret local evidence.
+
+External reference materials are listed in
+`docs/references/rtd-config-source-materials.md`. When a listed reference is
+needed, first derive it from cached environment evidence when possible (for
+example, RTD `.xdm` files from a cached S32DS root). If it cannot be derived
+safely, ask the user for the location and cache the confirmed local evidence.
+
+Keep machine-specific paths and cache workflow details out of `docs/`.
+Reference documents describe what the project depends on; the local cache
+records where those dependencies are found on this machine.
 
 ## Subagent Roles and Collaboration
 
