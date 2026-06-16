@@ -2,8 +2,8 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.3.2 |
-| Date | 2026-06-02 |
+| Version | 0.3.3 |
+| Date | 2026-06-16 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Records RTD CfgFile CLI development source materials, vendor tool environment assumptions, and runtime data boundaries. |
 
@@ -51,18 +51,20 @@ Runtime commands must not load:
 
 ## Known Development Inputs
 
-Known local development inputs are listed here for traceability. These paths are
-development references, not runtime dependencies. If a local path changes,
-update this document or add a project-specific reference note; do not hard-code
-the path into runtime code.
+Known development input types are listed here for traceability. This document
+must not contain machine-specific absolute paths. Concrete local locations are
+checkout facts, not project specification. When local tooling needs a path,
+first check the project-local ignored external-dependency cache. If the entry is
+absent or stale, ask the user for the location and cache only the non-secret
+availability evidence.
 
-| Source | Reference location | Use | Notes |
+| Source | How to locate | Use | Notes |
 | --- | --- | --- | --- |
-| S32K344/S32K324/S32K314 IOMUX workbook | `D:\WorkSpace\ExploreSpace\Copy of S32K344_S32K324_S32K314_IOMUX.xlsx` | Build S32K3 pin mapping data | Development input only |
-| S32K3 RTD module `.xdm` files | `C:\NXP\S32DS.3.6.7\S32DS\software\PlatformSDK_S32K3\RTD\<ModulePackage>\config\<Module>.xdm` | Build module schema and constraints | Development input only |
-| Uart RTD descriptor example | `C:\NXP\S32DS.3.6.7\S32DS\software\PlatformSDK_S32K3\RTD\Uart_TS_T40D34M70I1R0\config\Uart.xdm` | Build Uart schema and constraints | Development input only |
-| S32DS ConfigTools projects | `tests/fixtures/nxp/<backend>/<family>/<project>/` | Build and validate fixtures | Current Uart fixture: `tests/fixtures/nxp/ds/s32k3/Uart_Example_S32K344/`; keep generated/build artifacts out |
-| Deprecated rtd-config skills | `D:\WorkSpace\ExploreSpace\autombd-skills\skills\rtd-config` | Extract prior `.mex` editing experience for the `.mex` implementation | Development input only; `.mex` editing experience extracted to seed the implementation rules; never load at runtime |
+| S32K344/S32K324/S32K314 IOMUX workbook | Ask the user for the vendor workbook location, or reuse a cached `source.s32k3_iomux_workbook` local path if present. | Build S32K3 pin mapping data | Development input only |
+| S32K3 RTD module `.xdm` files | Locate from the user-provided S32DS/RTD installation root, or reuse cached `env.s32ds_root` / `source.s32k3_rtd_xdm` evidence if present. | Build module schema and constraints | Development input only |
+| Uart RTD descriptor example | Locate under the same S32K3 RTD descriptor set as the other module `.xdm` files; ask the user if the module package cannot be found. | Build Uart schema and constraints | Development input only |
+| S32DS ConfigTools projects | Use committed fixtures under `tests/fixtures/nxp/<backend>/<family>/<project>/`, or ask the user for any additional real project used only for data preparation. | Build and validate fixtures | Current Uart fixture: `tests/fixtures/nxp/ds/s32k3/Uart_Example_S32K344/`; keep generated/build artifacts out |
+| Deprecated rtd-config skills | Ask the user for the local legacy skill checkout only when prior `.mex` editing experience must be re-examined; cache as `source.legacy_rtd_config_skill` if used. | Extract prior `.mex` editing experience for the `.mex` implementation | Development input only; `.mex` editing experience extracted to seed the implementation rules; never load at runtime |
 
 ## Data Preparation Rule
 
@@ -75,6 +77,7 @@ project, and configured vendor validation tools.
 
 | Date | Version | Description |
 | --- | --- | --- |
+| 2026-06-16 | 0.3.3 | Removed machine-specific absolute paths from known development inputs and redirected concrete locations to local external-dependency cache evidence. |
 | 2026-06-02 | 0.3.2 | Added deprecated rtd-config skills as development-only source material and linked the M1 experience baseline. |
 | 2026-06-02 | 0.3.1 | Aligned fixture reference path with backend/family/device/module/projects/project layout and recorded the current Uart fixture. |
 | 2026-06-02 | 0.3.0 | Renamed document for RTD CfgFile CLI and clarified allowed vendor validation tool environment dependencies. |
