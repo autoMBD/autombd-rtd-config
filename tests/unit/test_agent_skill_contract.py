@@ -74,6 +74,9 @@ def test_external_dependency_memory_skill_is_lightweight_contract():
     assert "name: external-dependency-memory" in skill
     assert ".agent-state/external-dependencies.json" in skill
     assert "docs/references/rtd-config-source-materials.md" in skill
+    assert "refuse the module" in skill
+    assert "development request" in skill
+    assert "source.s32k3_rtd_xdm.<module>" in skill
     assert "Never record tokens" in skill
     assert "tools/agent_env_check.py" not in skill
     assert "environment-verification.json" not in skill

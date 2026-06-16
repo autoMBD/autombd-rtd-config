@@ -71,25 +71,35 @@ documents before being accepted.
 
 Use `agent-discipline/skills/external-dependency-memory/SKILL.md` and the
 ignored local cache `.agent-state/external-dependencies.json` for external
-tools, installed environments, connectors, and reference materials used by this
-project. The cache stores local, non-secret availability evidence so agents do
-not repeat the same checks across conversations.
+tools, installed environments, connectors, reference materials, and other
+outside-repository facts that may be reused. The cache stores local, non-secret
+availability evidence so agents do not repeat the same checks across
+conversations.
 
 Before using any external dependency, read the cache first. If a valid entry is
 present, reuse it. If the entry is missing, stale, or contradicted by the task,
-resolve the dependency once and update the cache with concise evidence. Never
-store tokens, passwords, copied credential output, or broad command logs.
+resolve the dependency once and update the cache only when the result is likely
+to be reused. Never store tokens, passwords, copied credential output, broad
+command logs, or one-off scratch findings.
 
-S32 Design Studio (S32DS) is the project's explicit external tool dependency
-for vendor validation. If an S32DS root is needed and no valid cache entry
-exists, do not scan broad local directories. Ask the user for the S32DS
-installation root, then cache the confirmed root as non-secret local evidence.
+S32 Design Studio (S32DS) and the reference materials listed in
+`docs/references/rtd-config-source-materials.md` are hard prerequisites for RTD
+CfgFile CLI module development. If a module development task needs S32DS
+validation or reference-derived constraints/parameters and the S32DS root or
+required reference material path is not known and usable, refuse that
+development task and ask the user for the missing path. Resume only after the
+user supplies a usable path and it is cached.
 
-External reference materials are listed in
-`docs/references/rtd-config-source-materials.md`. When a listed reference is
-needed, first derive it from cached environment evidence when possible (for
-example, RTD `.xdm` files from a cached S32DS root). If it cannot be derived
-safely, ask the user for the location and cache the confirmed local evidence.
+If an S32DS root is needed and no valid cache entry exists, do not scan broad
+local directories. Ask the user for the S32DS installation root, then cache the
+confirmed root as non-secret local evidence. For listed reference materials,
+first derive them from cached environment evidence when possible, such as RTD
+`.xdm` files from a cached S32DS root; otherwise ask the user for the location.
+
+When any `<Module>.xdm` file content is used as a source for constraints,
+parameters, references, enums, defaults, or validation assumptions, record that
+exact descriptor file in the local cache, not only the RTD root. The cache entry
+must include enough evidence for a later agent to find the same file directly.
 
 Keep machine-specific paths and cache workflow details out of `docs/`.
 Reference documents describe what the project depends on; the local cache
