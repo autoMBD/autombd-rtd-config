@@ -69,13 +69,19 @@ documents before being accepted.
 
 ## External Dependency Memory
 
-When a task may depend on tools, installed environments, connectors, or source
-materials outside this repository, use the
-`agent-discipline/skills/external-dependency-memory/SKILL.md` skill before
-rechecking them. The skill reuses and updates the ignored local cache at
-`.agent-state/external-dependencies.json`; the cache stores only non-secret
-availability evidence. Known source-material locations remain governed by
-`docs/references/rtd-config-source-materials.md`.
+When a task may depend on tools, installed environments, connectors, or
+materials outside this repository, use
+`agent-discipline/skills/external-dependency-memory/SKILL.md` before repeating
+checks or asking the user. The agent should first read the ignored local cache
+at `.agent-state/external-dependencies.json`, then actively locate any missing
+dependency from project context and relevant reference documents. Ask the user
+only when the dependency cannot be found safely.
+
+After an external dependency is found, confirmed unavailable, or supplied by
+the user, update the local cache with concise non-secret evidence so later
+agents can reuse it. Do not put machine-specific paths, credentials, or cache
+workflow details into `docs/`; keep `docs/references/` as project reference
+material, not local environment state.
 
 ## Subagent Roles and Collaboration
 
