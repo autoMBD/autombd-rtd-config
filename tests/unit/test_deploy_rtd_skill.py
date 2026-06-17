@@ -67,9 +67,11 @@ def test_project_cli_and_skill_versions_match():
 
     versions = deploy.read_project_versions(Path(__file__).resolve().parents[2])
 
-    assert versions.skill == "0.1.0"
+    # The three project versions must MATCH each other; don't pin a literal —
+    # it bumps over time (e.g. the SKILL.md one-shot optimization -> 0.1.1).
     assert versions.launcher_header == versions.skill
     assert versions.package == versions.skill
+    deploy.parse_version_tuple(versions.skill)  # must be a valid semver (raises otherwise)
 
 
 def assert_released_payload(installed: Path):
@@ -135,7 +137,8 @@ def test_deploy_updates_when_installed_version_is_older(tmp_path):
 
     assert result.action == "deployed"
     assert "old-development-note.txt" not in {p.name for p in installed.iterdir()}
-    assert "version: 0.1.0" in (installed / "SKILL.md").read_text(encoding="utf-8")
+    src_version = deploy.read_project_versions(repo_root).skill
+    assert f"version: {src_version}" in (installed / "SKILL.md").read_text(encoding="utf-8")
 
 
 def test_deploy_replaces_existing_claude_copy_with_link(tmp_path):
@@ -165,8 +168,9 @@ def test_main_reports_linked_agent_destinations(tmp_path, capsys):
 
     output = capsys.readouterr().out
     assert exit_code == 0
-    assert "linked autombd-rtd 0.1.0 for claude" in output
-    assert "skipped autombd-rtd 0.1.0 for claude" not in output
+    src_version = deploy.read_project_versions(repo_root).skill
+    assert f"linked autombd-rtd {src_version} for claude" in output
+    assert f"skipped autombd-rtd {src_version} for claude" not in output
 
 
 def test_deploy_skips_when_installed_version_is_current_or_newer(tmp_path):
