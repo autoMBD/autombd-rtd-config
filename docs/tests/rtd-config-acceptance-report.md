@@ -2,7 +2,7 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.18.0 |
+| Version | 0.21.0 |
 | Date | 2026-06-17 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Current pass/fail evidence for the E2E acceptance cases defined in `rtd-config-test-cases.md`. This document is the living status record the catalog points to; the catalog defines the target, this records where the tool actually stands. |
@@ -43,13 +43,12 @@ asset). The **KPI** column records each case's measured KPI result against its
 catalog budget (`pass`/`miss`, with the edit-attempt count and the §1
 context→check KPI window time); a case not yet exercised under the black-box protocol
 reads *Not yet measured*, and a KPI `miss` never weakens the functional **PASS**.
-The detailed per-case implementation evidence is preserved in the changelog below.
 
 | ID | Module | Status | KPI |
 | --- | --- | --- | --- |
 | RTD-MEX-MCU-001 | MCU | **PASS** | **PASS** — 1 edit attempt, validation-excluded 96 s ≤ 2 min budget (black-box, 2026-06-15; legacy `validation_excluded_s` metric — predates the 2026-06-17 context→check refinement, to be re-measured separately) |
 | RTD-MEX-BASENXP-001 | BaseNXP | **PASS** | **PASS** — 1 edit attempt, 53.5 s ≤ 1 min budget (black-box, 2026-06-17; after one-shot SKILL.md optimization, context→check window) |
-| RTD-MEX-PLATFORM-001 | Platform | **PASS** | Not yet measured |
+| RTD-MEX-PLATFORM-001 | Platform | **PASS** | **PASS** — 1 edit attempt, 58.7 s ≤ 1 min budget (black-box, 2026-06-17; after universal one-shot workflow optimization, context→check window) |
 | RTD-MEX-PORT-001 | Port | **PASS** | Not yet measured |
 | RTD-MEX-DIO-001 | Dio | **PASS** | Not yet measured |
 | RTD-MEX-DIO-002 | Dio | **PASS** | Not yet measured |
@@ -115,22 +114,25 @@ now-operational gate.
 
 | Date | Version | Description |
 | --- | --- | --- |
-| 2026-06-14 | 0.13.0 | Strengthened the vendor gate (external-review remediation): `validate` now also flags `From Problems view: Tool problem issue:` Clocks/Peripherals/Pins resource violations, closing the LL-014 bypass where an `HSE_CLK>120 MHz` config exit-0'd and false-passed; re-baselined against the real gate (pristine + a valid 160/80/40 config still pass; the HSE_CLK>120 case is now caught). Refreshed the deterministic count to 467. Companion fixes: M1-wording code sweep, doc path/asset-rule corrections, `.gitignore` + README de-stage. |
-| 2026-06-14 | 0.12.0 | RTD-MEX-DIO-002 **PASS**: `dio set --pin PTA30` auto-creates the absent `DioPort_1` container (DioPortId 1, array index 1) then inserts the channel (DioChannelId 14); vendor + codegen verified cold (auto-discovery) on the focused case and the full 5-task combined scenario — `Dio_Cfg.h` has `DioConf_DioChannel_LED_CTRL ((uint16)0x001eU)` and `DioConf_DioPort_DioPort_1 ((uint8)0x01U)`. Added as black-box round-2 hardening (LL-019); deterministic suite 422 green. |
-| 2026-06-13 | 0.11.0 | Added the KPI evidence policy: functionally passing cases that miss KPI return to Worker optimization for up to three iterations; after the third miss, the true KPI result is recorded in this report. |
-| 2026-06-11 | 0.1.0 | Created the acceptance report (the catalog's pass/fail record). Recorded the repaired vendor gate (Flow B, operational + error-detecting + project-safe), the honest 0/9 per-case baseline with each gap, the cross-cutting critical-path blockers, and the sequenced execution plan. |
-| 2026-06-11 | 0.2.0 | RTD-MEX-PLATFORM-001 **PASS** (1/9): `platform set` edits an existing `PlatformIsrConfig` priority/enable on the LPUART3 interrupt; verified end-to-end against the real S32DS gate (exit 0, 120 generated files, no severe). Marked plan step 3 done. |
-| 2026-06-11 | 0.3.0 | RTD-MEX-BASENXP-001 **PASS** (2/9): `basenxp set --enable-system-timer` inserts an OsIf counter referencing the Mcu CORE_CLK point (FLEXIO_CLK), vendor-gate green; drove the byte-faithful element-insertion writer (blocker #1 DONE) and landed the complete 2091-signal `pins.json` (blocker #3 DONE). Updated the per-case table, cross-cutting blockers, and execution plan. |
-| 2026-06-11 | 0.4.0 | RTD-MEX-MCL-001 **PASS** (3/9): `mcl set --add-flexio-logic-channel` appends a FlexIO logic channel with a dynamically-computed unique ChannelId/PinId, vendor-gate green (9-line narrow insert). Marked plan step 5 done. |
-| 2026-06-12 | 0.5.0 | RTD-MEX-PORT-001 **PASS** (4/9): `port set` validates a pin against pins.json then inserts both the `<pin>` header and the Port `PortPin` struct; vendor gate green and the generated SIUL2 source reflects the pins. Review hardening fixed a shared-writer same-prefix tag-matching bug (`<pin>` vs `<pin_features>`) that could have forced whole-file reserialization. Marked plan step 7 done. |
-| 2026-06-12 | 0.6.0 | RTD-MEX-DIO-001 **PASS** (5/9): `dio set` (cross-module Dio+Port) inserts the DioChannel + the Port GPIO output pin and clears the Dio `config_set` `quick_selection` so codegen emits the channel; vendor gate green and `Dio_Cfg.h` contains `DioConf_DioChannel_LED_CTRL`. Established the codegen-verification gate step (LL-013) and confirmed MCL-001 codegen. Marked plan step 8 done. |
-| 2026-06-12 | 0.7.0 | RTD-MEX-MCU-001 **PASS** (6/9): `mcu set` configures the 160/80/40 clock tree (PLL + MC_CGM dividers incl. HSE_CLK/2), McuNoPll/mirror fixes, and merges the Clock Reference Points; vendor + codegen verified over 3 vendor-driven refine iterations. Established LL-014 (comprehensive Problems-view SEVERE scan for clock cases). All 6 non-UART modules done; remaining UART-001/002/003. |
-| 2026-06-12 | 0.8.0 | RTD-MEX-UART-001 **PASS** (7/9): `uart set` (3-module orchestration) edits the LPUART_8 channel + module callback and inserts the Platform ISR + Mcu clock ref; vendor + 3-module codegen verified (converged on the first vendor run). Established LL-015 (narrowness-bound discipline as orchestration grows). All 7 modules now have an accepted capability; remaining UART-002 (FlexIO channel creation) + UART-003 (DMA). |
-| 2026-06-13 | 0.9.0 | RTD-MEX-UART-002 **PASS** (8/9): `uart add-flexio-channel` creates a FlexIO Tx+Rx Uart channel pair + their MCL logic channels with consistent references + module callback; vendor + end-to-end codegen verified (converged first vendor run). LL-016 ended the recurring documentation-only-asset pattern (FlexIO asset keys now loaded/pinned). Marked plan step 10 done. Only UART-003 (DMA) remains. |
-| 2026-06-13 | 0.10.0 | RTD-MEX-UART-003 **PASS** (9/9 — minimal system COMPLETE): developed the DMA capability (Uart DMA method + Tx/Rx refs + MCL DMA channels/instance + Platform DMATCD ISRs); vendor + 4-module codegen verified; `_check_dma` now enforces the DMA INVALID rule (LL-017). All seven modules accepted: deterministic (389), static, vendor gate, and per-case codegen all green; every case Reviewer-approved. All five cross-cutting blockers resolved. |
-| 2026-06-15 | 0.14.0 | Issue #7 reorganization: removed KPI-cap clause from §1 (agent-discipline, already canonical in AGENTS.md); removed pointer to deleted implementation-plan from §4 execution-plan text. |
-| 2026-06-15 | 0.14.1 | Issue #7 follow-up: de-agented the §1 KPI-evidence-policy row — dropped the `miss-after-3` status value and the optimization-iteration count (the capped optimization loop is agent-discipline, canonical in AGENTS.md); KPI status is recorded as `pass`/`miss`. |
-| 2026-06-15 | 0.15.0 | Recorded the first **measured KPI** result (RTD-MEX-MCU-001): functional PASS with **KPI PASS** — a cold Codex agent driving the released skill applied 1 edit attempt and finished the non-validation work in 96 s ≤ the 2 min budget; independently re-verified on the vendor gate (exit 0, 0 SEVERE, 120 files, codegen 160/80/40). KPI was reconstructed from the black-box agent's session log (edit-attempt count + validation-excluded time). Synced the stale header `Version` (was 0.13.0, behind the 0.14.x rows) to the current 0.15.0. |
-| 2026-06-15 | 0.16.0 | Restructured the §2 per-case table: replaced the now-obsolete **Gap to PASS** column (all 10 cases are PASS, so there is no gap) with a **KPI** column for recording each case's measured KPI result. MCU-001 carries its measured result (**PASS** — 1 edit, 96 s ≤ 2 min); the other nine read *Not yet measured*. The per-case implementation evidence the old column held is preserved in this changelog (each case's PASS row). |
-| 2026-06-17 | 0.17.0 | Recorded the measured KPI for **RTD-MEX-BASENXP-001** (issue #13 back-fill). Functional **PASS** re-confirmed under the TRUE black-box protocol — an independent vendor-gate re-run on the agent-produced `.mex` returned exit 0, 120 generated files, 0 SEVERE, with `OsIfUseSystemTimer=true` and exactly one `OsIfCounterConfig` referencing the Mcu `FLEXIO_CLK` (CORE_CLK) point (OsIf codegen emitted). **KPI: MISS** — 1 edit attempt (meets the single-attempt expectation), but validation-excluded time 134 s > the 1 min budget (total span ≈ 290 s, of which the S32DS `validate` runtime of 156 s is excluded per policy; the remaining cold-agent intent-analysis/planning/edit overhead dominates). Per the KPI policy the miss is recorded as-is and does not weaken the functional PASS. |
-| 2026-06-17 | 0.18.0 | RTD-MEX-BASENXP-001 KPI re-measured **PASS** after a one-shot optimization, and the KPI metric corrected to match its definition. **(1) Optimization:** `autombd-rtd/SKILL.md` now presents a single self-contained edit as a one-shot (`basenxp set --enable-system-timer --configure` → `validate`) rather than a multi-phase "plan→configure→validate" workflow; under the black-box protocol this removed codex's internal `update_plan` ceremony (5 calls → 0; 13 agent steps → 4). **(2) Metric correction:** the canonical KPI is now the `[context-injected → static-check-passed]` window (`kpi_seconds` in `tools/blackbox_e2e.py`), not the old `validation_excluded_s` proxy (which over-counted the standalone `check` + post-edit deliberation + report); the check-detector also now excludes codex plan-tool `{"plan":…}` payloads (whose step prose contains "check"/"validate"/"--configure"). **Re-measured:** baseline 81.1 s (MISS) → optimized **53.5 s ≤ 1 min (PASS)**; functional PASS unchanged (independent vendor gate exit 0, 120 files, 0 SEVERE, `OsIfUseSystemTimer=true` + one `OsIfCounterConfig`→`FLEXIO_CLK`). RTD-MEX-MCU-001's 96 s predates this refinement and is to be re-measured separately (out of scope). |
+| 2026-06-17 | 0.21.0 | Compressed changelog: retained all versions, condensed descriptions to 1–2 lines. |
+| 2026-06-17 | 0.20.0 | Universal one-shot workflow in SKILL.md replaces per-module recipes. PLATFORM-001 KPI PASS (58.7 s). |
+| 2026-06-17 | 0.19.0 | PLATFORM-001 KPI baseline: MISS at 73.3 s (11 commands). Functional PASS reconfirmed. |
+| 2026-06-17 | 0.18.0 | KPI metric refined to `[context-injected → static-check-passed]` window. BASENXP-001 KPI PASS (53.5 s). |
+| 2026-06-17 | 0.17.0 | BASENXP-001 KPI first measured: MISS at 134 s validation-excluded. Functional PASS reconfirmed. |
+| 2026-06-15 | 0.16.0 | Replaced Gap-to-PASS column with KPI column in per-case table. |
+| 2026-06-15 | 0.15.0 | First KPI measured: MCU-001 96 s ≤ 2 min (PASS) under black-box protocol. |
+| 2026-06-15 | 0.14.1 | De-agented KPI policy: removed `miss-after-3`; KPI status is `pass`/`miss`. |
+| 2026-06-15 | 0.14.0 | Issue #7 doc reorganization: removed stale KPI-cap clause and implementation-plan pointer. |
+| 2026-06-14 | 0.13.0 | Vendor gate strengthened: catches Clocks/Peripherals/Pins SEVERE that previously exit-0'd. |
+| 2026-06-14 | 0.12.0 | RTD-MEX-DIO-002 PASS: DioPort auto-creation on PTA30 (DioPort_1 → DioChannelId 14). |
+| 2026-06-13 | 0.11.0 | Added KPI evidence policy: miss triggers up to 3 optimization iterations, then recorded. |
+| 2026-06-13 | 0.10.0 | RTD-MEX-UART-003 PASS. DMA capability complete — all 9 cases PASS, minimal system COMPLETE. |
+| 2026-06-13 | 0.9.0 | RTD-MEX-UART-002 PASS: `uart add-flexio-channel` creates FlexIO Tx+Rx with MCL refs. |
+| 2026-06-12 | 0.8.0 | RTD-MEX-UART-001 PASS: `uart set` 3-module orchestration (Uart + Platform + Mcu). |
+| 2026-06-12 | 0.7.0 | RTD-MEX-MCU-001 PASS: 160/80/40 clock tree over 3 vendor refine iterations. |
+| 2026-06-12 | 0.6.0 | RTD-MEX-DIO-001 PASS: DioChannel + Port GPIO (cross-module). Codegen verification gate (LL-013). |
+| 2026-06-12 | 0.5.0 | RTD-MEX-PORT-001 PASS: pin validation + PortPin insert. Fixed `<pin>` vs `<pin_features>` tag bug. |
+| 2026-06-11 | 0.4.0 | RTD-MEX-MCL-001 PASS: FlexIO logic channel with computed ChannelId/PinId. |
+| 2026-06-11 | 0.3.0 | RTD-MEX-BASENXP-001 PASS: OsIf counter insertion. Byte-faithful element insertion + pins.json. |
+| 2026-06-11 | 0.2.0 | RTD-MEX-PLATFORM-001 PASS (1/9): `platform set` edits PlatformIsrConfig priority/enable. |
+| 2026-06-11 | 0.1.0 | Created the acceptance report with per-case table, blockers, execution plan. |
