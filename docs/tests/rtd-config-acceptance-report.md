@@ -2,8 +2,8 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.21.0 |
-| Date | 2026-06-17 |
+| Version | 0.22.0 |
+| Date | 2026-06-18 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Current pass/fail evidence for the E2E acceptance cases defined in `rtd-config-test-cases.md`. This document is the living status record the catalog points to; the catalog defines the target, this records where the tool actually stands. |
 
@@ -49,7 +49,7 @@ reads *Not yet measured*, and a KPI `miss` never weakens the functional **PASS**
 | RTD-MEX-MCU-001 | MCU | **PASS** | **PASS** — 1 edit attempt, validation-excluded 96 s ≤ 2 min budget (black-box, 2026-06-15; legacy `validation_excluded_s` metric — predates the 2026-06-17 context→check refinement, to be re-measured separately) |
 | RTD-MEX-BASENXP-001 | BaseNXP | **PASS** | **PASS** — 1 edit attempt, 53.5 s ≤ 1 min budget (black-box, 2026-06-17; after one-shot SKILL.md optimization, context→check window) |
 | RTD-MEX-PLATFORM-001 | Platform | **PASS** | **PASS** — 1 edit attempt, 58.7 s ≤ 1 min budget (black-box, 2026-06-17; after universal one-shot workflow optimization, context→check window) |
-| RTD-MEX-PORT-001 | Port | **PASS** | Not yet measured |
+| RTD-MEX-PORT-001 | Port | **PASS** | **PASS** — 1 edit attempt, 54.4 s ≤ 1 min budget (black-box, 2026-06-18; context→check window) |
 | RTD-MEX-DIO-001 | Dio | **PASS** | Not yet measured |
 | RTD-MEX-DIO-002 | Dio | **PASS** | Not yet measured |
 | RTD-MEX-MCL-001 | Mcl | **PASS** | Not yet measured |
@@ -114,6 +114,7 @@ now-operational gate.
 
 | Date | Version | Description |
 | --- | --- | --- |
+| 2026-06-18 | 0.22.0 | Back-filled KPI evidence for RTD-MEX-PORT-001 (1 edit attempt, 54.4 s context→check; PASS). Closes #15. |
 | 2026-06-17 | 0.21.0 | Compressed changelog: retained all versions, condensed descriptions to 1–2 lines. |
 | 2026-06-17 | 0.20.0 | Universal one-shot workflow in SKILL.md replaces per-module recipes. PLATFORM-001 KPI PASS (58.7 s). |
 | 2026-06-17 | 0.19.0 | PLATFORM-001 KPI baseline: MISS at 73.3 s (11 commands). Functional PASS reconfirmed. |
