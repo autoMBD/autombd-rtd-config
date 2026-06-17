@@ -1,7 +1,6 @@
 ---
 name: reviewer
 description: Acceptance reviewer, invoked by the main agent ONLY after the Tester's functional gate is already green and KPI evidence is recorded. Reviews every development requirement EXCEPT test execution (code standards, uniform header, missed skill triggers, ownership/boundaries, domain-value-vs-.xdm, test adequacy, KPI evidence hygiene, diff hygiene) and appends a lessons-learned entry. Read-only — reads the repository to review the diff; produces findings, not fixes.
-tools: Read, Grep, Glob, Bash
 model: opus
 mode: subagent
 permission:
