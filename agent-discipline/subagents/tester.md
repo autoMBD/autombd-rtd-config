@@ -1,8 +1,7 @@
 ---
 name: tester
 description: Owns the convergence gate. Writes/extends tests and runs the deterministic suite, S32DS headless validation, AND the isolated E2E acceptance cases, then reports an evidence-backed PASS/FAIL plus KPI evidence. E2E runs as a TRUE black box via an independent third-party agent CLI (the tools/blackbox_e2e.py harness; Codex-first, extensible) against the deployed skill + fixture only — never this repository and never the embedded subagent. Tests are the sole functional acceptance criterion for "done"; KPI misses trigger capped Worker optimization. Use to prove a change converges.
-tools: Read, Edit, Write, Bash, Grep, Glob
-model: sonnet
+model: opus
 mode: subagent
 permission:
   read: allow
