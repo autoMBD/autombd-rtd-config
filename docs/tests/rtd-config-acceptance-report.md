@@ -2,8 +2,8 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.16.0 |
-| Date | 2026-06-15 |
+| Version | 0.18.0 |
+| Date | 2026-06-17 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Current pass/fail evidence for the E2E acceptance cases defined in `rtd-config-test-cases.md`. This document is the living status record the catalog points to; the catalog defines the target, this records where the tool actually stands. |
 
@@ -25,7 +25,7 @@ criteria met). KPI is monitored separately.
 | S32DS headless validation operational | **OPERATIONAL (fixed 2026-06-11)** | Flow B verified on S32DS 3.6.7; pristine `Uart_Example_S32K344` → exit `0`, 120 generated files, `severe_problems: []` via `python -m rtd_config validate`. |
 | Pass gate detects real errors | **VERIFIED** | Known-bad probe (`OsIfUseSystemTimer=true`, empty `OsIfCounterConfig`) → SEVERE `[TOOL] The resource "BaseNXP" … has the following error: The number of OsIf Counters must be exactly one …`; gate returns `passed=false`. |
 | Caller project safety | **VERIFIED** | After validation the caller's `.mex` is byte-identical (validation runs on a throwaway copy). |
-| KPI evidence policy | **DEFINED (2026-06-13)** | Each isolated case records elapsed time, edit-attempt count, KPI status (`pass` or `miss`), and final disposition. |
+| KPI evidence policy | **DEFINED (2026-06-13; metric refined 2026-06-17)** | Each isolated case records its edit-attempt count, the measured KPI, the KPI status (`pass`/`miss`), and the disposition. The canonical KPI is the **`[context-injected → static-check-passed]` window** — intent analysis + planning + implementation + file editing, as the user perceives it — emitted first-class by `tools/blackbox_e2e.py` (`kpi.kpi_seconds`). It **excludes** the agent-runner startup before the prompt lands AND everything after the static `check` (the vendor `validate` runtime and the trailing report). The older `validation_excluded_s` (`total_span` − `validate`) is retained only as a diagnostic; it over-counts and is not the KPI. |
 
 > **Why this matters:** before the fix, the gate failed on *every* input — the
 > registration step timed out, so a pristine fixture returned exit `2`. The
@@ -40,15 +40,15 @@ All cases use the fixture `Uart_Example_S32K344`. The **Status** column is the
 functional acceptance signal — legend: **PASS** (vendor gate green under
 isolation), **FAIL** (capability missing), **BLOCKED** (depends on an unbuilt
 asset). The **KPI** column records each case's measured KPI result against its
-catalog budget (`pass`/`miss`, with the edit-attempt count and the
-validation-excluded time); a case not yet exercised under the black-box protocol
+catalog budget (`pass`/`miss`, with the edit-attempt count and the §1
+context→check KPI window time); a case not yet exercised under the black-box protocol
 reads *Not yet measured*, and a KPI `miss` never weakens the functional **PASS**.
 The detailed per-case implementation evidence is preserved in the changelog below.
 
 | ID | Module | Status | KPI |
 | --- | --- | --- | --- |
-| RTD-MEX-MCU-001 | MCU | **PASS** | **PASS** — 1 edit attempt, validation-excluded 96 s ≤ 2 min budget (black-box, 2026-06-15) |
-| RTD-MEX-BASENXP-001 | BaseNXP | **PASS** | Not yet measured |
+| RTD-MEX-MCU-001 | MCU | **PASS** | **PASS** — 1 edit attempt, validation-excluded 96 s ≤ 2 min budget (black-box, 2026-06-15; legacy `validation_excluded_s` metric — predates the 2026-06-17 context→check refinement, to be re-measured separately) |
+| RTD-MEX-BASENXP-001 | BaseNXP | **PASS** | **PASS** — 1 edit attempt, 53.5 s ≤ 1 min budget (black-box, 2026-06-17; after one-shot SKILL.md optimization, context→check window) |
 | RTD-MEX-PLATFORM-001 | Platform | **PASS** | Not yet measured |
 | RTD-MEX-PORT-001 | Port | **PASS** | Not yet measured |
 | RTD-MEX-DIO-001 | Dio | **PASS** | Not yet measured |
@@ -132,3 +132,5 @@ now-operational gate.
 | 2026-06-15 | 0.14.1 | Issue #7 follow-up: de-agented the §1 KPI-evidence-policy row — dropped the `miss-after-3` status value and the optimization-iteration count (the capped optimization loop is agent-discipline, canonical in AGENTS.md); KPI status is recorded as `pass`/`miss`. |
 | 2026-06-15 | 0.15.0 | Recorded the first **measured KPI** result (RTD-MEX-MCU-001): functional PASS with **KPI PASS** — a cold Codex agent driving the released skill applied 1 edit attempt and finished the non-validation work in 96 s ≤ the 2 min budget; independently re-verified on the vendor gate (exit 0, 0 SEVERE, 120 files, codegen 160/80/40). KPI was reconstructed from the black-box agent's session log (edit-attempt count + validation-excluded time). Synced the stale header `Version` (was 0.13.0, behind the 0.14.x rows) to the current 0.15.0. |
 | 2026-06-15 | 0.16.0 | Restructured the §2 per-case table: replaced the now-obsolete **Gap to PASS** column (all 10 cases are PASS, so there is no gap) with a **KPI** column for recording each case's measured KPI result. MCU-001 carries its measured result (**PASS** — 1 edit, 96 s ≤ 2 min); the other nine read *Not yet measured*. The per-case implementation evidence the old column held is preserved in this changelog (each case's PASS row). |
+| 2026-06-17 | 0.17.0 | Recorded the measured KPI for **RTD-MEX-BASENXP-001** (issue #13 back-fill). Functional **PASS** re-confirmed under the TRUE black-box protocol — an independent vendor-gate re-run on the agent-produced `.mex` returned exit 0, 120 generated files, 0 SEVERE, with `OsIfUseSystemTimer=true` and exactly one `OsIfCounterConfig` referencing the Mcu `FLEXIO_CLK` (CORE_CLK) point (OsIf codegen emitted). **KPI: MISS** — 1 edit attempt (meets the single-attempt expectation), but validation-excluded time 134 s > the 1 min budget (total span ≈ 290 s, of which the S32DS `validate` runtime of 156 s is excluded per policy; the remaining cold-agent intent-analysis/planning/edit overhead dominates). Per the KPI policy the miss is recorded as-is and does not weaken the functional PASS. |
+| 2026-06-17 | 0.18.0 | RTD-MEX-BASENXP-001 KPI re-measured **PASS** after a one-shot optimization, and the KPI metric corrected to match its definition. **(1) Optimization:** `autombd-rtd/SKILL.md` now presents a single self-contained edit as a one-shot (`basenxp set --enable-system-timer --configure` → `validate`) rather than a multi-phase "plan→configure→validate" workflow; under the black-box protocol this removed codex's internal `update_plan` ceremony (5 calls → 0; 13 agent steps → 4). **(2) Metric correction:** the canonical KPI is now the `[context-injected → static-check-passed]` window (`kpi_seconds` in `tools/blackbox_e2e.py`), not the old `validation_excluded_s` proxy (which over-counted the standalone `check` + post-edit deliberation + report); the check-detector also now excludes codex plan-tool `{"plan":…}` payloads (whose step prose contains "check"/"validate"/"--configure"). **Re-measured:** baseline 81.1 s (MISS) → optimized **53.5 s ≤ 1 min (PASS)**; functional PASS unchanged (independent vendor gate exit 0, 120 files, 0 SEVERE, `OsIfUseSystemTimer=true` + one `OsIfCounterConfig`→`FLEXIO_CLK`). RTD-MEX-MCU-001's 96 s predates this refinement and is to be re-measured separately (out of scope). |

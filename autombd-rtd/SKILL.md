@@ -1,6 +1,6 @@
 ---
 name: autombd-rtd
-version: 0.1.0
+version: 0.1.1
 description: >-
   Configure NXP S32K3 RTD 7.0.1 .mex automotive projects through the bundled RTD
   CfgFile CLI. Use when a user asks to inspect a project, query pin options, or
@@ -43,21 +43,33 @@ machine-readable output.
 
 ## The plan → configure → validate workflow
 
-Every module command is **`<module> set`**, and it is two-phase by design:
+Every module command is **`<module> set`**. `--configure` does three things in
+one call: it normalizes the request, makes the narrow byte-faithful edit, and
+immediately runs the static checks. There are two ways to use it:
 
-1. **Plan (default).** `<module> set …` *without* `--configure` writes nothing —
-   it normalizes the request into a JSON intent and prints the plan, including
-   the cross-module dependencies it will satisfy. Review it first.
-2. **Configure.** Add **`--configure`** to apply: the provider makes a narrow,
-   byte-faithful edit to its owned `.mex` region(s), strips any stale
-   `quick_selection`, writes the file, and immediately runs the static checks.
-   Add **`--backup`** to first copy the original to `<file>.mex.bak`.
-3. **Validate (vendor gate).** Run `validate` to confirm with S32DS ConfigTools
-   (see below). Static checks never substitute for the vendor gate, and the
-   vendor gate never substitutes for the static checks.
+- **Fast path (default for a single, self-contained edit).** When you already
+  know the target module and the values to set, skip the standalone `inspect`
+  and the dry-run plan — go straight to `<module> set … --configure`, then run
+  `validate` once to confirm with the vendor gate. That is the whole workflow:
+  one `set --configure` call (apply + static checks together) + one `validate`
+  call. A separate `check` afterward is optional — `--configure` already ran
+  it, so re-running `check` is only a re-confirmation, not a required step.
+- **Plan-first (for cross-module orchestration, or when you want to review
+  before writing).** `<module> set …` *without* `--configure` writes nothing —
+  it prints the plan, including the cross-module dependencies it will satisfy,
+  so you can review before applying. Add **`--configure`** once you are ready
+  to write. Add **`--backup`** to first copy the original to `<file>.mex.bak`.
 
-Independent edits compose: run several `<module> set --configure` calls in
-sequence on the same project, then `validate` once at the end.
+Either way, `validate` is the vendor gate — static checks never substitute for
+it, and it never substitutes for the static checks. Independent edits compose:
+run several `<module> set --configure` calls in sequence on the same project,
+then `validate` once at the end.
+
+**Example (BaseNXP, one-shot):**
+`rtd-config basenxp set --project <dir> --enable-system-timer --configure`
+applies the edit and runs the static checks in that single call; follow with
+`rtd-config validate --project <dir> --json`. No `inspect`, no dry-run plan, no
+separate `check` — one edit, done.
 
 ## Public commands
 
@@ -80,6 +92,9 @@ sequence on the same project, then `validate` once at the end.
   `mcu set --project <dir> --core-clk 160 --aips-plat-clk 80 --aips-slow-clk 40 --add-all-clock-reference-points --configure`
 - **`rtd-config basenxp set --enable-system-timer`** — enable the OsIf system
   timer and insert one `OsIfCounterConfig` (the time base for driver timeouts).
+  One-shot recipe:
+  `basenxp set --project <dir> --enable-system-timer --configure` (applies the
+  edit and runs the static checks together) then `validate`.
 - **`rtd-config platform set --peripheral <e.g. LPUART_3> --priority <n>`** —
   set an existing interrupt's priority, keep it enabled, and confirm its ISR is
   registered. Target by `--peripheral` or exact `--isr-name`.

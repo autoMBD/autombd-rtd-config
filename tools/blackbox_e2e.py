@@ -39,22 +39,25 @@
 # Project:     RTD CfgFile CLI <https://github.com/autoMBD/autombd-rtd-config>
 # File:        blackbox_e2e.py
 # Author:      autoMBD <tkung.lqk@foxmail.com>
-# Date:        2026-06-15
-# Version:     0.2.0
+# Date:        2026-06-17
+# Version:     0.3.0
 # Description: True black-box isolated E2E harness that drives a third-party
 #              agent CLI (Codex; others via registry) to exercise the released
 #              autombd-rtd skill. A Tester uses this to run an E2E case as a
 #              genuine black box: fresh temp dir, deployed skill, copied fixture,
 #              and the agent sees only skill + fixture + the case's Subagent
-#              Prompt — never this repo or any prior context. The summary also
-#              carries first-class KPI evidence (edit-attempt count and
-#              validation-excluded time), derived from the codex session log
-#              that the run's `session id:` banner pins deterministically.
+#              Prompt — never this repo or any prior context. The summary
+#              carries the CANONICAL per-case KPI (`kpi_seconds`, the
+#              [context-injected -> static-check-passed] window) plus
+#              diagnostic-only evidence (edit-attempt count and
+#              validation-excluded time), all derived from the codex session
+#              log that the run's `session id:` banner pins deterministically.
 # =================================================================================
 
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import os
 import re
@@ -400,18 +403,50 @@ def get_runner(agent: str) -> Callable[..., RunResult]:
 # Session KPI extraction
 # ---------------------------------------------------------------------------
 #
-# The per-case KPI has two measurable parts: (a) the edit-attempt count and
-# (b) the time EXCLUDING validation runtime.  The harness's own ``elapsed_s`` is
-# wall-clock that INCLUDES the agent's own ``validate`` (S32DS) calls, so it
-# cannot serve as the KPI.  These helpers reconstruct both metrics from the
-# codex session rollout JSONL (per-event ms timestamps + the exact commands the
-# agent ran).  Detection is module-agnostic and ``--json``-independent:
+# The CANONICAL per-case KPI is ``kpi_seconds``: the owner-locked window from
+# the moment the prompt/context is injected (the user's perceived start) to the
+# moment the standalone static ``check`` passes — i.e.
+# ``[context_injected -> check_passed]``.  This deliberately EXCLUDES (a) the
+# ``task_started``->context startup gap before the prompt lands, and (b)
+# everything AFTER ``check``: the vendor ``validate`` (S32DS) runtime and the
+# trailing agent report.  ``edit_attempts``, ``validate_runs_s``,
+# ``total_span_s`` and ``validation_excluded_s`` remain as DIAGNOSTICS only —
+# ``validation_excluded_s`` (``total_span_s`` minus the validate calls) still
+# over-counts because it keeps the post-edit deliberation, the standalone
+# ``check`` itself, and the trailing report, so it must never be read as the
+# KPI; ``kpi_seconds`` is the one number that gates the per-case budget.
+#
+# These helpers reconstruct every metric from the codex session rollout JSONL
+# (per-event ms timestamps + the exact commands the agent ran).  Detection is
+# module-agnostic and ``--json``-independent:
 #   - an *edit attempt* is any skill command carrying the universal
 #     ``--configure`` apply flag (the dry-run ``plan`` variant lacks it);
-#   - a *validation run* is any ``validate`` subcommand invocation.
+#   - a *validation run* is any ``validate`` subcommand invocation;
+#   - the *context-injection event* is the first ``message``/``user_message``
+#     payload at/after ``task_started`` (codex's permissions/AGENTS.md/prompt
+#     events injected into the first turn);
+#   - the *standalone check* is a ``function_call`` whose command contains the
+#     ``check`` verb but is neither the mutating ``--configure`` edit nor the
+#     vendor ``validate`` gate, paired to its ``function_call_output`` strictly
+#     by ``call_id`` (never by event order), so a ``check``/``validate`` pair
+#     dispatched back-to-back is still resolved correctly even if the other
+#     call's output arrives first.
 
 #: Word-boundary match for the ``validate`` subcommand verb.
 _VALIDATE_RE = re.compile(r"\bvalidate\b")
+
+#: Match the standalone ``check`` SUBCOMMAND: the ``check`` verb (``(?<!-)``
+#: rejects a hyphenated flag like ``--skip-git-repo-check``) immediately
+#: followed by a CLI flag (``(?=\s+--)``), which every real ``check --project
+#: …`` invocation carries.  This rejects the bare word "check" inside a quoted
+#: path/arg, and (together with ``_is_plan_tool``) the word inside a plan-tool
+#: payload.  A command counts as the standalone check only when it also is NOT
+#: the mutating ``--configure`` edit and NOT the ``validate`` vendor gate.
+_CHECK_RE = re.compile(r"(?<!-)\bcheck\b(?=\s+--)")
+
+#: Payload types codex emits for the prompt/context content injected into the
+#: first turn (permissions/AGENTS.md/the task prompt itself).
+_CONTEXT_PAYLOAD_TYPES = ("message", "user_message")
 
 
 def _default_codex_home() -> Path:
@@ -467,24 +502,62 @@ def _command_of(payload: dict[str, Any]) -> str:
     return str(cmd) if cmd is not None else ""
 
 
+def _is_plan_tool(command: str) -> bool:
+    """True if *command* is a codex ``update_plan`` payload, not a shell command.
+
+    Codex's plan tool is a ``function_call`` whose ``arguments`` are
+    ``{"plan": [{"step": ..., "status": ...}, ...]}`` (no ``command`` key), so
+    ``_command_of`` returns that raw JSON.  Its plan-step prose routinely
+    contains words like "check", "validate", or "configure", which would
+    otherwise be misclassified as skill commands — a real defect: an early plan
+    update worded "...check..." was matched as the standalone ``check`` and
+    ended the KPI window ~48 s too early.  Plan-tool calls do no project work,
+    so they are excluded from every command classification.
+    """
+    s = command.lstrip()
+    if not s.startswith("{"):
+        return False
+    try:
+        obj = json.loads(s)
+    except json.JSONDecodeError:
+        return False
+    return isinstance(obj, dict) and "plan" in obj
+
+
 def compute_session_kpi(session_path: Path) -> dict[str, Any]:
     """Derive per-case KPI evidence from a codex rollout JSONL.
 
     Returns a dict with:
+      - ``kpi_seconds`` — THE CANONICAL per-case KPI: the
+        ``[context_injected -> check_passed]`` window in seconds (float,
+        rounded to 2 dp), or ``None`` when either boundary cannot be located
+        (no context event, or no standalone ``check``).  This is the number
+        the per-case budget gates — never ``validation_excluded_s`` (see
+        below);
+      - ``context_injected_ts`` / ``check_passed_ts`` — the two boundary
+        ISO-8601 timestamps backing ``kpi_seconds`` (or ``None``), kept for
+        auditability;
       - ``edit_attempts`` — number of mutating skill invocations (commands
         carrying ``--configure``; the dry-run ``plan`` is correctly excluded);
       - ``validate_runs_s`` — per-call durations of ``validate`` (S32DS) commands;
       - ``total_span_s`` — ``task_started``→``task_complete`` span, falling back
         to first ``function_call`` → last ``function_call_output`` when the task
         markers are absent (e.g. a truncated/timed-out session);
-      - ``validation_excluded_s`` — ``total_span_s`` minus the sum of
-        ``validate_runs_s`` (the KPI metric: intent/planning/impl/edit time with
-        validation runtime removed);
+      - ``validation_excluded_s`` — DIAGNOSTIC ONLY (no longer the KPI):
+        ``total_span_s`` minus the sum of ``validate_runs_s``.  It still
+        over-counts relative to ``kpi_seconds`` because it keeps the
+        post-edit deliberation, the standalone ``check`` call itself, and the
+        trailing agent report that follow the canonical window's end;
       - ``commands`` — a compact per-call timeline for auditability.
     """
     calls: dict[Any, dict[str, Any]] = {}
     ts_start: str | None = None
     ts_end: str | None = None
+    # Candidate context (message/user_message) events, in file order.  The
+    # winning anchor cannot be picked until ts_start is FINAL (task_started
+    # may itself appear after a stray pre-task event in the raw log), so every
+    # candidate is buffered here and resolved once the single pass completes.
+    context_candidates: list[tuple[str | None, str]] = []
 
     with session_path.open(encoding="utf-8") as handle:
         for line in handle:
@@ -510,24 +583,65 @@ def compute_session_kpi(session_path: Path) -> dict[str, Any]:
                 entry["command"] = _command_of(payload)
             elif ptype == "function_call_output":
                 calls.setdefault(payload.get("call_id"), {})["out_ts"] = ts
+            elif ptype in _CONTEXT_PAYLOAD_TYPES and ts is not None:
+                context_candidates.append((ts, ptype))
+
+    # Resolve the context-injection anchor now that ts_start is final: the
+    # FIRST message/user_message event at/after task_started.  A candidate
+    # strictly earlier than task_started (e.g. stray pre-task priming that
+    # happens to appear before the task_started line) is not the user's
+    # perceived start and must be ignored.
+    start_dt = _parse_iso(ts_start or "")
+    context_injected_ts: str | None = None
+    for cand_ts, _cand_type in context_candidates:
+        cand_dt = _parse_iso(cand_ts or "")
+        if cand_dt is None:
+            continue
+        if start_dt is None or cand_dt >= start_dt:
+            context_injected_ts = cand_ts
+            break
 
     commands: list[dict[str, Any]] = []
     edit_attempts = 0
     validate_runs: list[float] = []
     call_times: list[datetime] = []
     out_times: list[datetime] = []
+    check_passed_dt: datetime | None = None
+    check_passed_ts: str | None = None
 
     for entry in calls.values():
         command = entry.get("command", "")
         call_dt = _parse_iso(entry.get("call_ts") or "")
         out_dt = _parse_iso(entry.get("out_ts") or "")
         duration = (out_dt - call_dt).total_seconds() if (call_dt and out_dt) else None
-        is_edit = "--configure" in command
-        is_validate = bool(_VALIDATE_RE.search(command))
+        # Codex plan-tool (`update_plan`) calls are NOT shell commands; their
+        # plan-step prose can contain "check"/"validate"/"configure" and must
+        # never be classified as a skill command (else an early plan update
+        # worded "...check..." ends the KPI window prematurely).
+        is_plan = _is_plan_tool(command)
+        is_edit = (not is_plan) and "--configure" in command
+        is_validate = (not is_plan) and bool(_VALIDATE_RE.search(command))
+        # The standalone `check` is the `check` verb minus the mutating edit
+        # and minus the vendor `validate` gate — those are distinct
+        # subcommands even though `validate` does not itself contain "check".
+        is_standalone_check = (
+            (not is_plan)
+            and bool(_CHECK_RE.search(command))
+            and not is_edit
+            and not is_validate
+        )
         if is_edit:
             edit_attempts += 1
         if is_validate and duration is not None:
             validate_runs.append(round(duration, 2))
+        if is_standalone_check and out_dt is not None:
+            # Resolve ties by EARLIEST output timestamp — pairing is always by
+            # call_id (each `entry` already belongs to exactly one call_id), so
+            # this only matters when multiple standalone `check` calls exist;
+            # the FIRST one to pass anchors the canonical window's end.
+            if check_passed_dt is None or out_dt < check_passed_dt:
+                check_passed_dt = out_dt
+                check_passed_ts = entry.get("out_ts")
         if call_dt:
             call_times.append(call_dt)
         if out_dt:
@@ -539,16 +653,31 @@ def compute_session_kpi(session_path: Path) -> dict[str, Any]:
             "is_validate": is_validate,
         })
 
-    start_dt = _parse_iso(ts_start or "") or (min(call_times) if call_times else None)
-    end_dt = _parse_iso(ts_end or "") or (max(out_times) if out_times else None)
+    # Diagnostic total span: task_started->task_complete, falling back to the
+    # first call -> last output when the task markers are absent.  Distinct
+    # from `start_dt`/context_dt above — this backs total_span_s/
+    # validation_excluded_s (diagnostics), not kpi_seconds (the canonical KPI).
+    span_start_dt = start_dt or (min(call_times) if call_times else None)
+    span_end_dt = _parse_iso(ts_end or "") or (max(out_times) if out_times else None)
     total_span_s = (
-        round((end_dt - start_dt).total_seconds(), 2) if (start_dt and end_dt) else None
+        round((span_end_dt - span_start_dt).total_seconds(), 2)
+        if (span_start_dt and span_end_dt) else None
     )
     validation_excluded_s = (
         round(total_span_s - sum(validate_runs), 2) if total_span_s is not None else None
     )
 
+    context_dt = _parse_iso(context_injected_ts or "")
+    kpi_seconds = (
+        round((check_passed_dt - context_dt).total_seconds(), 2)
+        if (context_dt is not None and check_passed_dt is not None)
+        else None
+    )
+
     return {
+        "kpi_seconds": kpi_seconds,
+        "context_injected_ts": context_injected_ts,
+        "check_passed_ts": check_passed_ts,
         "edit_attempts": edit_attempts,
         "validate_runs_s": validate_runs,
         "total_span_s": total_span_s,

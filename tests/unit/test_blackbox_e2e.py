@@ -830,6 +830,29 @@ class TestPipelineWiring:
 
 
 # ---------------------------------------------------------------------------
+# 5b. Deploy-module loader: _load_deploy_module (issue #13 regression guard)
+# ---------------------------------------------------------------------------
+#
+# Every pipeline test above injects ``deploy_fn``, so the REAL default deploy
+# path — ``_default_deploy`` -> ``_load_deploy_module``, which resolves
+# ``tools/deploy_rtd_skill.py`` via ``importlib.util`` — is never exercised by
+# them.  When the ``import importlib.util`` line was dropped (the issue #12
+# import reshuffle), every test still passed while ``python tools/blackbox_e2e.py``
+# died at runtime with ``NameError: name 'importlib' is not defined`` on the
+# first real deploy.  This test drives the real loader so the import can never
+# regress unnoticed again.
+
+class TestLoadDeployModule:
+    def test_load_deploy_module_imports_real_deploy(self):
+        """_load_deploy_module must load tools/deploy_rtd_skill.py through
+        importlib.util (no NameError) and expose a callable ``deploy``."""
+        mod = load_module()
+        deploy_mod = mod._load_deploy_module()
+        assert hasattr(deploy_mod, "deploy"), "deploy_rtd_skill must expose deploy()"
+        assert callable(deploy_mod.deploy)
+
+
+# ---------------------------------------------------------------------------
 # 6. New targeted tests for the four cleanup items
 # ---------------------------------------------------------------------------
 
@@ -1309,6 +1332,229 @@ class TestComputeSessionKpi:
         kpi = mod.compute_session_kpi(sp)
         assert kpi["edit_attempts"] == 1
         assert kpi["validate_runs_s"] == [120.0]
+
+
+# ---------------------------------------------------------------------------
+# 7b. Canonical kpi_seconds window: [context_injected -> check_passed]
+# ---------------------------------------------------------------------------
+#
+# The owner-locked KPI window excludes (a) the task_started->first-context-event
+# startup gap and (b) everything after the standalone `check` (the `validate`
+# vendor-gate runtime + the trailing report).  These tests are independent of
+# total_span_s/validate timing on purpose -- the window is anchored only to the
+# context-injection event and the standalone `check`'s function_call_output.
+
+# context injected at task_started+10s; standalone `check` dispatched, its
+# output lands at +70s (kpi_seconds == 60.0); `validate` follows afterwards and
+# must NOT affect kpi_seconds even though it dominates total_span_s.
+_KPI_WINDOW_EVENTS = [
+    {"timestamp": "2026-06-17T09:00:00.000Z", "payload": {"type": "task_started"}},
+    {"timestamp": "2026-06-17T09:00:10.000Z", "payload": {"type": "user_message", "message": "修改MCU的时钟配置"}},
+    {"timestamp": "2026-06-17T09:00:12.000Z", "payload": {"type": "function_call", "call_id": "e0", "arguments": json.dumps({"command": "Get-Content .\\SKILL.md"})}},
+    {"timestamp": "2026-06-17T09:00:13.000Z", "payload": {"type": "function_call_output", "call_id": "e0"}},
+    {"timestamp": "2026-06-17T09:00:20.000Z", "payload": {"type": "function_call", "call_id": "e1", "arguments": json.dumps({"command": "python skill mcu set --core-clk 160 --configure --json"})}},
+    {"timestamp": "2026-06-17T09:00:21.000Z", "payload": {"type": "function_call_output", "call_id": "e1"}},
+    {"timestamp": "2026-06-17T09:01:00.000Z", "payload": {"type": "function_call", "call_id": "e2", "arguments": json.dumps({"command": "python skill check --json"})}},
+    {"timestamp": "2026-06-17T09:01:10.000Z", "payload": {"type": "function_call_output", "call_id": "e2"}},
+    {"timestamp": "2026-06-17T09:01:15.000Z", "payload": {"type": "function_call", "call_id": "e3", "arguments": json.dumps({"command": "python skill validate --json"})}},
+    {"timestamp": "2026-06-17T09:03:35.000Z", "payload": {"type": "function_call_output", "call_id": "e3"}},
+    {"timestamp": "2026-06-17T09:03:40.000Z", "payload": {"type": "task_complete"}},
+]
+
+
+class TestComputeSessionKpiWindow:
+    def test_kpi_seconds_equals_context_to_check_output_window(self, tmp_path):
+        """kpi_seconds == check_output_ts - context_ts == 60.0, regardless of
+        the much larger total_span_s/validate duration that follows `check`."""
+        mod = load_module()
+        sp = _write_session(tmp_path / "s.jsonl", _KPI_WINDOW_EVENTS)
+        kpi = mod.compute_session_kpi(sp)
+
+        assert kpi["kpi_seconds"] == 60.0
+        assert kpi["context_injected_ts"] == "2026-06-17T09:00:10.000Z"
+        assert kpi["check_passed_ts"] == "2026-06-17T09:01:10.000Z"
+        # Sanity: the diagnostic total_span_s is much larger (it includes the
+        # 140 s validate + the trailing report window) -- kpi_seconds must NOT
+        # equal it, proving the two metrics are independent.
+        assert kpi["total_span_s"] is not None
+        assert kpi["total_span_s"] != kpi["kpi_seconds"]
+
+    def test_kpi_seconds_excludes_standalone_check_from_validate_detection(self, tmp_path):
+        """The standalone `check` call must not be miscounted as a validate run,
+        and `validate` must not be miscounted as the standalone check."""
+        mod = load_module()
+        sp = _write_session(tmp_path / "s.jsonl", _KPI_WINDOW_EVENTS)
+        kpi = mod.compute_session_kpi(sp)
+
+        assert kpi["validate_runs_s"] == [140.0]
+        assert kpi["edit_attempts"] == 1
+
+    def test_kpi_seconds_back_to_back_dispatch_ends_at_check_output_not_validate(self, tmp_path):
+        """check and validate function_calls dispatched back-to-back (both
+        issued before either output returns) must still pair by call_id, and
+        kpi_seconds must end at the CHECK output -- not the validate output,
+        even though the validate function_call is issued (and may complete)
+        first in the raw event order."""
+        mod = load_module()
+        events = [
+            {"timestamp": "2026-06-17T10:00:00.000Z", "payload": {"type": "task_started"}},
+            {"timestamp": "2026-06-17T10:00:05.000Z", "payload": {"type": "message", "message": "context"}},
+            # validate dispatched FIRST...
+            {"timestamp": "2026-06-17T10:00:06.000Z", "payload": {"type": "function_call", "call_id": "v0", "arguments": json.dumps({"command": "python skill validate --json"})}},
+            # ...then check dispatched SECOND, before either output arrives.
+            {"timestamp": "2026-06-17T10:00:07.000Z", "payload": {"type": "function_call", "call_id": "k0", "arguments": json.dumps({"command": "python skill check --json"})}},
+            # validate's output completes FIRST (it could even race ahead)...
+            {"timestamp": "2026-06-17T10:00:50.000Z", "payload": {"type": "function_call_output", "call_id": "v0"}},
+            # ...but the check output is what must bound kpi_seconds.
+            {"timestamp": "2026-06-17T10:01:05.000Z", "payload": {"type": "function_call_output", "call_id": "k0"}},
+            {"timestamp": "2026-06-17T10:01:10.000Z", "payload": {"type": "task_complete"}},
+        ]
+        sp = _write_session(tmp_path / "s.jsonl", events)
+        kpi = mod.compute_session_kpi(sp)
+
+        # context 10:00:05 -> check output 10:01:05 = 60.0 s, NOT the validate
+        # output at 10:00:50 (which would give 45.0 s if pairing were wrong).
+        assert kpi["kpi_seconds"] == 60.0
+        assert kpi["check_passed_ts"] == "2026-06-17T10:01:05.000Z"
+
+    def test_kpi_seconds_none_when_no_standalone_check(self, tmp_path):
+        """No standalone `check` call anywhere in the session -> kpi_seconds is
+        None, and the function still returns every other field without raising."""
+        mod = load_module()
+        # Drop the standalone `check` call_id pair ("e2") entirely -- only the
+        # earlier --configure edit and the later validate remain.
+        events = [
+            e for e in _KPI_WINDOW_EVENTS
+            if not (
+                e["payload"].get("type") in ("function_call", "function_call_output")
+                and e["payload"].get("call_id") == "e2"
+            )
+        ]
+        sp = _write_session(tmp_path / "s.jsonl", events)
+        kpi = mod.compute_session_kpi(sp)
+
+        assert kpi["kpi_seconds"] is None
+        assert kpi["check_passed_ts"] is None
+        # other diagnostics must still be populated -- no exception, no silent
+        # half-filled dict.
+        assert kpi["context_injected_ts"] == "2026-06-17T09:00:10.000Z"
+        assert kpi["edit_attempts"] == 1
+        assert kpi["validate_runs_s"] == [140.0]
+        assert kpi["total_span_s"] is not None
+
+    def test_kpi_seconds_none_when_no_context_event(self, tmp_path):
+        """No message/user_message event at/after task_started -> kpi_seconds
+        is None even though a standalone `check` exists."""
+        mod = load_module()
+        events = [e for e in _KPI_WINDOW_EVENTS if e["payload"].get("type") not in ("user_message", "message")]
+        sp = _write_session(tmp_path / "s.jsonl", events)
+        kpi = mod.compute_session_kpi(sp)
+
+        assert kpi["kpi_seconds"] is None
+        assert kpi["context_injected_ts"] is None
+        # check_passed_ts is still derivable (the check call/output pair exists)
+        assert kpi["check_passed_ts"] == "2026-06-17T09:01:10.000Z"
+
+    def test_kpi_seconds_ignores_context_event_before_task_started(self, tmp_path):
+        """A message/user_message timestamped BEFORE task_started (e.g. stray
+        system priming) must not be selected as the context-injection anchor;
+        only the first one at/after task_started counts."""
+        mod = load_module()
+        events = [
+            {"timestamp": "2026-06-17T08:59:00.000Z", "payload": {"type": "message", "message": "pre-task priming, must be ignored"}},
+        ] + _KPI_WINDOW_EVENTS
+        sp = _write_session(tmp_path / "s.jsonl", events)
+        kpi = mod.compute_session_kpi(sp)
+
+        assert kpi["context_injected_ts"] == "2026-06-17T09:00:10.000Z"
+        assert kpi["kpi_seconds"] == 60.0
+
+    def test_existing_fields_unchanged_shape_with_new_kpi_fields_present(self, tmp_path):
+        """The pre-existing diagnostic fields keep their exact shape; the new
+        canonical fields are simply additive keys on the same dict."""
+        mod = load_module()
+        sp = _write_session(tmp_path / "s.jsonl", _KPI_WINDOW_EVENTS)
+        kpi = mod.compute_session_kpi(sp)
+
+        for key in ("edit_attempts", "validate_runs_s", "total_span_s", "validation_excluded_s", "commands"):
+            assert key in kpi
+        for key in ("kpi_seconds", "context_injected_ts", "check_passed_ts"):
+            assert key in kpi
+
+    def test_kpi_window_ignores_check_validate_configure_inside_update_plan(self, tmp_path):
+        """REGRESSION (BASENXP baseline): a codex ``update_plan`` call carries its
+        plan as ``{"plan": [...]}`` (no "command" key), and its step prose
+        routinely contains "check"/"validate"/"--configure". Those plan-tool
+        calls must be excluded from ALL classification: never matched as the
+        standalone ``check`` (which ended the KPI window ~48 s early on the real
+        baseline -> 33 s instead of the true ~81 s), and never inflating
+        ``edit_attempts`` / ``validate_runs_s``."""
+        mod = load_module()
+        events = [
+            {"timestamp": "2026-06-17T11:00:00.000Z", "payload": {"type": "task_started"}},
+            {"timestamp": "2026-06-17T11:00:10.000Z", "payload": {"type": "user_message", "message": "使能OsIf的系统定时器"}},
+            # EARLY update_plan whose prose mentions --configure, check, validate.
+            {"timestamp": "2026-06-17T11:00:12.000Z", "payload": {"type": "function_call", "call_id": "p0", "arguments": json.dumps({"plan": [{"step": "run basenxp set --configure", "status": "in_progress"}, {"step": "then run check and validate", "status": "pending"}]})}},
+            {"timestamp": "2026-06-17T11:00:13.000Z", "payload": {"type": "function_call_output", "call_id": "p0"}},
+            # the one real mutating edit
+            {"timestamp": "2026-06-17T11:00:20.000Z", "payload": {"type": "function_call", "call_id": "e1", "arguments": json.dumps({"command": "python skill basenxp set --enable-system-timer --configure --json"})}},
+            {"timestamp": "2026-06-17T11:00:21.000Z", "payload": {"type": "function_call_output", "call_id": "e1"}},
+            # a second update_plan, again mentioning check
+            {"timestamp": "2026-06-17T11:00:25.000Z", "payload": {"type": "function_call", "call_id": "p1", "arguments": json.dumps({"plan": [{"step": "run check then validate", "status": "in_progress"}]})}},
+            {"timestamp": "2026-06-17T11:00:26.000Z", "payload": {"type": "function_call_output", "call_id": "p1"}},
+            # the REAL standalone check -- this must anchor check_passed
+            {"timestamp": "2026-06-17T11:01:10.000Z", "payload": {"type": "function_call", "call_id": "k0", "arguments": json.dumps({"command": "python skill check --project . --json"})}},
+            {"timestamp": "2026-06-17T11:01:11.000Z", "payload": {"type": "function_call_output", "call_id": "k0"}},
+            # vendor validate afterwards (excluded from the window)
+            {"timestamp": "2026-06-17T11:01:12.000Z", "payload": {"type": "function_call", "call_id": "v0", "arguments": json.dumps({"command": "python skill validate --json"})}},
+            {"timestamp": "2026-06-17T11:03:30.000Z", "payload": {"type": "function_call_output", "call_id": "v0"}},
+            {"timestamp": "2026-06-17T11:03:35.000Z", "payload": {"type": "task_complete"}},
+        ]
+        sp = _write_session(tmp_path / "s.jsonl", events)
+        kpi = mod.compute_session_kpi(sp)
+
+        # window ends at the REAL check output (11:01:11), NOT the early
+        # plan-tool output (11:00:13): 61.0 s, not 3.0 s.
+        assert kpi["check_passed_ts"] == "2026-06-17T11:01:11.000Z"
+        assert kpi["kpi_seconds"] == 61.0
+        # plan-step prose must not inflate edit / validate detection
+        assert kpi["edit_attempts"] == 1
+        assert kpi["validate_runs_s"] == [138.0]
+
+    def test_check_regex_not_fooled_by_hyphenated_flag(self, tmp_path):
+        """A hyphenated flag containing "check" (e.g. ``--skip-git-repo-check``)
+        must not be matched as the standalone ``check`` subcommand."""
+        mod = load_module()
+        events = [
+            {"timestamp": "2026-06-17T12:00:00.000Z", "payload": {"type": "task_started"}},
+            {"timestamp": "2026-06-17T12:00:05.000Z", "payload": {"type": "message", "message": "ctx"}},
+            {"timestamp": "2026-06-17T12:00:06.000Z", "payload": {"type": "function_call", "call_id": "g0", "arguments": json.dumps({"command": "git status --skip-git-repo-check"})}},
+            {"timestamp": "2026-06-17T12:00:07.000Z", "payload": {"type": "function_call_output", "call_id": "g0"}},
+            {"timestamp": "2026-06-17T12:00:10.000Z", "payload": {"type": "task_complete"}},
+        ]
+        sp = _write_session(tmp_path / "s.jsonl", events)
+        kpi = mod.compute_session_kpi(sp)
+
+        assert kpi["check_passed_ts"] is None
+        assert kpi["kpi_seconds"] is None
+
+    def test_check_regex_requires_subcommand_flag_not_bare_word(self, tmp_path):
+        """The bare word "check" in a quoted path/argument (not the skill
+        subcommand, which is always ``check --<flag>``) must not be matched as
+        the standalone check or anchor the KPI window."""
+        mod = load_module()
+        events = [
+            {"timestamp": "2026-06-17T13:00:00.000Z", "payload": {"type": "task_started"}},
+            {"timestamp": "2026-06-17T13:00:05.000Z", "payload": {"type": "message", "message": "ctx"}},
+            {"timestamp": "2026-06-17T13:00:06.000Z", "payload": {"type": "function_call", "call_id": "c0", "arguments": json.dumps({"command": "Get-Content -LiteralPath '.\\my check notes.txt'"})}},
+            {"timestamp": "2026-06-17T13:00:07.000Z", "payload": {"type": "function_call_output", "call_id": "c0"}},
+            {"timestamp": "2026-06-17T13:00:10.000Z", "payload": {"type": "task_complete"}},
+        ]
+        sp = _write_session(tmp_path / "s.jsonl", events)
+        kpi = mod.compute_session_kpi(sp)
+
+        assert kpi["check_passed_ts"] is None
+        assert kpi["kpi_seconds"] is None
 
 
 class TestPipelineKpiWiring:
