@@ -108,7 +108,7 @@ records where those dependencies are found on this machine.
 ## Subagent Roles and Collaboration
 
 The orchestrator dispatches four specialized subagents defined in
-`.claude/agents/`. Every handoff is self-contained and grounds domain facts in
+`agent-discipline/subagents/`. Every handoff is self-contained and grounds domain facts in
 `docs/specs/rtd-config-domain-truth.md` (never invent enum/pin/ID
 values).
 
@@ -201,7 +201,7 @@ agent respects the boundary in both directions:
   content and **no** pointers to Category B, so a developer can work from `docs/`
   alone, with or without an agent.
 - **Category B — agent discipline**: how the agent system operates — this charter
-  (`AGENTS.md`), the role definitions (`.claude/agents/`), and the charter's
+  (`AGENTS.md`), the role definitions (`agent-discipline/subagents/`), and the charter's
   supplements (`agent-discipline/`: the lessons log, the owner's review-comment
   tracker, the documentation-governance rules, and the read-only review archive).
   Category B **may** reference Category A; Category A must never reference B.

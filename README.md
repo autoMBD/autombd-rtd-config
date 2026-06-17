@@ -113,8 +113,7 @@ autombd-rtd/                 # ← the deliverable: an installable Agent Skill b
 tests/                       # deterministic suite — the convergence gate
   fixtures/nxp/<ds|eb>/<family>/<project>/   #   real vendor project fixtures (ds = S32DS, eb = EB tresos)
 docs/                        # specs, tests, roadmaps, references — development documentation only
-agent-discipline/            # agent charter, lessons learned, review records, governance
-.claude/agents/              # Worker / Reviewer / Explorer / Tester subagent roles
+agent-discipline/            # agent charter, lessons learned, review records, governance, subagent roles
 .claude/skills/              # common authoring skills (uniform file header, …)
 pyproject.toml               # pytest configuration + project metadata
 ```
@@ -154,7 +153,7 @@ under `.agent-state/`.
 | Doc | Purpose |
 | --- | --- |
 | [`AGENTS.md`](AGENTS.md) | Agent charter: orchestrator duties, roles, iteration loop |
-| [`.claude/agents/`](.claude/agents/) | Explorer / Worker / Tester / Reviewer role definitions |
+| [`agent-discipline/subagents/`](agent-discipline/subagents/) | Explorer / Worker / Tester / Reviewer role definitions |
 | [Owner review comments](agent-discipline/owner-review-comments.md) | Review-comment resolutions across rounds |
 | [Agent lessons learned](agent-discipline/agent-lessons-learned.md) | Reviewer's running lessons log |
 | [Documentation governance](agent-discipline/documentation-governance.md) | Governance rules + authoritative documentation map |

@@ -23,8 +23,8 @@ categories:
   agent-discipline content and carries no pointers or links to agent-discipline
   documents. Includes specs (architecture, domain truth), test documents
   (strategy, cases, acceptance report), the roadmap, and references.
-- **Category B — Agent discipline** (`AGENTS.md` at repo root, `.claude/agents/`,
-  and `agent-discipline/`): agent charter, role definitions, iteration loop,
+- **Category B — Agent discipline** (`AGENTS.md` at repo root,
+  `agent-discipline/subagents/`, and `agent-discipline/`): agent charter, role definitions, iteration loop,
   KPI policies, review records, lessons learned, and this governance document.
 
 Cross-category pointers are allowed from Category B to Category A (e.g.,
@@ -94,10 +94,10 @@ paths are relative to the repository root.
 | Document | Role | References |
 | --- | --- | --- |
 | `AGENTS.md` | Agent charter: orchestrator duties, four roles, iteration loop, convergence gate, KPI policies, documentation discipline | domain-truth, agent-lessons-learned, test cases |
-| `.claude/agents/explorer.md` | Explorer role definition | AGENTS.md, domain-truth |
-| `.claude/agents/worker.md` | Worker role definition | AGENTS.md, domain-truth |
-| `.claude/agents/tester.md` | Tester role definition | AGENTS.md, test cases |
-| `.claude/agents/reviewer.md` | Reviewer role definition | AGENTS.md, agent-lessons-learned |
+| `agent-discipline/subagents/explorer.md` | Explorer role definition | AGENTS.md, domain-truth |
+| `agent-discipline/subagents/worker.md` | Worker role definition | AGENTS.md, domain-truth |
+| `agent-discipline/subagents/tester.md` | Tester role definition | AGENTS.md, test cases |
+| `agent-discipline/subagents/reviewer.md` | Reviewer role definition | AGENTS.md, agent-lessons-learned |
 | `agent-discipline/skills/external-dependency-memory/SKILL.md` | Skill for reusing local external dependency evidence across agents and conversations | AGENTS.md, source materials |
 | `agent-discipline/owner-review-comments.md` | Review-comment resolutions across rounds | agent-discipline/review-archive/ |
 | `agent-discipline/agent-lessons-learned.md` | Reviewer's running lessons log | — |
@@ -123,7 +123,7 @@ flowchart TD
   TC --> DT
   AR["docs/tests/acceptance-report"] --> TC
   RM["docs/roadmaps/roadmap"]
-  ROLES[".claude/agents/"] --> AGENTS
+  ROLES["agent-discipline/subagents/"] --> AGENTS
   LL["agent-discipline/agent-lessons-learned"] --> AGENTS
   CT["agent-discipline/owner-review-comments"] -.archives.-> OBS["agent-discipline/review-archive/"]
   SKILL["autombd-rtd/SKILL.md + assets/ + CLI"] -. released deliverable .-> TC

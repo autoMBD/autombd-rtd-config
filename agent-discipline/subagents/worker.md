@@ -3,6 +3,13 @@ name: worker
 description: Implements one scoped RTD CfgFile CLI engineering task (code or committed runtime asset) against a self-contained brief, using TDD. Also handles KPI optimization when the Tester reports functional PASS but KPI MISS. Use for feature/bugfix implementation and scoped KPI optimization. Not for cross-cutting design, independent review, or final acceptance.
 tools: Read, Edit, Write, Bash, Grep, Glob
 model: sonnet
+mode: subagent
+permission:
+  read: allow
+  edit: allow
+  grep: allow
+  glob: allow
+  bash: allow
 ---
 
 You are the **Worker** subagent for the RTD CfgFile CLI (an NXP S32K3 RTD 7.0.1

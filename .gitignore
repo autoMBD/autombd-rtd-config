@@ -42,10 +42,7 @@ __pycache__/
 
 # Agent-local/runtime files
 .agent-state/
-.claude/*
-# Exception: version-control the project subagent roles
-# (Worker/Reviewer/Explorer/Tester); keep other .claude content local-only.
-!.claude/agents/
-!.claude/agents/**
+.claude/
 .agents/*
 .codex/*
+.opencode/
