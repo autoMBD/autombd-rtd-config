@@ -33,6 +33,7 @@ language.settings.xml
 
 # Temp files
 *.tmp
+tests/.tmp/
 *.log
 *.stackdump
 __pycache__/

@@ -182,6 +182,12 @@ exposes a systemic issue.
   E2E subagent validation should converge within 5 minutes. A subagent run may
   continue up to 10 minutes to expose useful problem evidence; after 10
   minutes, the main agent intervenes and collects issue information.
+- All test temporary artifacts (black-box workdirs, validation throwaways)
+  stay within the repository workspace — use `tests/.tmp/` as the canonical
+  temp base (e.g. `--temp-base tests/.tmp` for `tools/blackbox_e2e.py`). The
+  harness auto-cleans on success; if `--keep` is used for subagent analysis,
+  the orchestrator must clean up afterward. Never leave test artifacts in
+  system `%TEMP%`. `tests/.tmp/` is in `.gitignore`.
 
 ## Documentation discipline
 
