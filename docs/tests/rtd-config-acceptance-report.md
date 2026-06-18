@@ -2,7 +2,7 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.24.0 |
+| Version | 0.24.1 |
 | Date | 2026-06-19 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Current pass/fail evidence for the E2E acceptance cases defined in `rtd-config-test-cases.md`. This document is the living status record the catalog points to; the catalog defines the target, this records where the tool actually stands. |
@@ -36,15 +36,15 @@ criteria met). KPI is monitored separately.
 
 ## 2. Per-case status
 
-All cases use the fixture `Uart_Example_S32K344`. The **Status** column is the
-functional acceptance signal — legend: **PASS** (vendor gate green under
-isolation), **FAIL** (capability missing), **BLOCKED** (depends on an unbuilt
-asset), **NOT RUN** (catalogued but not yet exercised under the black-box
-protocol). The **KPI** column records each case's measured KPI result against its
-catalog budget (`pass`/`miss`, with the edit-attempt count and the §1
-context→check KPI window time); a case not yet exercised under the black-box
-protocol reads *Not yet measured*, and a KPI `miss` never weakens the functional
-**PASS**.
+Non-ADC cases use the fixture `Uart_Example_S32K344`; ADC cases use
+`Autombd_Test_Adc_S32K344`. The **Status** column is the functional acceptance
+signal — legend: **PASS** (vendor gate green under isolation), **FAIL**
+(capability missing), **BLOCKED** (depends on an unbuilt asset), **NOT RUN**
+(catalogued but not yet exercised under the black-box protocol). The **KPI**
+column records each case's measured KPI result against its catalog budget
+(`pass`/`miss`, with the edit-attempt count and the §1 context→check KPI window
+time); a case not yet exercised under the black-box protocol reads *Not yet
+measured*, and a KPI `miss` never weakens the functional **PASS**.
 
 | ID | Module | Status | KPI |
 | --- | --- | --- | --- |
@@ -116,6 +116,7 @@ history. New ADC evidence is recorded in §2 as each case is exercised.
 
 | Date | Version | Description |
 | --- | --- | --- |
+| 2026-06-19 | 0.24.1 | Clarified that ADC E2E cases use the ADC-ready `Autombd_Test_Adc_S32K344` fixture, while non-ADC cases keep `Uart_Example_S32K344`. |
 | 2026-06-19 | 0.24.0 | Added RTD-MEX-ADC-001 through RTD-MEX-ADC-004 as NOT RUN with the catalogued one-edit, ≤2 min KPI budget, keeping the 10/14 summary aligned with the expanded E2E catalog. |
 | 2026-06-18 | 0.23.0 | Back-filled KPI for Dio (DIO-001/002: PASS 46.1/26.3 s), Mcl (MCL-001: PASS 24.3 s), Uart (UART-001/002: PASS 32.8/28.6 s; UART-003: PASS 55.3 s after --hw auto-detect optimization). Closes #16, #17, #18. |
 | 2026-06-18 | 0.22.0 | Back-filled KPI evidence for RTD-MEX-PORT-001 (1 edit attempt, 54.4 s context→check; PASS). Closes #15. |
