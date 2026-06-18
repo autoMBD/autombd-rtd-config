@@ -759,6 +759,50 @@ class TestCliIntegration:
         assert "mcu" in payload["changed_modules"]
         assert payload["runtime_verification"]["static_check"]["status"] == "passed"
 
+    def test_no_hw_auto_detect_from_existing_channel(self, tmp_path):
+        """When --hw is omitted, the existing UartHwChannel is auto-detected."""
+        project = copy_uart_fixture(tmp_path)
+        doc = MexDocument.load(project / "Uart_Example.mex")
+        result = apply_uart_set(doc, _intent(
+            baud=115200, mode="interrupt",
+        ))
+        assert not result.blocked, [d.to_dict() for d in result.diagnostics]
+        ch = _uart_channel_0(doc)
+        assert _detail_setting(doc, ch, "UartHwChannel") == "LPUART_3"
+
+    def test_no_hw_auto_detect_preserves_hw_channel(self, tmp_path):
+        """Auto-detection preserves the existing UartHwChannel without blanking."""
+        project = copy_uart_fixture(tmp_path)
+        doc = MexDocument.load(project / "Uart_Example.mex")
+        ch_before = _uart_channel_0(doc)
+        assert _detail_setting(doc, ch_before, "UartHwChannel") == "LPUART_3"
+        result = apply_uart_set(doc, _intent(mode="dma"))
+        assert not result.blocked, [d.to_dict() for d in result.diagnostics]
+        ch_after = _uart_channel_0(doc)
+        assert _detail_setting(doc, ch_after, "UartHwChannel") == "LPUART_3"
+
+    def test_cli_no_hw_auto_detect(self, tmp_path):
+        """CLI `uart set` without --hw succeeds on a single-channel fixture."""
+        project = copy_uart_fixture(tmp_path)
+        result = subprocess.run(
+            [
+                sys.executable, "-m", "rtd_config",
+                "uart", "set",
+                "--project", str(project),
+                "--mode", "interrupt",
+                "--baud", "115200",
+                "--configure",
+                "--json",
+            ],
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+        payload = json.loads(result.stdout)
+        assert result.returncode == 0, result.stderr
+        assert payload["status"] == "passed", payload
+
     def test_cli_backward_compat_lpuart_0(self, tmp_path):
         """Existing CLI call (LPUART_0 without new flags) still works."""
         project = copy_uart_fixture(tmp_path)

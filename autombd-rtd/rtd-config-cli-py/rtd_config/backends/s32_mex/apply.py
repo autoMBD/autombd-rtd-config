@@ -242,6 +242,24 @@ def apply_uart_set(doc: MexDocument, intent: Intent) -> ApplyResult:
         ))
         return result
 
+    # Auto-detect hw from the selected channel when not explicitly provided.
+    if not hw:
+        detail = _find_struct(channel, "DetailModuleConfiguration")
+        if detail is not None:
+            hw_s = doc.find_child_setting(detail, "UartHwChannel")
+            if hw_s is not None and hw_s.attrib.get("value"):
+                hw = hw_s.attrib.get("value", "")
+        want_flexio = _is_flexio_request(hw)
+        if not hw:
+            result.diagnostics.append(Diagnostic(
+                severity="blocker",
+                code="uart_hw_required",
+                module="uart",
+                message="--hw is required when the channel has no existing UartHwChannel to auto-detect.",
+                details={},
+            ))
+            return result
+
     if want_flexio:
         container = _find_struct(channel, "FlexioModuleConfiguration")
         method_setting = doc.find_child_setting(container, "FlexioUartInteruptDmaMethod") if container is not None else None

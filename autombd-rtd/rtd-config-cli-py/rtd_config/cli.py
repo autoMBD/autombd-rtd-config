@@ -113,7 +113,7 @@ def build_parser() -> argparse.ArgumentParser:
     uart_actions = uart_parser.add_subparsers(dest="action")
     uart_set = uart_actions.add_parser("set")
     uart_set.add_argument("--project", required=True)
-    uart_set.add_argument("--hw", required=True)
+    uart_set.add_argument("--hw", required=False)
     # RTD 7.0.1 has no polling async-method value; interrupt and DMA are supported.
     uart_set.add_argument("--mode", default="interrupt", choices=["interrupt", "dma"])
     uart_set.add_argument("--baud", type=int, default=115200)
@@ -318,7 +318,7 @@ def normalize_uart_intent(args: argparse.Namespace) -> Intent:
     from rtd_config.backends.s32_mex.apply import _load_uart_asset
 
     payload: dict = {
-        "hw": args.hw,
+        "hw": args.hw or "",
         "mode": args.mode,
         "baud": args.baud,
     }
