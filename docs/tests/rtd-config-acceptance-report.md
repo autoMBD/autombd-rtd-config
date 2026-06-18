@@ -2,8 +2,8 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.23.0 |
-| Date | 2026-06-18 |
+| Version | 0.24.1 |
+| Date | 2026-06-19 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Current pass/fail evidence for the E2E acceptance cases defined in `rtd-config-test-cases.md`. This document is the living status record the catalog points to; the catalog defines the target, this records where the tool actually stands. |
 
@@ -36,13 +36,15 @@ criteria met). KPI is monitored separately.
 
 ## 2. Per-case status
 
-All cases use the fixture `Uart_Example_S32K344`. The **Status** column is the
-functional acceptance signal — legend: **PASS** (vendor gate green under
-isolation), **FAIL** (capability missing), **BLOCKED** (depends on an unbuilt
-asset). The **KPI** column records each case's measured KPI result against its
-catalog budget (`pass`/`miss`, with the edit-attempt count and the §1
-context→check KPI window time); a case not yet exercised under the black-box protocol
-reads *Not yet measured*, and a KPI `miss` never weakens the functional **PASS**.
+Non-ADC cases use the fixture `Uart_Example_S32K344`; ADC cases use
+`Autombd_Test_Adc_S32K344`. The **Status** column is the functional acceptance
+signal — legend: **PASS** (vendor gate green under isolation), **FAIL**
+(capability missing), **BLOCKED** (depends on an unbuilt asset), **NOT RUN**
+(catalogued but not yet exercised under the black-box protocol). The **KPI**
+column records each case's measured KPI result against its catalog budget
+(`pass`/`miss`, with the edit-attempt count and the §1 context→check KPI window
+time); a case not yet exercised under the black-box protocol reads *Not yet
+measured*, and a KPI `miss` never weakens the functional **PASS**.
 
 | ID | Module | Status | KPI |
 | --- | --- | --- | --- |
@@ -56,20 +58,20 @@ reads *Not yet measured*, and a KPI `miss` never weakens the functional **PASS**
 | RTD-MEX-UART-001 | UART | **PASS** | **PASS** — 1 edit attempt, 32.8 s ≤ 1 min budget (black-box, 2026-06-18; context→check window) |
 | RTD-MEX-UART-002 | UART | **PASS** | **PASS** — 1 edit attempt, 28.6 s ≤ 1 min budget (black-box, 2026-06-18; context→check window) |
 | RTD-MEX-UART-003 | UART | **PASS** | **PASS** — 1 edit attempt, 55.3 s ≤ 3 min budget (black-box, 2026-06-18; context→check window; auto-detect HW after --hw optional) |
+| RTD-MEX-ADC-001 | ADC | **NOT RUN** | Not yet measured — catalog budget is 1 edit attempt and ≤ 2 min context→check window. |
+| RTD-MEX-ADC-002 | ADC | **NOT RUN** | Not yet measured — catalog budget is 1 edit attempt and ≤ 2 min context→check window. |
+| RTD-MEX-ADC-003 | ADC | **NOT RUN** | Not yet measured — catalog budget is 1 edit attempt and ≤ 2 min context→check window. |
+| RTD-MEX-ADC-004 | ADC | **NOT RUN** | Not yet measured — catalog budget is 1 edit attempt and ≤ 2 min context→check window. |
 
-**Summary: 10 / 10 cases PASS — the seven-module minimal system is COMPLETE**
-(RTD-MEX-DIO-002 added as black-box round-2 hardening). All seven modules
-(Mcu, BaseNXP, Platform, Port, Dio, Mcl, Uart) reach the full acceptance bar:
-deterministic suite (467 tests green), static checks, the S32DS vendor gate
-(exit 0 + no SEVERE `[TOOL]` + code generated), AND each E2E case's generated
-code verified to reflect the edit (LL-013). Every case also passed independent
-non-test acceptance review with all findings closed. The five cross-cutting blockers
-(element insertion, cross-module orchestration, `pins.json`, DMA, CLI surface)
-are all resolved.
+**Summary: 10 / 14 cases PASS.** The seven-module minimal system remains
+complete: all Mcu, BaseNXP, Platform, Port, Dio, Mcl, and Uart cases reach the
+full acceptance bar (deterministic suite, static checks, the S32DS vendor gate,
+and code-generation evidence). The four ADC cases were added to the catalog on
+2026-06-19 and have not yet been exercised under the black-box protocol.
 
 ## 3. Cross-cutting blockers (critical path)
 
-These unblock multiple cases and should land before/with per-module work:
+These historical blockers unblocked the accepted minimal-system cases:
 
 1. ✅ **Byte-faithful element insertion** — DONE. `document.py
    replace_element_region` splices a new element region (self-closed → populated)
@@ -92,8 +94,8 @@ These unblock multiple cases and should land before/with per-module work:
 
 ## 4. Execution plan
 
-Each module runs the per-module delivery checklist, proven against the
-now-operational gate.
+The completed minimal-system delivery sequence is preserved here as acceptance
+history. New ADC evidence is recorded in §2 as each case is exercised.
 
 | Step | Work | Unblocks |
 | --- | --- | --- |
@@ -114,6 +116,8 @@ now-operational gate.
 
 | Date | Version | Description |
 | --- | --- | --- |
+| 2026-06-19 | 0.24.1 | Clarified that ADC E2E cases use the ADC-ready `Autombd_Test_Adc_S32K344` fixture, while non-ADC cases keep `Uart_Example_S32K344`. |
+| 2026-06-19 | 0.24.0 | Added RTD-MEX-ADC-001 through RTD-MEX-ADC-004 as NOT RUN with the catalogued one-edit, ≤2 min KPI budget, keeping the 10/14 summary aligned with the expanded E2E catalog. |
 | 2026-06-18 | 0.23.0 | Back-filled KPI for Dio (DIO-001/002: PASS 46.1/26.3 s), Mcl (MCL-001: PASS 24.3 s), Uart (UART-001/002: PASS 32.8/28.6 s; UART-003: PASS 55.3 s after --hw auto-detect optimization). Closes #16, #17, #18. |
 | 2026-06-18 | 0.22.0 | Back-filled KPI evidence for RTD-MEX-PORT-001 (1 edit attempt, 54.4 s context→check; PASS). Closes #15. |
 | 2026-06-17 | 0.21.0 | Compressed changelog: retained all versions, condensed descriptions to 1–2 lines. |
