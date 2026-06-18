@@ -22,4 +22,4 @@ pythonpath = ["autombd-rtd/rtd-config-cli-py"]
 # rtd_config` on Windows. sys-level capture leaves the real OS std handles
 # intact for subprocess inheritance while still capturing test output for
 # failure diagnostics (unlike -s, which discards it).
-addopts = "--capture=sys"
+addopts = "--capture=sys --basetemp=tests/.tmp"
