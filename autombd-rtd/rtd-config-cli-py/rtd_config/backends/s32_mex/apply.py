@@ -4138,3 +4138,2027 @@ def _apply_uart_append_flexio_channel_inner(
         doc.replace_element_region(channel_array, array_bytes)
 
     return True
+
+
+# ===========================================================================
+# Adc: Hardware-Unit configuration (groups, channels, watchdog) -- RTD-MEX-ADC
+# ===========================================================================
+
+def _load_adc_asset() -> dict:
+    """Load the committed adc.json asset at runtime. Never reads raw .xdm/.epd."""
+    asset_path = _ASSET_ROOT / "nxp" / "s32k3" / "adc" / "adc.json"
+    return json.loads(asset_path.read_text(encoding="utf-8"))
+
+
+# Sampling-derivation constants pinned to adc.json by
+# test_adc_apply.py::test_adc_json_matches_apply_code_literals (LL-012). The
+# values are embedded for speed but the pin test fails on any drift from the
+# committed asset, so the asset stays the single source of truth.
+_ADC_SAMPLING_CLOCK_HZ = 160_000_000
+_ADC_ALLOWED_PRESCALERS = (1, 2, 4)
+_ADC_SD_MIN = 8
+_ADC_SD_MAX = 255
+
+# CLI/intent token -> .mex enum value (mirrors adc.json cli_enum_map; pinned by
+# the asset-schema test). Embedded so the hot path avoids re-reading the asset.
+_ADC_TRANSFER_ENUM = {"interrupt": "ADC_INTERRUPT", "dma": "ADC_DMA"}
+_ADC_ACCESS_ENUM = {
+    "single": "ADC_ACCESS_MODE_SINGLE",
+    "streaming": "ADC_ACCESS_MODE_STREAMING",
+}
+_ADC_CONV_ENUM = {
+    "oneshot": "ADC_CONV_MODE_ONESHOT",
+    "continuous": "ADC_CONV_MODE_CONTINUOUS",
+}
+_ADC_TRIGGER_ENUM = {"sw": "ADC_TRIGG_SRC_SW", "hw": "ADC_TRIGG_SRC_HW"}
+
+# AdcGroupConversionType domain (Adc.xdm AdcGroupConversionType RANGE, L2937-2938).
+# A CTU/BCTU-sourced HW-triggered group MUST be Injected, not Normal: Adc.xdm's
+# INVALID XPath (L2942-2943) rejects NORMAL when AdcGroupTriggSrc=ADC_TRIGG_SRC_HW
+# and the trigger source's AdcHwTrigSrc does not contain 'EXT_TRIG' (i.e. it is a
+# BCTU_EMIOS_* token). The companion rule (L2952-2953) additionally requires the
+# global AdcUseHardwareNormalGroups flag for the NORMAL case. Emitting INJECTED for
+# the BCTU case clears both SEVERE problems without enabling a normal-group flag.
+_ADC_CONV_TYPE_NORMAL = "ADC_CONV_TYPE_NORMAL"
+_ADC_CONV_TYPE_INJECTED = "ADC_CONV_TYPE_INJECTED"
+
+# BCTU (Body Cross Triggering Unit) single-hardware-trigger constants
+# (RTD-MEX-ADC-003). Mirrors adc.json["bctu"]; pinned to the committed asset by
+# test_adc003_bctu_apply.py::test_adc_json_matches_bctu_code_literals (LL-012).
+# The trigger-source token domain (BCTU_EMIOS_<inst>_<ch>, EXT_TRIG, AUX_EXT_TRIG)
+# lives in the device .epd; the runtime validates a requested token against the
+# asset-described prefixes/range, never inventing one.
+_BCTU_HW_TRIGGER_NAME = "AdcHwTrigger_0"
+_BCTU_HW_TRIGGER_REF = "/Adc/Adc/AdcConfigSet/AdcHwTrigger_0"
+_BCTU_TRIGGER_SOURCE_PREFIXES = ("BCTU_EMIOS_0_", "BCTU_EMIOS_1_", "BCTU_EMIOS_2_")
+_BCTU_TRIGGER_SOURCE_EXTRA = ("EXT_TRIG", "AUX_EXT_TRIG")
+_BCTU_EMIOS_CHANNEL_MAX = 22
+_BCTU_CONV_MODE_ENUM = {"single": "SINGLE", "list": "LIST"}
+_BCTU_DATA_DESTINATION_ENUM = {
+    "data_reg": "BCTU_ADC_DATA_REG",
+    "fifo1": "BCTU_FIFO1",
+    "fifo2": "BCTU_FIFO2",
+}
+_BCTU_DEFAULT_DATA_DESTINATION = "BCTU_ADC_DATA_REG"
+_BCTU_ADC_TARGET_BIT = {"ADC0": 0, "ADC1": 1, "ADC2": 2}
+
+# BCTU LIST-mode + FIFO-DMA constants (RTD-MEX-ADC-004). Mirrors adc.json["bctu"];
+# pinned to the committed asset by
+# test_adc004_bctu_list_apply.py::test_adc_json_matches_bctu_list_code_literals.
+# All values are grounded in Adc.xdm: BctuTriggerConversionMode RANGE {SINGLE,LIST}
+# (L4505-4508); BctuListItems field order (L4762-4818); BctuResultFifos field order
+# (L4841-5043, BctuFifoDmaEnable INVALID L4984-4988 -> mutually exclusive with FIFO
+# interrupts and requires CtuEnableDmaTransferMode).
+_BCTU_CONV_MODE_LIST = "LIST"
+_BCTU_FIFO_INDEX_ENUM = {"fifo1": "BCTU_FIFO1", "fifo2": "BCTU_FIFO2"}
+_BCTU_CTU_DMA_TRANSFER_MODE_SETTING = "CtuEnableDmaTransferMode"
+# DMA logic-channel ref reused for the FIFO DMA buffer transfer (Adc.xdm L5038:
+# BctuFifoDmaChannelId REF -> Mcl/MclConfig/dmaLogicChannel_Type). The same
+# dmaLogicChannel_Type_0 the ADC-002 unit-DMA path activates is reused here.
+_BCTU_FIFO_DMA_CHANNEL_REF = "/Mcl/Mcl/MclConfig/dmaLogicChannel_Type_0"
+
+
+def _bctu_trigger_source_valid(token: str) -> bool:
+    """Return True when ``token`` is a device BCTU trigger-source enum value.
+
+    Grounded in the device .epd enum (BCTU_EMIOS_<inst:0..2>_<ch:0..22>, plus the
+    EXT_TRIG / AUX_EXT_TRIG extras). The runtime validates against this domain so
+    a repointed AdcHwTrigSrc is never an invented token ConfigTools would reject.
+    """
+    text = token.strip()
+    if text in _BCTU_TRIGGER_SOURCE_EXTRA:
+        return True
+    for prefix in _BCTU_TRIGGER_SOURCE_PREFIXES:
+        if text.startswith(prefix):
+            suffix = text[len(prefix):]
+            if suffix.isdigit() and 0 <= int(suffix) <= _BCTU_EMIOS_CHANNEL_MAX:
+                return True
+    return False
+
+
+def _is_bctu_trigger_source(token: str) -> bool:
+    """Return True when ``token`` is a BCTU trigger source (a BCTU_EMIOS_* token).
+
+    This is the BCTU subset of the valid trigger-source domain: the EXT_TRIG /
+    AUX_EXT_TRIG extras are NOT BCTU sources. It mirrors the Adc.xdm XPath
+    predicate ``not(contains(AdcHwTrigSrc, 'EXT_TRIG'))`` used to decide whether a
+    HW-triggered group's conversion type must be Injected (BCTU) or stays Normal
+    (external trigger). Both EXTRA tokens contain 'EXT_TRIG', so this returns
+    False for them and True only for a BCTU_EMIOS_* source.
+    """
+    text = token.strip()
+    if "EXT_TRIG" in text:
+        return False
+    return any(text.startswith(prefix) for prefix in _BCTU_TRIGGER_SOURCE_PREFIXES)
+
+
+def _adc_group_conversion_type(trigger_enum: str, bctu: "dict | None") -> str:
+    """Derive AdcGroupConversionType for a group (Adc.xdm AdcGroupConversionType).
+
+    A HW-triggered group whose HW trigger source is a BCTU source must be
+    Injected (Adc.xdm INVALID rule L2942-2943); every other group (any SW group,
+    or an external-trigger HW group) stays Normal — the byte-faithful default
+    that keeps the S32DS-validated ADC-001/002 SW groups unchanged.
+    """
+    if trigger_enum != "ADC_TRIGG_SRC_HW":
+        return _ADC_CONV_TYPE_NORMAL
+    source_token = str((bctu or {}).get("trigger_source", "")).strip()
+    if source_token and _is_bctu_trigger_source(source_token):
+        return _ADC_CONV_TYPE_INJECTED
+    return _ADC_CONV_TYPE_NORMAL
+
+
+def _derive_adc_sampling_duration(sampling_time_s: float) -> "tuple[int, int]":
+    """Return ``(AdcSamplingDuration, prescaler)`` for a requested sampling time.
+
+    The duration is ``round(sampling_time_s * clock / prescaler)``. The smallest
+    allowed prescaler that lands the duration within [8, 255] is chosen
+    (Adc.xdm: AdcPrescale {1,2,4}; AdcSamplingDuration INVALID range 8..255).
+
+    Raises ``ValueError`` when no prescaler yields an in-range duration so the
+    caller can surface an actionable diagnostic instead of writing an invalid
+    value. The value is always computed here, never read as a per-case literal.
+    """
+    for prescaler in _ADC_ALLOWED_PRESCALERS:
+        duration = round(sampling_time_s * _ADC_SAMPLING_CLOCK_HZ / prescaler)
+        if _ADC_SD_MIN <= duration <= _ADC_SD_MAX:
+            return duration, prescaler
+    raise ValueError(
+        f"No prescaler in {list(_ADC_ALLOWED_PRESCALERS)} yields an "
+        f"AdcSamplingDuration within [{_ADC_SD_MIN},{_ADC_SD_MAX}] for "
+        f"sampling_time={sampling_time_s}s at {_ADC_SAMPLING_CLOCK_HZ} Hz."
+    )
+
+
+def _resolve_adc_channel(name: str, asset: dict) -> "tuple[str, int] | None":
+    """Resolve a user channel token to ``(full_literal, channel_id)``.
+
+    Accepts either the full literal (e.g. ``S10_ChanNum34``) or the short alias
+    (e.g. ``S10``). Returns None when the channel is not in the device enum.
+    """
+    cmap = asset["channel_name_to_id"]
+    aliases = asset["channel_short_name_aliases"]
+    token = name.strip()
+    if token in cmap:
+        return token, cmap[token]
+    if token in aliases:
+        full = aliases[token]
+        return full, cmap[full]
+    upper = token.upper()
+    for short, full in aliases.items():
+        if short.upper() == upper:
+            return full, cmap[full]
+    return None
+
+
+def _adc_find_hw_unit(doc: MexDocument, adc_cfg: ET.Element, unit_id: str) -> ET.Element | None:
+    for el in adc_cfg.iter():
+        if el.tag.endswith("array") and el.attrib.get("name") == "AdcHwUnit":
+            for child in el:
+                if not child.tag.endswith("struct"):
+                    continue
+                s = doc.find_child_setting(child, "AdcHwUnitId")
+                if s is not None and s.attrib.get("value") == unit_id:
+                    return child
+    return None
+
+
+def _adc_hw_unit_array(doc: MexDocument, adc_cfg: ET.Element) -> ET.Element | None:
+    for el in adc_cfg.iter():
+        if el.tag.endswith("array") and el.attrib.get("name") == "AdcHwUnit":
+            return el
+    return None
+
+
+def _adc_hw_config_array(doc: MexDocument, adc_cfg: ET.Element) -> ET.Element | None:
+    for el in adc_cfg.iter():
+        if el.tag.endswith("array") and el.attrib.get("name") == "AdcHwConfiguration":
+            return el
+    return None
+
+
+def _adc_find_hw_config(doc: MexDocument, adc_cfg: ET.Element, configured_id: str) -> ET.Element | None:
+    arr = _adc_hw_config_array(doc, adc_cfg)
+    if arr is None:
+        return None
+    for child in arr:
+        if not child.tag.endswith("struct"):
+            continue
+        s = doc.find_child_setting(child, "AdcHwConfiguredId")
+        if s is not None and s.attrib.get("value") == configured_id:
+            return child
+    return None
+
+
+def _adc_max_logical_unit_id(doc: MexDocument, adc_cfg: ET.Element) -> int:
+    max_id = -1
+    arr = _adc_hw_unit_array(doc, adc_cfg)
+    if arr is None:
+        return max_id
+    for child in arr:
+        if not child.tag.endswith("struct"):
+            continue
+        s = doc.find_child_setting(child, "AdcLogicalUnitId")
+        if s is not None:
+            try:
+                max_id = max(max_id, int(s.attrib.get("value", "0")))
+            except ValueError:
+                pass
+    return max_id
+
+
+def _adc_unit_struct_index(unit: "ET.Element | None") -> int:
+    """Return a Hw Unit struct's integer ``@name`` (its stable position key).
+
+    The struct ``@name`` of an AdcHwUnit is assigned once at creation and is
+    preserved across update-path rebuilds, so it is a deterministic ordering key
+    for "which units come before this one". Returns a large sentinel when absent
+    so an indeterminate unit never counts as "before" another.
+    """
+    if unit is None:
+        return 1 << 30
+    try:
+        return int(unit.attrib.get("name", "-1"))
+    except ValueError:
+        return 1 << 30
+
+
+def _adc_global_max_member_index(
+    doc: MexDocument,
+    adc_cfg: ET.Element,
+    member_array: str,
+    exclude_unit: "ET.Element | None" = None,
+    only_before_unit: "ET.Element | None" = None,
+) -> int:
+    """Return the global max integer ``@name`` of ``member_array`` structs.
+
+    The ADC validator (Adc.xdm L2334/L2846/L3958) requires the struct ``@name``
+    attribute of AdcChannel / AdcGroup / AdcThresholdControl to be UNIQUE ACROSS
+    ALL Hw Units (not 0-based per unit). A new unit therefore continues struct
+    numbering from this global max + 1. Returns -1 when no such struct exists.
+
+    ``exclude_unit`` skips one Hw Unit struct so the update path can compute the
+    base from the OTHER units only (the rebuilt unit's own members are about to
+    be replaced; counting them would make the indices grow on every re-apply).
+
+    ``only_before_unit`` restricts counting to Hw Units whose struct ``@name``
+    index is strictly LESS than the given unit's. This makes a multi-unit rebuild
+    idempotent and globally consistent: each unit derives its base only from the
+    units ordered before it (never from a later-created sibling), so re-applying
+    reproduces the same first-apply indices instead of letting two units leapfrog
+    each other's ranges on every pass.
+    """
+    max_idx = -1
+    unit_arr = _adc_hw_unit_array(doc, adc_cfg)
+    if unit_arr is None:
+        return max_idx
+    before_index = _adc_unit_struct_index(only_before_unit) if only_before_unit is not None else None
+    for unit in unit_arr:
+        if not unit.tag.endswith("struct"):
+            continue
+        if exclude_unit is not None and unit is exclude_unit:
+            continue
+        if before_index is not None and _adc_unit_struct_index(unit) >= before_index:
+            continue
+        for child in unit:
+            if not (child.tag.endswith("array") and child.attrib.get("name") == member_array):
+                continue
+            for member in child:
+                if not member.tag.endswith("struct"):
+                    continue
+                try:
+                    max_idx = max(max_idx, int(member.attrib.get("name", "-1")))
+                except ValueError:
+                    pass
+    return max_idx
+
+
+def _adc_global_max_group_id(
+    doc: MexDocument,
+    adc_cfg: ET.Element,
+    exclude_unit: "ET.Element | None" = None,
+    only_before_unit: "ET.Element | None" = None,
+) -> int:
+    """Return the global max AdcGroupId across all Hw Units (Adc.xdm L2996).
+
+    ``exclude_unit`` skips one Hw Unit struct so the update path derives the base
+    from the OTHER units only; ``only_before_unit`` restricts the scan to units
+    ordered before the rebuilt one (see ``_adc_global_max_member_index`` for why
+    this keeps a multi-unit rebuild idempotent).
+    """
+    max_id = -1
+    unit_arr = _adc_hw_unit_array(doc, adc_cfg)
+    if unit_arr is None:
+        return max_id
+    before_index = _adc_unit_struct_index(only_before_unit) if only_before_unit is not None else None
+    for unit in unit_arr:
+        if not unit.tag.endswith("struct"):
+            continue
+        if exclude_unit is not None and unit is exclude_unit:
+            continue
+        if before_index is not None and _adc_unit_struct_index(unit) >= before_index:
+            continue
+        for child in unit:
+            if not (child.tag.endswith("array") and child.attrib.get("name") == "AdcGroup"):
+                continue
+            for group in child:
+                if not group.tag.endswith("struct"):
+                    continue
+                s = doc.find_child_setting(group, "AdcGroupId")
+                if s is not None:
+                    try:
+                        max_id = max(max_id, int(s.attrib.get("value", "-1")))
+                    except ValueError:
+                        pass
+    return max_id
+
+
+def _build_adc_channel_struct_bytes(
+    struct_index: int,
+    logical_id: int,
+    channel_name: str,
+    channel_id: int,
+    watchdog: "dict | None",
+    unit_name: str,
+    indent: int,
+    line_ending: bytes,
+    threshold_control_name: str = "AdcThresholdControl_0",
+) -> bytes:
+    """Build one AdcChannel struct (byte-faithful to fixture AdcChannel_0).
+
+    ``struct_index`` is the struct ``@name`` / ``Name`` suffix; it is globally
+    unique across Hw Units (Adc.xdm L2334). ``logical_id`` is the per-unit
+    AdcLogicalChannelId (0-based within the unit, Adc.xdm L2356 range). When
+    ``watchdog`` is provided the channel enables thresholds, references the unit's
+    ``threshold_control_name`` AdcThresholdControl, and registers the watchdog
+    notification.
+    """
+    le = line_ending.decode("latin-1")
+    sp = " " * indent
+    spc = " " * (indent + 3)
+    lines = [
+        f'{sp}<struct name="{struct_index}">',
+        f'{spc}<setting name="Name" value="AdcChannel_{struct_index}"/>',
+        f'{spc}<setting name="AdcLogicalChannelId" value="{logical_id}"/>',
+        f'{spc}<setting name="AdcChannelName" value="{channel_name}"/>',
+        f'{spc}<setting name="AdcChannelId" value="{channel_id}"/>',
+        f'{spc}<array name="AdcChannelConvTime"/>',
+        f'{spc}<array name="AdcChannelLimitCheck"/>',
+        f'{spc}<array name="AdcChannelHighLimit"/>',
+        f'{spc}<array name="AdcChannelLowLimit"/>',
+        f'{spc}<array name="AdcChannelRangeSelect"/>',
+        f'{spc}<array name="AdcChannelRefVoltsrcHigh"/>',
+        f'{spc}<array name="AdcChannelRefVoltsrcLow"/>',
+        f'{spc}<array name="AdcChannelResolution"/>',
+        f'{spc}<array name="AdcChannelSampTime"/>',
+        f'{spc}<setting name="AdcEnablePresampling" value="false"/>',
+    ]
+    if watchdog is not None:
+        ref_path = f"/Adc/Adc/AdcConfigSet/{unit_name}/{threshold_control_name}"
+        lines += [
+            f'{spc}<setting name="AdcEnableThresholds" value="true"/>',
+            f'{spc}<array name="AdcThresholdRegister">',
+            f'{spc}   <setting name="0" value="{ref_path}"/>',
+            f'{spc}</array>',
+            f'{spc}<setting name="AdcWdogNotification" value="{watchdog["notification"]}"/>',
+        ]
+    else:
+        lines += [
+            f'{spc}<setting name="AdcEnableThresholds" value="false"/>',
+            f'{spc}<array name="AdcThresholdRegister"/>',
+            f'{spc}<setting name="AdcWdogNotification" value="NULL_PTR"/>',
+        ]
+    lines.append(f'{sp}</struct>')
+    return le.join(lines).encode("utf-8")
+
+
+def _build_adc_group_struct_bytes(
+    struct_index: int,
+    group_id: int,
+    group: dict,
+    sampling_duration: int,
+    channel_refs: "list[str]",
+    indent: int,
+    line_ending: bytes,
+) -> bytes:
+    """Build one AdcGroup struct (byte-faithful to fixture AdcGroup_0)."""
+    le = line_ending.decode("latin-1")
+    sp = " " * indent
+    spc = " " * (indent + 3)
+    # The struct Name/@name is vendor bookkeeping that MUST be globally unique
+    # across Hw Units (Adc.xdm L2846); a user-supplied group name is ignored to
+    # guarantee uniqueness. The user's intent is captured by group position +
+    # settings, not the AUTOSAR container short-name.
+    name = f"AdcGroup_{struct_index}"
+    access = group["access_enum"]
+    conv = group["conv_enum"]
+    trigg = group["trigger_enum"]
+    # AdcGroupConversionType is a DISTINCT setting from AdcGroupConversionMode
+    # (Normal/Injected vs oneshot/continuous). It defaults to Normal — byte-faithful
+    # to the fixture and the S32DS-validated SW groups — and is Injected only for a
+    # BCTU/CTU-sourced HW-triggered group (resolved by the caller, grounded in
+    # _adc_group_conversion_type / Adc.xdm AdcGroupConversionType).
+    conv_type = group.get("conv_type_enum", _ADC_CONV_TYPE_NORMAL)
+    num_samples = group["num_samples"]
+    notification = group.get("notification")
+    alt_default = 22
+
+    lines = [
+        f'{sp}<struct name="{struct_index}">',
+        f'{spc}<setting name="Name" value="{name}"/>',
+        f'{spc}<setting name="AdcGroupAccessMode" value="{access}"/>',
+        f'{spc}<setting name="AdcGroupConversionMode" value="{conv}"/>',
+        f'{spc}<setting name="AdcGroupConversionType" value="{conv_type}"/>',
+        f'{spc}<setting name="AdcGroupId" value="{group_id}"/>',
+        f'{spc}<array name="AdcGroupPriority"/>',
+        f'{spc}<array name="AdcGroupReplacement"/>',
+        f'{spc}<setting name="AdcGroupTriggSrc" value="{trigg}"/>',
+        f'{spc}<setting name="AdcGroupHwTriggerSource" value="/Adc/Adc/AdcConfigSet/AdcHwTrigger_0"/>',
+        f'{spc}<array name="AdcHwTrigSignal"/>',
+        f'{spc}<array name="AdcHwTrigTimer"/>',
+    ]
+    if notification:
+        lines += [
+            f'{spc}<array name="AdcNotification">',
+            f'{spc}   <setting name="0" value="{notification}"/>',
+            f'{spc}</array>',
+        ]
+    else:
+        lines.append(f'{spc}<array name="AdcNotification"/>')
+    lines += [
+        f'{spc}<setting name="AdcExtraNotification" value="NULL_PTR"/>',
+        f'{spc}<setting name="AdcDmaErrorNotification" value="NULL_PTR"/>',
+        f'{spc}<setting name="AdcStreamingBufferMode" value="ADC_STREAM_BUFFER_LINEAR"/>',
+        f'{spc}<setting name="AdcEnableOptimizeDmaStreamingGroups" value="false"/>',
+        f'{spc}<setting name="AdcEnableHalfInterrupt" value="false"/>',
+        f'{spc}<setting name="AdcStreamingNumSamples" value="{num_samples}"/>',
+        f'{spc}<setting name="AdcStreamResultGroup" value="false"/>',
+        f'{spc}<setting name="AdcEnableChDisableChGroup" value="false"/>',
+        f'{spc}<setting name="AdcWithoutInterrupts" value="false"/>',
+        f'{spc}<setting name="AdcWithoutDma" value="false"/>',
+        f'{spc}<setting name="AdcExtDMAChanEnable" value="false"/>',
+        f'{spc}<struct name="AdcGroupConversionConfiguration">',
+        f'{spc}   <setting name="Name" value="AdcGroupConversionConfiguration"/>',
+        f'{spc}   <setting name="AdcGroupHardwareAverageEnable" value="false"/>',
+        f'{spc}   <setting name="AdcGroupHardwareAverageSelect" value="SAMPLES_4"/>',
+        f'{spc}   <setting name="AdcSamplingDuration0" value="{sampling_duration}"/>',
+        f'{spc}   <setting name="AdcSamplingDuration1" value="{sampling_duration}"/>',
+        f'{spc}   <setting name="AdcSamplingDuration2" value="{sampling_duration}"/>',
+        f'{spc}</struct>',
+        f'{spc}<struct name="AdcAlternateGroupConvTimings">',
+        f'{spc}   <setting name="Name" value="AdcAlternateGroupConvTimings"/>',
+        f'{spc}   <setting name="AdcGroupAltHardwareAverageEnable" value="false"/>',
+        f'{spc}   <setting name="AdcGroupAltHardwareAverageSelect" value="SAMPLES_4"/>',
+        f'{spc}   <setting name="AdcAltGroupSamplingDuration0" value="{alt_default}"/>',
+        f'{spc}   <setting name="AdcAltGroupSamplingDuration1" value="{alt_default}"/>',
+        f'{spc}   <setting name="AdcAltGroupSamplingDuration2" value="{alt_default}"/>',
+        f'{spc}</struct>',
+        f'{spc}<array name="AdcGroupDefinition">',
+    ]
+    for ref_index, ref in enumerate(channel_refs):
+        lines.append(f'{spc}   <setting name="{ref_index}" value="{ref}"/>')
+    lines += [
+        f'{spc}</array>',
+        f'{spc}<array name="AdcGroupEcucPartitionRef"/>',
+        f'{sp}</struct>',
+    ]
+    return le.join(lines).encode("utf-8")
+
+
+def _build_adc_threshold_control_struct_bytes(
+    struct_index: int,
+    watchdog: dict,
+    indent: int,
+    line_ending: bytes,
+) -> bytes:
+    """Build one AdcThresholdControl struct (Adc.xdm AdcThresholdControl map)."""
+    le = line_ending.decode("latin-1")
+    sp = " " * indent
+    spc = " " * (indent + 3)
+    register = watchdog.get("register", "ADC_THRESHOLD_REG_0")
+    lines = [
+        f'{sp}<struct name="{struct_index}">',
+        f'{spc}<setting name="Name" value="AdcThresholdControl_{struct_index}"/>',
+        f'{spc}<setting name="AdcThresholdControlRegister" value="{register}"/>',
+        f'{spc}<setting name="AdcHighThreshold" value="{watchdog["high"]}"/>',
+        f'{spc}<setting name="AdcLowThreshold" value="{watchdog["low"]}"/>',
+        f'{sp}</struct>',
+    ]
+    return le.join(lines).encode("utf-8")
+
+
+def _build_adc_hw_unit_struct_bytes(
+    struct_index: int,
+    logical_unit_id: int,
+    unit_id: str,
+    unit_name: str,
+    transfer_enum: str,
+    channel_blocks: "list[bytes]",
+    group_blocks: "list[bytes]",
+    threshold_blocks: "list[bytes]",
+    indent: int,
+    line_ending: bytes,
+    prescale: int = 1,
+    dma_channel_refs: "list[str] | None" = None,
+    counting_dma_refs: "list[str] | None" = None,
+) -> bytes:
+    """Build a full AdcHwUnit struct, byte-faithful to the fixture AdcHwUnit_0.
+
+    ``prescale`` is the derived AdcPrescale (1/2/4). At the default 1 the array
+    is left empty (byte-faithful to the fixture); a non-default prescaler is
+    written as a one-entry post-build-variant array so the requested sampling
+    time is actually realized (Adc.xdm AdcPrescale, POSTBUILDVARIANTMULTIPLICITY).
+    ``dma_channel_refs`` / ``counting_dma_refs`` populate AdcDmaChannelId /
+    AdcCountingDmaChannelId with Mcl dmaLogicChannel_Type refs for DMA transfer.
+    """
+    le = line_ending.decode("latin-1")
+    sp = " " * indent
+    spc = " " * (indent + 3)
+    spcc = " " * (indent + 6)
+
+    def _array(name: str, blocks: "list[bytes]") -> "list[str]":
+        if not blocks:
+            return [f'{spc}<array name="{name}"/>']
+        out = [f'{spc}<array name="{name}">']
+        for b in blocks:
+            out.append(b.decode("utf-8"))
+        out.append(f'{spc}</array>')
+        return out
+
+    def _value_array(name: str, values: "list[str]") -> str:
+        """One <array> line (possibly multi-line) for a populated/empty value array."""
+        if not values:
+            return f'{spc}<array name="{name}"/>'
+        inner = le.join(
+            f'{spc}   <setting name="{i}" value="{v}"/>' for i, v in enumerate(values)
+        )
+        return f'{spc}<array name="{name}">{le}{inner}{le}{spc}</array>'
+
+    dma_refs = list(dma_channel_refs or [])
+    counting_refs = list(counting_dma_refs or [])
+    prescale_values = [] if prescale == 1 else [str(prescale)]
+
+    lines = [
+        f'{sp}<struct name="{struct_index}">',
+        f'{spc}<setting name="Name" value="{unit_name}"/>',
+        f'{spc}<setting name="AdcHwUnitId" value="{unit_id}"/>',
+        f'{spc}<setting name="AdcLogicalUnitId" value="{logical_unit_id}"/>',
+        f'{spc}<setting name="AdcTransferType" value="{transfer_enum}"/>',
+        _value_array("AdcDmaChannelId", dma_refs),
+        _value_array("AdcCountingDmaChannelId", counting_refs),
+        f'{spc}<array name="AdcClockSource"/>',
+        _value_array("AdcPrescale", prescale_values),
+        f'{spc}<setting name="AdcAltPrescale" value="2"/>',
+        f'{spc}<setting name="AdcCalibrationPrescale" value="2"/>',
+        f'{spc}<setting name="AdcHighSpeedEnable" value="false"/>',
+        f'{spc}<setting name="AdcAltHighSpeedEnable" value="false"/>',
+        f'{spc}<setting name="AdcPowerDownDelay" value="0"/>',
+        f'{spc}<setting name="AdcAltPowerDownDelay" value="0"/>',
+        f'{spc}<setting name="AdcMuxDelay" value="0"/>',
+        f'{spc}<setting name="AdcAutoClockOff" value="false"/>',
+        f'{spc}<setting name="AdcBypassSampling" value="false"/>',
+        f'{spc}<setting name="AdcHwUnitOverwriteEn" value="false"/>',
+        f'{spc}<setting name="AdcPresamplingInternalSignal0" value="VREFL"/>',
+        f'{spc}<setting name="AdcPresamplingInternalSignal1" value="VREFL"/>',
+        f'{spc}<setting name="AdcPresamplingInternalSignal2" value="VREFL"/>',
+        f'{spc}<setting name="AdcHwUnitUsrOffset" value="0"/>',
+        f'{spc}<setting name="AdcHwUnitUsrGain" value="0"/>',
+        f'{spc}<setting name="AdcHwUnitResolution" value="RESOLUTION_14"/>',
+        f'{spc}<setting name="AdcHwUnitBypassResolution" value="false"/>',
+        f'{spc}<setting name="AdcHwUnitDmaClearSource" value="DMA_REQ_CLEAR_ON_ACK"/>',
+        f'{spc}<setting name="AdcSarHwUnitVref" value="53"/>',
+        f'{spc}<struct name="SdAdcHwUnitSpecificConfiguration">',
+        f'{spcc}<setting name="Name" value="SdAdcHwUnitSpecificConfiguration_0"/>',
+        f'{spcc}<setting name="SdadcDecimaRate" value="DECIMATION_RATE_120"/>',
+        f'{spcc}<setting name="SdadcOutputSetDelay" value="0"/>',
+        f'{spcc}<setting name="SdadcFifoThreshold" value="0"/>',
+        f'{spcc}<setting name="SdadcCalibSkipped" value="16"/>',
+        f'{spcc}<setting name="SdadcCalibAverage" value="16"/>',
+        f'{spcc}<array name="SdAdcDspssSpecificConfiguration"/>',
+        f'{spc}</struct>',
+        f'{spc}<array name="AdcSelfTestThresholdConfiguration"/>',
+        f'{spc}<array name="AdcNormalConvTimings"/>',
+        f'{spc}<array name="AdcAlternateConvTimings"/>',
+    ]
+    lines += _array("AdcChannel", channel_blocks)
+    lines += _array("AdcGroup", group_blocks)
+    lines += _array("AdcThresholdControl", threshold_blocks)
+    lines += [
+        f'{spc}<array name="AdcHwUnitEcucPartitionRef"/>',
+        f'{sp}</struct>',
+    ]
+    return le.join(lines).encode("utf-8")
+
+
+def _build_adc_hw_config_struct_bytes(
+    struct_index: int,
+    configured_id: str,
+    normal_interrupt: bool,
+    wdg_threshold: bool,
+    dma_transfer: bool,
+    indent: int,
+    line_ending: bytes,
+) -> bytes:
+    """Build one AdcHwConfiguration struct (byte-faithful to fixture entry)."""
+    le = line_ending.decode("latin-1")
+    sp = " " * indent
+    spc = " " * (indent + 3)
+    ni = "true" if normal_interrupt else "false"
+    wt = "true" if wdg_threshold else "false"
+    dt = "true" if dma_transfer else "false"
+    lines = [
+        f'{sp}<struct name="{struct_index}">',
+        f'{spc}<setting name="Name" value="AdcHwConfiguration_{struct_index}"/>',
+        f'{spc}<setting name="AdcHwConfiguredId" value="{configured_id}"/>',
+        f'{spc}<setting name="AdcNormalInterruptEnable" value="{ni}"/>',
+        f'{spc}<setting name="AdcInjectedInterruptEnable" value="true"/>',
+        f'{spc}<setting name="AdcFifoFullInterruptEnable" value="false"/>',
+        f'{spc}<setting name="CtuFifoOfInterruptEnable" value="true"/>',
+        f'{spc}<setting name="WdgThresholdEnable" value="{wt}"/>',
+        f'{spc}<setting name="DmaTransferEnable" value="{dt}"/>',
+        f'{sp}</struct>',
+    ]
+    return le.join(lines).encode("utf-8")
+
+
+def _build_bctu_internal_trigger_struct_bytes(
+    trigger_source_ref: str,
+    data_destination: str,
+    conversion_mode: str,
+    target_mask: int,
+    channel_single_ref: "str | None",
+    list_start_index: int,
+    indent: int,
+    line_ending: bytes,
+) -> bytes:
+    """Build one BctuInternalTrigger struct (Adc.xdm field order L4399..).
+
+    SINGLE mode carries ``BctuAdcChannelSingle`` (an AdcChannel ASPath ref);
+    LIST mode omits it (the field is single-mode only, Adc.xdm L4596 EDITABLE
+    XPath) and instead the conversion targets come from the BctuListItems array.
+    The field order is byte-faithful to the descriptor; the single-channel ref is
+    inserted only when supplied so the LIST serialization matches the vendor shape.
+    """
+    le = line_ending.decode("latin-1")
+    sp2 = " " * indent           # inner <struct name="0"> open/close
+    sp3 = " " * (indent + 3)     # inner struct children
+    lines = [
+        f'{sp2}<struct name="0">',
+        f'{sp3}<setting name="Name" value="BctuInternalTrigger_0"/>',
+        f'{sp3}<setting name="BctuTriggerSource" value="{trigger_source_ref}"/>',
+        f'{sp3}<setting name="BctuTriggerLoop" value="false"/>',
+        f'{sp3}<setting name="BctuDataDestination" value="{data_destination}"/>',
+        f'{sp3}<setting name="BctuHwTriggerEnable" value="true"/>',
+        f'{sp3}<setting name="BctuTriggerConversionMode" value="{conversion_mode}"/>',
+        f'{sp3}<setting name="BctuAdcTargetMask" value="{target_mask}"/>',
+    ]
+    if channel_single_ref is not None:
+        lines.append(
+            f'{sp3}<setting name="BctuAdcChannelSingle" value="{channel_single_ref}"/>'
+        )
+    lines += [
+        f'{sp3}<setting name="BctuConversionListStartIndex" value="{list_start_index}"/>',
+        f'{sp2}</struct>',
+    ]
+    return le.join(lines).encode("utf-8")
+
+
+def _build_bctu_list_item_struct_bytes(
+    struct_index: int,
+    channel_literal: str,
+    wait_on_trig: bool,
+    last_channel: bool,
+    indent: int,
+    line_ending: bytes,
+) -> bytes:
+    """Build one BctuListItems struct (Adc.xdm field order L4762-4818).
+
+    Fields: Name, BctuAdcChannelList (the full AdcChannelName literal),
+    BctuNextChannelWaitOnTrig, BctuLastChannel. The command list is generated in
+    array order (Adc.xdm L4748-4749 "Command List is generated in the order given
+    by this array list"), so the item @name/index is the position in the list.
+    """
+    le = line_ending.decode("latin-1")
+    sp = " " * indent
+    spc = " " * (indent + 3)
+    wt = "true" if wait_on_trig else "false"
+    lc = "true" if last_channel else "false"
+    lines = [
+        f'{sp}<struct name="{struct_index}">',
+        f'{spc}<setting name="Name" value="BctuListItems_{struct_index}"/>',
+        f'{spc}<setting name="BctuAdcChannelList" value="{channel_literal}"/>',
+        f'{spc}<setting name="BctuNextChannelWaitOnTrig" value="{wt}"/>',
+        f'{spc}<setting name="BctuLastChannel" value="{lc}"/>',
+        f'{sp}</struct>',
+    ]
+    return le.join(lines).encode("utf-8")
+
+
+def _build_bctu_result_fifo_struct_bytes(
+    struct_index: int,
+    fifo_index: str,
+    watermark: int,
+    notification: str,
+    dma_enable: bool,
+    dma_buffer: str,
+    dma_channel_ref: "str | None",
+    indent: int,
+    line_ending: bytes,
+) -> bytes:
+    """Build one BctuResultFifos struct (Adc.xdm field order L4841-5043).
+
+    For the FIFO-DMA path (RTD-MEX-ADC-004): BctuFifoNotificationsEnable=false
+    (mutually exclusive with DMA, Adc.xdm L4984-4985), BctuWatermarkNotification
+    is the shared watermark callback (used by both interrupt and DMA, L4910),
+    underrun/overrun stay NULL_PTR, BctuFifoDmaEnable=true, BctuFifoDmaBuffer is
+    the linker-symbol buffer (default concat('BctuDmaFifo',N), L5012), and
+    BctuFifoDmaChannelId is a populated REF array pointing at an Mcl
+    dmaLogicChannel_Type (required when DMA enabled, L5038-5041).
+    """
+    le = line_ending.decode("latin-1")
+    sp = " " * indent
+    spc = " " * (indent + 3)
+    de = "true" if dma_enable else "false"
+    lines = [
+        f'{sp}<struct name="{struct_index}">',
+        f'{spc}<setting name="Name" value="BctuResultFifos_{struct_index}"/>',
+        f'{spc}<setting name="BctuResultFifoIndex" value="{fifo_index}"/>',
+        f'{spc}<setting name="BctuWatermarkValue" value="{watermark}"/>',
+        f'{spc}<setting name="BctuFifoNotificationsEnable" value="false"/>',
+        f'{spc}<setting name="BctuWatermarkNotification" value="{notification}"/>',
+        f'{spc}<setting name="BctuUnderrunNotification" value="NULL_PTR"/>',
+        f'{spc}<setting name="BctuOverrunNotification" value="NULL_PTR"/>',
+        f'{spc}<setting name="BctuFifoDmaEnable" value="{de}"/>',
+        f'{spc}<setting name="BctuFifoDmaBuffer" value="{dma_buffer}"/>',
+    ]
+    if dma_channel_ref:
+        lines += [
+            f'{spc}<array name="BctuFifoDmaChannelId">',
+            f'{spc}   <setting name="0" value="{dma_channel_ref}"/>',
+            f'{spc}</array>',
+        ]
+    else:
+        lines.append(f'{spc}<array name="BctuFifoDmaChannelId"/>')
+    lines.append(f'{sp}</struct>')
+    return le.join(lines).encode("utf-8")
+
+
+def _build_adc_bctu_hw_unit_struct_bytes(
+    struct_index: int,
+    trigger_source_ref: str,
+    data_destination: str,
+    conversion_mode: str,
+    target_mask: int,
+    channel_single_ref: "str | None",
+    adc_notification_blocks: "list[bytes]",
+    indent: int,
+    line_ending: bytes,
+    list_start_index: int = 0,
+    list_item_blocks: "list[bytes] | None" = None,
+    result_fifo_blocks: "list[bytes] | None" = None,
+) -> bytes:
+    """Build one BctuHwUnit struct (byte-faithful to Adc.xdm BctuHwUnit shape).
+
+    Field order is exactly the Adc.xdm descriptor order (BctuHwUnit L4207..,
+    BctuInternalTrigger L4399.., BctuAdcNotifications L4657.., BctuListItems
+    L4738.., BctuResultFifos L4822..).
+
+    SINGLE mode (RTD-MEX-ADC-003): one BctuInternalTrigger with a single-channel
+    ref, one BctuAdcNotifications, empty BctuListItems / BctuResultFifos.
+
+    LIST mode (RTD-MEX-ADC-004): one BctuInternalTrigger with NO single-channel
+    ref (multi-ADC target mask, LIST conversion mode), one BctuAdcNotifications
+    per target ADC, a populated BctuListItems array (the conversion list), and a
+    populated BctuResultFifos array (the FIFO destination + DMA).
+
+    ``trigger_source_ref`` / ``channel_single_ref`` / the AdcIndex refs in
+    ``adc_notification_blocks`` are instance ASPath refs (same serialization as
+    the fixture's AdcGroupHwTriggerSource), NOT raw tokens; the caller resolves
+    them so the cold agent never types an ASPath. ``target_mask`` is the per-ADC
+    bitmask (ADC1 -> 1<<1=2; ADC1|ADC2 -> 6).
+    """
+    le = line_ending.decode("latin-1")
+    sp = " " * indent                 # <struct> open/close
+    sp1 = " " * (indent + 3)          # direct children of the unit struct
+    sp2 = " " * (indent + 6)          # inner <struct name="0"> open/close
+
+    list_items = list(list_item_blocks or [])
+    result_fifos = list(result_fifo_blocks or [])
+
+    internal_trigger = _build_bctu_internal_trigger_struct_bytes(
+        trigger_source_ref=trigger_source_ref,
+        data_destination=data_destination,
+        conversion_mode=conversion_mode,
+        target_mask=target_mask,
+        channel_single_ref=channel_single_ref,
+        list_start_index=list_start_index,
+        indent=indent + 6,
+        line_ending=line_ending,
+    )
+
+    def _block_array(name: str, blocks: "list[bytes]") -> "list[str]":
+        if not blocks:
+            return [f'{sp1}<array name="{name}"/>']
+        out = [f'{sp1}<array name="{name}">']
+        for b in blocks:
+            out.append(b.decode("utf-8"))
+        out.append(f'{sp1}</array>')
+        return out
+
+    lines = [
+        f'{sp}<struct name="{struct_index}">',
+        f'{sp1}<setting name="Name" value="BctuHwUnit_{struct_index}"/>',
+        f'{sp1}<setting name="BctuHwUnitId" value="0"/>',
+        f'{sp1}<setting name="BctuLogicalUnitId" value="0"/>',
+        f'{sp1}<setting name="BctuLowPowerMode" value="false"/>',
+        f'{sp1}<setting name="BctuGlobalHwTriggers" value="true"/>',
+        f'{sp1}<setting name="BctuNewDataDMAEnableMask" value="0"/>',
+        f'{sp1}<setting name="BctuFifoDmaRawData" value="false"/>',
+        f'{sp1}<setting name="BctuTriggerNotification" value="NULL_PTR"/>',
+        f'{sp1}<array name="BctuInternalTrigger">',
+        internal_trigger.decode("utf-8"),
+        f'{sp1}</array>',
+    ]
+    lines += _block_array("BctuAdcNotifications", list(adc_notification_blocks))
+    lines += _block_array("BctuListItems", list_items)
+    lines += _block_array("BctuResultFifos", result_fifos)
+    lines.append(f'{sp}</struct>')
+    return le.join(lines).encode("utf-8")
+
+
+def _build_bctu_adc_notification_struct_bytes(
+    struct_index: int,
+    adc_index_ref: str,
+    new_data_notification: str,
+    indent: int,
+    line_ending: bytes,
+) -> bytes:
+    """Build one BctuAdcNotifications struct (Adc.xdm field order L4657..).
+
+    One per target ADC instance. ``adc_index_ref`` is the AdcHwUnit ASPath ref.
+    """
+    le = line_ending.decode("latin-1")
+    sp = " " * indent
+    spc = " " * (indent + 3)
+    lines = [
+        f'{sp}<struct name="{struct_index}">',
+        f'{spc}<setting name="Name" value="BctuAdcNotifications_{struct_index}"/>',
+        f'{spc}<setting name="BctuAdcNotificationsAdcIndex" value="{adc_index_ref}"/>',
+        f'{spc}<setting name="BctuAdcNewDataNotification" value="{new_data_notification}"/>',
+        f'{spc}<setting name="BctuDataOverrunNotification" value="NULL_PTR"/>',
+        f'{spc}<setting name="BctuListLastConversionNotification" value="NULL_PTR"/>',
+        f'{sp}</struct>',
+    ]
+    return le.join(lines).encode("utf-8")
+
+
+def _adc_bctu_find_array(doc: MexDocument, adc_cfg: ET.Element, name: str) -> "ET.Element | None":
+    """Find the AdcConfigSet-level array (AdcHwTrigger / BctuHwUnit) by name.
+
+    These arrays are direct children of the AdcConfigSet struct (siblings of the
+    AdcHwUnit array), not nested inside an AdcHwUnit.
+    """
+    for cfgset in adc_cfg.iter():
+        if not (cfgset.tag.endswith("struct") and cfgset.attrib.get("name") == "AdcConfigSet"):
+            continue
+        for child in cfgset:
+            if child.tag.endswith("array") and child.attrib.get("name") == name:
+                return child
+    return None
+
+
+def _adc_resolve_bctu_channel_struct_name(
+    doc: MexDocument, adc_cfg: ET.Element, unit_id: str, channel_literal: str
+) -> "tuple[str, str] | None":
+    """Return ``(unit_name, channel_struct_name)`` for ``channel_literal`` on ``unit_id``.
+
+    Reads the freshly spliced unit so BctuAdcChannelSingle references the ADC1
+    AdcChannel struct that actually exists (its real ``Name`` / @name), not a
+    guessed index. Returns None when the unit or channel is absent.
+    """
+    unit = _adc_find_hw_unit(doc, adc_cfg, unit_id)
+    if unit is None:
+        return None
+    name_el = doc.find_child_setting(unit, "Name")
+    unit_name = name_el.attrib.get("value") if name_el is not None else None
+    if not unit_name:
+        return None
+    for child in unit:
+        if not (child.tag.endswith("array") and child.attrib.get("name") == "AdcChannel"):
+            continue
+        for ch in child:
+            if not ch.tag.endswith("struct"):
+                continue
+            cn = doc.find_child_setting(ch, "AdcChannelName")
+            if cn is not None and cn.attrib.get("value") == channel_literal:
+                sn = doc.find_child_setting(ch, "Name")
+                struct_name = sn.attrib.get("value") if sn is not None else None
+                if struct_name:
+                    return unit_name, struct_name
+    return None
+
+
+def _bctu_target_mask(targets: "list[str]", default_unit: str) -> int:
+    """Return the per-ADC bitmask for the requested target ADC instances.
+
+    Each target contributes ``1 << bit`` where bit is the ADC index (ADC0->0,
+    ADC1->1, ADC2->2; Adc.xdm L4513 "1 shifted left n corresponds to n-th ADC").
+    Unknown targets contribute 0. Falls back to ``default_unit`` when no targets
+    are given.
+    """
+    units = [t for t in targets if t] or [default_unit]
+    mask = 0
+    for t in units:
+        bit = _BCTU_ADC_TARGET_BIT.get(t)
+        if bit is not None:
+            mask |= (1 << bit)
+    return mask
+
+
+def _apply_adc_bctu(
+    doc: MexDocument,
+    bctu: dict,
+    unit_id: str,
+    asset: dict,
+    result: ApplyResult,
+) -> bool:
+    """Wire the BCTU hardware-trigger subtree (RTD-MEX-ADC-003 single / -004 list).
+
+    Runs AFTER the AdcHwUnit splice(s) so the target units' channels exist to
+    reference. Two raw-bytes operations (each reloads the tree, so the targeted
+    element is re-found between them):
+
+    1. Repoint the existing ``AdcHwTrigger_0`` AdcHwTrigSrc to the requested BCTU
+       trigger-source token (validated against the device enum first).
+    2. Replace the empty ``<array name="BctuHwUnit"/>`` with one populated
+       BctuHwUnit struct.
+
+    SINGLE mode (ADC-003): BctuInternalTrigger references the unit's real channel
+    struct (BctuAdcChannelSingle); one BctuAdcNotifications; empty list/FIFO arrays.
+
+    LIST mode (ADC-004): BctuInternalTrigger uses LIST conversion mode, a multi-ADC
+    target mask, FIFO destination, no single-channel ref; one BctuAdcNotifications
+    per target ADC; a populated BctuListItems array (the 8-channel conversion list
+    with the trigger-order wait flags + final last-channel flag); and a populated
+    BctuResultFifos array (FIFO destination + DMA buffer + DMA channel ref).
+
+    The AdcHwTriggerApi / AdcEnableCtuControlModeApi / CtuEnableDmaTransferMode
+    gating flips happen in the shared tail. Returns True when the BCTU subtree was
+    wired, False when a blocker diagnostic was appended.
+    """
+    # --- Validate the trigger source against the device BCTU enum. ---
+    source_token = str(bctu.get("trigger_source", "")).strip()
+    if not _bctu_trigger_source_valid(source_token):
+        result.diagnostics.append(Diagnostic(
+            severity="blocker",
+            code="adc_bctu_trigger_source_not_in_device",
+            module="adc",
+            message=(
+                f"BCTU trigger source '{source_token}' is not a device BCTU "
+                f"trigger-source token. Use BCTU_EMIOS_<0..2>_<0..{_BCTU_EMIOS_CHANNEL_MAX}> "
+                f"(e.g. BCTU_EMIOS_2_15), EXT_TRIG, or AUX_EXT_TRIG."
+            ),
+            details={"trigger_source": source_token},
+        ))
+        return False
+
+    mode_token = str(bctu.get("mode", "single")).strip().lower()
+    is_list = mode_token == "list"
+    conv_mode = _BCTU_CONV_MODE_ENUM.get(mode_token, "SINGLE")
+    dest_token = str(bctu.get("destination", "data_reg")).strip().lower()
+    data_destination = _BCTU_DATA_DESTINATION_ENUM.get(
+        dest_token, _BCTU_DEFAULT_DATA_DESTINATION
+    )
+    line_ending = _detect_line_ending(doc._raw)
+    adc_cfg = doc.find_config_set("Adc")
+
+    # --- Resolve target ADC units (single: 'target'; list: 'targets'). ---
+    if is_list:
+        targets = [str(t).strip() for t in (bctu.get("targets") or []) if str(t).strip()]
+        if not targets:
+            targets = [unit_id]
+    else:
+        targets = [str(bctu.get("target", unit_id)).strip() or unit_id]
+    target_mask = _bctu_target_mask(targets, unit_id)
+
+    channel_single_ref = None
+    list_item_blocks: list[bytes] = []
+    if not is_list:
+        # --- SINGLE: resolve the single-conversion channel ref on the unit. ---
+        channel_token = str(bctu.get("channel", "")).strip()
+        resolved = _resolve_adc_channel(channel_token, asset) if channel_token else None
+        if resolved is None:
+            result.diagnostics.append(Diagnostic(
+                severity="blocker",
+                code="adc_bctu_channel_not_in_device",
+                module="adc",
+                message=(
+                    f"BCTU single-conversion channel '{channel_token}' is not in the "
+                    f"device channel enum. Use a valid AdcChannelName (e.g. S10)."
+                ),
+                details={"channel": channel_token},
+            ))
+            return False
+        channel_literal, _cid = resolved
+        ref_info = _adc_resolve_bctu_channel_struct_name(
+            doc, adc_cfg, unit_id, channel_literal
+        )
+        if ref_info is None:
+            result.diagnostics.append(Diagnostic(
+                severity="blocker",
+                code="adc_bctu_channel_not_on_unit",
+                module="adc",
+                message=(
+                    f"BCTU single-conversion channel '{channel_literal}' is not present "
+                    f"on unit {unit_id}; add it to one of the unit's groups so the BCTU "
+                    f"trigger can reference it."
+                ),
+                details={"unit": unit_id, "channel": channel_literal},
+            ))
+            return False
+        single_unit_name, channel_struct_name = ref_info
+        channel_single_ref = (
+            f"/Adc/Adc/AdcConfigSet/{single_unit_name}/{channel_struct_name}"
+        )
+    else:
+        # --- LIST: resolve the ordered conversion-list channel literals. ---
+        list_tokens = [str(c).strip() for c in (bctu.get("list") or []) if str(c).strip()]
+        if not list_tokens:
+            result.diagnostics.append(Diagnostic(
+                severity="blocker",
+                code="adc_bctu_list_empty",
+                module="adc",
+                message="BCTU LIST mode requires a non-empty 'list' of channels.",
+                details={},
+            ))
+            return False
+        list_literals: list[str] = []
+        for tok in list_tokens:
+            resolved = _resolve_adc_channel(tok, asset)
+            if resolved is None:
+                result.diagnostics.append(Diagnostic(
+                    severity="blocker",
+                    code="adc_bctu_list_channel_not_in_device",
+                    module="adc",
+                    message=(
+                        f"BCTU list channel '{tok}' is not in the device channel "
+                        f"enum. Use valid AdcChannelName tokens (e.g. VREFH, S20, P1)."
+                    ),
+                    details={"channel": tok},
+                ))
+                return False
+            list_literals.append(resolved[0])
+
+        # Resolve the trigger-order -> the per-item wait-on-trig flags. The order
+        # is a partition of the list into sub-lists; the list halts (waits for the
+        # trigger to be re-applied) after the last item of each sub-list except the
+        # final one (Adc.xdm L4783). BctuLastChannel is true only on the final item
+        # (L4803).
+        order = [int(n) for n in (bctu.get("trigger_order") or [len(list_literals)])]
+        if sum(order) != len(list_literals):
+            result.diagnostics.append(Diagnostic(
+                severity="blocker",
+                code="adc_bctu_trigger_order_mismatch",
+                module="adc",
+                message=(
+                    f"BCTU trigger_order {order} must sum to the list length "
+                    f"{len(list_literals)} (each sub-list size is a number of "
+                    f"channels converted on one trigger)."
+                ),
+                details={"trigger_order": order, "list_length": len(list_literals)},
+            ))
+            return False
+        wait_indices = set()
+        cursor = 0
+        for sub in order[:-1]:  # every sub-list except the last halts after its end
+            cursor += sub
+            wait_indices.add(cursor - 1)
+
+        item_indent = _detect_struct_indent(doc, adc_cfg) if adc_cfg is not None else 30
+        # The list item structs nest two levels under the BctuHwUnit struct; the
+        # exact indent is recomputed below from the BctuHwUnit array. Build with a
+        # placeholder indent that the array splice will not depend on (the array
+        # builder re-indents via the block string). We compute the real indent
+        # right before the array splice.
+        for li, literal in enumerate(list_literals):
+            list_item_blocks.append(_build_bctu_list_item_struct_bytes(
+                struct_index=li,
+                channel_literal=literal,
+                wait_on_trig=(li in wait_indices),
+                last_channel=(li == len(list_literals) - 1),
+                indent=0,  # re-rendered with proper indent at splice time
+                line_ending=line_ending,
+            ))
+        # Stash the resolved values for the indent-aware rebuild below.
+        bctu = dict(bctu)
+        bctu["_list_literals"] = list_literals
+        bctu["_wait_indices"] = sorted(wait_indices)
+
+    new_data_notification = (
+        str(bctu.get("new_data_notification", "NULL_PTR")).strip() or "NULL_PTR"
+    )
+
+    # --- 1. Repoint AdcHwTrigger_0's AdcHwTrigSrc (attribute edit; no splice). ---
+    _adc_bctu_set_hw_trigger_source(doc, adc_cfg, source_token)
+
+    # --- 2. Replace the empty BctuHwUnit array with a populated one (raw bytes). ---
+    adc_cfg = doc.find_config_set("Adc")
+    bctu_array = _adc_bctu_find_array(doc, adc_cfg, "BctuHwUnit")
+    if bctu_array is None:
+        result.diagnostics.append(Diagnostic(
+            severity="blocker",
+            code="adc_bctu_array_not_found",
+            module="adc",
+            message="No BctuHwUnit <array> found in the AdcConfigSet.",
+            details={},
+        ))
+        return False
+
+    existing_bctu = [c for c in bctu_array if c.tag.endswith("struct")]
+    array_indent = _detect_struct_indent(doc, bctu_array) - 3
+    struct_indent = _detect_struct_indent(doc, bctu_array)
+    if existing_bctu:
+        struct_indent = _detect_struct_indent(doc, existing_bctu[0])
+        array_indent = struct_indent - 3
+
+    # AdcNotifications: one per target ADC instance, AdcIndex ref -> the unit.
+    notif_indent = struct_indent + 6
+    adc_notification_blocks: list[bytes] = []
+    for ni, t in enumerate(targets):
+        t_unit = _adc_find_hw_unit(doc, adc_cfg, t)
+        t_name_el = doc.find_child_setting(t_unit, "Name") if t_unit is not None else None
+        t_unit_name = t_name_el.attrib.get("value") if t_name_el is not None else None
+        if not t_unit_name:
+            result.diagnostics.append(Diagnostic(
+                severity="blocker",
+                code="adc_bctu_target_unit_missing",
+                module="adc",
+                message=(
+                    f"BCTU target ADC unit '{t}' is not present in the configuration; "
+                    f"add the unit before wiring the BCTU trigger."
+                ),
+                details={"target": t},
+            ))
+            return False
+        adc_notification_blocks.append(_build_bctu_adc_notification_struct_bytes(
+            struct_index=ni,
+            adc_index_ref=f"/Adc/Adc/AdcConfigSet/{t_unit_name}",
+            new_data_notification=new_data_notification,
+            indent=notif_indent,
+            line_ending=line_ending,
+        ))
+
+    # Rebuild the list-item + result-fifo blocks with the proper nested indent now
+    # that struct_indent is known.
+    item_indent = struct_indent + 6
+    result_fifo_blocks: list[bytes] = []
+    if is_list:
+        list_literals = bctu["_list_literals"]
+        wait_indices = set(bctu["_wait_indices"])
+        list_item_blocks = [
+            _build_bctu_list_item_struct_bytes(
+                struct_index=li,
+                channel_literal=literal,
+                wait_on_trig=(li in wait_indices),
+                last_channel=(li == len(list_literals) - 1),
+                indent=item_indent,
+                line_ending=line_ending,
+            )
+            for li, literal in enumerate(list_literals)
+        ]
+        # FIFO destination + DMA result fifo (only when destination is a FIFO).
+        if data_destination in ("BCTU_FIFO1", "BCTU_FIFO2"):
+            fifo_dma = bool(bctu.get("fifo_dma", False))
+            fifo_notification = (
+                str(bctu.get("fifo_notification", "NULL_PTR")).strip() or "NULL_PTR"
+            )
+            # Watermark: DMA/interrupt request raised when active entries EXCEED the
+            # watermark (Adc.xdm L4864). For an N-sample batch (N = list length),
+            # watermark N-1 raises the request as the Nth sample lands; clamped to
+            # the [0,15] descriptor range (L4882-4885).
+            watermark = max(0, min(15, len(list_item_blocks) - 1))
+            fifo_suffix = data_destination[len("BCTU_FIFO"):]
+            dma_buffer = f"BctuDmaFifo{fifo_suffix}"
+            dma_channel_ref = _BCTU_FIFO_DMA_CHANNEL_REF if fifo_dma else None
+            result_fifo_blocks.append(_build_bctu_result_fifo_struct_bytes(
+                struct_index=0,
+                fifo_index=data_destination,
+                watermark=watermark,
+                notification=fifo_notification,
+                dma_enable=fifo_dma,
+                dma_buffer=dma_buffer,
+                dma_channel_ref=dma_channel_ref,
+                indent=item_indent,
+                line_ending=line_ending,
+            ))
+
+    new_struct_bytes = _build_adc_bctu_hw_unit_struct_bytes(
+        struct_index=0,
+        trigger_source_ref=_BCTU_HW_TRIGGER_REF,
+        data_destination=data_destination,
+        conversion_mode=conv_mode,
+        target_mask=target_mask,
+        channel_single_ref=channel_single_ref,
+        adc_notification_blocks=adc_notification_blocks,
+        indent=struct_indent,
+        line_ending=line_ending,
+        list_start_index=0,
+        list_item_blocks=list_item_blocks,
+        result_fifo_blocks=result_fifo_blocks,
+    )
+    le = line_ending.decode("latin-1")
+    sp_array = " " * array_indent
+    array_bytes = (
+        f'<array name="BctuHwUnit">{le}'
+        f'{new_struct_bytes.decode("utf-8")}{le}'
+        f'{sp_array}</array>'
+    ).encode("utf-8")
+    doc.replace_element_region(bctu_array, array_bytes)
+
+    # Re-confirm the AdcHwTrigger repoint survived the splice reload.
+    adc_cfg = doc.find_config_set("Adc")
+    _adc_bctu_set_hw_trigger_source(doc, adc_cfg, source_token)
+    return True
+
+
+def _adc_bctu_set_hw_trigger_source(
+    doc: MexDocument, adc_cfg: "ET.Element | None", source_token: str
+) -> None:
+    """Set AdcHwTrigger_0's AdcHwTrigSrc to ``source_token`` (attribute edit)."""
+    if adc_cfg is None:
+        return
+    trig_array = _adc_bctu_find_array(doc, adc_cfg, "AdcHwTrigger")
+    if trig_array is None:
+        return
+    for struct in trig_array:
+        if not struct.tag.endswith("struct"):
+            continue
+        name_el = doc.find_child_setting(struct, "Name")
+        if name_el is not None and name_el.attrib.get("value") == _BCTU_HW_TRIGGER_NAME:
+            src_el = doc.find_child_setting(struct, "AdcHwTrigSrc")
+            if src_el is not None:
+                src_el.set("value", source_token)
+            return
+
+
+def _adc_set_setting(
+    doc: MexDocument, container: ET.Element, name: str, value: str, result: ApplyResult,
+) -> None:
+    """Set a descendant <setting> value (attribute edit) and track it as modified."""
+    el = doc.find_child_setting(container, name)
+    if el is not None and el.attrib.get("value") != value:
+        el.set("value", value)
+        result.modified_elements.append(el)
+
+
+def _apply_adc_shared_tail(
+    doc: MexDocument, is_dma: bool, has_watchdog: bool, result: ApplyResult,
+    has_bctu: bool = False, has_fifo_dma: bool = False,
+) -> None:
+    """Cross-cutting attribute flips shared by the add and update paths.
+
+    Runs AFTER the last byte splice (attribute mutations made before a splice are
+    discarded when replace_element_region reloads the tree): the DMA global enable
+    + Mcl DMA activation for a DMA unit, the watchdog API enable when a watchdog is
+    requested, the HW-trigger / CTU-control-mode API enables when a BCTU hardware
+    trigger is wired, the CTU-DMA-transfer-mode enable + Mcl DMA activation when a
+    BCTU FIFO DMA is wired, and quick_selection removal on every edited config_set
+    (ConfigTools reverts a modified element that still carries quick_selection).
+
+    Both a unit-DMA (``is_dma``) and a BCTU FIFO-DMA (``has_fifo_dma``) consume the
+    Mcl DMA logic channel, so either one wires Mcl and records "mcl" in
+    changed_modules -- the plan and the .mex both include the Mcl co-edit, so the
+    reported changed_modules must reflect it (Tester-flagged on ADC-002).
+    """
+    if has_bctu:
+        adc_cfg = doc.find_config_set("Adc")
+        if adc_cfg is not None:
+            # AdcGeneral/AdcHwTriggerApi gates any HW-trigger group; AutosarExt/
+            # AdcEnableCtuControlModeApi gates the BctuHwUnit subtree (Adc.xdm
+            # L4182/L4186/L4203). Both are required for a BCTU hardware trigger.
+            _adc_set_setting(doc, adc_cfg, "AdcHwTriggerApi", "true", result)
+            _adc_set_setting(doc, adc_cfg, "AdcEnableCtuControlModeApi", "true", result)
+    if has_fifo_dma:
+        # AutosarExt/CtuEnableDmaTransferMode is required before any BctuFifoDmaEn
+        # can be enabled (Adc.xdm L4986-4987); it is editable only when CTU control
+        # mode API is on (set just above).
+        adc_cfg = doc.find_config_set("Adc")
+        if adc_cfg is not None:
+            _adc_set_setting(
+                doc, adc_cfg, _BCTU_CTU_DMA_TRANSFER_MODE_SETTING, "true", result
+            )
+    if is_dma or has_fifo_dma:
+        adc_cfg = doc.find_config_set("Adc")
+        if adc_cfg is not None and is_dma:
+            # The global unit-DMA support switch is for AdcTransferType=ADC_DMA
+            # units; a BCTU FIFO DMA does not use it (it uses CtuEnableDmaTransferMode).
+            _adc_set_setting(doc, adc_cfg, "AdcEnableDmaTransferMode", "true", result)
+        _activate_mcl_dma(doc)
+        # Either DMA path wires Mcl: report it in changed_modules.
+        if "mcl" not in result.changed_modules:
+            result.changed_modules.append("mcl")
+        mcl_cfg = doc.find_config_set("Mcl")
+        if mcl_cfg is not None and "quick_selection" in mcl_cfg.attrib:
+            doc.mark_modified(mcl_cfg)
+            result.modified_elements.append(mcl_cfg)
+    if has_watchdog:
+        adc_cfg = doc.find_config_set("Adc")
+        if adc_cfg is not None:
+            _adc_set_setting(doc, adc_cfg, "AdcEnableWatchdogApi", "true", result)
+    adc_cfg = doc.find_config_set("Adc")
+    if adc_cfg is not None and "quick_selection" in adc_cfg.attrib:
+        doc.mark_modified(adc_cfg)
+        result.modified_elements.append(adc_cfg)
+
+
+def _apply_adc_update_existing_unit(
+    doc: MexDocument,
+    existing_unit: ET.Element,
+    unit_id: str,
+    transfer_enum: str,
+    groups: list,
+    ordered_channels: "list[str]",
+    channel_id_by_literal: "dict[str, int]",
+    watchdog_by_channel: "dict[str, dict]",
+    sampling_duration: int,
+    prescale: int,
+    dma_channel_refs: "list[str]",
+    asset: dict,
+    result: ApplyResult,
+    bctu: "dict | None" = None,
+) -> None:
+    """Rebuild an EXISTING AdcHwUnit in place (RTD-MEX-ADC-002/003 update path).
+
+    The target unit already exists, so it is rebuilt with one
+    replace_element_region splice, preserving its struct identity
+    (@name / Name / AdcLogicalUnitId).
+
+    Channel/group/threshold-control struct ``@name`` / ``Name`` and ``AdcGroupId``
+    must be UNIQUE ACROSS ALL Hw Units (Adc.xdm L2334/L2846/L2996/L3958), exactly
+    as the add path enforces. The base indices are therefore continued from the
+    global max over the OTHER units (this rebuilt unit excluded, so re-apply is
+    byte-stable). For the first/sole unit (ADC0) the other-unit max is -1, so the
+    bases collapse to 0 and the output is identical to before (AdcChannel_0.., the
+    S32DS-validated ADC-002 shape). ``AdcLogicalChannelId`` stays per-unit 0-based.
+
+    The unit's existing AdcHwConfiguration entry is then updated by attribute
+    edits; the DMA global/Mcl flips and quick_selection removal run in the shared
+    tail.
+    """
+    line_ending = _detect_line_ending(doc._raw)
+    unit_struct_index = existing_unit.attrib.get("name", "0")
+    name_el = doc.find_child_setting(existing_unit, "Name")
+    unit_name = (
+        name_el.attrib.get("value")
+        if name_el is not None and name_el.attrib.get("value")
+        else f"AdcHwUnit_{unit_struct_index}"
+    )
+    lu_el = doc.find_child_setting(existing_unit, "AdcLogicalUnitId")
+    lu_val = lu_el.attrib.get("value") if lu_el is not None else None
+    logical_unit_id = int(lu_val) if lu_val and lu_val.lstrip("-").isdigit() else 0
+    unit_indent = _detect_struct_indent(doc, existing_unit)
+    child_struct_indent = unit_indent + 6
+
+    # Global-unique struct @name/Name + AdcGroupId bases, continued from the max
+    # across the units ORDERED BEFORE this one (by struct @name index). This
+    # mirrors the add path's `_adc_global_max_*(...) + 1` while staying idempotent
+    # for a MULTI-unit rebuild: deriving each unit's base only from earlier units
+    # (never from a later-created sibling) reproduces the first-apply indices, so
+    # two units cannot leapfrog each other's ranges on re-apply. For the first/sole
+    # unit there are no earlier units, so the bases collapse to 0 (the
+    # S32DS-validated ADC-002 shape). AdcLogicalChannelId remains per-unit 0-based.
+    adc_cfg_now = doc.find_config_set("Adc")
+    channel_name_base = _adc_global_max_member_index(
+        doc, adc_cfg_now, "AdcChannel", only_before_unit=existing_unit
+    ) + 1
+    group_name_base = _adc_global_max_member_index(
+        doc, adc_cfg_now, "AdcGroup", only_before_unit=existing_unit
+    ) + 1
+    threshold_name_base = _adc_global_max_member_index(
+        doc, adc_cfg_now, "AdcThresholdControl", only_before_unit=existing_unit
+    ) + 1
+    group_id_base = _adc_global_max_group_id(
+        doc, adc_cfg_now, only_before_unit=existing_unit
+    ) + 1
+
+    # channel literal -> its global AdcChannel struct Name index (for group defs).
+    channel_global_index = {
+        full: channel_name_base + local
+        for local, full in enumerate(ordered_channels)
+    }
+    # watchdog channel literal -> its global AdcThresholdControl Name index.
+    watchdog_control_index = {
+        full: threshold_name_base + ti
+        for ti, full in enumerate(watchdog_by_channel.keys())
+    }
+
+    channel_blocks: list[bytes] = []
+    for local_idx, full in enumerate(ordered_channels):
+        wd = watchdog_by_channel.get(full)
+        tc_name = (
+            f"AdcThresholdControl_{watchdog_control_index[full]}"
+            if wd is not None else "AdcThresholdControl_0"
+        )
+        channel_blocks.append(_build_adc_channel_struct_bytes(
+            struct_index=channel_name_base + local_idx,  # global unique @name/Name
+            logical_id=local_idx,                          # per-unit 0-based
+            channel_name=full,
+            channel_id=channel_id_by_literal[full],
+            watchdog=wd,
+            unit_name=unit_name,
+            indent=child_struct_indent,
+            line_ending=line_ending,
+            threshold_control_name=tc_name,
+        ))
+
+    group_blocks: list[bytes] = []
+    for gi, group in enumerate(groups):
+        access_enum = _ADC_ACCESS_ENUM.get(group.get("access", "single"), group.get("access"))
+        conv_enum = _ADC_CONV_ENUM.get(group.get("conv", "oneshot"), group.get("conv"))
+        trigger_enum = _ADC_TRIGGER_ENUM.get(group.get("trigger", "sw"), group.get("trigger"))
+        if (
+            access_enum == "ADC_ACCESS_MODE_STREAMING"
+            and trigger_enum == "ADC_TRIGG_SRC_SW"
+            and conv_enum == "ADC_CONV_MODE_ONESHOT"
+        ):
+            conv_enum = "ADC_CONV_MODE_CONTINUOUS"
+        group_resolved = dict(group)
+        group_resolved["access_enum"] = access_enum
+        group_resolved["conv_enum"] = conv_enum
+        group_resolved["trigger_enum"] = trigger_enum
+        group_resolved["conv_type_enum"] = _adc_group_conversion_type(trigger_enum, bctu)
+        group_resolved["num_samples"] = group.get("num_samples", 1)
+        channel_refs = [
+            f"/Adc/Adc/AdcConfigSet/{unit_name}/AdcChannel_{channel_global_index[_resolve_adc_channel(ch, asset)[0]]}"
+            for ch in group.get("channels", [])
+        ]
+        group_blocks.append(_build_adc_group_struct_bytes(
+            struct_index=group_name_base + gi,  # global unique @name/Name
+            group_id=group_id_base + gi,         # global unique AdcGroupId
+            group=group_resolved,
+            sampling_duration=sampling_duration,
+            channel_refs=channel_refs,
+            indent=child_struct_indent,
+            line_ending=line_ending,
+        ))
+
+    threshold_blocks: list[bytes] = []
+    for ti, (full, wd) in enumerate(watchdog_by_channel.items()):
+        threshold_blocks.append(_build_adc_threshold_control_struct_bytes(
+            struct_index=threshold_name_base + ti,  # global unique @name/Name
+            watchdog=wd,
+            indent=child_struct_indent,
+            line_ending=line_ending,
+        ))
+
+    unit_bytes = _build_adc_hw_unit_struct_bytes(
+        struct_index=unit_struct_index,
+        logical_unit_id=logical_unit_id,
+        unit_id=unit_id,
+        unit_name=unit_name,
+        transfer_enum=transfer_enum,
+        channel_blocks=channel_blocks,
+        group_blocks=group_blocks,
+        threshold_blocks=threshold_blocks,
+        indent=unit_indent,
+        line_ending=line_ending,
+        prescale=prescale,
+        dma_channel_refs=dma_channel_refs,
+        counting_dma_refs=[],
+    )
+    # replace_element_region preserves the whitespace BEFORE the original <struct>,
+    # so strip the leading indent the builder emits.
+    doc.replace_element_region(existing_unit, unit_bytes[unit_indent:])
+    result.changed_modules.append("adc")
+
+    # Update the unit's existing AdcHwConfiguration entry (the splice reloaded the
+    # tree, so re-find from the fresh config set). A DMA unit disables the
+    # End-of-Conversion / Injected interrupts and enables DMA transfer.
+    adc_cfg = doc.find_config_set("Adc")
+    hw = _adc_find_hw_config(doc, adc_cfg, unit_id) if adc_cfg is not None else None
+    if hw is not None:
+        is_dma = transfer_enum == "ADC_DMA"
+        _adc_set_setting(doc, hw, "DmaTransferEnable", "true" if is_dma else "false", result)
+        _adc_set_setting(doc, hw, "AdcNormalInterruptEnable", "false" if is_dma else "true", result)
+        _adc_set_setting(doc, hw, "AdcInjectedInterruptEnable", "false" if is_dma else "true", result)
+        if watchdog_by_channel:
+            _adc_set_setting(doc, hw, "WdgThresholdEnable", "true", result)
+
+
+def _adc_unique_list_channels(bctu: "dict | None") -> "list[str]":
+    """Return the unique BCTU list channels in first-seen order.
+
+    The conversion list may repeat a channel (e.g. S20, S20); the AdcChannel
+    structs that back the list (one per physical channel) must be unique, so the
+    repeats collapse. Returns [] when there is no list BCTU.
+    """
+    if not bctu or str(bctu.get("mode", "single")).strip().lower() != "list":
+        return []
+    seen: list[str] = []
+    for tok in bctu.get("list") or []:
+        t = str(tok).strip()
+        if t and t not in seen:
+            seen.append(t)
+    return seen
+
+
+def _apply_adc_set_multi(doc: MexDocument, intent: Intent) -> ApplyResult:
+    """Create several AdcHwUnits then wire one shared BCTU (RTD-MEX-ADC-004).
+
+    Payload shape::
+
+        {"units": [{"unit": "ADC1", "sampling_time_us": 5},
+                   {"unit": "ADC2", "sampling_time_us": 6}],
+         "transfer": "interrupt",
+         "bctu": {"mode": "list", "targets": ["ADC1","ADC2"], "list": [...],
+                  "trigger_order": [2,2,4], "destination": "fifo1",
+                  "fifo_dma": true, "fifo_notification": "Autombd_BctuFifoNotifi"}}
+
+    Each unit is created via the single-unit add path (so it gets a full
+    AdcHwUnit struct + AdcHwConfiguration). For a LIST BCTU each unit is given a
+    HW-triggered group containing the (unique) conversion-list channels, so the
+    BctuAdcChannelList enum literals resolve against real AdcChannel structs on
+    every target unit (Adc.xdm BctuAdcChannelList RANGE reads the unit's
+    AdcChannelName list, L4777). The BCTU subtree (and the gating/Mcl tail) is
+    wired once after all units exist.
+    """
+    result = ApplyResult()
+    payload = intent.payload
+    units = payload.get("units") or []
+    transfer_token = payload.get("transfer", "interrupt")
+    bctu = payload.get("bctu") or None
+    is_list_bctu = bool(bctu) and str(bctu.get("mode", "single")).strip().lower() == "list"
+    list_channels = _adc_unique_list_channels(bctu)
+
+    # Validate the BCTU LIST channels against the device enum FIRST, before the
+    # units are created. Otherwise an unknown list channel would be seeded into a
+    # per-unit auto-group and rejected by the generic add-path channel check
+    # (adc_channel_not_in_device) -- a less specific diagnostic than the BCTU list
+    # rejection (adc_bctu_list_channel_not_in_device) the caller expects for a bad
+    # 'list' token. Grounded in the committed adc.json channel enum (never invented).
+    if is_list_bctu and bctu is not None:
+        asset = _load_adc_asset()
+        for tok in bctu.get("list") or []:
+            token = str(tok).strip()
+            if token and _resolve_adc_channel(token, asset) is None:
+                result.diagnostics.append(Diagnostic(
+                    severity="blocker",
+                    code="adc_bctu_list_channel_not_in_device",
+                    module="adc",
+                    message=(
+                        f"BCTU list channel '{token}' is not in the device channel "
+                        f"enum. Use valid AdcChannelName tokens (e.g. VREFH, S20, P1)."
+                    ),
+                    details={"channel": token},
+                ))
+                return result
+
+    # Create each unit with a per-unit auto-group carrying the list channels (so a
+    # LIST BCTU has real AdcChannel structs to enumerate on every target unit).
+    for spec in units:
+        unit_id = str(spec.get("unit", "")).strip()
+        if not unit_id:
+            continue
+        unit_payload: dict = {
+            "unit": unit_id,
+            "transfer": spec.get("transfer", transfer_token),
+        }
+        if spec.get("sampling_time_us") is not None:
+            unit_payload["sampling_time_us"] = spec.get("sampling_time_us")
+        if spec.get("groups"):
+            unit_payload["groups"] = spec["groups"]
+        elif is_list_bctu and list_channels:
+            # A SW one-shot group holding the unique list channels. The group's
+            # sole purpose is to declare the channels as AdcChannel structs on the
+            # unit (AdcGroup MIN=1, and BctuAdcChannelList RANGE reads the unit's
+            # AdcChannel.AdcChannelName list -- Adc.xdm L4777), so the BCTU LIST can
+            # enumerate them. It is deliberately SW-triggered, NOT HW-triggered at
+            # AdcHwTrigger_0: a BCTU LIST dispatches conversions to every target ADC
+            # via BctuAdcTargetMask, so the per-unit groups must not each claim the
+            # shared BCTU trigger. Two ADC units sharing one AdcGroupHwTriggerSource
+            # is INVALID (Adc.xdm L3134 "BCTU trigger source ... must not be
+            # duplicated with trigger sources of other Adc units"), and a HW group
+            # from a CTU source would additionally have to be INJECTED (L2942). A SW
+            # group sidesteps both: the HW-trigger INVALID rules are gated on
+            # AdcGroupTriggSrc='ADC_TRIGG_SRC_HW'.
+            unit_payload["groups"] = [{
+                "trigger": "sw",
+                "access": "single",
+                "conv": "oneshot",
+                "num_samples": 1,
+                "channels": list(list_channels),
+            }]
+        if spec.get("watchdog"):
+            unit_payload["watchdog"] = spec["watchdog"]
+        sub_intent = Intent.from_dict(
+            {"module": "adc", "action": "set", "payload": unit_payload}
+        )
+        sub_result = apply_adc_set(doc, sub_intent)
+        result.diagnostics.extend(sub_result.diagnostics)
+        result.modified_elements.extend(sub_result.modified_elements)
+        for m in sub_result.changed_modules:
+            if m not in result.changed_modules:
+                result.changed_modules.append(m)
+        if sub_result.blocked:
+            return result
+
+    # Wire the single shared BCTU subtree now that every unit exists.
+    if bctu is not None:
+        asset = _load_adc_asset()
+        anchor_unit = str((units[0] or {}).get("unit", "")).strip() if units else ""
+        if not _apply_adc_bctu(doc, bctu, anchor_unit, asset, result):
+            return result
+        has_fifo_dma = bool(bctu.get("fifo_dma", False))
+        _apply_adc_shared_tail(
+            doc, is_dma=False, has_watchdog=False, result=result,
+            has_bctu=True, has_fifo_dma=has_fifo_dma,
+        )
+
+    # changed_modules contract: adc first.
+    result.changed_modules = (
+        (["adc"] if "adc" in result.changed_modules else [])
+        + [m for m in result.changed_modules if m != "adc"]
+    )
+    return result
+
+
+def apply_adc_set(doc: MexDocument, intent: Intent) -> ApplyResult:
+    """Configure an Adc Hardware Unit + its groups/channels/watchdog (RTD-MEX-ADC-001).
+
+    Intent payload (the --spec object):
+      unit (str):              AdcHwUnitId, e.g. "ADC1".
+      transfer (str):          "interrupt" | "dma" (CLI token).
+      sampling_time_us (num):  requested per-group sampling time in microseconds.
+      groups (list[dict]):     each {name?, trigger, access, conv, num_samples,
+                               notification?, channels[]}.
+      watchdog (list[dict]):   each {channel, high, low, notification, register?}.
+
+    For RTD-MEX-ADC-001 the target unit (ADC1) does not yet exist in the fixture,
+    so this builds a full AdcHwUnit struct (channels + groups + threshold-control)
+    and appends it after the last existing unit, then adds the unit's sibling
+    AdcHwConfiguration entry and flips AutosarExt/AdcEnableWatchdogApi when a
+    watchdog is requested. All edits are inside <config_set name="Adc">.
+
+    Byte-faithful: an empty payload is a no-op. quick_selection on the Adc
+    config_set is cleared LAST (after every replace_element_region reload).
+
+    Blocker codes:
+      adc_config_set_not_found        -- no enabled Adc <config_set>
+      adc_hw_unit_array_not_found     -- AdcHwUnit array absent
+      adc_channel_not_in_device       -- a channel name is not in the device enum
+      adc_sampling_out_of_range       -- derived AdcSamplingDuration outside 8..255
+      adc_threshold_high_below_low    -- watchdog high < low
+      adc_threshold_above_resolution  -- watchdog high above the resolution maximum
+      adc_unit_insert_failed          -- could not splice the new unit struct
+    """
+    payload = intent.payload
+    # Multi-unit form (RTD-MEX-ADC-004): payload carries "units":[{unit,
+    # sampling_time_us}, ...] plus one shared "bctu" block. Dispatch to the
+    # orchestrator that creates each unit then wires the single (list) BCTU.
+    if payload.get("units"):
+        return _apply_adc_set_multi(doc, intent)
+
+    result = ApplyResult()
+    unit_id = payload.get("unit")
+    if not unit_id:
+        return result
+
+    asset = _load_adc_asset()
+    transfer_token = payload.get("transfer", "interrupt")
+    transfer_enum = _ADC_TRANSFER_ENUM.get(transfer_token, transfer_token)
+    groups = payload.get("groups", []) or []
+    watchdog_reqs = payload.get("watchdog", []) or []
+    sampling_time_us = payload.get("sampling_time_us")
+
+    adc_cfg = doc.find_config_set("Adc")
+    if adc_cfg is None:
+        result.diagnostics.append(Diagnostic(
+            severity="blocker",
+            code="adc_config_set_not_found",
+            module="adc",
+            message="No enabled Adc <config_set> found; the tool edits an existing instance.",
+            details={},
+        ))
+        return result
+
+    unit_array = _adc_hw_unit_array(doc, adc_cfg)
+    if unit_array is None:
+        result.diagnostics.append(Diagnostic(
+            severity="blocker",
+            code="adc_hw_unit_array_not_found",
+            module="adc",
+            message="No AdcHwUnit <array> found in the Adc config set.",
+            details={},
+        ))
+        return result
+
+    # The resolution below (sampling/prescale, channels, watchdog) is shared by
+    # both the add-new-unit and update-existing-unit paths; the branch on whether
+    # the unit already exists is taken after it. The chosen prescaler is captured
+    # (not discarded) so a requested sampling time is actually realized (a 4 us
+    # request needs prescale 4 / duration 160, not duration 160 at prescale 1).
+    sampling_duration = None
+    prescale = 1
+    if sampling_time_us is not None:
+        try:
+            sampling_duration, prescale = _derive_adc_sampling_duration(
+                float(sampling_time_us) * 1e-6
+            )
+        except ValueError as exc:
+            result.diagnostics.append(Diagnostic(
+                severity="blocker",
+                code="adc_sampling_out_of_range",
+                module="adc",
+                message=(
+                    f"Requested sampling time {sampling_time_us} us cannot be "
+                    f"encoded as a valid AdcSamplingDuration (8..255) at any "
+                    f"prescaler {list(_ADC_ALLOWED_PRESCALERS)} for the active "
+                    f"ADC source clock. {exc}"
+                ),
+                details={"sampling_time_us": sampling_time_us},
+            ))
+            return result
+    if sampling_duration is None:
+        sampling_duration = 22
+
+    watchdog_by_channel: dict[str, dict] = {}
+    for wd in watchdog_reqs:
+        resolved = _resolve_adc_channel(wd.get("channel", ""), asset)
+        if resolved is None:
+            result.diagnostics.append(Diagnostic(
+                severity="blocker",
+                code="adc_channel_not_in_device",
+                module="adc",
+                message=(
+                    f"Watchdog channel '{wd.get('channel')}' is not in the device "
+                    f"channel enum. Use a valid AdcChannelName (e.g. P5, S10, VREFL)."
+                ),
+                details={"channel": wd.get("channel")},
+            ))
+            return result
+        full, _id = resolved
+        watchdog_by_channel[full] = wd
+
+    ordered_channels: list[str] = []
+    channel_id_by_literal: dict[str, int] = {}
+    for group in groups:
+        for ch in group.get("channels", []):
+            resolved = _resolve_adc_channel(ch, asset)
+            if resolved is None:
+                result.diagnostics.append(Diagnostic(
+                    severity="blocker",
+                    code="adc_channel_not_in_device",
+                    module="adc",
+                    message=(
+                        f"Channel '{ch}' is not in the device channel enum. Use a "
+                        f"valid AdcChannelName (e.g. P5, S10, VREFL, VREFH). Note: "
+                        f"S-channels start at S8 (there is no S0..S7)."
+                    ),
+                    details={"channel": ch},
+                ))
+                return result
+            full, cid = resolved
+            if full not in channel_id_by_literal:
+                channel_id_by_literal[full] = cid
+                ordered_channels.append(full)
+
+    resolution_max = asset["unit"]["resolution_max_threshold"].get("RESOLUTION_14", 16383)
+    for full, wd in watchdog_by_channel.items():
+        high = int(wd["high"])
+        low = int(wd["low"])
+        if high < low:
+            result.diagnostics.append(Diagnostic(
+                severity="blocker",
+                code="adc_threshold_high_below_low",
+                module="adc",
+                message=(
+                    f"Watchdog high threshold {high} must be >= low {low} "
+                    f"(channel {full})."
+                ),
+                details={"channel": full, "high": high, "low": low},
+            ))
+            return result
+        if high > resolution_max:
+            result.diagnostics.append(Diagnostic(
+                severity="blocker",
+                code="adc_threshold_above_resolution",
+                module="adc",
+                message=(
+                    f"Watchdog high threshold {high} exceeds the RESOLUTION_14 "
+                    f"maximum {resolution_max} (channel {full})."
+                ),
+                details={"channel": full, "high": high, "max": resolution_max},
+            ))
+            return result
+
+    line_ending = _detect_line_ending(doc._raw)
+
+    # DMA transfer wires one Mcl dmaLogicChannel_Type ref into AdcDmaChannelId
+    # (a single channel suffices for an interrupts-enabled SW streaming group;
+    # the counting-DMA channel is only needed for optimize-on / no-interrupt
+    # streaming -- Adc.xdm L364).
+    is_dma = transfer_enum == "ADC_DMA"
+    dma_channel_refs = (
+        ["/Mcl/Mcl/MclConfig/dmaLogicChannel_Type_0"] if is_dma else []
+    )
+
+    # Branch: a target unit that already exists (e.g. ADC0 in the fixture) is
+    # rebuilt in place; otherwise a new unit is appended below.
+    bctu = payload.get("bctu") or None
+    existing_unit = _adc_find_hw_unit(doc, adc_cfg, unit_id)
+    if existing_unit is not None:
+        _apply_adc_update_existing_unit(
+            doc, existing_unit, unit_id, transfer_enum, groups, ordered_channels,
+            channel_id_by_literal, watchdog_by_channel, sampling_duration, prescale,
+            dma_channel_refs, asset, result, bctu=bctu,
+        )
+        if bctu is not None:
+            if not _apply_adc_bctu(doc, bctu, unit_id, asset, result):
+                return result
+        _apply_adc_shared_tail(
+            doc, is_dma, bool(watchdog_by_channel), result, has_bctu=bctu is not None
+        )
+        return result
+
+    existing_unit_structs = [c for c in unit_array if c.tag.endswith("struct")]
+    new_unit_index = len(existing_unit_structs)
+    unit_name = f"AdcHwUnit_{new_unit_index}"
+    logical_unit_id = _adc_max_logical_unit_id(doc, adc_cfg) + 1
+
+    unit_indent = (
+        _detect_struct_indent(doc, existing_unit_structs[-1])
+        if existing_unit_structs else 30
+    )
+    child_struct_indent = unit_indent + 6
+
+    # Channel/group/threshold struct @name + Name + AdcGroupId must be UNIQUE
+    # ACROSS ALL Hw Units (Adc.xdm L2334/L2846/L2996/L3958). Continue each from
+    # the global max so a second unit does not collide with the baseline ADC0.
+    channel_name_base = _adc_global_max_member_index(doc, adc_cfg, "AdcChannel") + 1
+    group_name_base = _adc_global_max_member_index(doc, adc_cfg, "AdcGroup") + 1
+    threshold_name_base = _adc_global_max_member_index(doc, adc_cfg, "AdcThresholdControl") + 1
+    group_id_base = _adc_global_max_group_id(doc, adc_cfg) + 1
+
+    # Map each resolved channel literal -> its global struct Name (AdcChannel_<g>)
+    # for AdcGroupDefinition refs and AdcThresholdRegister wiring.
+    channel_global_index: dict[str, int] = {
+        full: channel_name_base + local for local, full in enumerate(ordered_channels)
+    }
+    # Map a watchdog channel literal -> its global AdcThresholdControl Name index.
+    watchdog_control_index: dict[str, int] = {
+        full: threshold_name_base + ti
+        for ti, full in enumerate(watchdog_by_channel.keys())
+    }
+
+    channel_blocks: list[bytes] = []
+    for local_idx, full in enumerate(ordered_channels):
+        cid = channel_id_by_literal[full]
+        wd = watchdog_by_channel.get(full)
+        tc_name = (
+            f"AdcThresholdControl_{watchdog_control_index[full]}"
+            if wd is not None else "AdcThresholdControl_0"
+        )
+        channel_blocks.append(_build_adc_channel_struct_bytes(
+            struct_index=channel_name_base + local_idx,  # global unique @name/Name
+            logical_id=local_idx,                          # per-unit 0-based
+            channel_name=full,
+            channel_id=cid,
+            watchdog=wd,
+            unit_name=unit_name,
+            indent=child_struct_indent,
+            line_ending=line_ending,
+            threshold_control_name=tc_name,
+        ))
+
+    group_blocks: list[bytes] = []
+    for gi, group in enumerate(groups):
+        access_enum = _ADC_ACCESS_ENUM.get(group.get("access", "single"), group.get("access"))
+        conv_enum = _ADC_CONV_ENUM.get(group.get("conv", "oneshot"), group.get("conv"))
+        trigger_enum = _ADC_TRIGGER_ENUM.get(group.get("trigger", "sw"), group.get("trigger"))
+
+        if (
+            access_enum == "ADC_ACCESS_MODE_STREAMING"
+            and trigger_enum == "ADC_TRIGG_SRC_SW"
+            and conv_enum == "ADC_CONV_MODE_ONESHOT"
+        ):
+            conv_enum = "ADC_CONV_MODE_CONTINUOUS"
+
+        group_resolved = dict(group)
+        group_resolved["access_enum"] = access_enum
+        group_resolved["conv_enum"] = conv_enum
+        group_resolved["trigger_enum"] = trigger_enum
+        group_resolved["conv_type_enum"] = _adc_group_conversion_type(trigger_enum, bctu)
+        group_resolved["num_samples"] = group.get("num_samples", 1)
+
+        channel_refs = [
+            f"/Adc/Adc/AdcConfigSet/{unit_name}/AdcChannel_{channel_global_index[_resolve_adc_channel(ch, asset)[0]]}"
+            for ch in group.get("channels", [])
+        ]
+        group_blocks.append(_build_adc_group_struct_bytes(
+            struct_index=group_name_base + gi,  # global unique @name/Name
+            group_id=group_id_base + gi,         # global unique AdcGroupId
+            group=group_resolved,
+            sampling_duration=sampling_duration,
+            channel_refs=channel_refs,
+            indent=child_struct_indent,
+            line_ending=line_ending,
+        ))
+
+    threshold_blocks: list[bytes] = []
+    for ti, (full, wd) in enumerate(watchdog_by_channel.items()):
+        threshold_blocks.append(_build_adc_threshold_control_struct_bytes(
+            struct_index=threshold_name_base + ti,  # global unique @name/Name
+            watchdog=wd,
+            indent=child_struct_indent,
+            line_ending=line_ending,
+        ))
+
+    unit_bytes = _build_adc_hw_unit_struct_bytes(
+        struct_index=new_unit_index,
+        logical_unit_id=logical_unit_id,
+        unit_id=unit_id,
+        unit_name=unit_name,
+        transfer_enum=transfer_enum,
+        channel_blocks=channel_blocks,
+        group_blocks=group_blocks,
+        threshold_blocks=threshold_blocks,
+        indent=unit_indent,
+        line_ending=line_ending,
+        prescale=prescale,
+        dma_channel_refs=dma_channel_refs,
+        counting_dma_refs=[],
+    )
+
+    if existing_unit_structs:
+        ok = _append_after_last_element(
+            doc, existing_unit_structs[-1], unit_bytes, line_ending
+        )
+        if not ok:
+            _append_struct_before_array_close(doc, unit_array, unit_bytes, line_ending)
+        if _adc_find_hw_unit(doc, doc.find_config_set("Adc"), unit_id) is None:
+            result.diagnostics.append(Diagnostic(
+                severity="blocker",
+                code="adc_unit_insert_failed",
+                module="adc",
+                message="Could not splice the new AdcHwUnit struct into the AdcHwUnit array.",
+                details={"unit": unit_id},
+            ))
+            return result
+    else:
+        le = line_ending.decode("latin-1")
+        sp_array = " " * (unit_indent - 3)
+        array_bytes = (
+            f'<array name="AdcHwUnit">{le}'
+            f'{unit_bytes.decode("utf-8")}{le}'
+            f'{sp_array}</array>'
+        ).encode("utf-8")
+        doc.replace_element_region(unit_array, array_bytes)
+
+    result.changed_modules.append("adc")
+
+    adc_cfg = doc.find_config_set("Adc")
+    if _adc_find_hw_config(doc, adc_cfg, unit_id) is None:
+        hw_config_array = _adc_hw_config_array(doc, adc_cfg)
+        if hw_config_array is not None:
+            existing_cfg_structs = [c for c in hw_config_array if c.tag.endswith("struct")]
+            cfg_index = len(existing_cfg_structs)
+            cfg_indent = (
+                _detect_struct_indent(doc, existing_cfg_structs[-1])
+                if existing_cfg_structs else 27
+            )
+            need_wdg = len(watchdog_by_channel) > 0
+            cfg_bytes = _build_adc_hw_config_struct_bytes(
+                struct_index=cfg_index,
+                configured_id=unit_id,
+                normal_interrupt=(transfer_enum == "ADC_INTERRUPT"),
+                wdg_threshold=need_wdg,
+                dma_transfer=(transfer_enum == "ADC_DMA"),
+                indent=cfg_indent,
+                line_ending=line_ending,
+            )
+            if existing_cfg_structs:
+                ok = _append_after_last_element(
+                    doc, existing_cfg_structs[-1], cfg_bytes, line_ending
+                )
+                if not ok:
+                    _append_struct_before_array_close(
+                        doc, hw_config_array, cfg_bytes, line_ending
+                    )
+            else:
+                le = line_ending.decode("latin-1")
+                sp_array = " " * (cfg_indent - 3)
+                array_bytes = (
+                    f'<array name="AdcHwConfiguration">{le}'
+                    f'{cfg_bytes.decode("utf-8")}{le}'
+                    f'{sp_array}</array>'
+                ).encode("utf-8")
+                doc.replace_element_region(hw_config_array, array_bytes)
+
+    if bctu is not None:
+        if not _apply_adc_bctu(doc, bctu, unit_id, asset, result):
+            return result
+
+    _apply_adc_shared_tail(
+        doc, is_dma, bool(watchdog_by_channel), result, has_bctu=bctu is not None
+    )
+    return result

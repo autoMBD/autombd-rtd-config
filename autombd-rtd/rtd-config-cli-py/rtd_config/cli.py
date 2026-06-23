@@ -64,8 +64,9 @@ from .modules.mcl import MclProvider
 from .modules.mcu import McuProvider
 from .modules.port import PortProvider
 from .modules.dio import DioProvider
+from .modules.adc import AdcProvider
 from .checks.static import run_static_checks
-from .backends.s32_mex.apply import apply_uart_set, apply_uart_add_flexio_channel, apply_platform_set, apply_basenxp_set, apply_mcl_set, apply_port_set, apply_dio_set, apply_mcu_set
+from .backends.s32_mex.apply import apply_uart_set, apply_uart_add_flexio_channel, apply_platform_set, apply_basenxp_set, apply_mcl_set, apply_port_set, apply_dio_set, apply_mcu_set, apply_adc_set
 from .backends.s32_mex.validation import find_s32ds_root, probe_which_root, run_validation
 
 
@@ -299,6 +300,31 @@ def build_parser() -> argparse.ArgumentParser:
     mcu_set.add_argument("--configure", action="store_true")
     mcu_set.add_argument("--backup", action="store_true")
     mcu_set.add_argument("--json", action="store_true")
+
+    adc_parser = subparsers.add_parser("adc")
+    adc_actions = adc_parser.add_subparsers(dest="action")
+    adc_set = adc_actions.add_parser(
+        "set",
+        help=(
+            "Configure an ADC Hardware Unit from a JSON --spec: target unit, "
+            "transfer mode, per-group sampling time (derived into "
+            "AdcSamplingDuration), groups (trigger/access/conv/samples/"
+            "notification/channels), and per-channel watchdog thresholds. "
+            "One `adc set --spec X --configure` expresses a full case."
+        ),
+    )
+    adc_set.add_argument("--project", required=True)
+    adc_set.add_argument(
+        "--spec",
+        metavar="PATH",
+        help=(
+            "Path to a JSON file describing the ADC config delta. Object shape: "
+            '{"unit","transfer","sampling_time_us","groups":[...],"watchdog":[...]}.'
+        ),
+    )
+    adc_set.add_argument("--configure", action="store_true")
+    adc_set.add_argument("--backup", action="store_true")
+    adc_set.add_argument("--json", action="store_true")
 
     return parser
 
@@ -753,6 +779,37 @@ def cmd_mcu_set(args: argparse.Namespace) -> int:
     return _configure_module(args, intent, plan, apply_mcu_set)
 
 
+def normalize_adc_intent(args: argparse.Namespace) -> Intent:
+    """Normalize `adc set` CLI arguments into the JSON intent contract.
+
+    The ADC config delta is expressed as a single JSON object via ``--spec``;
+    its keys become the intent payload verbatim so a cold agent can author one
+    self-contained spec file. Domain values (channel names, enum tokens, sampling
+    derivation) are resolved/validated downstream in apply_adc_set against the
+    committed adc.json asset -- the CLI does not invent or transform them here.
+    """
+    payload: dict = {}
+    spec_path = getattr(args, "spec", None)
+    if spec_path:
+        payload = json.loads(Path(spec_path).read_text(encoding="utf-8"))
+    return Intent.from_dict({"module": "adc", "action": "set", "payload": payload})
+
+
+def cmd_adc_set(args: argparse.Namespace) -> int:
+    intent = normalize_adc_intent(args)
+    plan = AdcProvider().plan(intent)
+
+    if not args.configure:
+        return emit({
+            "status": "passed",
+            "command": "plan",
+            "normalized_intent": _intent_dict(intent),
+            "plan": plan.to_dict(),
+        })
+
+    return _configure_module(args, intent, plan, apply_adc_set)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -792,6 +849,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "mcu" and getattr(args, "action", None) == "set":
         return cmd_mcu_set(args)
+
+    if args.command == "adc" and getattr(args, "action", None) == "set":
+        return cmd_adc_set(args)
 
     if args.version:
         return emit({

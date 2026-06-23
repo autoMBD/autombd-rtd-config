@@ -402,6 +402,354 @@ def _check_callback(requested_callback: str | None, diagnostics: list[Diagnostic
         ))
 
 
+def _mcl_dma_enabled(doc: MexDocument) -> bool:
+    """Return True when the Mcl MclEnableDma global switch is true.
+
+    Shared by the Uart DMA, ADC unit-DMA, and BCTU FIFO-DMA coherence checks: all
+    three consume an Mcl DMA logic channel and require the global Mcl DMA enable.
+    """
+    for setting in doc.root.iter():
+        if setting.tag.endswith("setting") and setting.attrib.get("name") == "MclEnableDma":
+            if setting.attrib.get("value", "false").lower() == "true":
+                return True
+    return False
+
+
+def _adc_channel_enum() -> set[str]:
+    """Return the device ADC channel-name enum from the committed adc.json asset.
+
+    Runtime reads only the committed asset, never the raw .epd. Returns an empty
+    set if the asset is unavailable so the check degrades to a no-op rather than
+    raising.
+    """
+    try:
+        from rtd_config.backends.s32_mex.apply import _load_adc_asset
+        return set(_load_adc_asset().get("channel_name_to_id", {}).keys())
+    except Exception:  # pragma: no cover - asset always present in this repo
+        return set()
+
+
+def _adc_unit_structs(doc: MexDocument, adc_cfg: ET.Element) -> list[ET.Element]:
+    units: list[ET.Element] = []
+    for el in adc_cfg.iter():
+        if el.tag.endswith("array") and el.attrib.get("name") == "AdcHwUnit":
+            units.extend(c for c in el if c.tag.endswith("struct"))
+    return units
+
+
+def _adc_hw_config_by_id(doc: MexDocument, adc_cfg: ET.Element) -> dict[str, ET.Element]:
+    out: dict[str, ET.Element] = {}
+    for el in adc_cfg.iter():
+        if el.tag.endswith("array") and el.attrib.get("name") == "AdcHwConfiguration":
+            for child in el:
+                if not child.tag.endswith("struct"):
+                    continue
+                s = doc.find_child_setting(child, "AdcHwConfiguredId")
+                if s is not None and s.attrib.get("value"):
+                    out[s.attrib["value"]] = child
+    return out
+
+
+def _check_adc(doc: MexDocument, diagnostics: list[Diagnostic]) -> None:
+    """ADC coherence validation (RTD-MEX-ADC-001).
+
+    Encodes the Adc.xdm INVALID rules that ConfigTools would otherwise report as
+    SEVERE on an incoherent edit:
+      - interrupt transfer (AdcTransferType=ADC_INTERRUPT) requires the unit's
+        AdcHwConfiguration[AdcHwConfiguredId=<unit>]/AdcNormalInterruptEnable=true
+        (adc_interrupt_not_enabled);
+      - a channel with AdcEnableThresholds=true requires AdcEnableWatchdogApi=true
+        (adc_watchdog_api_disabled), the unit's WdgThresholdEnable=true
+        (adc_unit_wdg_threshold_disabled), a non-empty AdcThresholdRegister ref +
+        a matching AdcThresholdControl entry (adc_threshold_ref_incomplete), and a
+        valid AdcWdogNotification (adc_watchdog_notification_invalid);
+      - a channel name must exist in the device channel enum
+        (adc_channel_not_in_device);
+      - an ADC_DMA unit requires the global Mcl DMA enable (adc_dma_mcl_not_enabled)
+        and a non-empty AdcDmaChannelId ref (adc_dma_refs_incomplete; Adc.xdm L334);
+      - a BCTU result FIFO with BctuFifoDmaEnable=true requires the global Mcl DMA
+        enable (adc_dma_mcl_not_enabled) and a non-empty BctuFifoDmaChannelId ref
+        (adc_dma_refs_incomplete; Adc.xdm L5041). These DMA rules mirror the Uart
+        _check_dma model (the cross-module Mcl wiring the apply tail performs).
+
+    Grounded in Adc.xdm INVALID rules (L334/L2758/L2759/L2760/L2761/L5041) + the
+    committed adc.json channel enum. Units with no threshold-enabled channels are
+    skipped by the watchdog rules so the baseline ADC0 fixture stays clean.
+    """
+    adc_cfg = doc.find_config_set("Adc")
+    if adc_cfg is None:
+        return
+
+    channel_enum = _adc_channel_enum()
+    hw_configs = _adc_hw_config_by_id(doc, adc_cfg)
+
+    # Adc-global watchdog API switch.
+    wdg_api_setting = doc.find_child_setting(adc_cfg, "AdcEnableWatchdogApi")
+    wdg_api_enabled = (
+        wdg_api_setting is not None
+        and wdg_api_setting.attrib.get("value", "false").lower() == "true"
+    )
+
+    # Mcl DMA global enable, shared by the ADC unit-DMA and BCTU FIFO-DMA rules.
+    mcl_dma_enabled = _mcl_dma_enabled(doc)
+
+    for unit in _adc_unit_structs(doc, adc_cfg):
+        unit_id_el = doc.find_child_setting(unit, "AdcHwUnitId")
+        unit_id = unit_id_el.attrib.get("value") if unit_id_el is not None else None
+        unit_name_el = doc.find_child_setting(unit, "Name")
+        unit_name = unit_name_el.attrib.get("value") if unit_name_el is not None else None
+        transfer_el = doc.find_child_setting(unit, "AdcTransferType")
+        transfer = transfer_el.attrib.get("value") if transfer_el is not None else None
+
+        # Collect this unit's direct AdcChannel / AdcThresholdControl children.
+        channels: list[ET.Element] = []
+        threshold_controls: list[ET.Element] = []
+        for child in unit:
+            if not (child.tag.endswith("array")):
+                continue
+            if child.attrib.get("name") == "AdcChannel":
+                channels = [c for c in child if c.tag.endswith("struct")]
+            elif child.attrib.get("name") == "AdcThresholdControl":
+                threshold_controls = [c for c in child if c.tag.endswith("struct")]
+
+        threshold_channels = [
+            c for c in channels
+            if (doc.find_child_setting(c, "AdcEnableThresholds") is not None
+                and doc.find_child_setting(c, "AdcEnableThresholds").attrib.get("value") == "true")
+        ]
+
+        # Interrupt transfer needs the unit's AdcNormalInterruptEnable=true.
+        if transfer == "ADC_INTERRUPT" and unit_id is not None:
+            hw_cfg = hw_configs.get(unit_id)
+            ni = doc.find_child_setting(hw_cfg, "AdcNormalInterruptEnable") if hw_cfg is not None else None
+            if hw_cfg is None or ni is None or ni.attrib.get("value", "false").lower() != "true":
+                diagnostics.append(Diagnostic(
+                    severity="blocker",
+                    code="adc_interrupt_not_enabled",
+                    module="adc",
+                    message=(
+                        f"ADC unit {unit_id} uses ADC_INTERRUPT transfer but its "
+                        f"AdcHwConfiguration[AdcHwConfiguredId={unit_id}]/"
+                        f"AdcNormalInterruptEnable is not true. Add/flip that "
+                        f"AdcHwConfiguration entry."
+                    ),
+                    details={"unit": unit_id},
+                ))
+
+        # DMA transfer coherence (modelled on the Uart _check_dma rules). An
+        # AdcTransferType=ADC_DMA unit consumes an Mcl DMA logic channel:
+        #   - MclEnableDma must be true (the global Mcl DMA switch; adc.xdm wires
+        #     AdcDmaChannelId -> /Mcl/.../dmaLogicChannel_Type, which is inert when
+        #     Mcl DMA is off) -> adc_dma_mcl_not_enabled;
+        #   - AdcDmaChannelId must hold a non-empty logic-channel ref (Adc.xdm L334
+        #     INVALID: not(node:refvalid(.)) and AdcTransferType='ADC_DMA') ->
+        #     adc_dma_refs_incomplete.
+        if transfer == "ADC_DMA":
+            if not mcl_dma_enabled:
+                diagnostics.append(Diagnostic(
+                    severity="blocker",
+                    code="adc_dma_mcl_not_enabled",
+                    module="mcl",
+                    message=(
+                        f"ADC unit {unit_id} uses ADC_DMA transfer but "
+                        f"MclEnableDma is not true in the Mcl configuration. Set "
+                        f"MclEnableDma=true or use interrupt mode."
+                    ),
+                    details={"unit": unit_id},
+                ))
+            dma_ref_populated = False
+            for child in unit:
+                if child.tag.endswith("array") and child.attrib.get("name") == "AdcDmaChannelId":
+                    for item in child:
+                        if (
+                            item.tag.endswith("setting")
+                            and item.attrib.get("value", "").strip()
+                        ):
+                            dma_ref_populated = True
+                    break
+            if not dma_ref_populated:
+                diagnostics.append(Diagnostic(
+                    severity="blocker",
+                    code="adc_dma_refs_incomplete",
+                    module="adc",
+                    message=(
+                        f"ADC unit {unit_id} uses ADC_DMA transfer but its "
+                        f"AdcDmaChannelId reference is empty. Populate it with an "
+                        f"Mcl dmaLogicChannel_Type ref (Adc.xdm INVALID rule)."
+                    ),
+                    details={"unit": unit_id},
+                ))
+
+        # Channel-name validity (every channel, every unit).
+        if channel_enum:
+            for c in channels:
+                name_el = doc.find_child_setting(c, "AdcChannelName")
+                cname = name_el.attrib.get("value") if name_el is not None else None
+                if cname is not None and cname not in channel_enum:
+                    diagnostics.append(Diagnostic(
+                        severity="blocker",
+                        code="adc_channel_not_in_device",
+                        module="adc",
+                        message=(
+                            f"ADC channel '{cname}' (unit {unit_id}) is not in the "
+                            f"device channel enum. Use a valid AdcChannelName "
+                            f"(S-channels start at S8; there is no S0..S7)."
+                        ),
+                        details={"unit": unit_id, "channel": cname},
+                    ))
+
+        if not threshold_channels:
+            continue  # no watchdog usage on this unit -> watchdog rules N/A
+
+        # Watchdog: global API must be enabled.
+        if not wdg_api_enabled:
+            diagnostics.append(Diagnostic(
+                severity="blocker",
+                code="adc_watchdog_api_disabled",
+                module="adc",
+                message=(
+                    "An ADC channel enables thresholds but "
+                    "AutosarExt/AdcEnableWatchdogApi is false. Set it true "
+                    "(Adc.xdm: watchdog must be globally enabled)."
+                ),
+                details={"unit": unit_id},
+            ))
+
+        # Watchdog: the unit's WdgThresholdEnable must be true.
+        hw_cfg = hw_configs.get(unit_id) if unit_id is not None else None
+        wt = doc.find_child_setting(hw_cfg, "WdgThresholdEnable") if hw_cfg is not None else None
+        if hw_cfg is None or wt is None or wt.attrib.get("value", "false").lower() != "true":
+            diagnostics.append(Diagnostic(
+                severity="blocker",
+                code="adc_unit_wdg_threshold_disabled",
+                module="adc",
+                message=(
+                    f"ADC unit {unit_id} has threshold-enabled channels but its "
+                    f"AdcHwConfiguration/WdgThresholdEnable is not true (Adc.xdm "
+                    f"requires the watchdog ISR be activated for the Hw Unit)."
+                ),
+                details={"unit": unit_id},
+            ))
+
+        control_names = {
+            doc.find_child_setting(tc, "Name").attrib.get("value")
+            for tc in threshold_controls
+            if doc.find_child_setting(tc, "Name") is not None
+        }
+
+        for c in threshold_channels:
+            cname_el = doc.find_child_setting(c, "AdcChannelName")
+            cname = cname_el.attrib.get("value") if cname_el is not None else None
+            # AdcThresholdRegister ref must exist, be non-empty, and reference a
+            # threshold control on this unit.
+            ref_value = None
+            for child in c:
+                if child.tag.endswith("array") and child.attrib.get("name") == "AdcThresholdRegister":
+                    for item in child:
+                        if item.tag.endswith("setting") and item.attrib.get("name") == "0":
+                            ref_value = item.attrib.get("value")
+                    break
+            ref_ok = bool(ref_value) and any(
+                ref_value.endswith(cn) or (cn and cn in ref_value) for cn in control_names
+            )
+            if not ref_ok:
+                diagnostics.append(Diagnostic(
+                    severity="blocker",
+                    code="adc_threshold_ref_incomplete",
+                    module="adc",
+                    message=(
+                        f"ADC channel '{cname}' (unit {unit_id}) enables thresholds "
+                        f"but its AdcThresholdRegister ref does not point to an "
+                        f"AdcThresholdControl entry on the same unit. Add a matching "
+                        f"AdcThresholdControl and reference it."
+                    ),
+                    details={"unit": unit_id, "channel": cname, "ref": ref_value},
+                ))
+
+            wdog_el = doc.find_child_setting(c, "AdcWdogNotification")
+            wdog = wdog_el.attrib.get("value") if wdog_el is not None else None
+            if wdog is None or wdog == "NULL_PTR" or not _C_IDENTIFIER.match(wdog):
+                diagnostics.append(Diagnostic(
+                    severity="blocker",
+                    code="adc_watchdog_notification_invalid",
+                    module="adc",
+                    message=(
+                        f"ADC channel '{cname}' (unit {unit_id}) enables thresholds "
+                        f"but AdcWdogNotification is not a valid C identifier "
+                        f"(got {wdog!r}); a watchdog notification is required."
+                    ),
+                    details={"unit": unit_id, "channel": cname, "notification": wdog},
+                ))
+
+    # BCTU FIFO-DMA coherence (RTD-MEX-ADC-004). A BctuResultFifos entry whose
+    # BctuFifoDmaEnable=true raises a DMA request that is serviced by an Mcl DMA
+    # logic channel (BctuFifoDmaChannelId -> /Mcl/.../dmaLogicChannel_Type), so:
+    #   - MclEnableDma must be true (the global Mcl DMA switch) ->
+    #     adc_dma_mcl_not_enabled;
+    #   - BctuFifoDmaChannelId must hold a non-empty ref (Adc.xdm L5041 INVALID:
+    #     not(node:refvalid(.)) and BctuFifoDmaEnable='true') -> adc_dma_refs_incomplete.
+    # The companion CtuEnableDmaTransferMode gate (Adc.xdm L4986-4987) is applied
+    # by the BCTU FIFO-DMA apply path; this check covers the cross-module Mcl wiring
+    # the apply tail performs, mirroring the Uart _check_dma model.
+    for fifo in _bctu_result_fifos(doc, adc_cfg):
+        dma_el = doc.find_child_setting(fifo, "BctuFifoDmaEnable")
+        if dma_el is None or dma_el.attrib.get("value", "false").lower() != "true":
+            continue
+        name_el = doc.find_child_setting(fifo, "Name")
+        fifo_name = name_el.attrib.get("value") if name_el is not None else None
+        if not mcl_dma_enabled:
+            diagnostics.append(Diagnostic(
+                severity="blocker",
+                code="adc_dma_mcl_not_enabled",
+                module="mcl",
+                message=(
+                    f"BCTU result FIFO '{fifo_name}' enables FIFO DMA "
+                    f"(BctuFifoDmaEnable=true) but MclEnableDma is not true in the "
+                    f"Mcl configuration. Set MclEnableDma=true."
+                ),
+                details={"fifo": fifo_name},
+            ))
+        dma_ref_populated = False
+        for child in fifo:
+            if child.tag.endswith("array") and child.attrib.get("name") == "BctuFifoDmaChannelId":
+                for item in child:
+                    if (
+                        item.tag.endswith("setting")
+                        and item.attrib.get("value", "").strip()
+                    ):
+                        dma_ref_populated = True
+                break
+        if not dma_ref_populated:
+            diagnostics.append(Diagnostic(
+                severity="blocker",
+                code="adc_dma_refs_incomplete",
+                module="adc",
+                message=(
+                    f"BCTU result FIFO '{fifo_name}' enables FIFO DMA but its "
+                    f"BctuFifoDmaChannelId reference is empty. Populate it with an "
+                    f"Mcl dmaLogicChannel_Type ref (Adc.xdm L5041 INVALID rule)."
+                ),
+                details={"fifo": fifo_name},
+            ))
+
+
+def _bctu_result_fifos(doc: MexDocument, adc_cfg: ET.Element) -> list[ET.Element]:
+    """Return every BctuResultFifos struct under the AdcConfigSet's BctuHwUnit.
+
+    BctuResultFifos arrays nest inside each BctuHwUnit struct, which is a direct
+    child of the AdcConfigSet struct (a sibling of the AdcHwUnit array).
+    """
+    out: list[ET.Element] = []
+    for fifos_array in adc_cfg.iter():
+        if not (
+            fifos_array.tag.endswith("array")
+            and fifos_array.attrib.get("name") == "BctuResultFifos"
+        ):
+            continue
+        out.extend(c for c in fifos_array if c.tag.endswith("struct"))
+    return out
+
+
 def run_static_checks(
     mex_path: Path,
     doc: MexDocument | None = None,
@@ -429,6 +777,7 @@ def run_static_checks(
         _check_flexio_refs(doc, diagnostics)
         _check_duplicate_lpuart_hw(doc, diagnostics)
         _check_uart_channel_ids(doc, diagnostics)
+        _check_adc(doc, diagnostics)
         _check_quick_selection_conflict(doc, modified_elements or [], diagnostics)
         _check_callback(requested_callback, diagnostics)
 
