@@ -50,6 +50,8 @@ import importlib.util
 import sys
 from pathlib import Path
 
+import pytest
+
 
 def load_deploy_module():
     module_path = Path(__file__).resolve().parents[2] / "tools" / "deploy_rtd_skill.py"
@@ -60,6 +62,49 @@ def load_deploy_module():
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module
+
+
+def test_retry_fs_recovers_from_transient_windows_lock(monkeypatch):
+    """A transient WinError-5 on a deploy FS op is retried, then succeeds.
+
+    Reproduces the deploy/black-box failure: AV/indexer briefly locks the freshly
+    staged skill tree so ``staging.rename(destination)`` raises WinError 5; the
+    bounded retry must absorb it instead of aborting the deploy.
+    """
+    deploy = load_deploy_module()
+    monkeypatch.setattr(deploy.sys, "platform", "win32")
+    monkeypatch.setattr(deploy.time, "sleep", lambda _s: None)  # no real backoff
+
+    calls = {"n": 0}
+
+    def flaky():
+        calls["n"] += 1
+        if calls["n"] < 3:
+            err = PermissionError("access denied")
+            err.winerror = 5
+            raise err
+
+    deploy._retry_fs(flaky)
+    assert calls["n"] == 3
+
+
+def test_retry_fs_reraises_non_transient_error_immediately(monkeypatch):
+    """A non-transient OSError is not retried and surfaces on the first attempt."""
+    deploy = load_deploy_module()
+    monkeypatch.setattr(deploy.sys, "platform", "win32")
+    monkeypatch.setattr(deploy.time, "sleep", lambda _s: None)
+
+    calls = {"n": 0}
+
+    def boom():
+        calls["n"] += 1
+        err = OSError("no such file")
+        err.winerror = 2  # ERROR_FILE_NOT_FOUND — not a transient lock code
+        raise err
+
+    with pytest.raises(OSError):
+        deploy._retry_fs(boom)
+    assert calls["n"] == 1  # not retried
 
 
 def test_project_cli_and_skill_versions_match():

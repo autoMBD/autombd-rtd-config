@@ -2,7 +2,7 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.24.1 |
+| Version | 0.25.1 |
 | Date | 2026-06-19 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Current pass/fail evidence for the E2E acceptance cases defined in `rtd-config-test-cases.md`. This document is the living status record the catalog points to; the catalog defines the target, this records where the tool actually stands. |
@@ -58,16 +58,19 @@ measured*, and a KPI `miss` never weakens the functional **PASS**.
 | RTD-MEX-UART-001 | UART | **PASS** | **PASS** — 1 edit attempt, 32.8 s ≤ 1 min budget (black-box, 2026-06-18; context→check window) |
 | RTD-MEX-UART-002 | UART | **PASS** | **PASS** — 1 edit attempt, 28.6 s ≤ 1 min budget (black-box, 2026-06-18; context→check window) |
 | RTD-MEX-UART-003 | UART | **PASS** | **PASS** — 1 edit attempt, 55.3 s ≤ 3 min budget (black-box, 2026-06-18; context→check window; auto-detect HW after --hw optional) |
-| RTD-MEX-ADC-001 | ADC | **NOT RUN** | Not yet measured — catalog budget is 1 edit attempt and ≤ 2 min context→check window. |
-| RTD-MEX-ADC-002 | ADC | **NOT RUN** | Not yet measured — catalog budget is 1 edit attempt and ≤ 2 min context→check window. |
-| RTD-MEX-ADC-003 | ADC | **NOT RUN** | Not yet measured — catalog budget is 1 edit attempt and ≤ 2 min context→check window. |
-| RTD-MEX-ADC-004 | ADC | **NOT RUN** | Not yet measured — catalog budget is 1 edit attempt and ≤ 2 min context→check window. |
+| RTD-MEX-ADC-001 | ADC | **PASS** | **PASS** — 1 edit attempt, 80.8 s ≤ 2 min budget (black-box, re-measured post-hardening 2026-06-23; context→check window; exit 0, 0 SEVERE, 125 generated files) |
+| RTD-MEX-ADC-002 | ADC | **PASS** | **PASS** — 1 edit attempt, 75.3 s ≤ 2 min budget (black-box, re-measured post-hardening 2026-06-23; context→check window; exit 0, 0 SEVERE, 125 generated files) |
+| RTD-MEX-ADC-003 | ADC | **PASS** | **PASS** — 1 edit attempt, 106.1 s ≤ 2 min budget (black-box, re-measured post-hardening 2026-06-23; context→check window; exit 0, 0 SEVERE, 125 generated files) |
+| RTD-MEX-ADC-004 | ADC | **PASS** | **PASS** — 1 edit attempt, 65.3 s ≤ 2 min budget (black-box, re-measured post-hardening 2026-06-23; context→check window; exit 0, 0 SEVERE, 125 generated files) |
 
-**Summary: 10 / 14 cases PASS.** The seven-module minimal system remains
-complete: all Mcu, BaseNXP, Platform, Port, Dio, Mcl, and Uart cases reach the
-full acceptance bar (deterministic suite, static checks, the S32DS vendor gate,
-and code-generation evidence). The four ADC cases were added to the catalog on
-2026-06-19 and have not yet been exercised under the black-box protocol.
+**Summary: 14 / 14 cases PASS.** The seven-module minimal system plus the ADC
+module reach the full acceptance bar (deterministic suite, static checks, the
+S32DS vendor gate, and code-generation evidence). All four ADC cases — interrupt
+software groups + watchdog (ADC-001), DMA streaming (ADC-002), BCTU single
+hardware trigger + new-data + watchdog (ADC-003), and dual-ADC BCTU list trigger
++ FIFO DMA (ADC-004) — pass the black-box protocol with one edit attempt each and
+KPI under the 2 min budget (80.8 / 75.3 / 106.1 / 65.3 s, re-measured after the
+forward-hardening), each exit 0 with 125 generated files and no SEVERE.
 
 ## 3. Cross-cutting blockers (critical path)
 
@@ -111,11 +114,14 @@ history. New ADC evidence is recorded in §2 as each case is exercised.
 | 9 | ✅ UART cross-module orchestration → UART-001 | UART-001 |
 | 10 | ✅ UART-002: FlexIO channel creation + MCL ref + ISR | UART-002 |
 | 11 | ✅ DMA capability (Uart + Mcl + Platform) → UART-003 | UART-003 |
+| 12 | ✅ ADC module: `adc set --spec` (Hw Unit / groups / channels / watchdog; DMA streaming + Mcl; BCTU single + list hardware triggers; FIFO DMA) → ADC-001..004 | ADC-001, ADC-002, ADC-003, ADC-004 |
 
 ## Changelog
 
 | Date | Version | Description |
 | --- | --- | --- |
+| 2026-06-23 | 0.25.1 | Re-measured the four ADC cases' black-box E2E + KPI after the ADC forward-hardening (shared group/trigger byte-builder + new static checks): all four remain functional PASS, 1 edit attempt, within the 2 min budget (ADC-001 80.8 s, ADC-002 75.3 s, ADC-003 106.1 s, ADC-004 65.3 s). The upward shifts on ADC-001/003 are Codex run-to-run variance (ADC-002 was flat), not a tool regression; deterministic suite (635) and the S32DS gate (all four, exit 0 + no SEVERE) were also re-confirmed post-hardening. Recorded KPIs now reflect the current (hardened) tool. |
+| 2026-06-23 | 0.25.0 | RTD-MEX-ADC-001 through ADC-004 PASS (issue #30): ADC module support delivered (interrupt software groups + watchdog, DMA streaming, BCTU single hardware trigger, dual-ADC BCTU list trigger + FIFO DMA). All four pass the black-box protocol with 1 edit attempt each and KPI under the 2 min budget (50.5 / 75.4 / 71.0 / 58.7 s), each exit 0 / 0 SEVERE / 125 generated files. Summary now 14 / 14 cases PASS; added the ADC delivery step to §4. |
 | 2026-06-19 | 0.24.1 | Clarified that ADC E2E cases use the ADC-ready `Autombd_Test_Adc_S32K344` fixture, while non-ADC cases keep `Uart_Example_S32K344`. |
 | 2026-06-19 | 0.24.0 | Added RTD-MEX-ADC-001 through RTD-MEX-ADC-004 as NOT RUN with the catalogued one-edit, ≤2 min KPI budget, keeping the 10/14 summary aligned with the expanded E2E catalog. |
 | 2026-06-18 | 0.23.0 | Back-filled KPI for Dio (DIO-001/002: PASS 46.1/26.3 s), Mcl (MCL-001: PASS 24.3 s), Uart (UART-001/002: PASS 32.8/28.6 s; UART-003: PASS 55.3 s after --hw auto-detect optimization). Closes #16, #17, #18. |

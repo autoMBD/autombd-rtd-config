@@ -52,6 +52,7 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -189,12 +190,49 @@ def should_deploy(source_version: str, destination: Path) -> tuple[bool, str]:
     return False, "installed_version_is_current_or_newer"
 
 
+# Windows transiently locks freshly-created/copied directory trees — antivirus,
+# Defender, and the Search indexer open handles for a few hundred milliseconds —
+# and rmtree/rename then fail with WinError 5 (access denied) or 32 (sharing
+# violation); a just-deleted directory name can also linger in a pending-delete
+# state, so renaming onto it fails until the FS settles. Retrying with a short
+# backoff clears these races without masking a genuine, persistent failure.
+_FS_RETRY_ATTEMPTS = 10
+_FS_RETRY_DELAY_S = 0.1
+
+
+def _is_transient_windows_lock(exc: OSError) -> bool:
+    """True for the transient Windows FS-lock errors worth retrying.
+
+    Scoped to Windows winerror codes so non-Windows behavior is unchanged and a
+    real, persistent error on any platform still surfaces promptly.
+    WinError 5 = ERROR_ACCESS_DENIED, 32 = ERROR_SHARING_VIOLATION,
+    145 = ERROR_DIR_NOT_EMPTY (rmtree mid-race).
+    """
+    return sys.platform == "win32" and getattr(exc, "winerror", None) in (5, 32, 145)
+
+
+def _retry_fs(operation) -> None:
+    """Run a filesystem mutation, retrying transient Windows lock errors.
+
+    Re-raises immediately for any non-transient error and re-raises the last
+    error once the attempt budget is exhausted, so a genuine failure is never
+    swallowed.
+    """
+    for attempt in range(_FS_RETRY_ATTEMPTS):
+        try:
+            operation()
+            return
+        except OSError as exc:
+            if not _is_transient_windows_lock(exc) or attempt == _FS_RETRY_ATTEMPTS - 1:
+                raise
+            time.sleep(_FS_RETRY_DELAY_S * (attempt + 1))
+
+
 def copy_released_payload(source_skill_root: Path, destination: Path) -> None:
     parent = destination.parent
     parent.mkdir(parents=True, exist_ok=True)
     staging = parent / f".{destination.name}.deploying"
-    if staging.exists():
-        shutil.rmtree(staging)
+    remove_path(staging)
     staging.mkdir()
 
     for item in SKILL_PAYLOAD_ITEMS:
@@ -206,14 +244,17 @@ def copy_released_payload(source_skill_root: Path, destination: Path) -> None:
             shutil.copy2(source, target)
 
     remove_path(destination)
-    staging.rename(destination)
+    # Atomic publish: the staged tree is renamed onto the destination. On Windows
+    # this is the step most exposed to the transient post-copy/post-delete lock
+    # window, so it is retried.
+    _retry_fs(lambda: staging.rename(destination))
 
 
 def remove_path(path: Path) -> None:
     if path.is_symlink() or path.is_file():
-        path.unlink()
+        _retry_fs(path.unlink)
     elif path.exists():
-        shutil.rmtree(path)
+        _retry_fs(lambda: shutil.rmtree(path))
 
 
 def ensure_link(source: Path, destination: Path) -> str:

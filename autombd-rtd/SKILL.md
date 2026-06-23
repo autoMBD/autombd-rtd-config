@@ -1,14 +1,15 @@
 ---
 name: autombd-rtd
-version: 0.1.1
+version: 0.1.2
 description: >-
   Configure NXP S32K3 RTD 7.0.1 .mex automotive projects through the bundled RTD
   CfgFile CLI. Use when a user asks to inspect a project, query pin options, or
-  plan/configure any of the seven minimal-system modules — Mcu (clock tree),
-  BaseNXP (OsIf system timer), Platform (interrupts/ISR), Port (pin mux), Dio
-  (channels), Mcl (FlexIO/DMA logic channels), or Uart (LPUART or FlexIO
-  channels, interrupt or DMA mode) — run static checks, or run S32DS headless
-  validation on an S32 ConfigTools .mex project.
+  plan/configure any supported module — Mcu (clock tree), BaseNXP (OsIf system
+  timer), Platform (interrupts/ISR), Port (pin mux), Dio (channels), Mcl
+  (FlexIO/DMA logic channels), Uart (LPUART or FlexIO channels, interrupt or DMA
+  mode), or Adc (Hardware Unit groups, channels, sampling-time derivation, and
+  watchdog thresholds) — run static checks, or run S32DS headless validation on
+  an S32 ConfigTools .mex project.
 license: MIT
 ---
 
@@ -129,8 +130,103 @@ the original to `<file>.mex.bak`.
   references and a callback. `--baud` (default 921600), `--word-length 8`,
   `--callback`, `--tx-name`/`--rx-name`. The shared FlexIO ISR + clock reference
   are ensured idempotently.
+- **`rtd-config adc set --spec <path.json>`** — configure an ADC Hardware Unit
+  from a single JSON spec: the target unit, transfer mode, per-group sampling
+  time (**derived** into `AdcSamplingDuration` from the ADC source clock +
+  prescale — never written as a literal), one or more conversion groups, and
+  per-channel watchdog thresholds. One `adc set --spec X --configure` expresses
+  a full case. The spec object:
+  ```json
+  {
+    "unit": "ADC1",
+    "transfer": "interrupt",
+    "sampling_time_us": 1,
+    "groups": [
+      {"name": "AdcGroup_0", "trigger": "sw", "access": "single",
+       "conv": "oneshot", "num_samples": 1,
+       "notification": "Autombd_AdcNotifi0", "channels": ["VREFL", "S10"]},
+      {"trigger": "sw", "access": "streaming", "conv": "continuous",
+       "num_samples": 10, "notification": "Autombd_AdcNotifi1",
+       "channels": ["VREFH", "P5"]}
+    ],
+    "watchdog": [
+      {"channel": "P5", "high": 3000, "low": 20,
+       "notification": "Autombd_AdcNotifiWdg"}
+    ]
+  }
+  ```
+  Token domains: `transfer` ∈ `interrupt|dma`; `trigger` ∈ `sw|hw`; `access` ∈
+  `single|streaming`; `conv` ∈ `oneshot|continuous`. **Channels** accept the
+  short name (`VREFL`, `S10`, `P5`) or the full literal (`S10_ChanNum34`);
+  S-channels start at **S8** (there is no S0–S7). The tool resolves channel
+  name→id, derives the sampling duration, picks the smallest valid prescaler,
+  adds the unit's `AdcHwConfiguration` (interrupt/watchdog coherence), and flips
+  `AdcEnableWatchdogApi` when a watchdog is requested. It also enforces the
+  vendor rule that a software-triggered **streaming** group must be
+  `continuous` (a SW streaming one-shot group is coerced to continuous).
+  Run, e.g.:
+  `adc set --project <dir> --spec adc001.json --configure --json`
 
-### Vendor validation
+  **BCTU hardware trigger (optional `bctu` block).** Add a `bctu` object to the
+  spec to wire a Body Cross-Triggering Unit trigger. The tool repoints
+  `AdcHwTrigger_0` to the chosen trigger source, populates the `BctuHwUnit`
+  subtree, and flips the gating APIs (`AdcHwTriggerApi`,
+  `AdcEnableCtuControlModeApi`, and — for FIFO DMA — `CtuEnableDmaTransferMode`).
+  Two modes:
+  - **`single`** — one BCTU-triggered conversion of one channel into a data
+    register or FIFO. Use the single-`unit` spec above plus:
+    ```json
+    "bctu": {
+      "trigger_source": "BCTU_EMIOS_2_15",
+      "mode": "single",
+      "target": "ADC1",
+      "channel": "S10",
+      "destination": "data_reg",
+      "new_data_notification": "Autombd_BctuNewDataNotifi"
+    }
+    ```
+    (A full ADC-003 spec is the single-`unit` form above with this `bctu` block;
+    the unit needs the BCTU `channel` in one of its groups so the trigger can
+    reference it.)
+  - **`list`** — a conversion *list* dispatched to one or more ADC units, with
+    results in a FIFO and an optional DMA request. Use the **multi-unit** spec
+    form (`units: [{unit, sampling_time_us}, …]` instead of a single `unit`) plus
+    a `list` `bctu`. The tool creates each unit (each gets its list channels as
+    `AdcChannel` structs via one SW group so the list can enumerate them) and
+    wires one shared BCTU. Worked ADC-004 (dual-ADC LIST + FIFO DMA):
+    ```json
+    {
+      "units": [
+        {"unit": "ADC1", "sampling_time_us": 5},
+        {"unit": "ADC2", "sampling_time_us": 6}
+      ],
+      "transfer": "interrupt",
+      "bctu": {
+        "trigger_source": "BCTU_EMIOS_1_20",
+        "mode": "list",
+        "targets": ["ADC1", "ADC2"],
+        "list": ["VREFH", "VREFL", "S20", "S20", "P1", "P2", "P3", "P4"],
+        "trigger_order": [2, 2, 4],
+        "destination": "fifo1",
+        "fifo_dma": true,
+        "fifo_notification": "Autombd_BctuFifoNotifi"
+      }
+    }
+    ```
+  `bctu` token domains: `trigger_source` ∈ the device BCTU tokens
+  `BCTU_EMIOS_{0,1,2}_{0..22}` (plus `EXT_TRIG` / `AUX_EXT_TRIG`); `mode` ∈
+  `single|list`; `destination` ∈ `data_reg|fifo1|fifo2`. Single keys: `target`
+  (one ADC), `channel` (one device channel), `new_data_notification`. List keys:
+  `targets` (the ADC units the list drives, e.g. `["ADC1","ADC2"]`), `list` (the
+  ordered device channels — repeats allowed, e.g. `S20, S20`), `trigger_order`
+  (a partition of the list whose parts sum to the list length; the list halts
+  for a re-trigger after each part except the last — `[2,2,4]` over 8 items
+  triggers 2 then 2 then 4 channels), `fifo_dma` (`true` raises a FIFO DMA
+  request and consumes an Mcl DMA logic channel — `changed_modules` then includes
+  `mcl`), and `fifo_notification` (the FIFO watermark callback). When `fifo_dma`
+  is on, the tool disables FIFO interrupt notifications (mutually exclusive with
+  DMA) and sets the watermark so the final sample of the batch raises the
+  request.
 - `rtd-config validate --project <dir> --json` — run S32DS / S32 ConfigTools
   **headless** validation. The tool **auto-discovers** a standard S32DS install
   (e.g. `C:\NXP\S32DS.<version>`, or `s32dsc.exe` on `PATH`); override with
@@ -155,6 +251,11 @@ declared dependencies, never silent edits:
 - **BaseNXP** owns the OsIf system-timer counter.
 - **Uart** owns channel settings and the Uart-side references, and declares the
   Mcu / Port / Platform / Mcl dependencies above.
+- **Adc** owns the `AdcHwUnit` configuration tree (channels, groups,
+  `AdcThresholdControl` entries), the unit's `AdcHwConfiguration` entry, and the
+  Adc-global `AdcEnableWatchdogApi` switch — all inside `<config_set name="Adc">`.
+  Interrupt mode is internal to the ADC peripheral (no Platform IRQ dependency
+  for the interrupt-software-group case).
 
 ## Interrupt and DMA modes
 
@@ -223,6 +324,27 @@ list. Read diagnostics instead of guessing. Key codes:
   signal; query `pin-options`.
 - `invalid_uart_callback` — the callback is not a valid C identifier
   (`NULL_PTR` is rejected).
+- `adc_channel_not_in_device` — an ADC channel name is not in the device enum
+  (remember S-channels start at S8; use a name from `adc.json`/`pin-options`).
+- `adc_sampling_out_of_range` — the requested sampling time cannot be encoded as
+  a valid `AdcSamplingDuration` (8–255) at any prescaler; lower the ADC source
+  clock (Mcu) or change the sampling time.
+- `adc_interrupt_not_enabled` — an interrupt-transfer unit lacks
+  `AdcHwConfiguration/AdcNormalInterruptEnable=true`.
+- `adc_watchdog_api_disabled` / `adc_unit_wdg_threshold_disabled` /
+  `adc_threshold_ref_incomplete` / `adc_watchdog_notification_invalid` — a
+  channel with watchdog thresholds needs `AdcEnableWatchdogApi=true`, the unit's
+  `WdgThresholdEnable=true`, a valid `AdcThresholdRegister` ref to a matching
+  `AdcThresholdControl` on the same unit, and a valid `AdcWdogNotification`.
+- `adc_dma_mcl_not_enabled` / `adc_dma_refs_incomplete` — an `ADC_DMA` unit, or a
+  BCTU result FIFO with `BctuFifoDmaEnable=true`, needs `MclEnableDma=true` and a
+  non-empty DMA channel ref (`AdcDmaChannelId` / `BctuFifoDmaChannelId`).
+- `adc_bctu_trigger_source_not_in_device` / `adc_bctu_channel_not_in_device` /
+  `adc_bctu_list_channel_not_in_device` — a `bctu` `trigger_source`, single
+  `channel`, or `list` channel is not a valid device token; use a
+  `BCTU_EMIOS_{0,1,2}_{0..22}` source and device channel names.
+- `adc_bctu_trigger_order_mismatch` — the `list` `trigger_order` parts do not sum
+  to the `list` length.
 - `*_config_set_not_found` / `*_not_found` (e.g. `uart_channel_not_found`,
   `platform_isr_not_found`, `mcu_config_set_not_found`) — the targeted existing
   instance was not found; the tool edits existing instances, it does not create

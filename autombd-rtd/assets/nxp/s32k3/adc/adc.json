@@ -1,0 +1,286 @@
+{
+  "_source": "S32K3 RTD 7.0.1 Adc.xdm (C:/NXP/S32DS.3.6.7/S32DS/software/PlatformSDK_S32K3/RTD/Adc_TS_T40D34M70I1R0/config/Adc.xdm) + device+package channel enum Adc_s32k344_mapbga257.epd (same package RTD/Adc_TS_T40D34M70I1R0/autosar/). Fixture: tests/fixtures/nxp/ds/s32k3/Autombd_Test_Adc_S32K344 (ADC0 baseline, ADC source clock 160 MHz). Cache ids: source.s32k3_rtd_xdm.adc, source.s32k3_rtd_epd.adc. Runtime reads ONLY this committed asset -- never raw .xdm/.epd. Code literals in apply.py are pinned to these values by tests/unit/test_adc_apply.py::test_adc_json_matches_apply_code_literals (LL-012).",
+  "rtd_version": "7.0.1",
+  "device": "s32k344",
+  "package": "mapbga257",
+
+  "_coverage": {
+    "_note": "Honest map of the ADC editable surface this CLI exposes today vs. the Adc.xdm items NOT yet configurable through the `adc set --spec` surface. Forward (Spec-first) development tracks the deferred surface explicitly so callers know the boundary; full-surface expansion of every Adc.xdm field is a separate, larger effort (issues #30/#37). The deferred fields below DO exist in Adc.xdm and are currently emitted at byte-faithful fixture defaults by the apply builders -- they are not absent, just not user-tunable yet. Multiple AdcHwTrigger + multiple BctuInternalTrigger (one BCTU) ARE supported (see `bctu.triggers`); multiple BctuHwUnit is NOT exposed because the S32K3 has a single BCTU peripheral (Adc.xdm L4180 caps the BctuHwUnit count at ecu:get('Adc.AdcConfigSet.BctuHwUnit')).",
+    "configurable_today": {
+      "unit": ["AdcHwUnitId (ADC0/1/2)", "AdcTransferType (interrupt/dma)", "AdcPrescale (derived from sampling_time_us)", "AdcDmaChannelId (DMA path; Mcl-wired)"],
+      "group": ["AdcGroupAccessMode (single/streaming)", "AdcGroupConversionMode (oneshot/continuous, streaming coerced)", "AdcGroupConversionType (Normal/Injected, derived)", "AdcGroupTriggSrc (sw/hw)", "AdcGroupHwTriggerSource (derived from the actual AdcHwTrigger)", "AdcStreamingNumSamples", "AdcNotification (completion callback)", "AdcSamplingDuration0/1/2 (derived)", "AdcGroupDefinition (channel refs)"],
+      "channel": ["AdcChannelName / AdcChannelId (device enum)", "AdcEnableThresholds + AdcThresholdRegister + AdcWdogNotification (watchdog)"],
+      "watchdog": ["AdcThresholdControlRegister", "AdcHighThreshold", "AdcLowThreshold", "AdcEnableWatchdogApi (global gate)", "WdgThresholdEnable (unit gate)"],
+      "bctu": ["AdcHwTrigger (one or many) + AdcHwTrigSrc (device BCTU enum)", "BctuInternalTrigger (one or many; SINGLE conversion)", "BctuTriggerSource (derived per trigger)", "BctuDataDestination (data_reg/fifo1/fifo2)", "BctuTriggerConversionMode (single/list)", "BctuAdcTargetMask (derived)", "BctuAdcChannelSingle (single mode)", "BctuListItems + trigger_order (list mode)", "BctuResultFifos + BctuFifoDmaEnable/Channel (list FIFO + DMA)", "BctuAdcNewDataNotification", "BctuWatermarkNotification"]
+    },
+    "not_yet_exposed": {
+      "_note": "Each item is an Adc.xdm editable field currently fixed at a byte-faithful default. Exposing any of these is future scope.",
+      "per_unit": ["AdcHwUnitResolution (RESOLUTION_8/10/12/14)", "AdcHighSpeedEnable / AdcAltHighSpeedEnable", "AdcPowerDownDelay / AdcAltPowerDownDelay", "AdcMuxDelay", "AdcEnablePresampling + AdcPresamplingInternalSignal0/1/2", "AdcHwUnitUsrOffset / AdcHwUnitUsrGain", "SdAdcHwUnitSpecificConfiguration (SdadcDecimaRate/OutputSetDelay/FifoThreshold/CalibSkipped/CalibAverage)"],
+      "per_group": ["AdcGroupPriority", "AdcGroupReplacement", "AdcGroupHardwareAverageEnable / AdcGroupHardwareAverageSelect", "AdcExtraNotification", "AdcDmaErrorNotification", "AdcEnableHalfInterrupt", "AdcStreamResultGroup", "AdcAlternateGroupConvTimings (alt sampling bands)"],
+      "per_channel": ["AdcChannelLimitCheck + AdcChannelHighLimit/AdcChannelLowLimit", "AdcChannelRangeSelect", "AdcChannelResolution (per-channel)", "per-channel presampling (AdcEnablePresampling at channel scope)"],
+      "bctu": ["BctuLowPowerMode", "BctuTriggerLoop", "BctuFifoDmaRawData", "BctuTriggerNotification", "BctuWatermarkValue tuning (currently list-length-1)", "BctuLastChannel manual override (currently auto on final list item)", "BctuUnderrunNotification / BctuOverrunNotification / BctuListLastConversionNotification", "multiple BctuHwUnit (device has a single BCTU peripheral -- not applicable on S32K3)"]
+    },
+    "references": ["issue #30 (ADC module)", "issue #37 (forward Spec-first correction)"]
+  },
+
+  "channel_name_to_id": {
+    "_source": "Adc_s32k344_mapbga257.epd AdcChannelName ENUMERATION (literal AdcChannelName, AdcChannelId = integer after 'ChanNum'). There is NO S0..S7; S-channels start at S8. X0..X3 reuse the symbolic name across several ChanNum ids; the .mex stores the full literal, so the key is the full literal.",
+    "P0_ChanNum0": 0,
+    "P1_ChanNum1": 1,
+    "P2_ChanNum2": 2,
+    "P3_ChanNum3": 3,
+    "P4_ChanNum4": 4,
+    "P5_ChanNum5": 5,
+    "P6_ChanNum6": 6,
+    "P7_ChanNum7": 7,
+    "S8_ChanNum32": 32,
+    "S9_ChanNum33": 33,
+    "S10_ChanNum34": 34,
+    "S11_ChanNum35": 35,
+    "S12_ChanNum36": 36,
+    "S13_ChanNum37": 37,
+    "S14_ChanNum38": 38,
+    "S15_ChanNum39": 39,
+    "S16_ChanNum40": 40,
+    "S17_ChanNum41": 41,
+    "S18_ChanNum42": 42,
+    "S19_ChanNum43": 43,
+    "S20_ChanNum44": 44,
+    "S21_ChanNum45": 45,
+    "S22_ChanNum46": 46,
+    "S23_ChanNum47": 47,
+    "BANDGAP_ChanNum48": 48,
+    "TEMPSENSOR_OUTPUT_ChanNum49": 49,
+    "ANAMUX_OUTPUT_ChanNum50": 50,
+    "VREFL_ChanNum54": 54,
+    "VREFH_ChanNum55": 55,
+    "X0_ChanNum64": 64,
+    "X0_ChanNum65": 65,
+    "X0_ChanNum66": 66,
+    "X0_ChanNum67": 67,
+    "X0_ChanNum68": 68,
+    "X0_ChanNum69": 69,
+    "X0_ChanNum70": 70,
+    "X0_ChanNum71": 71,
+    "X1_ChanNum72": 72,
+    "X1_ChanNum73": 73,
+    "X1_ChanNum74": 74,
+    "X1_ChanNum75": 75,
+    "X1_ChanNum76": 76,
+    "X1_ChanNum77": 77,
+    "X1_ChanNum78": 78,
+    "X1_ChanNum79": 79,
+    "X2_ChanNum80": 80,
+    "X2_ChanNum81": 81,
+    "X2_ChanNum82": 82,
+    "X2_ChanNum83": 83,
+    "X2_ChanNum84": 84,
+    "X2_ChanNum85": 85,
+    "X2_ChanNum86": 86,
+    "X2_ChanNum87": 87,
+    "X3_ChanNum88": 88,
+    "X3_ChanNum89": 89,
+    "X3_ChanNum90": 90,
+    "X3_ChanNum91": 91,
+    "X3_ChanNum92": 92,
+    "X3_ChanNum93": 93,
+    "X3_ChanNum94": 94,
+    "X3_ChanNum95": 95
+  },
+
+  "channel_short_name_aliases": {
+    "_note": "Convenience map from the short channel name a user types (e.g. VREFL, S10, P5) to the full AdcChannelName literal used in the .mex. Derived from channel_name_to_id by stripping the _ChanNum<id> suffix. For X-channels the short name is ambiguous (X0 maps to 64..71); the user must give the full literal for those. Only the unambiguous short names are listed here.",
+    "P0": "P0_ChanNum0",
+    "P1": "P1_ChanNum1",
+    "P2": "P2_ChanNum2",
+    "P3": "P3_ChanNum3",
+    "P4": "P4_ChanNum4",
+    "P5": "P5_ChanNum5",
+    "P6": "P6_ChanNum6",
+    "P7": "P7_ChanNum7",
+    "S8": "S8_ChanNum32",
+    "S9": "S9_ChanNum33",
+    "S10": "S10_ChanNum34",
+    "S11": "S11_ChanNum35",
+    "S12": "S12_ChanNum36",
+    "S13": "S13_ChanNum37",
+    "S14": "S14_ChanNum38",
+    "S15": "S15_ChanNum39",
+    "S16": "S16_ChanNum40",
+    "S17": "S17_ChanNum41",
+    "S18": "S18_ChanNum42",
+    "S19": "S19_ChanNum43",
+    "S20": "S20_ChanNum44",
+    "S21": "S21_ChanNum45",
+    "S22": "S22_ChanNum46",
+    "S23": "S23_ChanNum47",
+    "BANDGAP": "BANDGAP_ChanNum48",
+    "TEMPSENSOR_OUTPUT": "TEMPSENSOR_OUTPUT_ChanNum49",
+    "ANAMUX_OUTPUT": "ANAMUX_OUTPUT_ChanNum50",
+    "VREFL": "VREFL_ChanNum54",
+    "VREFH": "VREFH_ChanNum55"
+  },
+
+  "enum_domains": {
+    "_source": "Adc.xdm enumeration literal sets for the named vars.",
+    "AdcTransferType": ["ADC_INTERRUPT", "ADC_DMA"],
+    "AdcGroupAccessMode": ["ADC_ACCESS_MODE_SINGLE", "ADC_ACCESS_MODE_STREAMING"],
+    "AdcGroupConversionMode": ["ADC_CONV_MODE_ONESHOT", "ADC_CONV_MODE_CONTINUOUS"],
+    "AdcGroupConversionType": ["ADC_CONV_TYPE_NORMAL", "ADC_CONV_TYPE_INJECTED"],
+    "AdcGroupTriggSrc": ["ADC_TRIGG_SRC_SW", "ADC_TRIGG_SRC_HW"],
+    "AdcThresholdControlRegister": [
+      "ADC_THRESHOLD_REG_0",
+      "ADC_THRESHOLD_REG_1",
+      "ADC_THRESHOLD_REG_2",
+      "ADC_THRESHOLD_REG_3"
+    ]
+  },
+
+  "cli_enum_map": {
+    "_note": "Maps the minimal CLI/intent --spec tokens a cold agent authors to the .mex enum values, so SKILL.md examples stay short. Grounded in enum_domains above.",
+    "transfer": {
+      "interrupt": "ADC_INTERRUPT",
+      "dma": "ADC_DMA"
+    },
+    "access": {
+      "single": "ADC_ACCESS_MODE_SINGLE",
+      "streaming": "ADC_ACCESS_MODE_STREAMING"
+    },
+    "conv": {
+      "oneshot": "ADC_CONV_MODE_ONESHOT",
+      "continuous": "ADC_CONV_MODE_CONTINUOUS"
+    },
+    "trigger": {
+      "sw": "ADC_TRIGG_SRC_SW",
+      "hw": "ADC_TRIGG_SRC_HW"
+    }
+  },
+
+  "sampling_derivation": {
+    "_source": "Adc.xdm: AdcPrescale enum {1,2,4} DEFAULT 1 (L426-437); AdcSamplingDuration0/1/2 INVALID Range >=8 and <=255 (L3718-3720). ADC source clock for ADC0/ADC1/ADC2 in the Autombd_Test_Adc_S32K344 fixture = 160 MHz (clock_output ADC1_CLK.outFreq, fixture line ~119).",
+    "adc_source_clock_hz": 160000000,
+    "allowed_prescalers": [1, 2, 4],
+    "default_prescaler": 1,
+    "sampling_duration_min": 8,
+    "sampling_duration_max": 255,
+    "formula": "AdcSamplingDuration<band> = round(sampling_time_seconds * adc_source_clock_hz / prescaler). Choose the smallest allowed prescaler that lands the result within [sampling_duration_min, sampling_duration_max]. The three bands SD0/SD1/SD2 cover channels 0-31 / 32-63 / 64-95; the same derived value is written to all three because one sampling time is requested for the whole group. AdcChannelSampTime is READONLY/unused -- do NOT write it.",
+    "examples": {
+      "_note": "Illustrative checks only; the value is always computed from the formula, never read from here.",
+      "1us_prescale1": 160,
+      "4us_prescale1": 640,
+      "4us_prescale4": 160
+    }
+  },
+
+  "unit": {
+    "_source": "Adc.xdm AdcConfigSet/AdcHwUnit + fixture AdcHwUnit_0. Field order and defaults are byte-faithful to the Autombd_Test_Adc_S32K344 fixture AdcHwUnit_0 so a new unit struct reproduces the vendor shape exactly.",
+    "hw_unit_id_enum": ["ADC0", "ADC1", "ADC2"],
+    "default_resolution": "RESOLUTION_14",
+    "resolution_max_threshold": {
+      "RESOLUTION_14": 16383,
+      "RESOLUTION_12": 4095,
+      "RESOLUTION_10": 1023,
+      "RESOLUTION_8": 255
+    }
+  },
+
+  "group_defaults": {
+    "_source": "Fixture AdcGroup_0 struct (byte-faithful field order/defaults). AdcGroupConversionConfiguration holds SD0/SD1/SD2; AdcAlternateGroupConvTimings holds the alternate bands (left at fixture defaults). AdcNotification array holds the completion callback as <setting name=\"0\" value=\"<fn>\"/>; requires AdcGeneral/AdcGrpNotifCapability=true (fixture already true).",
+    "AdcGroupConversionType": "ADC_CONV_TYPE_NORMAL",
+    "AdcGroupHwTriggerSource_ref": "/Adc/Adc/AdcConfigSet/AdcHwTrigger_0",
+    "AdcStreamingBufferMode": "ADC_STREAM_BUFFER_LINEAR",
+    "AdcGroupHardwareAverageSelect": "SAMPLES_4",
+    "alt_sampling_duration_default": 22,
+    "notification_array": "AdcNotification",
+    "notification_capability_setting": "AdcGrpNotifCapability"
+  },
+
+  "watchdog": {
+    "_source": "Adc.xdm AdcConfigSet/AdcHwUnit/AdcThresholdControl (L3934-4090): fields AdcThresholdControlRegister (DEFAULT ADC_THRESHOLD_REG_0), AdcHighThreshold (DEFAULT 16383, <=resolution max), AdcLowThreshold (DEFAULT 0); High>=Low. Channel-level: AdcEnableThresholds gates AdcThresholdRegister ref + AdcWdogNotification. Coherence INVALID rules: L2758 channel thresholds require AutosarExt/AdcEnableWatchdogApi=true; L2761/L204 require the unit's AdcHwConfiguration[AdcHwConfiguredId=<unit>]/WdgThresholdEnable=true; L2791 the AdcThresholdRegister ref must be non-empty and contain the Hw Unit struct name.",
+    "default_threshold_register": "ADC_THRESHOLD_REG_0",
+    "high_threshold_default": 16383,
+    "low_threshold_default": 0,
+    "global_watchdog_api_setting": "AdcEnableWatchdogApi",
+    "global_watchdog_api_path": "AutosarExt/AdcEnableWatchdogApi",
+    "unit_wdg_threshold_enable_setting": "WdgThresholdEnable",
+    "channel_enable_thresholds_setting": "AdcEnableThresholds",
+    "channel_threshold_register_ref_array": "AdcThresholdRegister",
+    "channel_wdog_notification_setting": "AdcWdogNotification",
+    "threshold_register_ref_path_pattern": "/Adc/Adc/AdcConfigSet/{unit_name}/{threshold_control_name}"
+  },
+
+  "bctu": {
+    "_source": "Adc.xdm AdcConfigSet/BctuHwUnit (field order L4207..) + BctuInternalTrigger (L4399..: BctuTriggerSource ref, BctuTriggerLoop DEFAULT false, BctuDataDestination enum, BctuHwTriggerEnable DEFAULT true, BctuTriggerConversionMode enum incl SINGLE L4504, BctuAdcTargetMask INTEGER DEFAULT 1, BctuAdcChannelSingle ref, BctuConversionListStartIndex DEFAULT 0) + BctuAdcNotifications (L4657..: BctuAdcNotificationsAdcIndex ref, BctuAdcNewDataNotification, BctuDataOverrunNotification, BctuListLastConversionNotification). Trigger-source tokens + BctuDataDestination enum from Adc_s32k344_mapbga257.epd. Gating: AdcGeneral/AdcHwTriggerApi (any HW-trigger group) + AutosarExt/AdcEnableCtuControlModeApi (gates BctuHwUnit editability/presence, Adc.xdm L4182/L4186/L4203). The fixture already has a placeholder AdcHwTrigger_0; ADC-003 repoints its AdcHwTrigSrc and populates the empty BctuHwUnit array.",
+    "hw_trigger_api_setting": "AdcHwTriggerApi",
+    "ctu_control_mode_api_setting": "AdcEnableCtuControlModeApi",
+    "adc_hw_trigger_name": "AdcHwTrigger_0",
+    "adc_hw_trigger_ref_path": "/Adc/Adc/AdcConfigSet/AdcHwTrigger_0",
+    "adc_hw_trigger_source_setting": "AdcHwTrigSrc",
+    "trigger_source_prefixes": ["BCTU_EMIOS_0_", "BCTU_EMIOS_1_", "BCTU_EMIOS_2_"],
+    "trigger_source_extra_tokens": ["EXT_TRIG", "AUX_EXT_TRIG"],
+    "emios_channel_max": 22,
+    "conversion_mode_map": {"single": "SINGLE"},
+    "data_destination_map": {
+      "data_reg": "BCTU_ADC_DATA_REG",
+      "fifo1": "BCTU_FIFO1",
+      "fifo2": "BCTU_FIFO2"
+    },
+    "default_data_destination": "BCTU_ADC_DATA_REG",
+    "adc_target_bit_by_unit": {"ADC0": 0, "ADC1": 1, "ADC2": 2},
+    "unit_index_ref_path_pattern": "/Adc/Adc/AdcConfigSet/{unit_name}",
+    "channel_ref_path_pattern": "/Adc/Adc/AdcConfigSet/{unit_name}/{channel_struct_name}"
+  },
+
+  "constraints": {
+    "_note": "Adc.xdm INVALID/RANGE rules over the IMPLEMENTED editable surface, encoded as static-check blockers so ARBITRARY valid inputs are held to the same rules ConfigTools enforces (not just the four ADC E2E cases). Each rule cites the Adc.xdm line. Enforced in checks/static.py::_check_adc; pinned to this asset by tests/unit/test_adc_static_checks.py.",
+    "group_streaming_num_samples": {
+      "_source": "Adc.xdm AdcStreamingNumSamples L3405-3411 (INVALID Range 1..255; RANGE XPath L3410: SINGLE access requires ==1) + DESC L3389-3391 (streaming acquires several samples per channel).",
+      "single_access_num_samples": 1,
+      "streaming_access_num_samples_min": 2,
+      "code_single": "adc_group_single_num_samples_invalid",
+      "code_streaming": "adc_group_streaming_num_samples_invalid"
+    },
+    "bctu_target_mask_single_bit_for_single_mode": {
+      "_source": "Adc.xdm BctuAdcTargetMask INVALID L4539-4540: (BctuTriggerConversionMode='SINGLE') and bit:and(N, N-1) != 0 is invalid -- a multi-ADC mask is valid only for LIST conversion.",
+      "single_mode_mask_must_be_single_bit": true,
+      "code": "adc_bctu_target_mask_invalid"
+    },
+    "bctu_list_start_index_below_list_length": {
+      "_source": "Adc.xdm BctuConversionListStartIndex INVALID L4620-4622: (BctuTriggerConversionMode='LIST') and (start >= count(BctuListItems/*)) is invalid -- start index must be < list length.",
+      "list_mode_start_index_lt_list_length": true,
+      "code": "adc_bctu_list_start_index_invalid"
+    },
+    "bctu_trigger_source_unique": {
+      "_source": "Adc.xdm AdcHwTrigSrc INVALID L4170 (text:uniq trigger source) + BctuTriggerSource INVALID L4418 (trigger index unique across BctuInternalTrigger). Each AdcHwTrigger must have a distinct AdcHwTrigSrc; each BctuInternalTrigger references a distinct AdcHwTrigger.",
+      "code_apply": "adc_bctu_trigger_source_duplicate"
+    },
+    "threshold_register_ref_resolves": {
+      "_note": "Already enforced by adc_threshold_ref_incomplete: a channel with AdcEnableThresholds=true must reference an AdcThresholdControl on the same unit (Adc.xdm AdcThresholdRegister REF L2786 + L2791). Listed here for completeness; not duplicated.",
+      "code": "adc_threshold_ref_incomplete"
+    }
+  },
+
+  "hw_configuration": {
+    "_source": "Adc.xdm AdcConfigSet sibling array AdcHwConfiguration + fixture AdcHwConfiguration_0 (AdcHwConfiguredId=ADC0). One entry per Hw Unit id. AdcNormalInterruptEnable gates ADC_INTERRUPT transfer; WdgThresholdEnable gates channel thresholds; DmaTransferEnable gates ADC_DMA transfer.",
+    "configured_id_setting": "AdcHwConfiguredId",
+    "normal_interrupt_enable_setting": "AdcNormalInterruptEnable",
+    "wdg_threshold_enable_setting": "WdgThresholdEnable",
+    "dma_transfer_enable_setting": "DmaTransferEnable",
+    "field_order": [
+      "Name",
+      "AdcHwConfiguredId",
+      "AdcNormalInterruptEnable",
+      "AdcInjectedInterruptEnable",
+      "AdcFifoFullInterruptEnable",
+      "CtuFifoOfInterruptEnable",
+      "WdgThresholdEnable",
+      "DmaTransferEnable"
+    ]
+  },
+
+  "coherence_flags": {
+    "_note": "AutosarExt/AdcEnableThresholdConfigurationApi gating (L6709): requires AdcEnableWatchdogApi=true. Listed so a later watchdog-config path stays coherent; ADC-001 does not flip AdcEnableThresholdConfigurationApi.",
+    "global_watchdog_api_setting": "AdcEnableWatchdogApi",
+    "threshold_configuration_api_setting": "AdcEnableThresholdConfigurationApi"
+  }
+}

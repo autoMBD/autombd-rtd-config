@@ -56,9 +56,24 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 UART_FIXTURE = (
     REPO_ROOT / "tests" / "fixtures" / "nxp" / "ds" / "s32k3" / "Uart_Example_S32K344"
 )
+# ADC-ready S32DS project (ADC0 baseline; ADC source clock 160 MHz). Used by the
+# ADC E2E/unit cases that need a real Adc instance to edit.
+ADC_FIXTURE = (
+    REPO_ROOT / "tests" / "fixtures" / "nxp" / "ds" / "s32k3" / "Autombd_Test_Adc_S32K344"
+)
 
 
 def copy_uart_fixture(tmp_path: Path) -> Path:
     target = tmp_path / "Uart_Example_S32K344"
     shutil.copytree(UART_FIXTURE, target)
+    return target
+
+
+def copy_adc_fixture(tmp_path: Path) -> Path:
+    """Copy the ADC-ready S32K344 project into ``tmp_path`` and return its dir.
+
+    The project's single .mex is ``Autombd_Test_Adc_S32K344.mex``.
+    """
+    target = tmp_path / "Autombd_Test_Adc_S32K344"
+    shutil.copytree(ADC_FIXTURE, target)
     return target
