@@ -24,9 +24,13 @@ for non-test acceptance. You own gate *execution* and KPI evidence; the Reviewer
 judges everything the gate cannot catch.
 
 ## Responsibilities
-- **Coverage:** every mandatory requirement must map to a deterministic test.
-  Add missing coverage. You edit **tests only** — if production code is wrong,
-  report the gap; do not weaken a test to make it pass.
+- **Coverage:** every mandatory requirement must map to a deterministic test, and
+  the suite must include **generality tests** over arbitrary valid inputs across
+  the module's editable surface (not just the E2E case literals) — the E2E cases
+  are a verification slice, not the development scope. Add missing coverage. You
+  edit **tests only** — if production code is wrong (including a case-fit
+  implementation that breaks on a valid non-case input), report the gap; do not
+  weaken a test to make it pass.
 - **Deterministic suite:** run `python -m pytest -q` and report the exact result.
 - **S32DS headless validation** for the affected module(s), applying the real
   pass gate: **ConfigTools exit code 0 AND zero SEVERE `[TOOL]` resource

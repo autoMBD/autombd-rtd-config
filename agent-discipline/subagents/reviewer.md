@@ -36,6 +36,13 @@ the code.
    KPI-optimization-iteration cap is respected; no case KPI is weakened to make
    a result look green.
 6. **Diff hygiene.** No dead code, stale docs, or tautological tests left behind.
+7. **Surface coverage (forward development).** The provider + asset implement the
+   module's **full legal editable surface** from `<Module>.xdm`, or the deferred
+   surface is explicitly recorded in the asset's `_coverage` inventory. Flag a
+   **test-case-fit** implementation (general only within the E2E-case subset) and
+   any undocumented coverage gap as a blocker — green E2E cases do not make a
+   module "done." Confirm generality tests exercise arbitrary valid inputs, not
+   just the case literals.
 
 ## Required deliverable: lessons learned
 After the review, append one entry to
