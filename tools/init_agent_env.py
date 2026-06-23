@@ -40,9 +40,9 @@
 # File:        init_agent_env.py
 # Author:      autoMBD <tkung.lqk@foxmail.com>
 # Date:        2026-06-23
-# Version:     0.1.0
+# Version:     0.2.0
 # Description: Unified structured input collector for Agent environment
-#              initialization. Runs as an interactive CLI to collect target
+#              initialization. Opens a tkinter GUI dialog to collect target
 #              platforms, operation mode, external dependency paths, and
 #              additional skill imports. Outputs deployment-ready JSON to
 #              stdout (or a file with --output). Also accepts pre-collected
@@ -54,6 +54,10 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import tkinter as tk
+import tkinter.filedialog as filedialog
+import tkinter.messagebox as messagebox
+import tkinter.ttk as ttk
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -79,215 +83,28 @@ PLATFORM_AGENT_DIRS: dict[str, str] = {
 }
 
 
-def _safe_input(prompt: str) -> str:
-    try:
-        return input(prompt)
-    except EOFError:
-        print("\nInput interrupted.", file=sys.stderr)
-        raise SystemExit(1)
-    except KeyboardInterrupt:
-        print("\nCancelled.", file=sys.stderr)
-        raise SystemExit(130)
-
-
-def _choose_multi(label: str, options: list[str]) -> list[str]:
-    print(f"\n{label}")
-    for i, opt in enumerate(options, 1):
-        print(f"  [{i}] {opt}")
-    print(f"  [0] Done / none")
-
-    selected: list[str] = []
-    while True:
-        raw = _safe_input("Enter number (0 when done): ").strip()
-        if raw == "":
-            continue
-        try:
-            n = int(raw)
-        except ValueError:
-            print(f"  Invalid number: {raw!r}")
-            continue
-        if n == 0:
-            break
-        if 1 <= n <= len(options):
-            name = options[n - 1]
-            if name not in selected:
-                selected.append(name)
-                print(f"  Added: {name}")
-            else:
-                print(f"  Already selected: {name}")
-        else:
-            print(f"  Out of range [1..{len(options)}]")
-    return selected
-
-
-def _choose_one(label: str, options: list[str]) -> str:
-    print(f"\n{label}")
-    for i, opt in enumerate(options, 1):
-        print(f"  [{i}] {opt}")
-
-    while True:
-        raw = _safe_input("Enter number: ").strip()
-        try:
-            n = int(raw)
-        except ValueError:
-            print(f"  Invalid number: {raw!r}")
-            continue
-        if 1 <= n <= len(options):
-            return options[n - 1]
-        print(f"  Out of range [1..{len(options)}]")
-
-
-def _choose_yes_no(question: str) -> bool:
-    while True:
-        raw = _safe_input(f"{question} [y/N]: ").strip().lower()
-        if raw in ("y", "yes"):
-            return True
-        if raw in ("n", "no", ""):
-            return False
-        print(f"  Please answer y or n.")
-
-
-def _ask_path(prompt: str) -> str:
-    while True:
-        raw = _safe_input(f"{prompt}: ").strip().strip("\"'")
-        if not raw:
-            print("  Path cannot be empty.")
-            continue
-        p = Path(raw).expanduser()
-        if not p.exists():
-            if _choose_yes_no(f"  Path does not exist: {p}. Use anyway?"):
-                return str(p.resolve())
-            continue
-        return str(p.resolve())
+# ── validation utilities ──────────────────────────────────────────────
 
 
 def _verify_s32ds_root(path: str) -> bool:
+    if not path:
+        return False
     p = Path(path)
     if not p.is_dir():
         return False
-    markers = [
-        p / "eclipse",
-        p / "S32DS",
-    ]
+    markers = [p / "eclipse", p / "S32DS"]
     return any(m.is_dir() for m in markers)
 
 
 def _verify_rtd_root(path: str) -> bool:
+    if not path:
+        return False
     p = Path(path)
     if not p.is_dir():
         return False
     entries = list(p.iterdir())
     rtd_packages = [e for e in entries if e.is_dir() and "_TS_T" in e.name]
     return len(rtd_packages) > 0
-
-
-def _ask_import_skills() -> dict[str, Any] | None:
-    print("\n--- Additional Skills Import ---")
-    choice = _choose_one(
-        "Import additional skills?",
-        [
-            "Skip — do not import additional skills",
-            "Import from local directory",
-            "Install from online source",
-        ],
-    )
-    if "Skip" in choice:
-        return None
-
-    result: dict[str, Any] = {}
-
-    if "local" in choice:
-        local = _ask_path("Local skill directory path")
-        result["type"] = "local"
-        result["path"] = local
-        result["description"] = f"Import skills from local directory: {local}"
-    elif "online" in choice:
-        url = _safe_input("Online skill source URL: ").strip()
-        result["type"] = "online"
-        result["url"] = url
-        result["description"] = f"Install skills from online source: {url}"
-
-    return result
-
-
-def run_interactive() -> dict[str, Any]:
-    print("=" * 60)
-    print("  RTD CfgFile CLI — Agent Environment Initialization")
-    print("=" * 60)
-
-    platforms = _choose_multi(
-        "Select target Agent platforms (multiple allowed):",
-        list(SUPPORTED_PLATFORMS),
-    )
-    if not platforms:
-        print("No platforms selected. Exiting.", file=sys.stderr)
-        raise SystemExit(1)
-
-    mode = _choose_one(
-        "Select operation mode:",
-        [
-            "Update — preserve existing environment; change only what is explicitly entered",
-            "Reset — clear project-level Agent environment and .agent-state/ for selected platforms, then reinitialize",
-        ],
-    )
-
-    reset_confirmed = False
-    if "Reset" in mode:
-        print(f"\n  RESET will clear the following for platforms: {', '.join(platforms)}")
-        print(f"    - Skill symlinks and subagent files under project-level directories")
-        print(f"    - The entire .agent-state/ cache")
-        print(f"  User-level and global Agent environments will NOT be affected.")
-        reset_confirmed = _choose_yes_no("  Confirm reset?")
-        if not reset_confirmed:
-            print("Reset cancelled. Switching to Update mode.")
-            mode = "update"
-
-    print("\n--- External Dependencies ---")
-    print("S32 Design Studio (S32DS) is a hard prerequisite for RTD CfgFile CLI")
-    print("module development. Provide the installation root path.")
-
-    s32ds_path = _ask_path("S32DS installation root")
-    if not _verify_s32ds_root(s32ds_path):
-        print(f"  WARNING: {s32ds_path} does not appear to be a valid S32DS root.")
-        print("  Expected subdirectories: eclipse/, S32DS/")
-        if not _choose_yes_no("  Proceed anyway?"):
-            print("Aborted by user.", file=sys.stderr)
-            raise SystemExit(1)
-
-    print("\nRTD packages are located under the PlatformSDK S32K3 RTD directory.")
-    print('Example: C:\\NXP\\S32DS.3.6.7\\S32DS\\software\\PlatformSDK_S32K3\\RTD')
-
-    rtd_path = _ask_path("RTD installation path")
-    if not _verify_rtd_root(rtd_path):
-        print(f"  WARNING: {rtd_path} does not contain RTD package directories (*_TS_T*).")
-        if not _choose_yes_no("  Proceed anyway?"):
-            print("Aborted by user.", file=sys.stderr)
-            raise SystemExit(1)
-
-    import_skills = _ask_import_skills()
-
-    result: dict[str, Any] = {
-        "version": 1,
-        "collected_at": datetime.now(timezone.utc).isoformat(),
-        "platforms": platforms,
-        "mode": "update" if "Update" in mode else "reset",
-        "reset_confirmed": reset_confirmed,
-        "s32ds_path": s32ds_path.replace("\\", "/"),
-        "rtd_path": rtd_path.replace("\\", "/"),
-    }
-    if import_skills is not None:
-        result["import_skills"] = import_skills
-
-    return result
-
-
-def load_input_file(path: str) -> dict[str, Any]:
-    p = Path(path)
-    if not p.is_file():
-        print(f"Input file not found: {p}", file=sys.stderr)
-        raise SystemExit(1)
-    with open(p, "r", encoding="utf-8-sig") as fh:
-        return json.load(fh)
 
 
 def validate_input(data: dict[str, Any]) -> list[str]:
@@ -299,7 +116,9 @@ def validate_input(data: dict[str, Any]) -> list[str]:
     else:
         unknown = [p for p in platforms if p not in SUPPORTED_PLATFORMS]
         if unknown:
-            errors.append(f"Unknown platforms: {unknown}. Supported: {list(SUPPORTED_PLATFORMS)}")
+            errors.append(
+                f"Unknown platforms: {unknown}. Supported: {list(SUPPORTED_PLATFORMS)}"
+            )
 
     mode = data.get("mode")
     if mode not in ("update", "reset"):
@@ -308,12 +127,305 @@ def validate_input(data: dict[str, Any]) -> list[str]:
     if mode == "reset" and not data.get("reset_confirmed", False):
         errors.append("'reset_confirmed' must be true for reset mode")
 
-    if not data.get("s32ds_path"):
-        errors.append("'s32ds_path' is required")
-    if not data.get("rtd_path"):
-        errors.append("'rtd_path' is required")
-
     return errors
+
+
+# ── tkinter GUI ────────────────────────────────────────────────────────
+
+
+class InitDialog(tk.Tk):
+    def __init__(self) -> None:
+        super().__init__()
+        self.title("RTD CfgFile CLI — Agent Environment Initialization")
+        self.resizable(False, False)
+
+        self.result: dict[str, Any] | None = None
+
+        self._platform_vars: dict[str, tk.BooleanVar] = {}
+        self._mode_var = tk.StringVar(value="update")
+        self._reset_confirmed_var = tk.BooleanVar(value=False)
+
+        self._s32ds_var = tk.StringVar()
+        self._rtd_var = tk.StringVar()
+        self._skip_paths_var = tk.BooleanVar(value=False)
+
+        self._import_var = tk.StringVar(value="skip")
+        self._import_path_var = tk.StringVar()
+        self._import_url_var = tk.StringVar()
+
+        self._build_ui()
+        self._on_mode_change()
+
+        self.protocol("WM_DELETE_WINDOW", self._on_cancel)
+        self.bind("<Escape>", lambda _e: self._on_cancel())
+
+        self.update_idletasks()
+        w = self.winfo_reqwidth()
+        h = self.winfo_reqheight()
+        x = (self.winfo_screenwidth() - w) // 2
+        y = (self.winfo_screenheight() - h) // 2
+        self.geometry(f"+{x}+{y}")
+
+        self.grab_set()
+        self.focus_force()
+
+    def _build_ui(self) -> None:
+        main = ttk.Frame(self, padding=(16, 12, 16, 12))
+        main.pack(fill="both", expand=True)
+
+        # ── platforms ──
+        plat_frame = ttk.LabelFrame(main, text="Target Agent Platforms", padding=(10, 8))
+        plat_frame.pack(fill="x", pady=(0, 10))
+
+        for pid in SUPPORTED_PLATFORMS:
+            var = tk.BooleanVar(value=False)
+            self._platform_vars[pid] = var
+            cb = ttk.Checkbutton(plat_frame, text=PLATFORM_LABELS[pid], variable=var)
+            cb.pack(anchor="w")
+
+        # ── mode ──
+        mode_frame = ttk.LabelFrame(main, text="Operation Mode", padding=(10, 8))
+        mode_frame.pack(fill="x", pady=(0, 10))
+
+        rb_update = ttk.Radiobutton(
+            mode_frame, text="Update — preserve existing; change only what is entered",
+            variable=self._mode_var, value="update", command=self._on_mode_change,
+        )
+        rb_update.pack(anchor="w")
+
+        rb_reset = ttk.Radiobutton(
+            mode_frame, text="Reset — clear project-level environment & .agent-state/, then reinitialize",
+            variable=self._mode_var, value="reset", command=self._on_mode_change,
+        )
+        rb_reset.pack(anchor="w")
+
+        self._reset_frame = ttk.Frame(mode_frame)
+        self._reset_frame.pack(fill="x", pady=(4, 0))
+        ttk.Label(
+            self._reset_frame,
+            text="Reset clears ONLY project-level files (not user/global).",
+            foreground="red",
+        ).pack(anchor="w")
+        cb_reset = ttk.Checkbutton(
+            self._reset_frame,
+            text="I confirm — clear project-level Agent environment and .agent-state/",
+            variable=self._reset_confirmed_var,
+        )
+        cb_reset.pack(anchor="w")
+
+        # ── external deps ──
+        deps_frame = ttk.LabelFrame(main, text="External Dependencies (optional)", padding=(10, 8))
+        deps_frame.pack(fill="x", pady=(0, 10))
+
+        cb_skip = ttk.Checkbutton(
+            deps_frame,
+            text="Skip S32DS/RTD paths (deploy skills & subagents only)",
+            variable=self._skip_paths_var,
+            command=self._on_skip_toggle,
+        )
+        cb_skip.pack(anchor="w", pady=(0, 6))
+
+        self._deps_content = ttk.Frame(deps_frame)
+        self._deps_content.pack(fill="x")
+
+        row_s32 = ttk.Frame(self._deps_content)
+        row_s32.pack(fill="x", pady=(0, 4))
+        ttk.Label(row_s32, text="S32DS root:").pack(side="left")
+        ttk.Entry(row_s32, textvariable=self._s32ds_var, width=45).pack(side="left", padx=(4, 4))
+        ttk.Button(row_s32, text="Browse...", command=self._browse_s32ds).pack(side="left")
+
+        row_rtd = ttk.Frame(self._deps_content)
+        row_rtd.pack(fill="x")
+        ttk.Label(row_rtd, text="RTD path:   ").pack(side="left")
+        ttk.Entry(row_rtd, textvariable=self._rtd_var, width=45).pack(side="left", padx=(4, 4))
+        ttk.Button(row_rtd, text="Browse...", command=self._browse_rtd).pack(side="left")
+
+        # ── additional skills ──
+        import_frame = ttk.LabelFrame(main, text="Additional Skills (optional)", padding=(10, 8))
+        import_frame.pack(fill="x", pady=(0, 12))
+
+        rb_skip = ttk.Radiobutton(
+            import_frame, text="Skip — do not import additional skills",
+            variable=self._import_var, value="skip", command=self._on_import_change,
+        )
+        rb_skip.pack(anchor="w")
+
+        rb_local = ttk.Radiobutton(
+            import_frame, text="Import from local directory",
+            variable=self._import_var, value="local", command=self._on_import_change,
+        )
+        rb_local.pack(anchor="w")
+
+        rb_online = ttk.Radiobutton(
+            import_frame, text="Install from online source",
+            variable=self._import_var, value="online", command=self._on_import_change,
+        )
+        rb_online.pack(anchor="w")
+
+        self._import_local_frame = ttk.Frame(import_frame)
+        row_local = ttk.Frame(self._import_local_frame)
+        row_local.pack(fill="x", pady=(4, 0))
+        ttk.Label(row_local, text="Directory:").pack(side="left")
+        ttk.Entry(row_local, textvariable=self._import_path_var, width=40).pack(side="left", padx=(4, 4))
+        ttk.Button(row_local, text="Browse...", command=self._browse_import_dir).pack(side="left")
+
+        self._import_online_frame = ttk.Frame(import_frame)
+        row_url = ttk.Frame(self._import_online_frame)
+        row_url.pack(fill="x", pady=(4, 0))
+        ttk.Label(row_url, text="URL:").pack(side="left")
+        ttk.Entry(row_url, textvariable=self._import_url_var, width=52).pack(side="left", padx=(4, 4))
+
+        # ── buttons ──
+        btn_frame = ttk.Frame(main)
+        btn_frame.pack(fill="x")
+
+        ttk.Button(btn_frame, text="OK", command=self._on_ok).pack(side="right", padx=(6, 0))
+        ttk.Button(btn_frame, text="Cancel", command=self._on_cancel).pack(side="right")
+
+    # ── event handlers ──────────────────────────────────────────────
+
+    def _on_mode_change(self) -> None:
+        if self._mode_var.get() == "reset":
+            for child in self._reset_frame.winfo_children():
+                child.configure(state="normal")
+        else:
+            for child in self._reset_frame.winfo_children():
+                child.configure(state="disabled")
+            self._reset_confirmed_var.set(False)
+
+    def _on_skip_toggle(self) -> None:
+        state = "disabled" if self._skip_paths_var.get() else "normal"
+        for child in self._deps_content.winfo_children():
+            self._set_children_state(child, state)
+
+    @staticmethod
+    def _set_children_state(parent: tk.Widget, state: str) -> None:
+        for child in parent.winfo_children():
+            try:
+                child.configure(state=state)
+            except tk.TclError:
+                pass
+            if isinstance(child, tk.Frame) or isinstance(child, ttk.Frame):
+                InitDialog._set_children_state(child, state)
+
+    def _on_import_change(self) -> None:
+        val = self._import_var.get()
+        if val == "local":
+            self._import_local_frame.pack(fill="x", before=self._import_online_frame)
+            self._import_online_frame.pack_forget()
+        elif val == "online":
+            self._import_online_frame.pack(fill="x", before=self._import_local_frame)
+            self._import_local_frame.pack_forget()
+        else:
+            self._import_local_frame.pack_forget()
+            self._import_online_frame.pack_forget()
+
+    def _browse_s32ds(self) -> None:
+        path = filedialog.askdirectory(title="Select S32DS Installation Root")
+        if path:
+            self._s32ds_var.set(Path(path).resolve().as_posix())
+
+    def _browse_rtd(self) -> None:
+        path = filedialog.askdirectory(title="Select RTD Installation Path")
+        if path:
+            self._rtd_var.set(Path(path).resolve().as_posix())
+
+    def _browse_import_dir(self) -> None:
+        path = filedialog.askdirectory(title="Select Skill Directory")
+        if path:
+            self._import_path_var.set(Path(path).resolve().as_posix())
+
+    # ── actions ─────────────────────────────────────────────────────
+
+    def _on_ok(self) -> None:
+        platforms = [pid for pid, var in self._platform_vars.items() if var.get()]
+        if not platforms:
+            messagebox.showwarning("No Platforms", "Please select at least one target platform.")
+            return
+
+        mode = self._mode_var.get()
+
+        if mode == "reset" and not self._reset_confirmed_var.get():
+            messagebox.showwarning(
+                "Reset Not Confirmed",
+                "Please confirm the reset by checking the confirmation box.",
+            )
+            return
+
+        s32ds_path = ""
+        rtd_path = ""
+        if not self._skip_paths_var.get():
+            s32ds_path = self._s32ds_var.get().strip()
+            rtd_path = self._rtd_var.get().strip()
+
+            if s32ds_path and not _verify_s32ds_root(s32ds_path):
+                if not messagebox.askyesno(
+                    "Invalid S32DS Path",
+                    f"The path does not appear to be a valid S32DS root:\n{s32ds_path}\n\nUse anyway?",
+                ):
+                    return
+
+            if rtd_path and not _verify_rtd_root(rtd_path):
+                if not messagebox.askyesno(
+                    "Invalid RTD Path",
+                    f"The path does not contain RTD packages (*_TS_T*):\n{rtd_path}\n\nUse anyway?",
+                ):
+                    return
+
+        import_skills: dict[str, Any] | None = None
+        import_type = self._import_var.get()
+        if import_type == "local":
+            local_path = self._import_path_var.get().strip()
+            if local_path:
+                import_skills = {
+                    "type": "local",
+                    "path": local_path,
+                    "description": f"Import skills from local directory: {local_path}",
+                }
+        elif import_type == "online":
+            url = self._import_url_var.get().strip()
+            if url:
+                import_skills = {
+                    "type": "online",
+                    "url": url,
+                    "description": f"Install skills from online source: {url}",
+                }
+
+        self.result = {
+            "version": 1,
+            "collected_at": datetime.now(timezone.utc).isoformat(),
+            "platforms": platforms,
+            "mode": mode,
+            "reset_confirmed": (mode == "reset" and self._reset_confirmed_var.get()),
+            "s32ds_path": s32ds_path.replace("\\", "/"),
+            "rtd_path": rtd_path.replace("\\", "/"),
+        }
+        if import_skills is not None:
+            self.result["import_skills"] = import_skills
+
+        self.destroy()
+
+    def _on_cancel(self) -> None:
+        self.result = None
+        self.destroy()
+
+
+def run_gui() -> dict[str, Any] | None:
+    app = InitDialog()
+    app.mainloop()
+    return app.result
+
+
+# ── CLI entry point ────────────────────────────────────────────────────
+
+
+def load_input_file(path: str) -> dict[str, Any]:
+    p = Path(path)
+    if not p.is_file():
+        print(f"Input file not found: {p}", file=sys.stderr)
+        raise SystemExit(1)
+    with open(p, "r", encoding="utf-8-sig") as fh:
+        return json.load(fh)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -336,6 +448,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--validate-only",
         action="store_true",
         help="Validate an existing input file without interactive collection (requires --input)",
+    )
+    parser.add_argument(
+        "--no-gui",
+        action="store_true",
+        help="Fall back to text CLI prompts instead of GUI (when tkinter is unavailable)",
     )
     return parser
 
@@ -364,7 +481,26 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"ERROR: {e}", file=sys.stderr)
             return 1
     else:
-        data = run_interactive()
+        if args.no_gui:
+            print("--no-gui is not implemented. Use --input to supply pre-collected data.", file=sys.stderr)
+            return 2
+
+        try:
+            result = run_gui()
+        except tk.TclError as exc:
+            print(
+                f"GUI initialization failed: {exc}\n"
+                "tkinter may not be available in this environment.\n"
+                "Run with --input to supply pre-collected JSON.",
+                file=sys.stderr,
+            )
+            return 2
+
+        if result is None:
+            print("Cancelled by user.", file=sys.stderr)
+            return 130
+
+        data = result
 
     json_text = json.dumps(data, indent=2, ensure_ascii=False)
 
