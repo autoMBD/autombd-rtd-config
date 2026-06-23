@@ -133,7 +133,6 @@ def test_initialize_agent_discipline_uses_native_platform_paths():
         ".codex/agents/<name>.toml",
         ".agents/skills/<name>/",
         "references/platform-contract.md",
-        "tools/deploy_agent_env.py",
     ):
         assert required in skill
 
@@ -144,3 +143,38 @@ def test_initialize_agent_discipline_uses_native_platform_paths():
     collector = Path("tools/init_agent_env.py").read_text(encoding="utf-8")
     assert '"opencode": ".opencode/skills"' not in collector
     assert '"codex": ".agents/agents"' not in collector
+
+
+def test_initialize_agent_discipline_requires_gui_first_complete_input():
+    skill = Path(
+        "agent-discipline/skills/initialize-agent-discipline/SKILL.md"
+    ).read_text(encoding="utf-8")
+
+    for required in (
+        "native structured GUI input",
+        "must not infer target platforms",
+        "must not infer the operation mode",
+        "S32DS and RTD paths are required",
+        "env.s32ds",
+        "env.rtd",
+        "Do not deploy anything until the GUI input is complete",
+        "Initialization is complete only when",
+    ):
+        assert required in skill
+
+    for forbidden in (
+        "Default to update mode",
+        "optional S32DS and RTD paths",
+        "Empty paths are valid",
+        "Use portable text prompts",
+        "tools/init_agent_env.py",
+        "tools/deploy_agent_env.py",
+    ):
+        assert forbidden not in skill
+
+    platform_contract = Path(
+        "agent-discipline/skills/initialize-agent-discipline/"
+        "references/platform-contract.md"
+    ).read_text(encoding="utf-8")
+    assert "native project-local file tools" in platform_contract
+    assert "Use a deterministic deployment script" not in platform_contract
