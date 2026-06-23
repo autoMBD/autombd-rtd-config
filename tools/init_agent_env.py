@@ -410,29 +410,10 @@ class InitDialog(tk.Tk):
         self.destroy()
 
 
-def _can_open_display() -> bool:
-    """Return True if tkinter can create a window in the current environment."""
-    try:
-        root = tk.Tk()
-        root.withdraw()
-        root.destroy()
-        return True
-    except tk.TclError:
-        return False
-
-
 def run_gui() -> dict[str, Any] | None:
     app = InitDialog()
     app.mainloop()
     return app.result
-
-
-def run_interactive() -> dict[str, Any] | None:
-    """Try GUI first; fall back to CLI if display is unavailable."""
-    if _can_open_display():
-        return run_gui()
-    print("[no display — using text mode]", file=sys.stderr)
-    return run_cli()
 
 
 # ── CLI interactive fallback ────────────────────────────────────────────
@@ -517,7 +498,6 @@ def _ask_path_optional(prompt: str) -> str:
 def run_cli() -> dict[str, Any] | None:
     print("=" * 60)
     print("  RTD CfgFile CLI — Agent Environment Initialization")
-    print("  (text mode — use --no-gui when tkinter is unavailable)")
     print("=" * 60)
 
     platforms = _choose_multi(
@@ -641,9 +621,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="Validate an existing input file without interactive collection (requires --input)",
     )
     parser.add_argument(
-        "--no-gui",
+        "--gui",
         action="store_true",
-        help="Fall back to text CLI prompts instead of GUI (when tkinter is unavailable)",
+        help="Open tkinter GUI dialog instead of text prompts (requires desktop display)",
     )
     return parser
 
@@ -671,16 +651,19 @@ def main(argv: list[str] | None = None) -> int:
             for e in errors:
                 print(f"ERROR: {e}", file=sys.stderr)
             return 1
-    elif args.no_gui:
-        print("[text mode requested]", file=sys.stderr)
-        result = run_cli()
+    elif args.gui:
+        try:
+            result = run_gui()
+        except tk.TclError:
+            print("tkinter unavailable — falling back to text mode", file=sys.stderr)
+            result = run_cli()
         if result is None:
+            print("Cancelled by user.", file=sys.stderr)
             return 130
         data = result
     else:
-        result = run_interactive()
+        result = run_cli()
         if result is None:
-            print("Cancelled by user.", file=sys.stderr)
             return 130
         data = result
 

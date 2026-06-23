@@ -108,15 +108,21 @@ Run the unified input collector GUI:
 python tools/init_agent_env.py --output .agent-state/init-input.json
 ```
 
-This opens a tkinter dialog with:
+The default mode is **interactive text prompts** (numbered choices, works in all
+environments). The script presents:
 
-- **Target platforms** — checkboxes for Codex, Claude, OpenCode
+- **Target platforms** — multi-select from `codex`, `claude`, `opencode`
 - **Operation mode** — Update (preserve existing) or Reset (clear + reinitialize)
-- **Reset confirmation** — checkbox, visible only when Reset is selected
-- **S32DS installation root** — text entry + **Browse...** button; optional
-  (check "Skip S32DS/RTD paths" to deploy skills/subagents only)
-- **RTD installation path** — text entry + **Browse...** button; optional
+- **Reset confirmation** — yes/no prompt, shown only when Reset is selected
+- **S32DS installation root** — text entry, press Enter to skip; optional
+- **RTD installation path** — text entry, press Enter to skip; optional
 - **Additional skills import** — Skip / Local directory / Online URL
+
+Use `--gui` to open a tkinter window instead (requires desktop display).
+
+```bash
+python tools/init_agent_env.py --gui --output .agent-state/init-input.json
+```
 
 On OK the script validates inputs and writes JSON to the `--output` file. On
 Cancel the script exits with code 130.
@@ -126,9 +132,6 @@ If the input has already been collected, reload it:
 ```bash
 python tools/init_agent_env.py --input .agent-state/init-input.json
 ```
-
-If tkinter is unavailable (headless environment), supply pre-collected input
-via `--input`.
 
 #### Collected Input Schema
 
