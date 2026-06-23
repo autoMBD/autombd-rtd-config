@@ -470,11 +470,21 @@ def _check_adc(doc: MexDocument, diagnostics: list[Diagnostic]) -> None:
       - a BCTU result FIFO with BctuFifoDmaEnable=true requires the global Mcl DMA
         enable (adc_dma_mcl_not_enabled) and a non-empty BctuFifoDmaChannelId ref
         (adc_dma_refs_incomplete; Adc.xdm L5041). These DMA rules mirror the Uart
-        _check_dma model (the cross-module Mcl wiring the apply tail performs).
+        _check_dma model (the cross-module Mcl wiring the apply tail performs);
+      - a SINGLE-access group must have AdcStreamingNumSamples==1 and a
+        STREAMING-access group must have it >1 (adc_group_single_num_samples_invalid
+        / adc_group_streaming_num_samples_invalid; Adc.xdm AdcStreamingNumSamples
+        L3405-3411);
+      - a SINGLE-conversion BctuInternalTrigger must select a single ADC bit in
+        BctuAdcTargetMask (adc_bctu_target_mask_invalid; Adc.xdm L4539-4540) and a
+        LIST trigger's BctuConversionListStartIndex must be < the BctuListItems
+        count (adc_bctu_list_start_index_invalid; Adc.xdm L4621).
 
-    Grounded in Adc.xdm INVALID rules (L334/L2758/L2759/L2760/L2761/L5041) + the
-    committed adc.json channel enum. Units with no threshold-enabled channels are
-    skipped by the watchdog rules so the baseline ADC0 fixture stays clean.
+    Grounded in Adc.xdm INVALID/RANGE rules (L334/L2758/L2759/L2760/L2761/L3410/
+    L4539/L4621/L5041) + the committed adc.json channel enum. Units with no
+    threshold-enabled channels are skipped by the watchdog rules so the baseline
+    ADC0 fixture stays clean. These checks guard ARBITRARY valid inputs against the
+    same Adc.xdm rules the vendor enforces, not just the four ADC E2E cases.
     """
     adc_cfg = doc.find_config_set("Adc")
     if adc_cfg is None:
@@ -501,14 +511,17 @@ def _check_adc(doc: MexDocument, diagnostics: list[Diagnostic]) -> None:
         transfer_el = doc.find_child_setting(unit, "AdcTransferType")
         transfer = transfer_el.attrib.get("value") if transfer_el is not None else None
 
-        # Collect this unit's direct AdcChannel / AdcThresholdControl children.
+        # Collect this unit's direct AdcChannel / AdcGroup / AdcThresholdControl.
         channels: list[ET.Element] = []
+        groups: list[ET.Element] = []
         threshold_controls: list[ET.Element] = []
         for child in unit:
             if not (child.tag.endswith("array")):
                 continue
             if child.attrib.get("name") == "AdcChannel":
                 channels = [c for c in child if c.tag.endswith("struct")]
+            elif child.attrib.get("name") == "AdcGroup":
+                groups = [c for c in child if c.tag.endswith("struct")]
             elif child.attrib.get("name") == "AdcThresholdControl":
                 threshold_controls = [c for c in child if c.tag.endswith("struct")]
 
@@ -517,6 +530,50 @@ def _check_adc(doc: MexDocument, diagnostics: list[Diagnostic]) -> None:
             if (doc.find_child_setting(c, "AdcEnableThresholds") is not None
                 and doc.find_child_setting(c, "AdcEnableThresholds").attrib.get("value") == "true")
         ]
+
+        # Group access-mode vs sample-count coherence (Adc.xdm AdcStreamingNumSamples
+        # L3405-3411 + DESC L3389-3391): a SINGLE-access group must have
+        # AdcStreamingNumSamples == 1 (vendor RANGE rule, L3410); a STREAMING-access
+        # group acquires several samples per channel (DESC), so a value <= 1 is a
+        # degenerate streaming group ConfigTools would not produce -- guard it so an
+        # arbitrary input is held to the same shape the vendor enforces.
+        for grp in groups:
+            access_el = doc.find_child_setting(grp, "AdcGroupAccessMode")
+            access = access_el.attrib.get("value") if access_el is not None else None
+            ns_el = doc.find_child_setting(grp, "AdcStreamingNumSamples")
+            if ns_el is None or access is None:
+                continue
+            try:
+                num_samples = int(ns_el.attrib.get("value", "1"))
+            except ValueError:
+                continue
+            gname_el = doc.find_child_setting(grp, "Name")
+            gname = gname_el.attrib.get("value") if gname_el is not None else None
+            if access == "ADC_ACCESS_MODE_SINGLE" and num_samples != 1:
+                diagnostics.append(Diagnostic(
+                    severity="blocker",
+                    code="adc_group_single_num_samples_invalid",
+                    module="adc",
+                    message=(
+                        f"ADC group '{gname}' (unit {unit_id}) is SINGLE access mode "
+                        f"but AdcStreamingNumSamples={num_samples}; it must be 1 for "
+                        f"ADC_ACCESS_MODE_SINGLE (Adc.xdm AdcStreamingNumSamples RANGE)."
+                    ),
+                    details={"unit": unit_id, "group": gname, "num_samples": num_samples},
+                ))
+            elif access == "ADC_ACCESS_MODE_STREAMING" and num_samples <= 1:
+                diagnostics.append(Diagnostic(
+                    severity="blocker",
+                    code="adc_group_streaming_num_samples_invalid",
+                    module="adc",
+                    message=(
+                        f"ADC group '{gname}' (unit {unit_id}) is STREAMING access mode "
+                        f"but AdcStreamingNumSamples={num_samples}; a streaming group "
+                        f"acquires more than one sample per channel (Adc.xdm "
+                        f"AdcStreamingNumSamples)."
+                    ),
+                    details={"unit": unit_id, "group": gname, "num_samples": num_samples},
+                ))
 
         # Interrupt transfer needs the unit's AdcNormalInterruptEnable=true.
         if transfer == "ADC_INTERRUPT" and unit_id is not None:
@@ -731,6 +788,107 @@ def _check_adc(doc: MexDocument, diagnostics: list[Diagnostic]) -> None:
                 ),
                 details={"fifo": fifo_name},
             ))
+
+    # BCTU internal-trigger coherence (Adc.xdm BctuInternalTrigger L4399..). For
+    # each BctuInternalTrigger under any BctuHwUnit:
+    #   - BctuAdcTargetMask must select a SINGLE bit when BctuTriggerConversionMode
+    #     is SINGLE (Adc.xdm L4539-4540: a multi-ADC mask is valid only for LIST;
+    #     for a single-conversion trigger BCTU ignores a multi-bit mask) ->
+    #     adc_bctu_target_mask_invalid;
+    #   - BctuConversionListStartIndex must be < the number of BctuListItems in the
+    #     same BctuHwUnit when the mode is LIST (Adc.xdm L4621) ->
+    #     adc_bctu_list_start_index_invalid.
+    for trig, list_item_count in _bctu_internal_triggers(doc, adc_cfg):
+        mode_el = doc.find_child_setting(trig, "BctuTriggerConversionMode")
+        mode = mode_el.attrib.get("value") if mode_el is not None else "SINGLE"
+        name_el = doc.find_child_setting(trig, "Name")
+        trig_name = name_el.attrib.get("value") if name_el is not None else None
+
+        mask_el = doc.find_child_setting(trig, "BctuAdcTargetMask")
+        if mask_el is not None and mode == "SINGLE":
+            try:
+                mask = int(mask_el.attrib.get("value", "1"))
+            except ValueError:
+                mask = 1
+            # A single set bit means mask & (mask - 1) == 0 (and mask != 0).
+            if mask == 0 or (mask & (mask - 1)) != 0:
+                diagnostics.append(Diagnostic(
+                    severity="blocker",
+                    code="adc_bctu_target_mask_invalid",
+                    module="adc",
+                    message=(
+                        f"BCTU internal trigger '{trig_name}' is SINGLE conversion "
+                        f"mode but BctuAdcTargetMask={mask} selects more than one ADC. "
+                        f"A multi-ADC mask is valid only for LIST conversion (Adc.xdm "
+                        f"BctuAdcTargetMask INVALID rule); use a single-bit mask."
+                    ),
+                    details={"trigger": trig_name, "mask": mask, "mode": mode},
+                ))
+
+        if mode == "LIST":
+            start_el = doc.find_child_setting(trig, "BctuConversionListStartIndex")
+            if start_el is not None:
+                try:
+                    start = int(start_el.attrib.get("value", "0"))
+                except ValueError:
+                    start = 0
+                if list_item_count > 0 and start >= list_item_count:
+                    diagnostics.append(Diagnostic(
+                        severity="blocker",
+                        code="adc_bctu_list_start_index_invalid",
+                        module="adc",
+                        message=(
+                            f"BCTU internal trigger '{trig_name}' uses LIST mode but "
+                            f"BctuConversionListStartIndex={start} is not less than the "
+                            f"number of BctuListItems ({list_item_count}); the start "
+                            f"index must be < the list length (Adc.xdm L4621)."
+                        ),
+                        details={
+                            "trigger": trig_name,
+                            "start_index": start,
+                            "list_length": list_item_count,
+                        },
+                    ))
+
+
+def _bctu_internal_triggers(
+    doc: MexDocument, adc_cfg: ET.Element
+) -> "list[tuple[ET.Element, int]]":
+    """Return every BctuInternalTrigger struct paired with its BctuHwUnit's
+    BctuListItems count.
+
+    BctuInternalTrigger and BctuListItems arrays both nest inside the same
+    BctuHwUnit struct (a direct child of the AdcConfigSet struct). The list-item
+    count is needed to validate BctuConversionListStartIndex (must be < list
+    length, Adc.xdm L4621). Returns ``[]`` when there is no BCTU subtree.
+    """
+    out: "list[tuple[ET.Element, int]]" = []
+    for cfgset in adc_cfg.iter():
+        if not (cfgset.tag.endswith("struct") and cfgset.attrib.get("name") == "AdcConfigSet"):
+            continue
+        for bctu_array in cfgset:
+            if not (
+                bctu_array.tag.endswith("array")
+                and bctu_array.attrib.get("name") == "BctuHwUnit"
+            ):
+                continue
+            for hw_unit in bctu_array:
+                if not hw_unit.tag.endswith("struct"):
+                    continue
+                triggers: list[ET.Element] = []
+                list_item_count = 0
+                for child in hw_unit:
+                    if not child.tag.endswith("array"):
+                        continue
+                    if child.attrib.get("name") == "BctuInternalTrigger":
+                        triggers = [c for c in child if c.tag.endswith("struct")]
+                    elif child.attrib.get("name") == "BctuListItems":
+                        list_item_count = sum(
+                            1 for c in child if c.tag.endswith("struct")
+                        )
+                for trig in triggers:
+                    out.append((trig, list_item_count))
+    return out
 
 
 def _bctu_result_fifos(doc: MexDocument, adc_cfg: ET.Element) -> list[ET.Element]:

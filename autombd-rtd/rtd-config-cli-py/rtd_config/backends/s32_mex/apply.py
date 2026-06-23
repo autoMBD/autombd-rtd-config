@@ -4190,6 +4190,22 @@ _ADC_CONV_TYPE_INJECTED = "ADC_CONV_TYPE_INJECTED"
 # asset-described prefixes/range, never inventing one.
 _BCTU_HW_TRIGGER_NAME = "AdcHwTrigger_0"
 _BCTU_HW_TRIGGER_REF = "/Adc/Adc/AdcConfigSet/AdcHwTrigger_0"
+
+
+def _adc_hw_trigger_name(index: int) -> str:
+    """Return the AdcHwTrigger struct ``Name`` for ``index`` (AdcHwTrigger_<i>)."""
+    return f"AdcHwTrigger_{index}"
+
+
+def _adc_hw_trigger_ref(index: int) -> str:
+    """Return the AdcHwTrigger ASPath ref for ``index``.
+
+    At index 0 this is the single-trigger ``/Adc/Adc/AdcConfigSet/AdcHwTrigger_0``
+    every E2E case lands on; a multi-trigger config addresses AdcHwTrigger_1.. so
+    each BctuTriggerSource / AdcGroupHwTriggerSource references the actual trigger
+    created, never a hardcoded ``/AdcHwTrigger_0``.
+    """
+    return f"/Adc/Adc/AdcConfigSet/{_adc_hw_trigger_name(index)}"
 _BCTU_TRIGGER_SOURCE_PREFIXES = ("BCTU_EMIOS_0_", "BCTU_EMIOS_1_", "BCTU_EMIOS_2_")
 _BCTU_TRIGGER_SOURCE_EXTRA = ("EXT_TRIG", "AUX_EXT_TRIG")
 _BCTU_EMIOS_CHANNEL_MAX = 22
@@ -4540,8 +4556,19 @@ def _build_adc_group_struct_bytes(
     channel_refs: "list[str]",
     indent: int,
     line_ending: bytes,
+    hw_trigger_ref: str = _BCTU_HW_TRIGGER_REF,
 ) -> bytes:
-    """Build one AdcGroup struct (byte-faithful to fixture AdcGroup_0)."""
+    """Build one AdcGroup struct (byte-faithful to fixture AdcGroup_0).
+
+    ``hw_trigger_ref`` is the AdcHwTrigger struct this group's
+    ``AdcGroupHwTriggerSource`` points at. It defaults to the single-trigger
+    ``AdcHwTrigger_0`` ref so a one-trigger config (every E2E case) stays
+    byte-identical; the caller threads the ACTUAL trigger ref when more than one
+    AdcHwTrigger exists so the group references the trigger that was created
+    (never a hardcoded ``/AdcHwTrigger_0``). The value is the same instance ASPath
+    serialization the fixture uses; AdcGroupHwTriggerSource is only meaningful for
+    a HW-triggered group, but the field is always emitted byte-faithfully.
+    """
     le = line_ending.decode("latin-1")
     sp = " " * indent
     spc = " " * (indent + 3)
@@ -4573,7 +4600,7 @@ def _build_adc_group_struct_bytes(
         f'{spc}<array name="AdcGroupPriority"/>',
         f'{spc}<array name="AdcGroupReplacement"/>',
         f'{spc}<setting name="AdcGroupTriggSrc" value="{trigg}"/>',
-        f'{spc}<setting name="AdcGroupHwTriggerSource" value="/Adc/Adc/AdcConfigSet/AdcHwTrigger_0"/>',
+        f'{spc}<setting name="AdcGroupHwTriggerSource" value="{hw_trigger_ref}"/>',
         f'{spc}<array name="AdcHwTrigSignal"/>',
         f'{spc}<array name="AdcHwTrigTimer"/>',
     ]
@@ -4790,6 +4817,7 @@ def _build_bctu_internal_trigger_struct_bytes(
     list_start_index: int,
     indent: int,
     line_ending: bytes,
+    struct_index: int = 0,
 ) -> bytes:
     """Build one BctuInternalTrigger struct (Adc.xdm field order L4399..).
 
@@ -4798,13 +4826,19 @@ def _build_bctu_internal_trigger_struct_bytes(
     XPath) and instead the conversion targets come from the BctuListItems array.
     The field order is byte-faithful to the descriptor; the single-channel ref is
     inserted only when supplied so the LIST serialization matches the vendor shape.
+
+    ``struct_index`` is the array position / Name suffix. It defaults to 0 so a
+    single-trigger BctuHwUnit is byte-identical; a multi-trigger BctuHwUnit holds
+    one BctuInternalTrigger per AdcHwTrigger (indices 0..N-1), each referencing a
+    DISTINCT ``trigger_source_ref`` (Adc.xdm L4418 requires the trigger index be
+    unique across the BctuInternalTrigger array).
     """
     le = line_ending.decode("latin-1")
-    sp2 = " " * indent           # inner <struct name="0"> open/close
+    sp2 = " " * indent           # inner <struct name="i"> open/close
     sp3 = " " * (indent + 3)     # inner struct children
     lines = [
-        f'{sp2}<struct name="0">',
-        f'{sp3}<setting name="Name" value="BctuInternalTrigger_0"/>',
+        f'{sp2}<struct name="{struct_index}">',
+        f'{sp3}<setting name="Name" value="BctuInternalTrigger_{struct_index}"/>',
         f'{sp3}<setting name="BctuTriggerSource" value="{trigger_source_ref}"/>',
         f'{sp3}<setting name="BctuTriggerLoop" value="false"/>',
         f'{sp3}<setting name="BctuDataDestination" value="{data_destination}"/>',
@@ -4916,6 +4950,7 @@ def _build_adc_bctu_hw_unit_struct_bytes(
     list_start_index: int = 0,
     list_item_blocks: "list[bytes] | None" = None,
     result_fifo_blocks: "list[bytes] | None" = None,
+    internal_trigger_blocks: "list[bytes] | None" = None,
 ) -> bytes:
     """Build one BctuHwUnit struct (byte-faithful to Adc.xdm BctuHwUnit shape).
 
@@ -4945,16 +4980,21 @@ def _build_adc_bctu_hw_unit_struct_bytes(
     list_items = list(list_item_blocks or [])
     result_fifos = list(result_fifo_blocks or [])
 
-    internal_trigger = _build_bctu_internal_trigger_struct_bytes(
-        trigger_source_ref=trigger_source_ref,
-        data_destination=data_destination,
-        conversion_mode=conversion_mode,
-        target_mask=target_mask,
-        channel_single_ref=channel_single_ref,
-        list_start_index=list_start_index,
-        indent=indent + 6,
-        line_ending=line_ending,
-    )
+    # One BctuInternalTrigger by default (byte-identical single-trigger path); a
+    # multi-trigger BctuHwUnit passes pre-built blocks (one per AdcHwTrigger).
+    if internal_trigger_blocks is None:
+        internal_triggers = [_build_bctu_internal_trigger_struct_bytes(
+            trigger_source_ref=trigger_source_ref,
+            data_destination=data_destination,
+            conversion_mode=conversion_mode,
+            target_mask=target_mask,
+            channel_single_ref=channel_single_ref,
+            list_start_index=list_start_index,
+            indent=indent + 6,
+            line_ending=line_ending,
+        )]
+    else:
+        internal_triggers = list(internal_trigger_blocks)
 
     def _block_array(name: str, blocks: "list[bytes]") -> "list[str]":
         if not blocks:
@@ -4975,10 +5015,8 @@ def _build_adc_bctu_hw_unit_struct_bytes(
         f'{sp1}<setting name="BctuNewDataDMAEnableMask" value="0"/>',
         f'{sp1}<setting name="BctuFifoDmaRawData" value="false"/>',
         f'{sp1}<setting name="BctuTriggerNotification" value="NULL_PTR"/>',
-        f'{sp1}<array name="BctuInternalTrigger">',
-        internal_trigger.decode("utf-8"),
-        f'{sp1}</array>',
     ]
+    lines += _block_array("BctuInternalTrigger", internal_triggers)
     lines += _block_array("BctuAdcNotifications", list(adc_notification_blocks))
     lines += _block_array("BctuListItems", list_items)
     lines += _block_array("BctuResultFifos", result_fifos)
@@ -5075,6 +5113,241 @@ def _bctu_target_mask(targets: "list[str]", default_unit: str) -> int:
     return mask
 
 
+def _apply_adc_bctu_multi_trigger(
+    doc: MexDocument,
+    bctu: dict,
+    unit_id: str,
+    asset: dict,
+    result: ApplyResult,
+) -> bool:
+    """Wire a BCTU with SEVERAL hardware triggers (general multi-trigger path).
+
+    Device truth (Adc.xdm): the S32K3 has a single BCTU peripheral, so the
+    BctuHwUnit count is capped at ecu:get('Adc.AdcConfigSet.BctuHwUnit') (L4180).
+    Multiple triggers are therefore expressed as ONE BctuHwUnit holding several
+    AdcHwTrigger structs (the AdcHwTrigger MAP has MIN=0, no max -- L4126) and one
+    BctuInternalTrigger per AdcHwTrigger (BctuInternalTrigger is a MAP -- L4374),
+    each BctuTriggerSource referencing its own AdcHwTrigger (the index must be
+    unique across the array -- L4418), and one BctuAdcNotifications per DISTINCT
+    target ADC instance (the AdcIndex must be unique -- L4674).
+
+    Each ``bctu['triggers'][i]`` is a SINGLE-conversion sub-trigger::
+
+        {"trigger_source": "BCTU_EMIOS_<inst>_<ch>",  # distinct per trigger
+         "target": "ADC0",                              # target ADC instance
+         "channel": "S10",                              # channel on that unit
+         "destination": "data_reg",                     # data-reg destination
+         "new_data_notification": "Fn"}                 # per-target new-data cb
+
+    The shared top-level ``bctu`` keys (destination, new_data_notification) supply
+    defaults when a sub-trigger omits them. Returns True on success; appends a
+    blocker and returns False otherwise. LIST sub-triggers / FIFO destinations are
+    not part of the multi-trigger surface yet (see adc.json `_coverage`).
+    """
+    triggers = [t for t in (bctu.get("triggers") or []) if isinstance(t, dict)]
+    if not triggers:
+        result.diagnostics.append(Diagnostic(
+            severity="blocker",
+            code="adc_bctu_triggers_empty",
+            module="adc",
+            message="BCTU multi-trigger requires a non-empty 'triggers' list.",
+            details={},
+        ))
+        return False
+
+    line_ending = _detect_line_ending(doc._raw)
+    default_dest_token = str(bctu.get("destination", "data_reg")).strip().lower()
+    default_new_data = str(bctu.get("new_data_notification", "NULL_PTR")).strip() or "NULL_PTR"
+
+    # --- Validate sub-triggers: source domain + source uniqueness (L4170/L4418). ---
+    seen_sources: set[str] = set()
+    resolved_triggers: list[dict] = []
+    for ti, trig in enumerate(triggers):
+        source_token = str(trig.get("trigger_source", "")).strip()
+        if not _bctu_trigger_source_valid(source_token):
+            result.diagnostics.append(Diagnostic(
+                severity="blocker",
+                code="adc_bctu_trigger_source_not_in_device",
+                module="adc",
+                message=(
+                    f"BCTU trigger source '{source_token}' (trigger {ti}) is not a "
+                    f"device BCTU trigger-source token. Use BCTU_EMIOS_<0..2>_"
+                    f"<0..{_BCTU_EMIOS_CHANNEL_MAX}>, EXT_TRIG, or AUX_EXT_TRIG."
+                ),
+                details={"trigger_source": source_token, "trigger_index": ti},
+            ))
+            return False
+        if source_token in seen_sources:
+            result.diagnostics.append(Diagnostic(
+                severity="blocker",
+                code="adc_bctu_trigger_source_duplicate",
+                module="adc",
+                message=(
+                    f"BCTU trigger source '{source_token}' is used by more than one "
+                    f"trigger. Each AdcHwTrigger must have a unique AdcHwTrigSrc "
+                    f"(Adc.xdm L4170)."
+                ),
+                details={"trigger_source": source_token},
+            ))
+            return False
+        seen_sources.add(source_token)
+
+        target = str(trig.get("target", unit_id)).strip() or unit_id
+        channel_token = str(trig.get("channel", "")).strip()
+        resolved = _resolve_adc_channel(channel_token, asset) if channel_token else None
+        if resolved is None:
+            result.diagnostics.append(Diagnostic(
+                severity="blocker",
+                code="adc_bctu_channel_not_in_device",
+                module="adc",
+                message=(
+                    f"BCTU single-conversion channel '{channel_token}' (trigger {ti}) "
+                    f"is not in the device channel enum. Use a valid AdcChannelName."
+                ),
+                details={"channel": channel_token, "trigger_index": ti},
+            ))
+            return False
+        resolved_triggers.append({
+            "source_token": source_token,
+            "target": target,
+            "channel_literal": resolved[0],
+            "destination": str(trig.get("destination", default_dest_token)).strip().lower(),
+            "new_data_notification": (
+                str(trig.get("new_data_notification", default_new_data)).strip()
+                or "NULL_PTR"
+            ),
+        })
+
+    adc_cfg = doc.find_config_set("Adc")
+
+    # --- Ensure one AdcHwTrigger_<i> per sub-trigger (repoint #0, append #1..). ---
+    for ti, rt in enumerate(resolved_triggers):
+        _adc_bctu_ensure_hw_trigger(doc, adc_cfg, ti, rt["source_token"], line_ending)
+        adc_cfg = doc.find_config_set("Adc")  # re-find: append may have spliced
+
+    # --- Resolve each sub-trigger's single-channel ref on its target unit. ---
+    for rt in resolved_triggers:
+        ref_info = _adc_resolve_bctu_channel_struct_name(
+            doc, adc_cfg, rt["target"], rt["channel_literal"]
+        )
+        if ref_info is None:
+            result.diagnostics.append(Diagnostic(
+                severity="blocker",
+                code="adc_bctu_channel_not_on_unit",
+                module="adc",
+                message=(
+                    f"BCTU single-conversion channel '{rt['channel_literal']}' is not "
+                    f"present on unit {rt['target']}; add it to one of the unit's "
+                    f"groups so the BCTU trigger can reference it."
+                ),
+                details={"unit": rt["target"], "channel": rt["channel_literal"]},
+            ))
+            return False
+        t_unit_name, channel_struct_name = ref_info
+        rt["unit_name"] = t_unit_name
+        rt["channel_single_ref"] = (
+            f"/Adc/Adc/AdcConfigSet/{t_unit_name}/{channel_struct_name}"
+        )
+
+    # --- Locate the BctuHwUnit array + compute indents. ---
+    bctu_array = _adc_bctu_find_array(doc, adc_cfg, "BctuHwUnit")
+    if bctu_array is None:
+        result.diagnostics.append(Diagnostic(
+            severity="blocker",
+            code="adc_bctu_array_not_found",
+            module="adc",
+            message="No BctuHwUnit <array> found in the AdcConfigSet.",
+            details={},
+        ))
+        return False
+    existing_bctu = [c for c in bctu_array if c.tag.endswith("struct")]
+    struct_indent = _detect_struct_indent(doc, bctu_array)
+    if existing_bctu:
+        struct_indent = _detect_struct_indent(doc, existing_bctu[0])
+    array_indent = struct_indent - 3
+    inner_indent = struct_indent + 6
+
+    # --- Build one BctuInternalTrigger per sub-trigger (each -> its AdcHwTrigger). ---
+    internal_trigger_blocks: list[bytes] = []
+    for ti, rt in enumerate(resolved_triggers):
+        data_destination = _BCTU_DATA_DESTINATION_ENUM.get(
+            rt["destination"], _BCTU_DEFAULT_DATA_DESTINATION
+        )
+        target_mask = _bctu_target_mask([rt["target"]], unit_id)
+        internal_trigger_blocks.append(_build_bctu_internal_trigger_struct_bytes(
+            trigger_source_ref=_adc_hw_trigger_ref(ti),
+            data_destination=data_destination,
+            conversion_mode="SINGLE",
+            target_mask=target_mask,
+            channel_single_ref=rt["channel_single_ref"],
+            list_start_index=0,
+            indent=inner_indent,
+            line_ending=line_ending,
+            struct_index=ti,
+        ))
+
+    # --- One BctuAdcNotifications per DISTINCT target ADC (AdcIndex unique, L4674). ---
+    adc_notification_blocks: list[bytes] = []
+    notif_seen: dict[str, str] = {}
+    for rt in resolved_triggers:
+        if rt["target"] in notif_seen:
+            continue
+        notif_seen[rt["target"]] = rt["new_data_notification"]
+    for ni, (target, new_data) in enumerate(notif_seen.items()):
+        t_unit = _adc_find_hw_unit(doc, adc_cfg, target)
+        t_name_el = doc.find_child_setting(t_unit, "Name") if t_unit is not None else None
+        t_unit_name = t_name_el.attrib.get("value") if t_name_el is not None else None
+        if not t_unit_name:
+            result.diagnostics.append(Diagnostic(
+                severity="blocker",
+                code="adc_bctu_target_unit_missing",
+                module="adc",
+                message=(
+                    f"BCTU target ADC unit '{target}' is not present in the "
+                    f"configuration; add the unit before wiring the BCTU trigger."
+                ),
+                details={"target": target},
+            ))
+            return False
+        adc_notification_blocks.append(_build_bctu_adc_notification_struct_bytes(
+            struct_index=ni,
+            adc_index_ref=f"/Adc/Adc/AdcConfigSet/{t_unit_name}",
+            new_data_notification=new_data,
+            indent=inner_indent,
+            line_ending=line_ending,
+        ))
+
+    # --- Splice the single BctuHwUnit struct holding all internal triggers. ---
+    new_struct_bytes = _build_adc_bctu_hw_unit_struct_bytes(
+        struct_index=0,
+        trigger_source_ref=_adc_hw_trigger_ref(0),  # unused: blocks supplied below
+        data_destination=_BCTU_DEFAULT_DATA_DESTINATION,
+        conversion_mode="SINGLE",
+        target_mask=1,
+        channel_single_ref=None,
+        adc_notification_blocks=adc_notification_blocks,
+        indent=struct_indent,
+        line_ending=line_ending,
+        internal_trigger_blocks=internal_trigger_blocks,
+    )
+    le = line_ending.decode("latin-1")
+    sp_array = " " * array_indent
+    array_bytes = (
+        f'<array name="BctuHwUnit">{le}'
+        f'{new_struct_bytes.decode("utf-8")}{le}'
+        f'{sp_array}</array>'
+    ).encode("utf-8")
+    doc.replace_element_region(bctu_array, array_bytes)
+
+    # Re-confirm each AdcHwTrigger repoint survived the splice reload.
+    adc_cfg = doc.find_config_set("Adc")
+    for ti, rt in enumerate(resolved_triggers):
+        _adc_bctu_set_hw_trigger_source(
+            doc, adc_cfg, rt["source_token"], _adc_hw_trigger_name(ti)
+        )
+    return True
+
+
 def _apply_adc_bctu(
     doc: MexDocument,
     bctu: dict,
@@ -5088,8 +5361,10 @@ def _apply_adc_bctu(
     reference. Two raw-bytes operations (each reloads the tree, so the targeted
     element is re-found between them):
 
-    1. Repoint the existing ``AdcHwTrigger_0`` AdcHwTrigSrc to the requested BCTU
-       trigger-source token (validated against the device enum first).
+    1. Repoint the addressed ``AdcHwTrigger_<i>`` AdcHwTrigSrc to the requested
+       BCTU trigger-source token (validated against the device enum first). The
+       trigger is addressed by its actual index (0 for a single-trigger config,
+       byte-identical to the fixture placeholder), never a hardcoded name.
     2. Replace the empty ``<array name="BctuHwUnit"/>`` with one populated
        BctuHwUnit struct.
 
@@ -5102,10 +5377,20 @@ def _apply_adc_bctu(
     with the trigger-order wait flags + final last-channel flag); and a populated
     BctuResultFifos array (FIFO destination + DMA buffer + DMA channel ref).
 
+    MULTI-TRIGGER (general): when ``bctu['triggers']`` is a non-empty list, the one
+    BctuHwUnit (the S32K3 has a single BCTU peripheral -- Adc.xdm L4180 caps the
+    BctuHwUnit count at ecu:get('Adc.AdcConfigSet.BctuHwUnit')) carries one
+    AdcHwTrigger + one BctuInternalTrigger per sub-trigger, each referencing its own
+    distinct AdcHwTrigger (Adc.xdm L4418: the trigger index must be unique across
+    the BctuInternalTrigger array). Dispatched to ``_apply_adc_bctu_multi_trigger``.
+
     The AdcHwTriggerApi / AdcEnableCtuControlModeApi / CtuEnableDmaTransferMode
     gating flips happen in the shared tail. Returns True when the BCTU subtree was
     wired, False when a blocker diagnostic was appended.
     """
+    # Multi-trigger dispatch: one BCTU, several AdcHwTrigger + BctuInternalTrigger.
+    if bctu.get("triggers"):
+        return _apply_adc_bctu_multi_trigger(doc, bctu, unit_id, asset, result)
     # --- Validate the trigger source against the device BCTU enum. ---
     source_token = str(bctu.get("trigger_source", "")).strip()
     if not _bctu_trigger_source_valid(source_token):
@@ -5382,9 +5667,15 @@ def _apply_adc_bctu(
 
 
 def _adc_bctu_set_hw_trigger_source(
-    doc: MexDocument, adc_cfg: "ET.Element | None", source_token: str
+    doc: MexDocument, adc_cfg: "ET.Element | None", source_token: str,
+    trigger_name: str = _BCTU_HW_TRIGGER_NAME,
 ) -> None:
-    """Set AdcHwTrigger_0's AdcHwTrigSrc to ``source_token`` (attribute edit)."""
+    """Set the named AdcHwTrigger's AdcHwTrigSrc to ``source_token`` (attribute edit).
+
+    ``trigger_name`` defaults to ``AdcHwTrigger_0`` (the fixture placeholder every
+    single-trigger config repoints, byte-identically). A multi-trigger config
+    passes AdcHwTrigger_1.. so each trigger's AdcHwTrigSrc is set independently.
+    """
     if adc_cfg is None:
         return
     trig_array = _adc_bctu_find_array(doc, adc_cfg, "AdcHwTrigger")
@@ -5394,11 +5685,65 @@ def _adc_bctu_set_hw_trigger_source(
         if not struct.tag.endswith("struct"):
             continue
         name_el = doc.find_child_setting(struct, "Name")
-        if name_el is not None and name_el.attrib.get("value") == _BCTU_HW_TRIGGER_NAME:
+        if name_el is not None and name_el.attrib.get("value") == trigger_name:
             src_el = doc.find_child_setting(struct, "AdcHwTrigSrc")
             if src_el is not None:
                 src_el.set("value", source_token)
             return
+
+
+def _adc_bctu_ensure_hw_trigger(
+    doc: MexDocument, adc_cfg: "ET.Element | None", index: int, source_token: str,
+    line_ending: bytes,
+) -> None:
+    """Ensure an ``AdcHwTrigger_<index>`` struct exists with AdcHwTrigSrc set.
+
+    The fixture ships a single placeholder ``AdcHwTrigger_0``; index 0 therefore
+    only repoints it (no splice -> byte-identical to the single-trigger path). For
+    index >= 1 (a multi-trigger config) the AdcHwTrigger struct does not yet exist,
+    so a new one is appended to the AdcHwTrigger array byte-faithfully (the same
+    Name + AdcHwTrigSrc shape as the placeholder, Adc.xdm AdcHwTrigger map). The
+    AdcHwTrigSrc value is validated by the caller before this runs.
+    """
+    if adc_cfg is None:
+        return
+    trig_array = _adc_bctu_find_array(doc, adc_cfg, "AdcHwTrigger")
+    if trig_array is None:
+        return
+    trigger_name = _adc_hw_trigger_name(index)
+    existing = [c for c in trig_array if c.tag.endswith("struct")]
+    for struct in existing:
+        name_el = doc.find_child_setting(struct, "Name")
+        if name_el is not None and name_el.attrib.get("value") == trigger_name:
+            _adc_bctu_set_hw_trigger_source(doc, adc_cfg, source_token, trigger_name)
+            return
+    # Append a new AdcHwTrigger_<index> struct (multi-trigger path). Match the
+    # placeholder field order (Name, AdcHwTrigSrc) + the array's struct indent.
+    if existing:
+        struct_indent = _detect_struct_indent(doc, existing[-1])
+    else:
+        struct_indent = _detect_struct_indent(doc, trig_array)
+    le = line_ending.decode("latin-1")
+    sp = " " * struct_indent
+    spc = " " * (struct_indent + 3)
+    new_struct = (
+        f'{sp}<struct name="{index}">{le}'
+        f'{spc}<setting name="Name" value="{trigger_name}"/>{le}'
+        f'{spc}<setting name="AdcHwTrigSrc" value="{source_token}"/>{le}'
+        f'{sp}</struct>'
+    ).encode("utf-8")
+    if existing:
+        _append_after_last_element(doc, existing[-1], new_struct, line_ending)
+    else:
+        # Empty AdcHwTrigger array -> replace with a populated one.
+        array_indent = struct_indent - 3
+        sp_array = " " * array_indent
+        array_bytes = (
+            f'<array name="AdcHwTrigger">{le}'
+            f'{new_struct.decode("utf-8")}{le}'
+            f'{sp_array}</array>'
+        ).encode("utf-8")
+        doc.replace_element_region(trig_array, array_bytes)
 
 
 def _adc_set_setting(

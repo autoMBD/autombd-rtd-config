@@ -4,6 +4,25 @@
   "device": "s32k344",
   "package": "mapbga257",
 
+  "_coverage": {
+    "_note": "Honest map of the ADC editable surface this CLI exposes today vs. the Adc.xdm items NOT yet configurable through the `adc set --spec` surface. Forward (Spec-first) development tracks the deferred surface explicitly so callers know the boundary; full-surface expansion of every Adc.xdm field is a separate, larger effort (issues #30/#37). The deferred fields below DO exist in Adc.xdm and are currently emitted at byte-faithful fixture defaults by the apply builders -- they are not absent, just not user-tunable yet. Multiple AdcHwTrigger + multiple BctuInternalTrigger (one BCTU) ARE supported (see `bctu.triggers`); multiple BctuHwUnit is NOT exposed because the S32K3 has a single BCTU peripheral (Adc.xdm L4180 caps the BctuHwUnit count at ecu:get('Adc.AdcConfigSet.BctuHwUnit')).",
+    "configurable_today": {
+      "unit": ["AdcHwUnitId (ADC0/1/2)", "AdcTransferType (interrupt/dma)", "AdcPrescale (derived from sampling_time_us)", "AdcDmaChannelId (DMA path; Mcl-wired)"],
+      "group": ["AdcGroupAccessMode (single/streaming)", "AdcGroupConversionMode (oneshot/continuous, streaming coerced)", "AdcGroupConversionType (Normal/Injected, derived)", "AdcGroupTriggSrc (sw/hw)", "AdcGroupHwTriggerSource (derived from the actual AdcHwTrigger)", "AdcStreamingNumSamples", "AdcNotification (completion callback)", "AdcSamplingDuration0/1/2 (derived)", "AdcGroupDefinition (channel refs)"],
+      "channel": ["AdcChannelName / AdcChannelId (device enum)", "AdcEnableThresholds + AdcThresholdRegister + AdcWdogNotification (watchdog)"],
+      "watchdog": ["AdcThresholdControlRegister", "AdcHighThreshold", "AdcLowThreshold", "AdcEnableWatchdogApi (global gate)", "WdgThresholdEnable (unit gate)"],
+      "bctu": ["AdcHwTrigger (one or many) + AdcHwTrigSrc (device BCTU enum)", "BctuInternalTrigger (one or many; SINGLE conversion)", "BctuTriggerSource (derived per trigger)", "BctuDataDestination (data_reg/fifo1/fifo2)", "BctuTriggerConversionMode (single/list)", "BctuAdcTargetMask (derived)", "BctuAdcChannelSingle (single mode)", "BctuListItems + trigger_order (list mode)", "BctuResultFifos + BctuFifoDmaEnable/Channel (list FIFO + DMA)", "BctuAdcNewDataNotification", "BctuWatermarkNotification"]
+    },
+    "not_yet_exposed": {
+      "_note": "Each item is an Adc.xdm editable field currently fixed at a byte-faithful default. Exposing any of these is future scope.",
+      "per_unit": ["AdcHwUnitResolution (RESOLUTION_8/10/12/14)", "AdcHighSpeedEnable / AdcAltHighSpeedEnable", "AdcPowerDownDelay / AdcAltPowerDownDelay", "AdcMuxDelay", "AdcEnablePresampling + AdcPresamplingInternalSignal0/1/2", "AdcHwUnitUsrOffset / AdcHwUnitUsrGain", "SdAdcHwUnitSpecificConfiguration (SdadcDecimaRate/OutputSetDelay/FifoThreshold/CalibSkipped/CalibAverage)"],
+      "per_group": ["AdcGroupPriority", "AdcGroupReplacement", "AdcGroupHardwareAverageEnable / AdcGroupHardwareAverageSelect", "AdcExtraNotification", "AdcDmaErrorNotification", "AdcEnableHalfInterrupt", "AdcStreamResultGroup", "AdcAlternateGroupConvTimings (alt sampling bands)"],
+      "per_channel": ["AdcChannelLimitCheck + AdcChannelHighLimit/AdcChannelLowLimit", "AdcChannelRangeSelect", "AdcChannelResolution (per-channel)", "per-channel presampling (AdcEnablePresampling at channel scope)"],
+      "bctu": ["BctuLowPowerMode", "BctuTriggerLoop", "BctuFifoDmaRawData", "BctuTriggerNotification", "BctuWatermarkValue tuning (currently list-length-1)", "BctuLastChannel manual override (currently auto on final list item)", "BctuUnderrunNotification / BctuOverrunNotification / BctuListLastConversionNotification", "multiple BctuHwUnit (device has a single BCTU peripheral -- not applicable on S32K3)"]
+    },
+    "references": ["issue #30 (ADC module)", "issue #37 (forward Spec-first correction)"]
+  },
+
   "channel_name_to_id": {
     "_source": "Adc_s32k344_mapbga257.epd AdcChannelName ENUMERATION (literal AdcChannelName, AdcChannelId = integer after 'ChanNum'). There is NO S0..S7; S-channels start at S8. X0..X3 reuse the symbolic name across several ChanNum ids; the .mex stores the full literal, so the key is the full literal.",
     "P0_ChanNum0": 0,
@@ -210,6 +229,35 @@
     "adc_target_bit_by_unit": {"ADC0": 0, "ADC1": 1, "ADC2": 2},
     "unit_index_ref_path_pattern": "/Adc/Adc/AdcConfigSet/{unit_name}",
     "channel_ref_path_pattern": "/Adc/Adc/AdcConfigSet/{unit_name}/{channel_struct_name}"
+  },
+
+  "constraints": {
+    "_note": "Adc.xdm INVALID/RANGE rules over the IMPLEMENTED editable surface, encoded as static-check blockers so ARBITRARY valid inputs are held to the same rules ConfigTools enforces (not just the four ADC E2E cases). Each rule cites the Adc.xdm line. Enforced in checks/static.py::_check_adc; pinned to this asset by tests/unit/test_adc_static_checks.py.",
+    "group_streaming_num_samples": {
+      "_source": "Adc.xdm AdcStreamingNumSamples L3405-3411 (INVALID Range 1..255; RANGE XPath L3410: SINGLE access requires ==1) + DESC L3389-3391 (streaming acquires several samples per channel).",
+      "single_access_num_samples": 1,
+      "streaming_access_num_samples_min": 2,
+      "code_single": "adc_group_single_num_samples_invalid",
+      "code_streaming": "adc_group_streaming_num_samples_invalid"
+    },
+    "bctu_target_mask_single_bit_for_single_mode": {
+      "_source": "Adc.xdm BctuAdcTargetMask INVALID L4539-4540: (BctuTriggerConversionMode='SINGLE') and bit:and(N, N-1) != 0 is invalid -- a multi-ADC mask is valid only for LIST conversion.",
+      "single_mode_mask_must_be_single_bit": true,
+      "code": "adc_bctu_target_mask_invalid"
+    },
+    "bctu_list_start_index_below_list_length": {
+      "_source": "Adc.xdm BctuConversionListStartIndex INVALID L4620-4622: (BctuTriggerConversionMode='LIST') and (start >= count(BctuListItems/*)) is invalid -- start index must be < list length.",
+      "list_mode_start_index_lt_list_length": true,
+      "code": "adc_bctu_list_start_index_invalid"
+    },
+    "bctu_trigger_source_unique": {
+      "_source": "Adc.xdm AdcHwTrigSrc INVALID L4170 (text:uniq trigger source) + BctuTriggerSource INVALID L4418 (trigger index unique across BctuInternalTrigger). Each AdcHwTrigger must have a distinct AdcHwTrigSrc; each BctuInternalTrigger references a distinct AdcHwTrigger.",
+      "code_apply": "adc_bctu_trigger_source_duplicate"
+    },
+    "threshold_register_ref_resolves": {
+      "_note": "Already enforced by adc_threshold_ref_incomplete: a channel with AdcEnableThresholds=true must reference an AdcThresholdControl on the same unit (Adc.xdm AdcThresholdRegister REF L2786 + L2791). Listed here for completeness; not duplicated.",
+      "code": "adc_threshold_ref_incomplete"
+    }
   },
 
   "hw_configuration": {
