@@ -128,7 +128,7 @@ applications.
 Load and execute the `initialize-agent-discipline` skill when:
 
 - Starting development from a **clean clone** — no platform-specific project
-  directories (`.claude/`, `.opencode/`, `.codex/`) exist.
+  directories (`.claude/`, `.opencode/`, `.agents/`) exist.
 - The project-level Agent environment has **not been initialized** (missing
   skills, subagents, or external-dependency cache).
 - The user explicitly requests an **update** or **reset** of the Agent

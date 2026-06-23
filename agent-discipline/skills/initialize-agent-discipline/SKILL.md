@@ -7,107 +7,142 @@ description: Initialize the project-level Agent environment for the RTD CfgFile 
 
 ## Overview
 
-Use this skill to set up or maintain the project-level Agent environment for
-this project. It deploys agent-discipline skills, subagent templates, and
-external-dependency memory to the target Agent platforms so that every agent
-working in this checkout operates from the same project discipline.
+This skill sets up the project-level Agent environment by deploying
+agent-discipline skills, subagent templates, and external-dependency memory to
+the selected Agent platforms. Every agent working in this checkout then operates
+from the same project discipline.
 
-This skill is a set of agent instructions, not a standalone program or script.
-The agent executes each step using its own native tools — structured GUI input,
-filesystem operations, and file writes — without any dedicated initialization
-scripts or separate GUI applications.
+The skill orchestrates three phases:
+
+1. **Collect structured input** — run `python tools/init_agent_env.py` to
+   interactively gather platforms, mode, paths, and optional imports. The script
+   outputs deployment-ready JSON. This unified input collector works identically
+   on all Agent platforms — no platform-native GUI tools are required.
+2. **Research platform formats** — for each selected platform, search and
+   retrieve the authoritative subagent/agent configuration format before
+   generating any files.
+3. **Execute deployment** — create symlinks for skills, convert and write
+   subagent files in each platform's native format, and initialize the
+   external-dependency cache.
+
+No standalone GUI application. No dedicated initialization scripts beyond the
+input collector.
 
 ## Trigger Conditions
 
-This skill should be loaded and executed when:
+Load and execute this skill when:
 
-- Development starts from a clean clone and no platform-specific project
-  directories (`.claude/`, `.opencode/`, `.codex/`) exist.
-- The project-level Agent environment has not been initialized (missing skills,
-  subagents, or external-dependency cache).
-- The user explicitly requests an update or reset of the Agent discipline.
-- The user requests importing additional skills from local or online sources.
+- Development starts from a **clean clone** and no platform-specific project
+  directories (`.claude/`, `.opencode/`, `.agents/`) exist.
+- The project-level Agent environment has **not been initialized** (missing
+  skills, subagents, or external-dependency cache).
+- The user explicitly requests an **update** or **reset** of the Agent
+  discipline.
+- The user requests **importing additional skills** from local or online
+  sources.
 
 ## Boundaries
 
 This skill manages the project-level Agent environment ONLY:
 
-- **Project-level directories:** `.claude/`, `.opencode/`, `.codex/` for skills
-  and subagents, plus `.agent-state/` for the external-dependency cache.
-- **NOT user-level or global Agent environments** (e.g. `~/.claude/`,
-  `~/.config/opencode/`, `~/.codex/`). Those belong to the user and must not
-  be modified.
-- **NOT the `autombd-rtd/` skill payload** — that is deployed separately by
-  `tools/deploy_rtd_skill.py` and is outside this skill's scope.
+| In scope | Out of scope |
+| --- | --- |
+| `.claude/skills/`, `.claude/agents/` (Claude) | `~/.claude/` (user-level/global) |
+| `.opencode/skills/`, `.opencode/agents/` (OpenCode) | `~/.config/opencode/` (user-level/global) |
+| `.agents/skills/`, `.agents/agents/` (Codex) | `~/.codex/` (user-level/global) |
+| `.agent-state/external-dependencies.json` | `autombd-rtd/` skill payload |
+
+The `autombd-rtd/` skill payload is deployed separately by
+`tools/deploy_rtd_skill.py` and is outside this skill's scope.
 
 ## Files and Paths Reference
 
 ### Source paths (committed in repository)
+
 | Content | Path |
 | --- | --- |
 | Agent-discipline skills | `agent-discipline/skills/<name>/SKILL.md` |
-| Subagent templates (Claude format) | `agent-discipline/subagents/<name>.md` |
-| External-dependency cache (if exists) | `.agent-state/external-dependencies.json` |
+| Subagent templates | `agent-discipline/subagents/<name>.md` |
+| Input collector script | `tools/init_agent_env.py` |
 
 ### Target paths per platform (generated, NOT committed)
+
 | Platform | Skills directory | Subagents directory |
 | --- | --- | --- |
 | Claude | `.claude/skills/<name>/` | `.claude/agents/<name>.md` |
 | OpenCode | `.opencode/skills/<name>/` | `.opencode/agents/<name>.md` |
-| Codex | `.codex/skills/<name>/` | `.codex/agents/<name>.md` |
+| Codex | `.agents/skills/<name>/` | `.agents/agents/<name>.md` |
 
-All generated files under `.claude/`, `.opencode/`, `.codex/`, and
+> **Important:** Codex resolves project-level skills and agents from `.agents/`,
+> not `.codex/`. This is confirmed by the existing `tools/deploy_rtd_skill.py`
+> which deploys the Codex skill to `.agents/skills/`.
+
+All generated files under `.claude/`, `.opencode/`, `.agents/`, and
 `.agent-state/` are covered by `.gitignore` and must never be committed.
 
 ## Workflow
 
-### Step 1: Collect Target Platforms
+### Phase 1: Collect Structured Input
 
-Use the agent platform's native structured GUI input capability
-(e.g. the `question` tool) to let the user select which Agent platforms to
-initialize. Support multiple selection:
+Run the unified input collector:
 
-- **Claude** — Claude Code (VS Code extension); skills + subagents go under
-  `.claude/`.
-- **OpenCode** — opencode CLI; skills + subagents go under `.opencode/`.
-- **Codex** — OpenAI Codex CLI; skills + subagents go under `.codex/`.
-
-Question example:
-
-```
-question: "Select the target Agent platforms to initialize."
-header: "Target Platforms"
-options:
-  - label: "Claude"
-  - label: "OpenCode"
-  - label: "Codex"
-multiple: true
+```bash
+python tools/init_agent_env.py
 ```
 
-If no platform is selected, stop and report that at least one platform must
-be chosen.
+This launches an interactive CLI that prompts the user for:
 
-### Step 2: Select Operation Mode
+- **Target platforms** — multi-select from `codex`, `claude`, `opencode`
+- **Operation mode** — `update` (preserve existing) or `reset` (clear + reinitialize)
+- **Reset confirmation** — explicit yes/no before any deletion (reset mode only)
+- **S32DS installation root** — validated for expected subdirectories (`eclipse/`, `S32DS/`)
+- **RTD installation path** — validated for RTD package directories (`*_TS_T*`)
+- **Additional skills import** — optionally import from local directory or online source
 
-Use native structured GUI input to let the user choose between **Update** and
-**Reset** mode:
+The script writes the collected input as JSON to stdout. Capture it:
 
+```powershell
+python tools/init_agent_env.py --output .agent-state/init-input.json
 ```
-question: "Select the operation mode."
-header: "Operation Mode"
-options:
-  - label: "Update"
-    description: "Preserve existing environment; change only what is explicitly selected or entered in this operation."
-  - label: "Reset"
-    description: "Clear project-level Agent environment and .agent-state/ cache for the selected platforms, then reinitialize from current input."
+
+Or parse from stdout directly.
+
+If the input has already been collected and saved to a file, use:
+
+```bash
+python tools/init_agent_env.py --input .agent-state/init-input.json
 ```
+
+to validate and reload it non-interactively.
+
+#### Collected Input Schema
+
+```json
+{
+  "version": 1,
+  "collected_at": "2026-06-23T12:00:00Z",
+  "platforms": ["claude", "opencode"],
+  "mode": "update",
+  "reset_confirmed": false,
+  "s32ds_path": "C:/NXP/S32DS.3.6.7",
+  "rtd_path": "C:/NXP/S32DS.3.6.7/S32DS/software/PlatformSDK_S32K3/RTD",
+  "import_skills": {
+    "type": "local",
+    "path": "D:/my-skills",
+    "description": "Import skills from local directory: D:/my-skills"
+  }
+}
+```
+
+Preserve this file in `.agent-state/` for update-mode reuse. In reset mode,
+the `.agent-state/` directory is cleared, so the file is removed.
 
 #### Update Mode Rules
 
-- **Preserve** all existing project-level Agent files and `.agent-state/`
-  cache entries that are not explicitly touched in this operation.
+- **Preserve** all existing project-level Agent files and `.agent-state/` cache
+  entries that are not explicitly touched in this operation.
 - **Deploy or update** only the platforms, skills, subagents, and cache entries
-  that the user explicitly selects or enters.
+  that the user explicitly selected or entered.
 - If a symlink destination already exists and points to the correct source,
   skip it (no change).
 - If a subagent file already exists, overwrite it with the converted content
@@ -115,220 +150,183 @@ options:
 
 #### Reset Mode Rules
 
-- **Clear only** the project-level Agent environment for the selected
-  platforms — delete their skill symlinks and generated subagent files.
+- **Clear only** the project-level Agent environment for the selected platforms
+  — delete their skill symlinks and generated subagent files.
 - **Clear** the current project's `.agent-state/` directory entirely.
 - **Do NOT affect** any user-level or global Agent environment
   (`~/.claude/`, `~/.config/opencode/`, `~/.codex/`).
-- **Before deleting anything**, show the exact scope of what will be cleared
-  and obtain explicit user confirmation via native GUI.
+- The `tools/init_agent_env.py` script handles the confirmation prompt. Do not
+  proceed with reset unless the collected input has `"reset_confirmed": true`.
 
-Reset scope confirmation example:
-
-```
-question: "Reset will delete the following. Confirm?"
-header: "Reset Confirmation"
-options:
-  - label: "Confirm Reset"
-    description: "Selected platforms: Claude, OpenCode. Will delete .claude/skills/, .claude/agents/, .opencode/skills/, .opencode/agents/, .agent-state/ entirely."
-  - label: "Cancel"
-    description: "Abort the reset and return to mode selection."
-```
-
-After confirmation, delete the listed directories and files, then proceed
-with reinitialization from the user's current input.
-
-### Step 3: Collect S32DS and RTD Paths
-
-Use native structured GUI input to collect the S32 Design Studio installation
-root and the RTD installation path. These are required for the
-external-dependency cache.
-
-Use free-text input fields:
+After collecting input with reset mode confirmed, delete the listed directories:
 
 ```
-question: "Enter the S32 Design Studio installation root path."
-header: "S32DS Path"
-options:
-  - label: "Enter path manually"
-    description: "Provide the absolute path to the S32DS installation root (e.g. C:\\NXP\\S32DS.3.6.7)"
+Remove-Item -Recurse -Force -LiteralPath ".claude\skills"
+Remove-Item -Recurse -Force -LiteralPath ".claude\agents"
+Remove-Item -Recurse -Force -LiteralPath ".agent-state"
 ```
 
+Then proceed with reinitialization from the collected input.
+
+### Phase 2: Research Platform Subagent Formats
+
+Before generating any subagent files, **retrieve the authoritative subagent
+configuration format for each selected platform**. Never guess or hardcode a
+format — formats evolve and differ between platforms.
+
+#### OpenCode Agent Format
+
+The format is documented in the project's `customize-opencode` skill and the
+published JSON Schema.
+
+1. Load the `customize-opencode` skill if available. Key facts:
+   - Agent files live in `.opencode/agent/<name>.md` or `.opencode/agents/<name>.md`.
+   - Required frontmatter fields: `description`, `mode` (`subagent`, `primary`, `all`).
+   - Optional: `model` (provider-prefixed, e.g. `anthropic/claude-sonnet-4-6`),
+     `permission`, `temperature`, `top_p`, `hidden`, `color`, `disable`.
+   - The `name` field is **inferred from the filename**, not declared in frontmatter.
+2. Fetch the authoritative JSON Schema: `https://opencode.ai/config.json`
+   Locate the agent object schema to confirm the current field set.
+3. Apply any current-field changes from the schema before writing.
+
+Typical OpenCode agent file structure:
+
+```markdown
+---
+description: <from template>
+mode: subagent
+permission:
+  edit: allow
+  bash: allow
+---
+(markdown body from template)
 ```
-question: "Enter the RTD installation path."
-header: "RTD Path"
-options:
-  - label: "Enter path manually"
-    description: "Provide the absolute path to the RTD package root (e.g. C:\\NXP\\S32DS.3.6.7\\S32DS\\software\\PlatformSDK_S32K3\\RTD)"
-```
 
-For each path provided, verify:
-1. The path exists on the filesystem.
-2. For S32DS: the directory contains expected subdirectories
-   (e.g. `eclipse/`, `S32DS/`).
-3. For RTD: the directory contains RTD module packages
-   (directories matching `*_TS_T*`).
+#### Claude Agent Format
 
-If verification fails, report the specific problem and ask for a corrected
-path. Do not cache unverified paths.
+The subagent templates under `agent-discipline/subagents/` are already in
+Claude-compatible format (YAML frontmatter + Markdown body). Claude Code
+resolves agents from `.claude/agents/`.
 
-### Step 4: Import Additional Skills (Optional)
+1. Read the existing templates to understand the field set:
+   ```yaml
+   ---
+   name: <agent-name>
+   description: <...>
+   model: opus
+   mode: subagent
+   permission:
+     read: allow
+     edit: allow
+     ...
+   ---
+   ```
+2. If Claude Code documentation or release notes are available through the
+   agent's web fetch capability, verify that the field set is current.
+3. Otherwise, use the template format as-is — it matches the conventions used
+   by this project's deploy toolchain and is known to work with Claude Code.
 
-Ask whether the user wants to import additional skills:
+#### Codex Agent Format
 
-```
-question: "Import additional skills?"
-header: "Additional Skills"
-options:
-  - label: "Skip"
-    description: "Do not import additional skills."
-  - label: "Import from local directory"
-    description: "Import skills from a specified local directory."
-  - label: "Install from online source"
-    description: "Install skills from a specified online source URL."
-```
+Codex resolves agents from `.agents/agents/`. The format is typically similar
+to the template format (YAML frontmatter + Markdown body).
 
-#### Import from Local Directory
+1. Check for existing `.agents/` content or documentation:
+   - If `.agents/agents/` already has files, inspect their frontmatter.
+   - If the Codex CLI has an `--agent-template` or similar command, use it.
+2. Search for current Codex agent configuration documentation:
+   - Check `https://github.com/openai/codex` docs or the Codex CLI `--help`.
+   - Use `webfetch` if available.
+3. If no documentation is found, use the template format as-is: the templates
+   under `agent-discipline/subagents/` are known to be compatible with this
+   project's Codex flow.
 
-1. Ask for the local directory path.
-2. Verify the directory exists and contains `**/SKILL.md` files.
-3. For each skill found, create a symlink from the platform's skill directory
-   to the source skill directory.
-4. If the source directory contains symlinks, resolve them before linking
-   (prefer the canonical path).
+#### For Any Future Platform
 
-#### Install from Online Source
+Apply the same principle: search for and retrieve the authoritative format
+definition before generating files. If no format can be confirmed, report the
+gap and skip that platform rather than writing potentially invalid files.
 
-1. Ask for the online source URL.
-2. Fetch the skill listing or manifest from the URL.
-3. For each skill, instruct the user on the installation command appropriate
-   for their platform. Online skill installation is platform-specific and
-   outside the scope of filesystem symlink operations; report what was
-   registered and any manual steps the user must complete.
+### Phase 3: Execute Deployment
 
-### Step 5: Execute Deployment
+Use the collected input (Phase 1) and the researched formats (Phase 2) to
+deploy.
 
-After collecting all inputs, execute the deployment for each selected platform.
+#### 3.1 Deploy Agent-Discipline Skills (Symlinks)
 
-#### 5.1 Reset Cleanup (Reset Mode Only)
+For each skill directory under `agent-discipline/skills/` and each selected
+platform:
 
-If in Reset mode and after user confirmation, delete:
-- For each selected platform: `{platform_dir}/skills/` and
-  `{platform_dir}/agents/` (where `platform_dir` is `.claude`, `.opencode`,
-  or `.codex`).
-- `.agent-state/` directory entirely.
-
-#### 5.2 Deploy Agent-Discipline Skills (Symlinks)
-
-For each skill directory under `agent-discipline/skills/`:
-
-1. Create the target platform's skill directory if it does not exist:
-   `{platform_dir}/skills/`
-2. Create a directory symlink (or junction on Windows) from
-   `{platform_dir}/skills/<skill-name>/` to the source directory
-   `agent-discipline/skills/<skill-name>/`.
+1. Create the platform's skill directory if it does not exist.
+   Use the paths from the table in [Files and Paths Reference](#files-and-paths-reference).
+2. Create a directory symlink (or junction on Windows) from the platform's
+   skill directory to the source directory.
 3. **Copying is prohibited.** If a symlink cannot be created, report the error
-   and stop. On Windows, symlink creation requires Developer Mode enabled or
-   administrator privileges. On failure, instruct the user to enable Developer
-   Mode or run the shell as administrator.
-4. Skip skills that are already correctly linked (destination exists and
-   resolves to the same source).
+   and stop. On Windows, enable Developer Mode or run as administrator.
+4. Skip skills that are already correctly linked.
 
 Windows symlink commands:
 
 ```powershell
-# Directory symlink (preferred, requires Developer Mode or admin)
 New-Item -ItemType SymbolicLink -Path ".claude\skills\external-dependency-memory" -Target "agent-discipline\skills\external-dependency-memory"
 
-# Fallback: directory junction (does not require Developer Mode)
 cmd /c mklink /J ".claude\skills\external-dependency-memory" "agent-discipline\skills\external-dependency-memory"
 ```
 
-On non-Windows systems (macOS, Linux):
+On non-Windows systems:
+
 ```bash
 ln -s "$(pwd)/agent-discipline/skills/external-dependency-memory" ".claude/skills/external-dependency-memory"
 ```
 
-Use absolute source paths when creating symlinks to ensure the link remains
-valid regardless of the working directory.
+Use absolute source paths. The source `agent-discipline/skills/<name>/` must
+resolve to a real directory containing `SKILL.md`.
 
-#### 5.3 Deploy Subagents
+#### 3.2 Deploy Subagents
 
-The subagent templates under `agent-discipline/subagents/` are in **Claude
-format** — YAML frontmatter with `name`, `description`, `model`, `mode`,
-and `permission` fields followed by a Markdown body.
+For each template under `agent-discipline/subagents/` and each selected platform:
 
-##### Claude Deployment
+1. Read the source template. Extract the `name` from its frontmatter.
+2. Convert to the target platform's format (researched in Phase 2).
+3. Write the converted file to the platform's agents directory:
+   - Claude: `.claude/agents/<name>.md`
+   - OpenCode: `.opencode/agents/<name>.md`
+   - Codex: `.agents/agents/<name>.md`
+4. In update mode, overwrite only if the source template has changed.
 
-Claude Code can consume the templates directly. For each template:
+##### OpenCode Conversion (Typical)
 
-1. Create `.claude/agents/` if it does not exist.
-2. Write the template content as-is to `.claude/agents/<name>.md` (extract
-   `name` from the frontmatter).
-3. If the destination file already exists and is identical to the source,
-   skip it.
+Based on the format retrieved in Phase 2, the conversion typically involves:
 
-##### OpenCode Deployment
+- **Remove** `name` (OpenCode infers from filename).
+- **Remove** or translate `model` (OpenCode uses provider-prefixed model IDs).
+  If the agent's current context provides a default model, use it; otherwise
+  omit to let OpenCode use its configured default.
+- **Keep** `description`, `mode` (`subagent`), and `permission`.
+- Add `"$schema": "https://opencode.ai/config.json"` for editor validation.
+- The Markdown body remains unchanged.
 
-Convert each Claude-format template to OpenCode format:
+> **Always verify against the schema fetched in Phase 2.** The above is the
+> typical conversion but may change with OpenCode updates.
 
-1. Create `.opencode/agents/` if it does not exist.
-2. Parse the frontmatter from the source template.
-3. Generate an OpenCode agent file with this frontmatter transformation:
-   - **Remove** the `name` field (OpenCode infers the name from the filename).
-   - **Remove** the `model` field, or set it to the project's default model.
-     If the surrounding agent context provides a default model, use that;
-     otherwise omit the field to let OpenCode use its configured default.
-   - **Keep** `description`, `mode`, and `permission` fields as-is.
-   - **Add** `"$schema": "https://opencode.ai/config.json"` for editor
-     validation support.
-   - Map `permission` values: Codex uses `allow`/`deny`; OpenCode supports
-     `allow`/`ask`/`deny`. The `allow` and `deny` values are directly
-     compatible.
-   - Write the frontmatter in YAML, followed by `---`, followed by the Markdown
-     body unchanged.
-4. Write to `.opencode/agents/<name>.md`.
+##### Claude Deployment (Typical)
 
-Example OpenCode conversion for the `explorer` template:
+The source templates are already in Claude-compatible format. Write them as-is
+to `.claude/agents/<name>.md`. Verify against any format documentation found
+in Phase 2.
 
-```markdown
----
-description: Read-only investigator that establishes ground-truth facts...
-mode: subagent
-permission:
-  read: allow
-  grep: allow
-  glob: allow
-  bash: allow
-  webfetch: allow
-  edit: deny
-  task: deny
----
-(original markdown body from template)
-```
+##### Codex Deployment (Typical)
 
-##### Codex Deployment
+The source templates are typically compatible with Codex. Write them to
+`.agents/agents/<name>.md`. Verify against any format documentation found in
+Phase 2.
 
-Convert each Claude-format template to Codex CLI format:
+#### 3.3 Initialize External-Dependency Cache
 
-1. Create `.codex/agents/` if it does not exist.
-2. Parse the frontmatter from the source template.
-3. Generate a Codex agent file:
-   - **Keep** `name` and `description` fields.
-   - **Remove** the `model` field or set it to the default provided by the
-     agent context.
-   - **Keep** `mode` (typically `subagent`).
-   - **Keep** `permission` fields (Codex uses `allow`/`deny`).
-4. If the exact Codex agent file format available in the agent's current
-   context differs from the above, apply the current format definition.
-5. Write to `.codex/agents/<name>.md`.
+Create or update `.agent-state/external-dependencies.json` using the paths
+from the collected input.
 
-#### 5.4 Initialize External-Dependency Cache
-
-Create or update `.agent-state/external-dependencies.json` with the S32DS
-and RTD paths collected in Step 3.
-
-If the file does not exist, create it with this structure:
+If the file does not exist, create it:
 
 ```json
 {
@@ -338,107 +336,97 @@ If the file does not exist, create it with this structure:
 }
 ```
 
-Then add or update entries (preserving other existing entries in Update mode):
+Add or update these entries (preserving other entries in update mode):
 
-**S32DS entry:**
 ```json
-"env.s32ds": {
-  "kind": "env",
-  "status": "available",
-  "location": "<user-provided S32DS root path, normalized with forward slashes>",
-  "evidence": "User provided installation path and verified directory exists during agent discipline initialization.",
-  "verified_at": "<ISO 8601 timestamp now>",
-  "verified_by": "<current platform name: codex|claude|opencode>"
+{
+  "env.s32ds": {
+    "kind": "env",
+    "status": "available",
+    "location": "<s32ds_path from input>",
+    "evidence": "User provided and verified during agent discipline initialization via tools/init_agent_env.py.",
+    "verified_at": "<ISO 8601 timestamp now>",
+    "verified_by": "<current platform name>"
+  },
+  "env.rtd": {
+    "kind": "env",
+    "status": "available",
+    "location": "<rtd_path from input>",
+    "evidence": "User provided and verified during agent discipline initialization via tools/init_agent_env.py.",
+    "verified_at": "<ISO 8601 timestamp now>",
+    "verified_by": "<current platform name>"
+  }
 }
 ```
 
-**RTD entry:**
-```json
-"env.rtd": {
-  "kind": "env",
-  "status": "available",
-  "location": "<user-provided RTD path, normalized with forward slashes>",
-  "evidence": "User provided RTD path and verified directory exists during agent discipline initialization.",
-  "verified_at": "<ISO 8601 timestamp now>",
-  "verified_by": "<current platform name: codex|claude|opencode>"
-}
-```
-
-Follow the recording rules from the `external-dependency-memory` skill:
+Follow the `external-dependency-memory` skill rules:
 - Use stable item keys (`env.s32ds`, `env.rtd`).
-- Write conservative evidence (path exists, directory structure verified).
+- Write conservative evidence.
 - Never record tokens, passwords, or credentials.
-- In Update mode, keep all other cache entries unchanged.
 
-#### 5.5 Deploy Additional Skills (If Selected)
+#### 3.4 Deploy Additional Skills (If Selected)
 
-For each additional skill from Step 4:
+If the collected input includes `import_skills`:
 
-**Local directory import:**
-1. Scan the user-provided directory for `**/SKILL.md` files.
+**Local directory (`type: "local"`):**
+1. Scan the provided `path` for `**/SKILL.md` files.
 2. For each skill found, create a directory symlink from each selected
    platform's `skills/` directory to the skill's source directory.
-3. Use the same symlink approach as in Step 5.2.
+3. Use the same symlink approach as in 3.1.
 4. Report each skill deployed and its source path.
 
-**Online source install:**
-1. Fetch the skill listing from the URL.
+**Online source (`type: "online"`):**
+1. Fetch the skill listing from the `url`.
 2. Report what is available and instruct the user on platform-specific
    installation commands.
-3. Do not attempt to automate online skill installation; the mechanism varies
-   by platform.
+3. Do not attempt to automate online installation; the mechanism varies by
+   platform.
 
-### Step 6: Verify
+### Phase 4: Verify
 
-After deployment, run these verifications:
+After deployment, run these checks:
 
 1. **Symlink integrity:** For each deployed skill symlink, verify the
-   destination exists and points to the intended source directory containing
-   a `SKILL.md` file.
-
-2. **Subagent file presence:** For each deployed platform, verify that every
-   template from `agent-discipline/subagents/` has a corresponding file in
-   the platform's agents directory.
-
-3. **Cache file validity:** Verify `.agent-state/external-dependencies.json`
-   is valid JSON and contains the expected `env.s32ds` and `env.rtd` entries
-   with `status: "available"`.
-
-4. **Git exclusion:** Verify no generated files under `.claude/`, `.opencode/`,
-   `.codex/`, or `.agent-state/` appear in `git status` as untracked files
-   (they should be covered by `.gitignore`).
-
-If any verification fails, report the specific failure and offer to retry
-the affected step.
+   destination exists and points to a directory containing `SKILL.md`.
+2. **Subagent file presence:** For each platform, verify every template from
+   `agent-discipline/subagents/` has a corresponding file in the platform's
+   agents directory with platform-appropriate frontmatter.
+3. **Cache validity:** Verify `.agent-state/external-dependencies.json` is
+   valid JSON with `env.s32ds` and `env.rtd` at `status: "available"`.
+4. **Git hygiene:** Verify no generated files appear in `git status` as
+   untracked (`.gitignore` covers `.claude/`, `.opencode/`, `.agents/`,
+   `.agent-state/`).
 
 ## Error Handling
 
-- **Symlink creation fails on Windows:** Instruct the user to enable Developer
-  Mode (Settings → Update & Security → For developers → Developer Mode) or
-  run the shell as administrator. Do not fall back to copying.
-- **Path verification fails:** Report which path check failed and why. Ask
-  the user for a corrected path rather than proceeding with unverified data.
-- **Template frontmatter is malformed:** Report which template file is
-  malformed and the specific parsing error. Skip that template; proceed with
-  the remaining templates.
-- **Git exclusion fails:** If generated files appear in `git status`, check
-  `.gitignore` coverage and add the missing pattern. Do not commit the
-  generated files.
+| Scenario | Action |
+| --- | --- |
+| `tools/init_agent_env.py` not found | Report the missing file path. The script is committed in `tools/`. Verify the repository is not corrupted. |
+| Script exits with error (user cancelled or path invalid) | Stop. Report the exit reason. Do not proceed with partial input. |
+| Collected input validation fails | Report which field failed and why. Ask the user to re-run the script. |
+| Platform format cannot be determined (Phase 2) | Report which platform and skip it. Proceed with the remaining platforms. Do not guess. |
+| Symlink creation fails on Windows | Instruct the user to enable Developer Mode or run as administrator. Do not fall back to copying. |
+| Template frontmatter is malformed | Report which template file and the specific parsing error. Skip that template; proceed with the rest. |
+| `.gitignore` does not cover generated files | Add the missing pattern to `.gitignore`. Do not stage generated files. |
+
+## Reference: Subagent Templates
+
+The four templates under `agent-discipline/subagents/`:
+
+| Template file | Agent name | Mode | Key permission restriction |
+| --- | --- | --- | --- |
+| `explorer.md` | explorer | subagent | `edit: deny`, `task: deny` |
+| `worker.md` | worker | subagent | full read/write/bash within scope |
+| `tester.md` | tester | subagent | full access; runs tests and validation |
+| `reviewer.md` | reviewer | subagent | `edit: deny`, `task: deny` |
 
 ## Closeout Checklist
 
-Before reporting completion:
-
-- [ ] All selected platforms have their `skills/` directory populated with
-  valid symlinks to `agent-discipline/skills/`.
-- [ ] All selected platforms have their `agents/` directory populated with
-  platform-appropriate subagent files derived from
-  `agent-discipline/subagents/`.
-- [ ] `.agent-state/external-dependencies.json` exists and contains valid
-  `env.s32ds` and `env.rtd` entries.
-- [ ] Additional skills (if requested) are deployed as symlinks.
-- [ ] In Reset mode, only project-level content was cleared; user-level and
-  global Agent environments are intact.
-- [ ] No generated files are staged in Git.
-- [ ] `git status` shows only expected changes (the skill itself and
-  `AGENTS.md` update, if applicable).
+- [ ] `tools/init_agent_env.py` ran successfully; input is valid and saved.
+- [ ] Platform subagent formats were researched and confirmed before generation.
+- [ ] All selected platforms have valid skill symlinks pointing to `agent-discipline/skills/`.
+- [ ] All selected platforms have platform-native subagent files derived from `agent-discipline/subagents/`.
+- [ ] `.agent-state/external-dependencies.json` exists with `env.s32ds` and `env.rtd`.
+- [ ] Additional skills (if requested) deployed as symlinks.
+- [ ] Reset mode: only project-level content cleared; user-level/global intact.
+- [ ] No generated files staged in Git.
