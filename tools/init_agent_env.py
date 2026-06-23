@@ -410,10 +410,201 @@ class InitDialog(tk.Tk):
         self.destroy()
 
 
+def _can_open_display() -> bool:
+    """Return True if tkinter can create a window in the current environment."""
+    try:
+        root = tk.Tk()
+        root.withdraw()
+        root.destroy()
+        return True
+    except tk.TclError:
+        return False
+
+
 def run_gui() -> dict[str, Any] | None:
     app = InitDialog()
     app.mainloop()
     return app.result
+
+
+def run_interactive() -> dict[str, Any] | None:
+    """Try GUI first; fall back to CLI if display is unavailable."""
+    if _can_open_display():
+        return run_gui()
+    print("[no display — using text mode]", file=sys.stderr)
+    return run_cli()
+
+
+# ── CLI interactive fallback ────────────────────────────────────────────
+
+
+def _safe_input(prompt: str) -> str:
+    try:
+        return input(prompt)
+    except EOFError:
+        print("\nInput interrupted.", file=sys.stderr)
+        raise SystemExit(1)
+    except KeyboardInterrupt:
+        print("\nCancelled.", file=sys.stderr)
+        raise SystemExit(130)
+
+
+def _choose_multi(label: str, options: list[str]) -> list[str]:
+    print(f"\n{label}")
+    for i, opt in enumerate(options, 1):
+        print(f"  [{i}] {opt}")
+    print(f"  [0] Done / none")
+
+    selected: list[str] = []
+    while True:
+        raw = _safe_input("Enter number (0 when done): ").strip()
+        if raw == "":
+            continue
+        try:
+            n = int(raw)
+        except ValueError:
+            print(f"  Invalid number: {raw!r}")
+            continue
+        if n == 0:
+            break
+        if 1 <= n <= len(options):
+            name = options[n - 1]
+            if name not in selected:
+                selected.append(name)
+                print(f"  Added: {name}")
+            else:
+                print(f"  Already selected: {name}")
+        else:
+            print(f"  Out of range [1..{len(options)}]")
+    return selected
+
+
+def _choose_one(label: str, options: list[str]) -> str:
+    print(f"\n{label}")
+    for i, opt in enumerate(options, 1):
+        print(f"  [{i}] {opt}")
+
+    while True:
+        raw = _safe_input("Enter number: ").strip()
+        try:
+            n = int(raw)
+        except ValueError:
+            print(f"  Invalid number: {raw!r}")
+            continue
+        if 1 <= n <= len(options):
+            return options[n - 1]
+        print(f"  Out of range [1..{len(options)}]")
+
+
+def _choose_yes_no(question: str) -> bool:
+    while True:
+        raw = _safe_input(f"{question} [y/N]: ").strip().lower()
+        if raw in ("y", "yes"):
+            return True
+        if raw in ("n", "no", ""):
+            return False
+        print("  Please answer y or n.")
+
+
+def _ask_path_optional(prompt: str) -> str:
+    raw = _safe_input(f"{prompt} (press Enter to skip): ").strip().strip("\"'")
+    if not raw:
+        return ""
+    p = Path(raw).expanduser()
+    return str(p.resolve())
+
+
+def run_cli() -> dict[str, Any] | None:
+    print("=" * 60)
+    print("  RTD CfgFile CLI — Agent Environment Initialization")
+    print("  (text mode — use --no-gui when tkinter is unavailable)")
+    print("=" * 60)
+
+    platforms = _choose_multi(
+        "Select target Agent platforms (multiple allowed):",
+        list(SUPPORTED_PLATFORMS),
+    )
+    if not platforms:
+        print("No platforms selected. Exiting.", file=sys.stderr)
+        return None
+
+    mode = _choose_one(
+        "Select operation mode:",
+        [
+            "Update — preserve existing environment; change only what is explicitly entered",
+            "Reset — clear project-level Agent environment and .agent-state/ for selected platforms, then reinitialize",
+        ],
+    )
+
+    reset_confirmed = False
+    if "Reset" in mode:
+        print(f"\n  RESET will clear the following for platforms: {', '.join(platforms)}")
+        print("    - Skill symlinks and subagent files under project-level directories")
+        print("    - The entire .agent-state/ cache")
+        print("  User-level and global Agent environments will NOT be affected.")
+        reset_confirmed = _choose_yes_no("  Confirm reset?")
+        if not reset_confirmed:
+            print("Reset cancelled. Switching to Update mode.")
+            mode = "update"
+
+    print("\n--- External Dependencies (optional) ---")
+    print("S32DS and RTD paths are optional. Press Enter to skip.")
+    print("If skipped, only skills and subagents will be deployed.")
+
+    skip_paths = _choose_yes_no("  Skip S32DS/RTD paths?")
+
+    s32ds_path = ""
+    rtd_path = ""
+    if not skip_paths:
+        s32ds_path = _ask_path_optional("S32DS installation root")
+        if s32ds_path and not _verify_s32ds_root(s32ds_path):
+            print(f"  WARNING: {s32ds_path} does not appear to be a valid S32DS root.")
+            if not _choose_yes_no("  Use anyway?"):
+                s32ds_path = ""
+
+        rtd_path = _ask_path_optional("RTD installation path")
+        if rtd_path and not _verify_rtd_root(rtd_path):
+            print(f"  WARNING: {rtd_path} does not contain RTD packages (*_TS_T*).")
+            if not _choose_yes_no("  Use anyway?"):
+                rtd_path = ""
+
+    print("\n--- Additional Skills Import (optional) ---")
+    import_skills: dict[str, Any] | None = None
+    import_choice = _choose_one(
+        "Import additional skills?",
+        [
+            "Skip — do not import additional skills",
+            "Import from local directory",
+            "Install from online source",
+        ],
+    )
+    if "local" in import_choice:
+        local = _ask_path_optional("Local skill directory path")
+        if local:
+            import_skills = {
+                "type": "local",
+                "path": local,
+                "description": f"Import skills from local directory: {local}",
+            }
+    elif "online" in import_choice:
+        url = _safe_input("Online skill source URL: ").strip()
+        if url:
+            import_skills = {
+                "type": "online",
+                "url": url,
+                "description": f"Install skills from online source: {url}",
+            }
+
+    return {
+        "version": 1,
+        "collected_at": datetime.now(timezone.utc).isoformat(),
+        "platforms": platforms,
+        "mode": "update" if "Update" in mode else "reset",
+        "reset_confirmed": reset_confirmed,
+        "s32ds_path": s32ds_path.replace("\\", "/"),
+        "rtd_path": rtd_path.replace("\\", "/"),
+        **({"import_skills": import_skills} if import_skills is not None else {}),
+    }
 
 
 # ── CLI entry point ────────────────────────────────────────────────────
@@ -480,26 +671,17 @@ def main(argv: list[str] | None = None) -> int:
             for e in errors:
                 print(f"ERROR: {e}", file=sys.stderr)
             return 1
+    elif args.no_gui:
+        print("[text mode requested]", file=sys.stderr)
+        result = run_cli()
+        if result is None:
+            return 130
+        data = result
     else:
-        if args.no_gui:
-            print("--no-gui is not implemented. Use --input to supply pre-collected data.", file=sys.stderr)
-            return 2
-
-        try:
-            result = run_gui()
-        except tk.TclError as exc:
-            print(
-                f"GUI initialization failed: {exc}\n"
-                "tkinter may not be available in this environment.\n"
-                "Run with --input to supply pre-collected JSON.",
-                file=sys.stderr,
-            )
-            return 2
-
+        result = run_interactive()
         if result is None:
             print("Cancelled by user.", file=sys.stderr)
             return 130
-
         data = result
 
     json_text = json.dumps(data, indent=2, ensure_ascii=False)
