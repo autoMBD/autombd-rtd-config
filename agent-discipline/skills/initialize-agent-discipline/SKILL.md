@@ -100,15 +100,71 @@ platform, choosing Update, or skipping the GUI.
 
 ### 2. Collect all choices through the repository GUI
 
-Run exactly:
+#### Windows/Codex desktop launch
+
+Do not run `python ... --gui` directly inside the Agent sandbox or a background
+PTY. That process may not attach to the user's interactive desktop, so the
+command can remain alive without displaying a window.
+
+For Codex on Windows, run the following PowerShell block through
+`exec_command` with `sandbox_permissions: "require_escalated"` and a
+justification that the Tkinter form must attach to the user's interactive
+desktop. Start the real Python executable with a normal visible window, retain
+the process handle, and wait for the user to submit or cancel:
 
 ```powershell
-python tools\init_agent_env.py --gui --output .agent-state\init-input.json
+$repoRoot = (Get-Location).Path
+$pythonExe = (Get-Command python.exe -ErrorAction Stop).Source
+$scriptPath = (Resolve-Path '.\tools\init_agent_env.py').Path
+$stateDir = Join-Path $repoRoot '.agent-state'
+$pendingInput = Join-Path $stateDir 'init-input.pending.json'
+$finalInput = Join-Path $stateDir 'init-input.json'
+
+New-Item -ItemType Directory -Path $stateDir -Force | Out-Null
+if (Test-Path -LiteralPath $pendingInput) {
+    Remove-Item -LiteralPath $pendingInput -Force
+}
+
+$arguments = @(
+    ('"{0}"' -f $scriptPath),
+    '--gui',
+    '--output',
+    ('"{0}"' -f $pendingInput)
+)
+$guiProcess = Start-Process `
+    -FilePath $pythonExe `
+    -ArgumentList $arguments `
+    -WorkingDirectory $repoRoot `
+    -WindowStyle Normal `
+    -PassThru `
+    -Wait
+
+if ($guiProcess.ExitCode -ne 0) {
+    throw "Agent environment GUI exited with code $($guiProcess.ExitCode)."
+}
+if (-not (Test-Path -LiteralPath $pendingInput)) {
+    throw 'Agent environment GUI exited without producing input.'
+}
+
+& $pythonExe $scriptPath --input $pendingInput --validate-only
+if ($LASTEXITCODE -ne 0) {
+    throw 'Agent environment GUI produced invalid input.'
+}
+Move-Item -LiteralPath $pendingInput -Destination $finalInput -Force
 ```
 
-Do not use the collector's text mode for Agent initialization. If the user
-cancels or the GUI exits without producing the file, stop without deployment.
-Validate the saved input before continuing:
+Never use `-WindowStyle Hidden`, omit `-Wait`, or treat a still-running process
+as successful collection. If the tool call yields a running process/session,
+wait on that same process until it exits; do not launch a second GUI.
+
+On other desktop platforms, use the platform's approved external-process method
+that attaches Tkinter to the interactive display, wait for exit, and apply the
+same pending-file checks. Do not use the collector's text mode for Agent
+initialization. If the user cancels or the GUI exits without producing valid
+input, stop without deployment.
+
+The Windows block already validates and promotes the pending file. Before
+deployment, the final input may be revalidated idempotently with:
 
 ```powershell
 python tools\init_agent_env.py `

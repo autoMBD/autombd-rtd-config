@@ -40,7 +40,7 @@
 # File:        init_agent_env.py
 # Author:      autoMBD <tkung.lqk@foxmail.com>
 # Date:        2026-06-24
-# Version:     0.3.0
+# Version:     0.3.1
 # Description: Unified structured input collector for Agent environment
 #              initialization. Its explicit --gui mode collects target
 #              platforms, operation mode, required external dependency paths,
@@ -615,9 +615,9 @@ def main(argv: list[str] | None = None) -> int:
     elif args.gui:
         try:
             result = run_gui()
-        except tk.TclError:
-            print("tkinter unavailable — falling back to text mode", file=sys.stderr)
-            result = run_cli()
+        except tk.TclError as exc:
+            print(f"tkinter GUI unavailable: {exc}", file=sys.stderr)
+            return 1
         if result is None:
             print("Cancelled by user.", file=sys.stderr)
             return 130
