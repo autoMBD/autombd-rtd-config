@@ -62,6 +62,7 @@ from tools.deploy_agent_env import (
     render_opencode_agent,
     skill_target_roots,
 )
+from tools.init_agent_env import validate_input
 
 
 SOURCE = (
@@ -98,6 +99,22 @@ def _config(*platforms: str, mode: str = "update") -> dict[str, object]:
         "s32ds_path": "",
         "rtd_path": "",
     }
+
+
+def test_collector_requires_verified_s32ds_and_rtd_paths(tmp_path):
+    config = _config("codex")
+    errors = validate_input(config)
+    assert "'s32ds_path' must be a verified S32DS installation root" in errors
+    assert "'rtd_path' must be a verified RTD package root" in errors
+
+    s32ds = tmp_path / "S32DS.3.6.7"
+    (s32ds / "eclipse").mkdir(parents=True)
+    rtd = tmp_path / "RTD"
+    (rtd / "Platform_TS_T40D34M10I0R0").mkdir(parents=True)
+    config["s32ds_path"] = str(s32ds)
+    config["rtd_path"] = str(rtd)
+
+    assert validate_input(config) == []
 
 
 def test_renderers_preserve_body_and_use_native_schema():
@@ -295,10 +312,17 @@ def test_online_skill_import_requires_explicit_external_installation(tmp_path):
 
 def test_cli_loads_collector_json_and_deploys_native_outputs(tmp_path):
     repo = _fixture_repo(tmp_path)
+    s32ds = tmp_path / "S32DS.3.6.7"
+    (s32ds / "eclipse").mkdir(parents=True)
+    rtd = tmp_path / "RTD"
+    (rtd / "Platform_TS_T40D34M10I0R0").mkdir(parents=True)
+    config = _config("claude", "opencode", "codex")
+    config["s32ds_path"] = str(s32ds)
+    config["rtd_path"] = str(rtd)
     input_path = repo / ".agent-state/init-input.json"
     input_path.parent.mkdir()
     input_path.write_text(
-        json.dumps(_config("claude", "opencode", "codex")),
+        json.dumps(config),
         encoding="utf-8",
     )
 

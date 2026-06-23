@@ -11,11 +11,11 @@ Run a GUI-first, user-directed initialization transaction that deploys the
 repository's Agent-discipline Skills and four role definitions to every platform
 the user selects, then records the required reusable environment evidence.
 
-This Skill is an instruction set executed by the Agent with its native tools.
-It is not a standalone GUI application and must not be replaced by dedicated
-initialization scripts. Input collection uses the current platform's native
-structured GUI input capability. Filesystem changes use the Agent's normal
-project-local file tools.
+This Skill is orchestrated by the Agent, but input collection and deployment are
+implemented by the repository's deterministic tools. Always use the repository
+GUI collector at `tools/init_agent_env.py`; do not substitute an Agent-native
+question window, conversational prompts, or inferred defaults. Apply the saved
+input with `tools/deploy_agent_env.py`.
 
 Before deployment, read
 [`references/platform-contract.md`](references/platform-contract.md) completely.
@@ -25,8 +25,8 @@ authoritative for the user-input workflow and completion criteria.
 
 ## Non-negotiable interaction rules
 
-- Always collect the initialization choices through native structured GUI input
-  before changing the filesystem, including on a clean checkout.
+- Always launch the repository GUI collector with `--gui` and save its validated
+  result before changing the filesystem, including on a clean checkout.
 - The Agent must not infer target platforms from the platform currently running
   the session. "Current Agent environment" means the project-level environment
   selected by the user, not automatically Codex, Claude Code, or OpenCode.
@@ -38,9 +38,9 @@ authoritative for the user-input workflow and completion criteria.
   GUI, but the user must confirm or replace them.
 - Do not turn missing dependency paths into empty values, do not omit the cache
   entries, and do not scan broad local directories to guess installations.
-- Do not replace the GUI with CLI text prompts, conversational assumptions, or
-  hand-authored input JSON. If native structured GUI input is unavailable, stop
-  before mutation and report that initialization requires a supported GUI.
+- Do not replace the repository GUI with Agent-native GUI controls, CLI text
+  prompts, conversational assumptions, or hand-authored input JSON. If the
+  repository GUI cannot open, stop before mutation and report the exact error.
 - Do not deploy anything until the GUI input is complete and validated.
 
 ## Boundaries
@@ -66,6 +66,8 @@ The released `autombd-rtd/` Skill is outside this workflow and is deployed by
 | --- | --- |
 | Canonical Agent-discipline Skills | `agent-discipline/skills/<name>/SKILL.md` |
 | Canonical Claude Code subagents | `agent-discipline/subagents/<name>.md` |
+| Repository GUI collector | `tools/init_agent_env.py` |
+| Deterministic deployer | `tools/deploy_agent_env.py` |
 | Platform deployment contract | `agent-discipline/skills/initialize-agent-discipline/references/platform-contract.md` |
 | External-dependency rules | `agent-discipline/skills/external-dependency-memory/SKILL.md` |
 
@@ -96,7 +98,23 @@ Inspect only these project locations:
 The pre-check establishes current state only. It does not authorize choosing a
 platform, choosing Update, or skipping the GUI.
 
-### 2. Collect all choices through the native GUI
+### 2. Collect all choices through the repository GUI
+
+Run exactly:
+
+```powershell
+python tools\init_agent_env.py --gui --output .agent-state\init-input.json
+```
+
+Do not use the collector's text mode for Agent initialization. If the user
+cancels or the GUI exits without producing the file, stop without deployment.
+Validate the saved input before continuing:
+
+```powershell
+python tools\init_agent_env.py `
+  --input .agent-state\init-input.json `
+  --validate-only
+```
 
 Collect and validate every field below before deployment:
 
@@ -147,6 +165,19 @@ Any prevalidation failure stops the transaction before filesystem mutation.
 
 ### 5. Apply the selected transaction
 
+Apply the complete validated input with the deterministic deployer:
+
+```powershell
+python tools\deploy_agent_env.py `
+  --input .agent-state\init-input.json `
+  --repo-root . `
+  --verified-by codex
+```
+
+Replace `codex` with the actual orchestrating platform name when another Agent
+platform runs the workflow. The target platform set still comes exclusively
+from the GUI input.
+
 For **Update**:
 
 - preserve unrelated project-local files and cache entries;
@@ -176,8 +207,16 @@ demand under the `external-dependency-memory` rules.
 
 ### 6. Verify and close out
 
-Run the focused Agent-environment tests, then `git diff --check` and
-`git status --short`. Confirm all of the following:
+Run the focused Agent-environment tests:
+
+```powershell
+python -m pytest tests\unit\test_deploy_agent_env.py `
+  tests\unit\test_agent_skill_contract.py -q
+git diff --check
+git status --short
+```
+
+Confirm all of the following:
 
 - every selected Skill target is a symlink or junction resolving to a source
   containing `SKILL.md`;
@@ -205,7 +244,7 @@ at session start.
 
 | Failure | Required action |
 | --- | --- |
-| Native GUI unavailable or cancelled | Stop before mutation; report that complete GUI input is required. |
+| Repository GUI unavailable or cancelled | Stop before mutation; report the exact collector error. |
 | No target platform selected | Return to the GUI; never select the current platform automatically. |
 | Operation mode not submitted | Return to the GUI; never assume Update. |
 | S32DS or RTD path missing/invalid | Return to the GUI for a corrected path; never scan or cache an empty value. |
@@ -220,7 +259,7 @@ at session start.
 ## Completion checklist
 
 - [ ] Platform contract and external-dependency-memory Skill were read.
-- [ ] Native GUI collected an explicit platform set and operation mode.
+- [ ] Repository GUI collected an explicit platform set and operation mode.
 - [ ] S32DS and RTD paths were explicitly confirmed and verified.
 - [ ] Additional-Skill choice was explicitly collected.
 - [ ] Reset, if selected, showed its exact scope and was explicitly confirmed.

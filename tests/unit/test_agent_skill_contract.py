@@ -151,7 +151,10 @@ def test_initialize_agent_discipline_requires_gui_first_complete_input():
     ).read_text(encoding="utf-8")
 
     for required in (
-        "native structured GUI input",
+        "repository GUI collector",
+        "tools/init_agent_env.py",
+        "--gui",
+        "tools/deploy_agent_env.py",
         "must not infer target platforms",
         "must not infer the operation mode",
         "S32DS and RTD paths are required",
@@ -163,18 +166,21 @@ def test_initialize_agent_discipline_requires_gui_first_complete_input():
         assert required in skill
 
     for forbidden in (
+        "native structured GUI input",
         "Default to update mode",
         "optional S32DS and RTD paths",
         "Empty paths are valid",
         "Use portable text prompts",
-        "tools/init_agent_env.py",
-        "tools/deploy_agent_env.py",
     ):
         assert forbidden not in skill
+
+    collector = Path("tools/init_agent_env.py").read_text(encoding="utf-8")
+    assert "_skip_paths_var" not in collector
+    assert "Skip S32DS/RTD paths" not in collector
 
     platform_contract = Path(
         "agent-discipline/skills/initialize-agent-discipline/"
         "references/platform-contract.md"
     ).read_text(encoding="utf-8")
-    assert "native project-local file tools" in platform_contract
-    assert "Use a deterministic deployment script" not in platform_contract
+    assert "deterministic deployment script" in platform_contract
+    assert "native project-local file tools" not in platform_contract

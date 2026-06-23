@@ -49,11 +49,11 @@ through both compatible locations; do not create a third copy or link.
 
 ## Subagent transformations
 
-Use the Agent's native project-local file tools and apply separate deterministic
-rendering rules for Claude Code, OpenCode, and Codex. Parse each canonical file
-once into `name`, `description`, `tools`, `model`, and Markdown body. Reject
-malformed frontmatter, duplicate fields, unsupported fields, and unknown tools
-before writing any target.
+Use the repository's deterministic deployment script with separate renderers
+for Claude Code, OpenCode, and Codex. Parse each canonical file once into
+`name`, `description`, `tools`, `model`, and Markdown body. Reject malformed
+frontmatter, duplicate fields, unsupported fields, and unknown tools before
+writing any target.
 
 Generate all selected-platform outputs in memory first. Validate the complete
 output set, then write each changed file through a temporary file in the target

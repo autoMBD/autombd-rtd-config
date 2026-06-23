@@ -39,14 +39,13 @@
 # Project:     RTD CfgFile CLI <https://github.com/autoMBD/autombd-rtd-config>
 # File:        init_agent_env.py
 # Author:      autoMBD <tkung.lqk@foxmail.com>
-# Date:        2026-06-23
-# Version:     0.2.0
+# Date:        2026-06-24
+# Version:     0.3.0
 # Description: Unified structured input collector for Agent environment
-#              initialization. Opens a tkinter GUI dialog to collect target
-#              platforms, operation mode, external dependency paths, and
-#              additional skill imports. Outputs deployment-ready JSON to
-#              stdout (or a file with --output). Also accepts pre-collected
-#              input via --input for non-interactive agent-driven use.
+#              initialization. Its explicit --gui mode collects target
+#              platforms, operation mode, required external dependency paths,
+#              and optional skill imports in a tkinter dialog. Outputs
+#              deployment-ready JSON and validates pre-collected input.
 # =================================================================================
 
 from __future__ import annotations
@@ -114,6 +113,14 @@ def validate_input(data: dict[str, Any]) -> list[str]:
     if mode == "reset" and not data.get("reset_confirmed", False):
         errors.append("'reset_confirmed' must be true for reset mode")
 
+    s32ds_path = data.get("s32ds_path")
+    if not isinstance(s32ds_path, str) or not _verify_s32ds_root(s32ds_path):
+        errors.append("'s32ds_path' must be a verified S32DS installation root")
+
+    rtd_path = data.get("rtd_path")
+    if not isinstance(rtd_path, str) or not _verify_rtd_root(rtd_path):
+        errors.append("'rtd_path' must be a verified RTD package root")
+
     return errors
 
 
@@ -134,7 +141,6 @@ class InitDialog(tk.Tk):
 
         self._s32ds_var = tk.StringVar()
         self._rtd_var = tk.StringVar()
-        self._skip_paths_var = tk.BooleanVar(value=False)
 
         self._import_var = tk.StringVar(value="skip")
         self._import_path_var = tk.StringVar()
@@ -201,16 +207,8 @@ class InitDialog(tk.Tk):
         cb_reset.pack(anchor="w")
 
         # ── external deps ──
-        deps_frame = ttk.LabelFrame(main, text="External Dependencies (optional)", padding=(10, 8))
+        deps_frame = ttk.LabelFrame(main, text="External Dependencies (required)", padding=(10, 8))
         deps_frame.pack(fill="x", pady=(0, 10))
-
-        cb_skip = ttk.Checkbutton(
-            deps_frame,
-            text="Skip S32DS/RTD paths (deploy skills & subagents only)",
-            variable=self._skip_paths_var,
-            command=self._on_skip_toggle,
-        )
-        cb_skip.pack(anchor="w", pady=(0, 6))
 
         self._deps_content = ttk.Frame(deps_frame)
         self._deps_content.pack(fill="x")
@@ -280,21 +278,6 @@ class InitDialog(tk.Tk):
                 child.configure(state="disabled")
             self._reset_confirmed_var.set(False)
 
-    def _on_skip_toggle(self) -> None:
-        state = "disabled" if self._skip_paths_var.get() else "normal"
-        for child in self._deps_content.winfo_children():
-            self._set_children_state(child, state)
-
-    @staticmethod
-    def _set_children_state(parent: tk.Widget, state: str) -> None:
-        for child in parent.winfo_children():
-            try:
-                child.configure(state=state)
-            except tk.TclError:
-                pass
-            if isinstance(child, tk.Frame) or isinstance(child, ttk.Frame):
-                InitDialog._set_children_state(child, state)
-
     def _on_import_change(self) -> None:
         val = self._import_var.get()
         if val == "local":
@@ -339,44 +322,45 @@ class InitDialog(tk.Tk):
             )
             return
 
-        s32ds_path = ""
-        rtd_path = ""
-        if not self._skip_paths_var.get():
-            s32ds_path = self._s32ds_var.get().strip()
-            rtd_path = self._rtd_var.get().strip()
+        s32ds_path = self._s32ds_var.get().strip()
+        rtd_path = self._rtd_var.get().strip()
 
-            if s32ds_path and not _verify_s32ds_root(s32ds_path):
-                if not messagebox.askyesno(
-                    "Invalid S32DS Path",
-                    f"The path does not appear to be a valid S32DS root:\n{s32ds_path}\n\nUse anyway?",
-                ):
-                    return
+        if not _verify_s32ds_root(s32ds_path):
+            messagebox.showwarning(
+                "Invalid S32DS Path",
+                "Select an existing S32DS root containing eclipse/ or S32DS/.",
+            )
+            return
 
-            if rtd_path and not _verify_rtd_root(rtd_path):
-                if not messagebox.askyesno(
-                    "Invalid RTD Path",
-                    f"The path does not contain RTD packages (*_TS_T*):\n{rtd_path}\n\nUse anyway?",
-                ):
-                    return
+        if not _verify_rtd_root(rtd_path):
+            messagebox.showwarning(
+                "Invalid RTD Path",
+                "Select an existing RTD root containing *_TS_T* package directories.",
+            )
+            return
 
         import_skills: dict[str, Any] | None = None
         import_type = self._import_var.get()
         if import_type == "local":
             local_path = self._import_path_var.get().strip()
-            if local_path:
-                import_skills = {
-                    "type": "local",
-                    "path": local_path,
-                    "description": f"Import skills from local directory: {local_path}",
-                }
+            if not local_path:
+                messagebox.showwarning("Missing Skill Directory", "Select a local Skill directory.")
+                return
+            import_skills = {
+                "type": "local",
+                "path": local_path,
+                "description": f"Import skills from local directory: {local_path}",
+            }
         elif import_type == "online":
             url = self._import_url_var.get().strip()
-            if url:
-                import_skills = {
-                    "type": "online",
-                    "url": url,
-                    "description": f"Install skills from online source: {url}",
-                }
+            if not url:
+                messagebox.showwarning("Missing Skill URL", "Enter an online Skill source URL.")
+                return
+            import_skills = {
+                "type": "online",
+                "url": url,
+                "description": f"Install skills from online source: {url}",
+            }
 
         self.result = {
             "version": 1,
@@ -514,26 +498,16 @@ def run_cli() -> dict[str, Any] | None:
             print("Reset cancelled. Switching to Update mode.")
             mode = "update"
 
-    print("\n--- External Dependencies (optional) ---")
-    print("S32DS and RTD paths are optional. Press Enter to skip.")
-    print("If skipped, only skills and subagents will be deployed.")
+    print("\n--- External Dependencies (required) ---")
+    s32ds_path = _ask_path_optional("S32DS installation root")
+    if not _verify_s32ds_root(s32ds_path):
+        print(f"  ERROR: {s32ds_path or '<empty>'} is not a valid S32DS root.")
+        return None
 
-    skip_paths = _choose_yes_no("  Skip S32DS/RTD paths?")
-
-    s32ds_path = ""
-    rtd_path = ""
-    if not skip_paths:
-        s32ds_path = _ask_path_optional("S32DS installation root")
-        if s32ds_path and not _verify_s32ds_root(s32ds_path):
-            print(f"  WARNING: {s32ds_path} does not appear to be a valid S32DS root.")
-            if not _choose_yes_no("  Use anyway?"):
-                s32ds_path = ""
-
-        rtd_path = _ask_path_optional("RTD installation path")
-        if rtd_path and not _verify_rtd_root(rtd_path):
-            print(f"  WARNING: {rtd_path} does not contain RTD packages (*_TS_T*).")
-            if not _choose_yes_no("  Use anyway?"):
-                rtd_path = ""
+    rtd_path = _ask_path_optional("RTD installation path")
+    if not _verify_rtd_root(rtd_path):
+        print(f"  ERROR: {rtd_path or '<empty>'} is not a valid RTD package root.")
+        return None
 
     print("\n--- Additional Skills Import (optional) ---")
     import_skills: dict[str, Any] | None = None

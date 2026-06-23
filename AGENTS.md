@@ -109,9 +109,9 @@ records where those dependencies are found on this machine.
 
 The agent discipline for this project includes skills, subagent templates, and
 an external-dependency cache that must be deployed to each Agent platform's
-project-level directory before development can proceed. This initialization is
-performed by the agent itself — there are no standalone scripts or GUI
-applications.
+project-level directory before development can proceed. The agent orchestrates
+the repository GUI collector and deterministic deployer; it must not replace
+them with Agent-native GUI controls or inferred answers.
 
 ### Initialization Skill
 
@@ -121,7 +121,8 @@ applications.
   Agent platform directories (Claude, OpenCode, Codex) using symbolic links for
   skills and platform-native subagent configurations. It also initializes
   `.agent-state/external-dependencies.json` with the S32DS and RTD installation
-  paths.
+  paths. User input is collected by `tools/init_agent_env.py --gui`; the saved
+  input is applied by `tools/deploy_agent_env.py`.
 
 ### Trigger Conditions
 
