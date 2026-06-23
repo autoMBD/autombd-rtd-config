@@ -70,19 +70,6 @@ PLATFORM_LABELS: dict[str, str] = {
     "opencode": "OpenCode",
 }
 
-PLATFORM_SKILL_DIRS: dict[str, str] = {
-    "codex": ".agents/skills",
-    "claude": ".claude/skills",
-    "opencode": ".opencode/skills",
-}
-
-PLATFORM_AGENT_DIRS: dict[str, str] = {
-    "codex": ".agents/agents",
-    "claude": ".claude/agents",
-    "opencode": ".opencode/agents",
-}
-
-
 # ── validation utilities ──────────────────────────────────────────────
 
 

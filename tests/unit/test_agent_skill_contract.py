@@ -47,6 +47,13 @@
 from pathlib import Path
 
 
+def _frontmatter(path: Path) -> str:
+    text = path.read_text(encoding="utf-8")
+    opening, frontmatter, _body = text.split("---", 2)
+    assert opening == ""
+    return frontmatter.strip()
+
+
 def test_rtd_config_skill_documents_public_cli_and_module_surface():
     skill = Path("autombd-rtd/SKILL.md").read_text(encoding="utf-8")
     # Names the tool and its read-only CLI surface.
@@ -80,3 +87,60 @@ def test_external_dependency_memory_skill_is_lightweight_contract():
     assert "Never record tokens" in skill
     assert "tools/agent_env_check.py" not in skill
     assert "environment-verification.json" not in skill
+
+
+def test_subagent_templates_keep_original_claude_code_frontmatter():
+    expected = {
+        "explorer": "\n".join((
+            "name: explorer",
+            "description: Read-only investigator that establishes ground-truth facts from the repo, fixtures, the RTD SDK (.xdm/.epd), and the S32DS ConfigTools docs — RTD enum domains, pin-mux matrices, fixture contents, and vendor CLI behavior. Returns decision-ready conclusions with evidence, never file dumps, never edits.",
+            "tools: Read, Grep, Glob, Bash, WebFetch",
+            "model: sonnet",
+        )),
+        "worker": "\n".join((
+            "name: worker",
+            "description: Implements one scoped RTD CfgFile CLI engineering task (code or committed runtime asset) against a self-contained brief, using TDD. Also handles KPI optimization when the Tester reports functional PASS but KPI MISS. Use for feature/bugfix implementation and scoped KPI optimization. Not for cross-cutting design, independent review, or final acceptance.",
+            "tools: Read, Edit, Write, Bash, Grep, Glob",
+            "model: sonnet",
+        )),
+        "tester": "\n".join((
+            "name: tester",
+            "description: Owns the convergence gate. Writes/extends tests and runs the deterministic suite, S32DS headless validation, AND the isolated E2E acceptance cases, then reports an evidence-backed PASS/FAIL plus KPI evidence. E2E runs as a TRUE black box via an independent third-party agent CLI (the tools/blackbox_e2e.py harness; Codex-first, extensible) against the deployed skill + fixture only — never this repository and never the embedded subagent. Tests are the sole functional acceptance criterion for \"done\"; KPI misses trigger capped Worker optimization. Use to prove a change converges.",
+            "tools: Read, Edit, Write, Bash, Grep, Glob",
+            "model: sonnet",
+        )),
+        "reviewer": "\n".join((
+            "name: reviewer",
+            "description: Acceptance reviewer, invoked by the main agent ONLY after the Tester's functional gate is already green and KPI evidence is recorded. Reviews every development requirement EXCEPT test execution (code standards, uniform header, missed skill triggers, ownership/boundaries, domain-value-vs-.xdm, test adequacy, KPI evidence hygiene, diff hygiene) and appends a lessons-learned entry. Read-only — reads the repository to review the diff; produces findings, not fixes.",
+            "tools: Read, Grep, Glob, Bash",
+            "model: opus",
+        )),
+    }
+
+    for name, expected_frontmatter in expected.items():
+        path = Path("agent-discipline/subagents") / f"{name}.md"
+        assert _frontmatter(path) == expected_frontmatter, name
+
+
+def test_initialize_agent_discipline_uses_native_platform_paths():
+    skill = Path(
+        "agent-discipline/skills/initialize-agent-discipline/SKILL.md"
+    ).read_text(encoding="utf-8")
+
+    for required in (
+        ".claude/agents/<name>.md",
+        ".opencode/agents/<name>.md",
+        ".codex/agents/<name>.toml",
+        ".agents/skills/<name>/",
+        "references/platform-contract.md",
+        "tools/deploy_agent_env.py",
+    ):
+        assert required in skill
+
+    assert ".agents/agents/<name>.md" not in skill
+    assert 'Add `"$schema"`' not in skill
+    assert "Write the template content as-is to `.agents/agents" not in skill
+
+    collector = Path("tools/init_agent_env.py").read_text(encoding="utf-8")
+    assert '"opencode": ".opencode/skills"' not in collector
+    assert '"codex": ".agents/agents"' not in collector
