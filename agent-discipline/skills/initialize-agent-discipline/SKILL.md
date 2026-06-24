@@ -181,27 +181,41 @@ Collect and validate every field below before deployment:
    contains an expected S32DS marker such as `eclipse/` or `S32DS/`.
 4. **RTD installation root** — absolute path to an existing directory that
    contains RTD package directories matching `*_TS_T*`.
-5. **Additional Skills** — explicitly choose Skip, import from a local
-   directory, or install from an online source. Skip is a valid explicit choice;
-   a missing answer is not.
-6. **Reset confirmation** — required only for Reset and must show the exact
+5. **Additional Skills** — explicitly choose one or more applicable workflows:
+   import from local sources and/or install in the user-level Agent environment
+   from an online request. Skip is mutually exclusive with both. For local
+   import, enter or browse to multiple local directories, scan them recursively,
+   use checkboxes plus **Select all** and **Clear all**, and submit the exact
+   selected Skills. For online installation, collect Skill names, package
+   references, URLs, or a natural-language discovery request. Skip is a valid
+   explicit choice; a missing answer is not.
+   The GUI records this explicit choice in `additional_skill_workflows` as
+   `skip` or a `local`/`online` combination; Skip is mutually exclusive.
+6. **Supplemental task** — optionally collect additional Agent-environment
+   initialization instructions. Preserve the text verbatim after trimming; do
+   not execute it before initialization and verification complete.
+7. **Reset confirmation** — required only for Reset and must show the exact
    selected project-local paths that will be removed.
 
 Normalize confirmed paths only after validation. If either dependency path is
 missing or invalid, keep the workflow at input collection and request a
 corrected value. Never cache unverified paths.
 
-### 3. Resolve additional Skills
+### 3. Resolve selected local Skills
 
-For a local import, recursively find `SKILL.md`, validate that each manifest
-`name` matches its directory name, resolve the canonical source, and include the
-Skill in the same target roots as canonical Skills. A name collision with a
-different source is fatal.
+For local import, the GUI writes `local_skill_import` with `roots` and exact
+`selected` entries. Each selected entry contains its manifest `name` and
+canonical source directory. Before mutation, revalidate that every selected
+source exists under a submitted root, contains `SKILL.md`, still has the same
+name, and does not collide with another selected or canonical Skill.
 
-For an online import, show the requested URL and use the appropriate platform
-installation workflow only after explicit user approval. After installation,
-resolve the installed local source and deploy project links to that source.
-Never silently download or execute arbitrary content.
+The deployer links selected local Skills only. It never rescans the roots to
+add unselected Skills. Deploy every selected directory through a directory
+symbolic link or Windows junction; never copy any Skill directory or file.
+
+The GUI writes an online request separately as `online_skill_request`. Online
+installation is outside the deterministic deployer and must not be converted
+to a project-local Skill link.
 
 ### 4. Prevalidate the complete deployment
 
@@ -261,12 +275,13 @@ Use stable cache keys and conservative evidence:
 Other external tools remain outside initialization scope and are cached on
 demand under the `external-dependency-memory` rules.
 
-### 6. Verify and close out
+### 6. Verify project initialization
 
 Run the focused Agent-environment tests:
 
 ```powershell
-python -m pytest tests\unit\test_deploy_agent_env.py `
+python -m pytest tests\unit\test_init_agent_env.py `
+  tests\unit\test_deploy_agent_env.py `
   tests\unit\test_agent_skill_contract.py -q
 git diff --check
 git status --short
@@ -293,6 +308,41 @@ succeeds for every selected platform, both dependency entries are cached, and
 all verification checks pass. Partial deployment or a missing cache entry is a
 failed initialization, not a successful reduced mode.
 
+### 7. Install requested online Skills
+
+When `online_skill_request` is present, process it only after project-level
+deployment and focused verification succeed:
+
+1. Check whether `find-skills` is available in the current user-level Agent
+   environment.
+2. If it is unavailable, automatically install `find-skills` with the
+   platform-supported user-level Skill installer. When the Skills CLI is the
+   available installer, use the verified canonical package for `find-skills`;
+   never ask the deterministic deployer to perform this installation.
+3. Load `find-skills`, discover the requested Skills, verify source quality as
+   its workflow requires, and install the user-selected online Skills into the
+   user-level Agent environment.
+4. Report the online installation result separately. A failure means the full
+   requested initialization is incomplete even though project deployment may
+   already have passed.
+
+Do not add symbolic links for online Skills in this repository. This workflow
+is outside the deterministic deployer and must obey the active platform's
+normal approval rules for network access and user-level writes.
+
+### 8. Evaluate the supplemental task
+
+When `supplemental_task` is present, evaluate it only after project deployment,
+verification, and requested online Skill installation all succeed.
+
+- If the task is within Agent-environment initialization scope, execute it
+  under the normal authorization and safety rules.
+- If it is out of scope, do not execute it. Explain why it is unrelated to
+  initialization and obtain explicit confirmation before treating it as a
+  separate task.
+- If an earlier initialization step failed, do not execute the supplemental
+  task.
+
 Restart or open a new session on platforms that load subagent definitions only
 at session start.
 
@@ -309,7 +359,9 @@ at session start.
 | Skill destination is an ordinary path or wrong link | Stop; never replace it implicitly or fall back to copying. |
 | Symlink and Windows junction creation both fail | Stop and request Developer Mode or suitable permissions. |
 | Generated native subagent fails validation | Stop before writing any generated output. |
-| Online Skill source selected | Obtain explicit approval and resolve a trusted local installed source before linking. |
+| Online Skill request selected | Complete project verification first, then use `find-skills` for user-level discovery and installation; never pass it to the deployer. |
+| `find-skills` unavailable | Automatically install it in the user-level Agent environment through the supported Skill installer, then resume online discovery. |
+| Supplemental task is out of scope | Finish initialization, explain the mismatch, and wait for explicit confirmation before executing it separately. |
 | Any selected platform fails deployment or verification | Report initialization as failed; do not claim partial success. |
 
 ## Completion checklist
@@ -318,6 +370,9 @@ at session start.
 - [ ] Repository GUI collected an explicit platform set and operation mode.
 - [ ] S32DS and RTD paths were explicitly confirmed and verified.
 - [ ] Additional-Skill choice was explicitly collected.
+- [ ] Selected local Skills were revalidated and linked; unselected Skills were not deployed.
+- [ ] Requested online Skills were installed in the user-level Agent environment through `find-skills`, outside the deterministic deployer.
+- [ ] Supplemental task was evaluated only after successful initialization; out-of-scope work received explicit confirmation.
 - [ ] Reset, if selected, showed its exact scope and was explicitly confirmed.
 - [ ] Complete deployment was prevalidated before mutation.
 - [ ] Skill targets are links/junctions, never copied directories.

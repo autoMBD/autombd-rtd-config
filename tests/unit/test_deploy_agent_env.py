@@ -39,8 +39,8 @@
 # Project:     RTD CfgFile CLI <https://github.com/autoMBD/autombd-rtd-config>
 # File:        test_deploy_agent_env.py
 # Author:      autoMBD <tkung.lqk@foxmail.com>
-# Date:        2026-06-24
-# Version:     0.1.0
+# Date:        2026-06-25
+# Version:     0.2.0
 # Description: Unit tests for deterministic Agent environment deployment.
 # =================================================================================
 
@@ -215,6 +215,9 @@ def test_skill_destination_must_be_a_link_to_the_canonical_source(tmp_path):
     with pytest.raises(AgentDeploymentError, match="ordinary"):
         ensure_directory_link(source, destination)
 
+    with pytest.raises(AgentDeploymentError, match="ordinary"):
+        ensure_directory_link(source, source)
+
 
 def test_legacy_cleanup_is_narrow_and_preserves_unrelated_files(tmp_path):
     repo = _fixture_repo(tmp_path)
@@ -298,6 +301,105 @@ def test_local_additional_skills_are_linked_not_copied(tmp_path):
     assert not (repo / ".opencode/skills").exists()
 
 
+def test_version_2_links_only_selected_local_skills_from_multiple_roots(tmp_path):
+    repo = _fixture_repo(tmp_path)
+    root_a = tmp_path / "skills-a"
+    root_b = tmp_path / "skills-b"
+    selected = root_a / "release"
+    unselected = root_b / "diagnostics"
+    selected.mkdir(parents=True)
+    unselected.mkdir(parents=True)
+    (selected / "SKILL.md").write_text(
+        "---\nname: release\ndescription: Release helper.\n---\n",
+        encoding="utf-8",
+    )
+    (unselected / "SKILL.md").write_text(
+        "---\nname: diagnostics\ndescription: Diagnostics helper.\n---\n",
+        encoding="utf-8",
+    )
+    config = _config("claude", "codex")
+    config["version"] = 2
+    config["local_skill_import"] = {
+        "roots": [str(root_a), str(root_b)],
+        "selected": [{"name": "release", "source": str(selected)}],
+    }
+
+    deploy(repo, config)
+
+    for target_root in (repo / ".claude/skills", repo / ".agents/skills"):
+        assert (target_root / "release/SKILL.md").samefile(selected / "SKILL.md")
+        assert not (target_root / "diagnostics").exists()
+
+
+def test_version_2_revalidates_selected_source_before_any_mutation(tmp_path):
+    repo = _fixture_repo(tmp_path)
+    root = tmp_path / "skills"
+    selected = root / "release"
+    selected.mkdir(parents=True)
+    (selected / "SKILL.md").write_text(
+        "---\nname: changed-name\ndescription: Changed.\n---\n",
+        encoding="utf-8",
+    )
+    config = _config("codex")
+    config["version"] = 2
+    config["local_skill_import"] = {
+        "roots": [str(root)],
+        "selected": [{"name": "release", "source": str(selected)}],
+    }
+
+    with pytest.raises(AgentDeploymentError, match="does not match directory"):
+        deploy(repo, config)
+
+    assert not (repo / ".agents/skills").exists()
+
+
+def test_version_2_rejects_selected_source_outside_roots_before_mutation(tmp_path):
+    repo = _fixture_repo(tmp_path)
+    root = tmp_path / "skills"
+    root.mkdir()
+    selected = tmp_path / "outside/release"
+    selected.mkdir(parents=True)
+    (selected / "SKILL.md").write_text(
+        "---\nname: release\ndescription: Release helper.\n---\n",
+        encoding="utf-8",
+    )
+    config = _config("codex")
+    config["version"] = 2
+    config["local_skill_import"] = {
+        "roots": [str(root)],
+        "selected": [{"name": "release", "source": str(selected)}],
+    }
+
+    with pytest.raises(AgentDeploymentError, match="outside submitted roots"):
+        deploy(repo, config)
+
+    assert not (repo / ".agents/skills").exists()
+
+
+def test_reset_rejects_local_source_inside_managed_skill_root_before_mutation(
+    tmp_path,
+):
+    repo = _fixture_repo(tmp_path)
+    selected = repo / ".agents/skills/release"
+    selected.mkdir(parents=True)
+    manifest = selected / "SKILL.md"
+    manifest.write_text(
+        "---\nname: release\ndescription: Release helper.\n---\n",
+        encoding="utf-8",
+    )
+    config = _config("codex", mode="reset")
+    config["version"] = 2
+    config["local_skill_import"] = {
+        "roots": [str(repo / ".agents/skills")],
+        "selected": [{"name": "release", "source": str(selected)}],
+    }
+
+    with pytest.raises(AgentDeploymentError, match="inside managed Skill root"):
+        deploy(repo, config)
+
+    assert manifest.is_file()
+
+
 def test_online_skill_import_requires_explicit_external_installation(tmp_path):
     repo = _fixture_repo(tmp_path)
     config = _config("codex")
@@ -308,6 +410,19 @@ def test_online_skill_import_requires_explicit_external_installation(tmp_path):
 
     with pytest.raises(AgentDeploymentError, match="online Skill import"):
         deploy(repo, config)
+
+
+def test_online_request_and_supplemental_task_are_not_deployer_inputs(tmp_path):
+    repo = _fixture_repo(tmp_path)
+    config = _config("codex")
+    config["version"] = 2
+    config["online_skill_request"] = "Find and install a testing skill."
+    config["supplemental_task"] = "Initialize Agent formatting rules."
+
+    deploy(repo, config)
+
+    skill_root = repo / ".agents/skills"
+    assert {path.name for path in skill_root.iterdir()} == {"example"}
 
 
 def test_cli_loads_collector_json_and_deploys_native_outputs(tmp_path):

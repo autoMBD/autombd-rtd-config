@@ -39,8 +39,8 @@
 # Project:     RTD CfgFile CLI <https://github.com/autoMBD/autombd-rtd-config>
 # File:        test_agent_skill_contract.py
 # Author:      autoMBD <tkung.lqk@foxmail.com>
-# Date:        2026-06-03
-# Version:     0.1.0
+# Date:        2026-06-25
+# Version:     0.2.0
 # Description: Unit test for the companion agent skill contract.
 # =================================================================================
 
@@ -191,3 +191,40 @@ def test_initialize_agent_discipline_requires_gui_first_complete_input():
     ).read_text(encoding="utf-8")
     assert "deterministic deployment script" in platform_contract
     assert "native project-local file tools" not in platform_contract
+
+
+def test_initialize_agent_discipline_documents_multi_skill_orchestration():
+    skill = Path(
+        "agent-discipline/skills/initialize-agent-discipline/SKILL.md"
+    ).read_text(encoding="utf-8")
+    platform_contract = Path(
+        "agent-discipline/skills/initialize-agent-discipline/"
+        "references/platform-contract.md"
+    ).read_text(encoding="utf-8")
+
+    for required in (
+        "multiple local directories",
+        "Select all",
+        "Clear all",
+        "additional_skill_workflows",
+        "local_skill_import",
+        "online_skill_request",
+        "supplemental_task",
+        "find-skills",
+        "user-level Agent environment",
+        "outside the deterministic deployer",
+        "out of scope",
+        "explicit confirmation",
+    ):
+        assert required in skill
+
+    for required in (
+        "selected local Skills only",
+        "directory symbolic link or Windows junction",
+        "never rescans the roots to add unselected Skills",
+        "online Skill installation is outside this contract",
+    ):
+        assert required in platform_contract
+
+    deployer = Path("tools/deploy_agent_env.py").read_text(encoding="utf-8")
+    assert "npx skills" not in deployer

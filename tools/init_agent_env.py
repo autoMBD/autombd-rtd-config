@@ -40,7 +40,7 @@
 # File:        init_agent_env.py
 # Author:      autoMBD <tkung.lqk@foxmail.com>
 # Date:        2026-06-24
-# Version:     0.3.1
+# Version:     0.4.0
 # Description: Unified structured input collector for Agent environment
 #              initialization. Its explicit --gui mode collects target
 #              platforms, operation mode, required external dependency paths,
@@ -52,14 +52,16 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 import tkinter as tk
 import tkinter.filedialog as filedialog
 import tkinter.messagebox as messagebox
 import tkinter.ttk as ttk
 from datetime import datetime, timezone
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
 
 SUPPORTED_PLATFORMS = ("codex", "claude", "opencode")
 
@@ -68,6 +70,176 @@ PLATFORM_LABELS: dict[str, str] = {
     "claude": "Claude",
     "opencode": "OpenCode",
 }
+
+SKILL_NAME_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+
+
+@dataclass(frozen=True)
+class LocalSkillCandidate:
+    name: str
+    source: Path
+
+
+@dataclass(frozen=True)
+class LocalSkillIssue:
+    source: Path
+    message: str
+
+
+@dataclass(frozen=True)
+class LocalSkillDiscovery:
+    candidates: tuple[LocalSkillCandidate, ...]
+    issues: tuple[LocalSkillIssue, ...]
+
+
+def _manifest_skill_name(skill_dir: Path) -> str:
+    manifest = skill_dir / "SKILL.md"
+    if not manifest.is_file():
+        raise ValueError(f"Skill source lacks SKILL.md: {skill_dir}")
+    text = manifest.read_text(encoding="utf-8-sig")
+    match = re.search(
+        r"(?m)^name:\s*([a-z0-9]+(?:-[a-z0-9]+)*)\s*$", text
+    )
+    if not match:
+        raise ValueError(f"Skill manifest lacks a valid name: {manifest}")
+    name = match.group(1)
+    if name != skill_dir.name:
+        raise ValueError(
+            f"Skill name {name!r} does not match directory {skill_dir.name!r}"
+        )
+    return name
+
+
+def _is_within(path: Path, roots: Iterable[Path]) -> bool:
+    for root in roots:
+        try:
+            path.relative_to(root)
+            return True
+        except ValueError:
+            continue
+    return False
+
+
+def discover_local_skills(roots: Iterable[str | Path]) -> LocalSkillDiscovery:
+    canonical_roots: list[Path] = []
+    issues: list[LocalSkillIssue] = []
+    for raw_root in roots:
+        root = Path(raw_root).expanduser().resolve(strict=False)
+        if root in canonical_roots:
+            continue
+        canonical_roots.append(root)
+        if not root.is_dir():
+            issues.append(LocalSkillIssue(root, f"Skill root is not a directory: {root}"))
+
+    by_identity: dict[tuple[str, Path], LocalSkillCandidate] = {}
+    sources_by_name: dict[str, set[Path]] = {}
+    for root in canonical_roots:
+        if not root.is_dir():
+            continue
+        try:
+            manifests = sorted(root.rglob("SKILL.md"))
+        except OSError as exc:
+            issues.append(LocalSkillIssue(root, f"Cannot scan Skill root {root}: {exc}"))
+            continue
+        for manifest in manifests:
+            source = manifest.parent.resolve(strict=True)
+            try:
+                name = _manifest_skill_name(source)
+            except (OSError, UnicodeError, ValueError) as exc:
+                issues.append(LocalSkillIssue(source, str(exc)))
+                continue
+            by_identity[(name, source)] = LocalSkillCandidate(name, source)
+            sources_by_name.setdefault(name, set()).add(source)
+
+    conflicting_names = {
+        name for name, sources in sources_by_name.items() if len(sources) > 1
+    }
+    for name in sorted(conflicting_names):
+        sources = sorted(sources_by_name[name], key=lambda path: path.as_posix())
+        issues.append(
+            LocalSkillIssue(
+                sources[0],
+                f"duplicate Skill name {name!r}: "
+                + " and ".join(path.as_posix() for path in sources),
+            )
+        )
+
+    candidates = tuple(
+        sorted(
+            (
+                candidate
+                for candidate in by_identity.values()
+                if candidate.name not in conflicting_names
+            ),
+            key=lambda candidate: (candidate.name, candidate.source.as_posix()),
+        )
+    )
+    return LocalSkillDiscovery(
+        candidates,
+        tuple(sorted(issues, key=lambda issue: (issue.source.as_posix(), issue.message))),
+    )
+
+
+class LocalSkillSelectionModel:
+    def __init__(self) -> None:
+        self._roots: list[Path] = []
+        self.discovery = LocalSkillDiscovery((), ())
+        self._selected: set[tuple[str, Path]] = set()
+
+    @property
+    def roots(self) -> tuple[Path, ...]:
+        return tuple(self._roots)
+
+    def add_root(self, root: str | Path) -> None:
+        canonical = Path(root).expanduser().resolve(strict=False)
+        if canonical not in self._roots:
+            self._roots.append(canonical)
+        self.rescan()
+
+    def remove_root(self, root: str | Path) -> None:
+        canonical = Path(root).expanduser().resolve(strict=False)
+        self._roots = [existing for existing in self._roots if existing != canonical]
+        self.rescan()
+
+    def rescan(self) -> None:
+        self.discovery = discover_local_skills(self._roots)
+        available = {
+            (candidate.name, candidate.source)
+            for candidate in self.discovery.candidates
+        }
+        self._selected.intersection_update(available)
+
+    def set_selected(self, name: str, source: str | Path, selected: bool) -> None:
+        identity = (name, Path(source).expanduser().resolve(strict=False))
+        if selected:
+            if identity not in {
+                (candidate.name, candidate.source)
+                for candidate in self.discovery.candidates
+            }:
+                raise ValueError(f"Unknown local Skill selection: {identity}")
+            self._selected.add(identity)
+        else:
+            self._selected.discard(identity)
+
+    def select_all(self) -> None:
+        self._selected = {
+            (candidate.name, candidate.source)
+            for candidate in self.discovery.candidates
+        }
+
+    def clear_all(self) -> None:
+        self._selected.clear()
+
+    def is_selected(self, candidate: LocalSkillCandidate) -> bool:
+        return (candidate.name, candidate.source) in self._selected
+
+    def selected_entries(self) -> tuple[dict[str, str], ...]:
+        return tuple(
+            {"name": name, "source": source.as_posix()}
+            for name, source in sorted(
+                self._selected, key=lambda item: (item[0], item[1].as_posix())
+            )
+        )
 
 # ── validation utilities ──────────────────────────────────────────────
 
@@ -93,8 +265,89 @@ def _verify_rtd_root(path: str) -> bool:
     return len(rtd_packages) > 0
 
 
+def validate_local_skill_import(spec: Any) -> list[str]:
+    errors: list[str] = []
+    if not isinstance(spec, dict):
+        return ["'local_skill_import' must be an object"]
+
+    raw_roots = spec.get("roots")
+    if not isinstance(raw_roots, list) or not raw_roots:
+        return ["'local_skill_import.roots' must be a non-empty list"]
+
+    roots: list[Path] = []
+    for index, raw_root in enumerate(raw_roots):
+        if not isinstance(raw_root, str) or not raw_root.strip():
+            errors.append(
+                f"'local_skill_import.roots[{index}]' must be a non-empty path"
+            )
+            continue
+        root = Path(raw_root).expanduser().resolve(strict=False)
+        if not root.is_dir():
+            errors.append(f"local Skill root is not a directory: {root}")
+        elif root not in roots:
+            roots.append(root)
+
+    selected = spec.get("selected")
+    if not isinstance(selected, list) or not selected:
+        errors.append("'local_skill_import' requires at least one selected Skill")
+        return errors
+
+    sources_by_name: dict[str, Path] = {}
+    seen_identities: set[tuple[str, Path]] = set()
+    for index, entry in enumerate(selected):
+        if not isinstance(entry, dict):
+            errors.append(
+                f"'local_skill_import.selected[{index}]' must be an object"
+            )
+            continue
+        name = entry.get("name")
+        raw_source = entry.get("source")
+        if not isinstance(name, str) or not SKILL_NAME_PATTERN.fullmatch(name):
+            errors.append(
+                f"'local_skill_import.selected[{index}].name' is invalid"
+            )
+            continue
+        if not isinstance(raw_source, str) or not raw_source.strip():
+            errors.append(
+                f"'local_skill_import.selected[{index}].source' must be a path"
+            )
+            continue
+        source = Path(raw_source).expanduser().resolve(strict=False)
+        identity = (name, source)
+        if identity in seen_identities:
+            continue
+        seen_identities.add(identity)
+        previous = sources_by_name.get(name)
+        if previous is not None and previous != source:
+            errors.append(
+                f"duplicate selected Skill name {name!r}: {previous} and {source}"
+            )
+            continue
+        sources_by_name[name] = source
+        if not source.is_dir():
+            errors.append(f"selected Skill source is not a directory: {source}")
+            continue
+        if roots and not _is_within(source, roots):
+            errors.append(f"selected Skill source is outside submitted roots: {source}")
+            continue
+        try:
+            actual_name = _manifest_skill_name(source)
+        except (OSError, UnicodeError, ValueError) as exc:
+            errors.append(str(exc))
+            continue
+        if actual_name != name:
+            errors.append(
+                f"selected Skill name {name!r} does not match manifest {actual_name!r}"
+            )
+    return errors
+
+
 def validate_input(data: dict[str, Any]) -> list[str]:
     errors: list[str] = []
+
+    version = data.get("version", 1)
+    if version not in (1, 2):
+        errors.append("'version' must be 1 or 2")
 
     platforms = data.get("platforms")
     if not isinstance(platforms, list) or not platforms:
@@ -121,6 +374,46 @@ def validate_input(data: dict[str, Any]) -> list[str]:
     if not isinstance(rtd_path, str) or not _verify_rtd_root(rtd_path):
         errors.append("'rtd_path' must be a verified RTD package root")
 
+    workflows: list[str] = []
+    if version == 2:
+        raw_workflows = data.get("additional_skill_workflows")
+        if not isinstance(raw_workflows, list) or not raw_workflows:
+            errors.append(
+                "'additional_skill_workflows' must be a non-empty list for version 2"
+            )
+        else:
+            workflows = [str(value) for value in raw_workflows]
+            unknown_workflows = sorted(
+                set(workflows).difference({"skip", "local", "online"})
+            )
+            if unknown_workflows:
+                errors.append(
+                    "unknown additional_skill_workflows: "
+                    + ", ".join(unknown_workflows)
+                )
+            if len(set(workflows)) != len(workflows):
+                errors.append("'additional_skill_workflows' must not contain duplicates")
+            if "skip" in workflows and len(workflows) > 1:
+                errors.append("Skip cannot be combined with local or online workflows")
+
+    if "local_skill_import" in data:
+        errors.extend(validate_local_skill_import(data["local_skill_import"]))
+        if version == 2 and "local" not in workflows:
+            errors.append("local_skill_import requires the local workflow")
+    elif version == 2 and "local" in workflows:
+        errors.append("the local workflow requires local_skill_import")
+
+    for field in ("online_skill_request", "supplemental_task"):
+        if field in data:
+            value = data[field]
+            if not isinstance(value, str) or not value.strip():
+                errors.append(f"'{field}' must be a non-empty string when provided")
+    if "online_skill_request" in data:
+        if version == 2 and "online" not in workflows:
+            errors.append("online_skill_request requires the online workflow")
+    elif version == 2 and "online" in workflows:
+        errors.append("the online workflow requires online_skill_request")
+
     return errors
 
 
@@ -142,12 +435,16 @@ class InitDialog(tk.Tk):
         self._s32ds_var = tk.StringVar()
         self._rtd_var = tk.StringVar()
 
-        self._import_var = tk.StringVar(value="skip")
-        self._import_path_var = tk.StringVar()
-        self._import_url_var = tk.StringVar()
+        self._skip_import_var = tk.BooleanVar(value=False)
+        self._local_import_var = tk.BooleanVar(value=False)
+        self._online_import_var = tk.BooleanVar(value=False)
+        self._local_skill_model = LocalSkillSelectionModel()
+        self._skill_vars: dict[tuple[str, Path], tk.BooleanVar] = {}
+        self._root_entry_var = tk.StringVar()
 
         self._build_ui()
         self._on_mode_change()
+        self._on_import_change()
 
         self.protocol("WM_DELETE_WINDOW", self._on_cancel)
         self.bind("<Escape>", lambda _e: self._on_cancel())
@@ -229,36 +526,122 @@ class InitDialog(tk.Tk):
         import_frame = ttk.LabelFrame(main, text="Additional Skills (optional)", padding=(10, 8))
         import_frame.pack(fill="x", pady=(0, 12))
 
-        rb_skip = ttk.Radiobutton(
+        cb_skip = ttk.Checkbutton(
             import_frame, text="Skip — do not import additional skills",
-            variable=self._import_var, value="skip", command=self._on_import_change,
+            variable=self._skip_import_var, command=self._on_skip_import_change,
         )
-        rb_skip.pack(anchor="w")
+        cb_skip.pack(anchor="w")
 
-        rb_local = ttk.Radiobutton(
-            import_frame, text="Import from local directory",
-            variable=self._import_var, value="local", command=self._on_import_change,
+        cb_local = ttk.Checkbutton(
+            import_frame, text="Import from local directories",
+            variable=self._local_import_var, command=self._on_import_change,
         )
-        rb_local.pack(anchor="w")
+        cb_local.pack(anchor="w")
 
-        rb_online = ttk.Radiobutton(
+        cb_online = ttk.Checkbutton(
             import_frame, text="Install from online source",
-            variable=self._import_var, value="online", command=self._on_import_change,
+            variable=self._online_import_var, command=self._on_import_change,
         )
-        rb_online.pack(anchor="w")
+        cb_online.pack(anchor="w")
 
         self._import_local_frame = ttk.Frame(import_frame)
-        row_local = ttk.Frame(self._import_local_frame)
-        row_local.pack(fill="x", pady=(4, 0))
-        ttk.Label(row_local, text="Directory:").pack(side="left")
-        ttk.Entry(row_local, textvariable=self._import_path_var, width=40).pack(side="left", padx=(4, 4))
-        ttk.Button(row_local, text="Browse...", command=self._browse_import_dir).pack(side="left")
+        path_row = ttk.Frame(self._import_local_frame)
+        path_row.pack(fill="x", pady=(4, 4))
+        ttk.Label(path_row, text="Directory:").pack(side="left")
+        ttk.Entry(
+            path_row, textvariable=self._root_entry_var, width=48
+        ).pack(side="left", fill="x", expand=True, padx=(4, 4))
+        ttk.Button(path_row, text="Add", command=self._add_import_path).pack(
+            side="left"
+        )
+        ttk.Button(
+            path_row, text="Browse...", command=self._browse_import_dir
+        ).pack(side="left", padx=(4, 0))
+
+        roots_row = ttk.Frame(self._import_local_frame)
+        roots_row.pack(fill="x", pady=(4, 0))
+        self._root_list = tk.Listbox(roots_row, height=3, width=58)
+        self._root_list.pack(side="left", fill="x", expand=True)
+        root_buttons = ttk.Frame(roots_row)
+        root_buttons.pack(side="left", padx=(6, 0))
+        ttk.Button(
+            root_buttons, text="Remove directory", command=self._remove_import_dir
+        ).pack(fill="x")
+        ttk.Button(root_buttons, text="Rescan", command=self._rescan_import_dirs).pack(
+            fill="x", pady=(3, 0)
+        )
+
+        selection_buttons = ttk.Frame(self._import_local_frame)
+        selection_buttons.pack(fill="x", pady=(6, 2))
+        ttk.Label(selection_buttons, text="Discovered Skills:").pack(side="left")
+        ttk.Button(
+            selection_buttons, text="Select all", command=self._select_all_skills
+        ).pack(side="right")
+        ttk.Button(
+            selection_buttons, text="Clear all", command=self._clear_all_skills
+        ).pack(side="right", padx=(0, 4))
+
+        skill_canvas_frame = ttk.Frame(self._import_local_frame)
+        skill_canvas_frame.pack(fill="both", expand=True)
+        self._skill_canvas = tk.Canvas(
+            skill_canvas_frame, height=110, highlightthickness=1
+        )
+        skill_scroll = ttk.Scrollbar(
+            skill_canvas_frame, orient="vertical", command=self._skill_canvas.yview
+        )
+        self._skill_canvas.configure(yscrollcommand=skill_scroll.set)
+        skill_scroll.pack(side="right", fill="y")
+        self._skill_canvas.pack(side="left", fill="both", expand=True)
+        self._skill_check_frame = ttk.Frame(self._skill_canvas)
+        self._skill_canvas_window = self._skill_canvas.create_window(
+            (0, 0), window=self._skill_check_frame, anchor="nw"
+        )
+        self._skill_check_frame.bind(
+            "<Configure>",
+            lambda _event: self._skill_canvas.configure(
+                scrollregion=self._skill_canvas.bbox("all")
+            ),
+        )
+        self._skill_canvas.bind(
+            "<Configure>",
+            lambda event: self._skill_canvas.itemconfigure(
+                self._skill_canvas_window, width=event.width
+            ),
+        )
+        self._skill_issue_var = tk.StringVar()
+        ttk.Label(
+            self._import_local_frame,
+            textvariable=self._skill_issue_var,
+            foreground="red",
+            wraplength=560,
+        ).pack(fill="x", pady=(3, 0))
 
         self._import_online_frame = ttk.Frame(import_frame)
-        row_url = ttk.Frame(self._import_online_frame)
-        row_url.pack(fill="x", pady=(4, 0))
-        ttk.Label(row_url, text="URL:").pack(side="left")
-        ttk.Entry(row_url, textvariable=self._import_url_var, width=52).pack(side="left", padx=(4, 4))
+        ttk.Label(
+            self._import_online_frame,
+            text="Skill names, package references, URLs, or discovery request:",
+        ).pack(anchor="w", pady=(4, 2))
+        self._online_request_text = tk.Text(
+            self._import_online_frame, width=66, height=4, wrap="word"
+        )
+        self._online_request_text.pack(fill="x")
+
+        # ── supplemental task ──
+        supplemental_frame = ttk.LabelFrame(
+            main, text="Supplemental Initialization Task (optional)", padding=(10, 8)
+        )
+        supplemental_frame.pack(fill="x", pady=(0, 12))
+        ttk.Label(
+            supplemental_frame,
+            text=(
+                "Runs after successful deployment, verification, and requested "
+                "online Skill installation."
+            ),
+        ).pack(anchor="w")
+        self._supplemental_text = tk.Text(
+            supplemental_frame, width=66, height=4, wrap="word"
+        )
+        self._supplemental_text.pack(fill="x", pady=(4, 0))
 
         # ── buttons ──
         btn_frame = ttk.Frame(main)
@@ -279,16 +662,20 @@ class InitDialog(tk.Tk):
             self._reset_confirmed_var.set(False)
 
     def _on_import_change(self) -> None:
-        val = self._import_var.get()
-        if val == "local":
-            self._import_local_frame.pack(fill="x", before=self._import_online_frame)
-            self._import_online_frame.pack_forget()
-        elif val == "online":
-            self._import_online_frame.pack(fill="x", before=self._import_local_frame)
-            self._import_local_frame.pack_forget()
-        else:
-            self._import_local_frame.pack_forget()
-            self._import_online_frame.pack_forget()
+        if self._local_import_var.get() or self._online_import_var.get():
+            self._skip_import_var.set(False)
+        self._import_local_frame.pack_forget()
+        self._import_online_frame.pack_forget()
+        if self._local_import_var.get():
+            self._import_local_frame.pack(fill="both", expand=True)
+        if self._online_import_var.get():
+            self._import_online_frame.pack(fill="x")
+
+    def _on_skip_import_change(self) -> None:
+        if self._skip_import_var.get():
+            self._local_import_var.set(False)
+            self._online_import_var.set(False)
+        self._on_import_change()
 
     def _browse_s32ds(self) -> None:
         path = filedialog.askdirectory(title="Select S32DS Installation Root")
@@ -300,10 +687,72 @@ class InitDialog(tk.Tk):
         if path:
             self._rtd_var.set(Path(path).resolve().as_posix())
 
+    def _add_import_path(self) -> None:
+        path = self._root_entry_var.get().strip().strip("\"'")
+        if not path:
+            messagebox.showwarning(
+                "Missing Skill Directory", "Enter or browse to a local Skill directory."
+            )
+            return
+        self._local_skill_model.add_root(path)
+        self._root_entry_var.set("")
+        self._refresh_local_skill_widgets()
+
     def _browse_import_dir(self) -> None:
-        path = filedialog.askdirectory(title="Select Skill Directory")
+        path = filedialog.askdirectory(title="Add Local Skill Search Directory")
         if path:
-            self._import_path_var.set(Path(path).resolve().as_posix())
+            self._root_entry_var.set(Path(path).resolve().as_posix())
+            self._add_import_path()
+
+    def _remove_import_dir(self) -> None:
+        selected = self._root_list.curselection()
+        if not selected:
+            return
+        self._sync_local_skill_selections()
+        roots = self._local_skill_model.roots
+        for index in reversed(selected):
+            self._local_skill_model.remove_root(roots[index])
+        self._refresh_local_skill_widgets()
+
+    def _rescan_import_dirs(self) -> None:
+        self._sync_local_skill_selections()
+        self._local_skill_model.rescan()
+        self._refresh_local_skill_widgets()
+
+    def _sync_local_skill_selections(self) -> None:
+        for (name, source), var in self._skill_vars.items():
+            self._local_skill_model.set_selected(name, source, var.get())
+
+    def _select_all_skills(self) -> None:
+        self._local_skill_model.select_all()
+        self._refresh_local_skill_widgets()
+
+    def _clear_all_skills(self) -> None:
+        self._local_skill_model.clear_all()
+        self._refresh_local_skill_widgets()
+
+    def _refresh_local_skill_widgets(self) -> None:
+        self._root_list.delete(0, tk.END)
+        for root in self._local_skill_model.roots:
+            self._root_list.insert(tk.END, root.as_posix())
+
+        for child in self._skill_check_frame.winfo_children():
+            child.destroy()
+        self._skill_vars.clear()
+        for candidate in self._local_skill_model.discovery.candidates:
+            identity = (candidate.name, candidate.source)
+            var = tk.BooleanVar(
+                value=self._local_skill_model.is_selected(candidate)
+            )
+            self._skill_vars[identity] = var
+            ttk.Checkbutton(
+                self._skill_check_frame,
+                text=f"{candidate.name}  —  {candidate.source.as_posix()}",
+                variable=var,
+            ).pack(anchor="w", fill="x")
+
+        issues = self._local_skill_model.discovery.issues
+        self._skill_issue_var.set("\n".join(issue.message for issue in issues))
 
     # ── actions ─────────────────────────────────────────────────────
 
@@ -339,40 +788,83 @@ class InitDialog(tk.Tk):
             )
             return
 
-        import_skills: dict[str, Any] | None = None
-        import_type = self._import_var.get()
-        if import_type == "local":
-            local_path = self._import_path_var.get().strip()
-            if not local_path:
-                messagebox.showwarning("Missing Skill Directory", "Select a local Skill directory.")
+        local_skill_import: dict[str, Any] | None = None
+        online_skill_request = ""
+        if not any(
+            (
+                self._skip_import_var.get(),
+                self._local_import_var.get(),
+                self._online_import_var.get(),
+            )
+        ):
+            messagebox.showwarning(
+                "Additional Skills Choice Required",
+                "Select Skip, local import, online installation, or both local and online.",
+            )
+            return
+        if self._local_import_var.get():
+            self._sync_local_skill_selections()
+            if not self._local_skill_model.roots:
+                messagebox.showwarning(
+                    "Missing Skill Directory", "Add at least one local Skill directory."
+                )
                 return
-            import_skills = {
-                "type": "local",
-                "path": local_path,
-                "description": f"Import skills from local directory: {local_path}",
-            }
-        elif import_type == "online":
-            url = self._import_url_var.get().strip()
-            if not url:
-                messagebox.showwarning("Missing Skill URL", "Enter an online Skill source URL.")
+            if self._local_skill_model.discovery.issues:
+                messagebox.showwarning(
+                    "Local Skill Scan Failed",
+                    "Resolve the reported local Skill scan errors before continuing.",
+                )
                 return
-            import_skills = {
-                "type": "online",
-                "url": url,
-                "description": f"Install skills from online source: {url}",
+            selected = self._local_skill_model.selected_entries()
+            if not selected:
+                messagebox.showwarning(
+                    "No Local Skills Selected", "Select at least one discovered Skill."
+                )
+                return
+            local_skill_import = {
+                "roots": [
+                    root.as_posix() for root in self._local_skill_model.roots
+                ],
+                "selected": list(selected),
             }
+        if self._online_import_var.get():
+            online_skill_request = self._online_request_text.get("1.0", "end").strip()
+            if not online_skill_request:
+                messagebox.showwarning(
+                    "Missing Online Skill Request",
+                    "Enter Skill names, package references, URLs, or a discovery request.",
+                )
+                return
+
+        supplemental_task = self._supplemental_text.get("1.0", "end").strip()
 
         self.result = {
-            "version": 1,
+            "version": 2,
             "collected_at": datetime.now(timezone.utc).isoformat(),
             "platforms": platforms,
             "mode": mode,
             "reset_confirmed": (mode == "reset" and self._reset_confirmed_var.get()),
             "s32ds_path": s32ds_path.replace("\\", "/"),
             "rtd_path": rtd_path.replace("\\", "/"),
+            "additional_skill_workflows": (
+                ["skip"]
+                if self._skip_import_var.get()
+                else [
+                    workflow
+                    for workflow, selected_workflow in (
+                        ("local", self._local_import_var.get()),
+                        ("online", self._online_import_var.get()),
+                    )
+                    if selected_workflow
+                ]
+            ),
         }
-        if import_skills is not None:
-            self.result["import_skills"] = import_skills
+        if local_skill_import is not None:
+            self.result["local_skill_import"] = local_skill_import
+        if online_skill_request:
+            self.result["online_skill_request"] = online_skill_request
+        if supplemental_task:
+            self.result["supplemental_task"] = supplemental_task
 
         self.destroy()
 
@@ -510,41 +1002,97 @@ def run_cli() -> dict[str, Any] | None:
         return None
 
     print("\n--- Additional Skills Import (optional) ---")
-    import_skills: dict[str, Any] | None = None
-    import_choice = _choose_one(
-        "Import additional skills?",
+    local_skill_import: dict[str, Any] | None = None
+    online_skill_request = ""
+    import_choices = _choose_multi(
+        "Select additional Skill workflows (multiple allowed):",
         [
             "Skip — do not import additional skills",
             "Import from local directory",
             "Install from online source",
         ],
     )
-    if "local" in import_choice:
-        local = _ask_path_optional("Local skill directory path")
-        if local:
-            import_skills = {
-                "type": "local",
-                "path": local,
-                "description": f"Import skills from local directory: {local}",
-            }
-    elif "online" in import_choice:
-        url = _safe_input("Online skill source URL: ").strip()
-        if url:
-            import_skills = {
-                "type": "online",
-                "url": url,
-                "description": f"Install skills from online source: {url}",
-            }
+    if not import_choices:
+        print("An explicit additional-Skill choice is required.", file=sys.stderr)
+        return None
+    skip_selected = any("Skip" in choice for choice in import_choices)
+    local_selected = any("local" in choice for choice in import_choices)
+    online_selected = any("online" in choice for choice in import_choices)
+    if skip_selected and (local_selected or online_selected):
+        print("Skip cannot be combined with local or online import.", file=sys.stderr)
+        return None
+    if local_selected:
+        roots: list[str] = []
+        print("Add local Skill directories; press Enter when finished.")
+        while True:
+            local = _ask_path_optional("Local Skill directory path")
+            if not local:
+                break
+            if local not in roots:
+                roots.append(local)
+        discovery = discover_local_skills(roots)
+        if discovery.issues:
+            for issue in discovery.issues:
+                print(f"  ERROR: {issue.message}", file=sys.stderr)
+            return None
+        labels = [
+            f"{candidate.name} — {candidate.source.as_posix()}"
+            for candidate in discovery.candidates
+        ]
+        selected_labels = _choose_multi("Select local Skills to deploy:", labels)
+        selected_set = set(selected_labels)
+        selected = [
+            {"name": candidate.name, "source": candidate.source.as_posix()}
+            for candidate, label in zip(discovery.candidates, labels, strict=True)
+            if label in selected_set
+        ]
+        if not selected:
+            print("No local Skills selected.", file=sys.stderr)
+            return None
+        local_skill_import = {"roots": roots, "selected": selected}
+    if online_selected:
+        online_skill_request = _safe_input(
+            "Online Skill names, references, URLs, or discovery request: "
+        ).strip()
+        if not online_skill_request:
+            print("Online Skill request is required.", file=sys.stderr)
+            return None
+
+    supplemental_task = _safe_input(
+        "Supplemental Agent-environment initialization task (optional): "
+    ).strip()
 
     return {
-        "version": 1,
+        "version": 2,
         "collected_at": datetime.now(timezone.utc).isoformat(),
         "platforms": platforms,
         "mode": "update" if "Update" in mode else "reset",
         "reset_confirmed": reset_confirmed,
         "s32ds_path": s32ds_path.replace("\\", "/"),
         "rtd_path": rtd_path.replace("\\", "/"),
-        **({"import_skills": import_skills} if import_skills is not None else {}),
+        "additional_skill_workflows": (
+            ["skip"]
+            if skip_selected
+            else [
+                workflow
+                for workflow, selected_workflow in (
+                    ("local", local_selected),
+                    ("online", online_selected),
+                )
+                if selected_workflow
+            ]
+        ),
+        **(
+            {"local_skill_import": local_skill_import}
+            if local_skill_import is not None
+            else {}
+        ),
+        **(
+            {"online_skill_request": online_skill_request}
+            if online_skill_request
+            else {}
+        ),
+        **({"supplemental_task": supplemental_task} if supplemental_task else {}),
     }
 
 

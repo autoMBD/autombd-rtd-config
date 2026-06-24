@@ -2,7 +2,7 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.1.0 |
+| Version | 0.1.1 |
 | Date | 2026-06-25 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Design for multi-directory local Skill discovery and selection, Agent-orchestrated user-level online Skill installation, and post-initialization supplemental tasks. |
@@ -96,6 +96,7 @@ the deployer cannot accidentally consume an online request:
   "reset_confirmed": false,
   "s32ds_path": "C:/NXP/S32DS.3.6.7",
   "rtd_path": "C:/NXP/S32DS.3.6.7/S32DS/software/PlatformSDK_S32K3/RTD",
+  "additional_skill_workflows": ["local", "online"],
   "local_skill_import": {
     "roots": ["D:/skills-a", "D:/skills-b"],
     "selected": [
@@ -108,9 +109,11 @@ the deployer cannot accidentally consume an online request:
 }
 ```
 
-Omit each optional field when its trimmed content is empty. The collector may
-read version 1 input for validation compatibility, but newly collected input is
-always version 2.
+`additional_skill_workflows` is required in version 2 and records either
+`["skip"]` or one or both of `local` and `online`; Skip is mutually exclusive.
+Omit each other optional field when its trimmed content is empty. The collector
+may read version 1 input for validation compatibility, but newly collected input
+is always version 2.
 
 ## Local discovery and validation
 

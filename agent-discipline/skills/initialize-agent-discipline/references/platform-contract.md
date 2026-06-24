@@ -2,8 +2,8 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.1.0 |
-| Date | 2026-06-24 |
+| Version | 0.2.0 |
+| Date | 2026-06-25 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Authoritative project-level Skill and subagent deployment contract for Claude Code, OpenCode, and Codex. |
 
@@ -46,6 +46,53 @@ Select its Skill source deterministically:
 When Claude Code and Codex are both selected, each platform still requires its
 own native Skill directory. OpenCode may observe the same canonical Skill
 through both compatible locations; do not create a third copy or link.
+
+## Selected local Skill contract
+
+Version 2 initialization input records the explicit GUI choice in
+`additional_skill_workflows`. Its value is `skip` or one or both of `local` and
+`online`; `skip` is mutually exclusive and the field must never be omitted.
+
+When the local workflow is selected, `local_skill_import` describes local Skill
+deployment. It contains:
+
+- `roots`: one or more canonical absolute source roots selected in the GUI;
+- `selected`: one or more objects containing the exact manifest `name` and
+  canonical `source` directory selected by the user.
+
+Prevalidate selected local Skills only. Every selected source must exist below
+one of the submitted roots, contain `SKILL.md`, retain the submitted name, and
+be unique by name and canonical source. A different source using the same name
+as another selected or canonical Skill is fatal before mutation.
+
+The deployer never rescans the roots to add unselected Skills. It deploys
+selected local Skills only, using a directory symbolic link or Windows junction
+at every applicable project target. It never copies a Skill directory or any
+file within one. Verification resolves each target and compares its
+`SKILL.md` with the exact submitted source.
+
+A selected local source must not live inside a managed project Skill target
+root. Reject that self-referential layout before mutation, especially in Reset
+mode where the managed root will be removed. An existing ordinary directory is
+never accepted as an already-deployed Skill even when it is also the submitted
+source; every deployed target must remain a symbolic link or junction.
+
+Legacy version 1 `import_skills.type = local` input may remain readable during
+migration, but every new GUI transaction emits version 2 selection data.
+
+## Online and supplemental orchestration boundary
+
+`online_skill_request` and `supplemental_task` are orchestration fields, not
+deployment inputs; online Skill installation is outside this contract. The
+orchestrating Agent uses `find-skills` to install requested Skills in the
+user-level Agent environment after project verification. The deterministic
+deployer does not use the network, write user-level paths, or create project
+links for online Skills.
+
+The orchestrating Agent evaluates `supplemental_task` only after deployment,
+verification, and requested online installation succeed. Out-of-scope work is
+reported and requires explicit user confirmation before it is executed as a
+separate task.
 
 ## Subagent transformations
 

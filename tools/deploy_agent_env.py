@@ -39,8 +39,8 @@
 # Project:     RTD CfgFile CLI <https://github.com/autoMBD/autombd-rtd-config>
 # File:        deploy_agent_env.py
 # Author:      autoMBD <tkung.lqk@foxmail.com>
-# Date:        2026-06-24
-# Version:     0.1.0
+# Date:        2026-06-25
+# Version:     0.2.0
 # Description: Deterministically deploy project-level Agent discipline assets.
 # =================================================================================
 
@@ -255,6 +255,14 @@ def _same_path(left: Path, right: Path) -> bool:
         return False
 
 
+def _path_is_within(path: Path, root: Path) -> bool:
+    try:
+        path.relative_to(root)
+        return True
+    except ValueError:
+        return False
+
+
 def _is_junction(path: Path) -> bool:
     isjunction = getattr(os.path, "isjunction", None)
     return bool(isjunction and isjunction(path))
@@ -265,9 +273,10 @@ def ensure_directory_link(source: Path, destination: Path) -> str:
     if not source.is_dir() or not (source / "SKILL.md").is_file():
         raise AgentDeploymentError(f"Skill source lacks SKILL.md: {source}")
     if destination.exists() or destination.is_symlink():
-        if _same_path(destination, source):
+        is_link = destination.is_symlink() or _is_junction(destination)
+        if is_link and _same_path(destination, source):
             return "unchanged"
-        kind = "wrong link" if destination.is_symlink() or _is_junction(destination) else "ordinary path"
+        kind = "wrong link" if is_link else "ordinary path"
         raise AgentDeploymentError(
             f"Skill destination is an {kind}, refusing replacement: {destination}"
         )
@@ -427,6 +436,78 @@ def _collect_skill_sources(
         raise AgentDeploymentError("no canonical Agent-discipline Skills found")
 
     combined = dict(canonical)
+    local_spec = config.get("local_skill_import")
+    if local_spec is not None:
+        if config.get("import_skills") is not None:
+            raise AgentDeploymentError(
+                "local_skill_import and legacy import_skills cannot be combined"
+            )
+        if not isinstance(local_spec, dict):
+            raise AgentDeploymentError("local_skill_import must be an object")
+        raw_roots = local_spec.get("roots")
+        selected = local_spec.get("selected")
+        if not isinstance(raw_roots, list) or not raw_roots:
+            raise AgentDeploymentError(
+                "local_skill_import.roots must be a non-empty list"
+            )
+        if not isinstance(selected, list) or not selected:
+            raise AgentDeploymentError(
+                "local_skill_import requires at least one selected Skill"
+            )
+        roots: list[Path] = []
+        for raw_root in raw_roots:
+            root = Path(str(raw_root)).expanduser().resolve(strict=False)
+            if not root.is_dir():
+                raise AgentDeploymentError(
+                    f"local Skill root is not a directory: {root}"
+                )
+            if root not in roots:
+                roots.append(root)
+
+        selected_names: dict[str, Path] = {}
+        for entry in selected:
+            if not isinstance(entry, dict):
+                raise AgentDeploymentError(
+                    "local_skill_import.selected entries must be objects"
+                )
+            submitted_name = str(entry.get("name", "")).strip()
+            raw_source = str(entry.get("source", "")).strip()
+            if not submitted_name or not raw_source:
+                raise AgentDeploymentError(
+                    "selected local Skill requires name and source"
+                )
+            source = Path(raw_source).expanduser().resolve(strict=False)
+            if not source.is_dir():
+                raise AgentDeploymentError(
+                    f"selected Skill source is not a directory: {source}"
+                )
+            if not any(
+                _path_is_within(source, root)
+                for root in roots
+            ):
+                raise AgentDeploymentError(
+                    f"selected Skill source is outside submitted roots: {source}"
+                )
+            actual_name = _skill_name_from_manifest(source)
+            if submitted_name != actual_name:
+                raise AgentDeploymentError(
+                    f"selected Skill name {submitted_name!r} does not match "
+                    f"manifest {actual_name!r}"
+                )
+            previous = selected_names.get(actual_name)
+            if previous is not None and not _same_path(previous, source):
+                raise AgentDeploymentError(
+                    f"duplicate Skill name {actual_name!r}: {previous} and {source}"
+                )
+            selected_names[actual_name] = source.resolve(strict=True)
+            existing = combined.get(actual_name)
+            if existing is not None and not _same_path(existing, source):
+                raise AgentDeploymentError(
+                    f"duplicate Skill name {actual_name!r}: {existing} and {source}"
+                )
+            combined[actual_name] = source.resolve(strict=True)
+        return canonical, combined
+
     import_spec = config.get("import_skills")
     if import_spec is None:
         return canonical, combined
@@ -572,7 +653,12 @@ def _verify_outputs(
     for relative_root in skill_target_roots(platforms):
         for name, source in skill_sources.items():
             target = repo_root / relative_root / name
-            if not _same_path(target, source) or not (target / "SKILL.md").is_file():
+            is_link = target.is_symlink() or _is_junction(target)
+            if (
+                not is_link
+                or not _same_path(target, source)
+                or not (target / "SKILL.md").is_file()
+            ):
                 raise AgentDeploymentError(f"Skill link verification failed: {target}")
     for path, content in outputs.items():
         if not path.is_file() or path.read_bytes() != content.encode("utf-8"):
@@ -614,6 +700,19 @@ def deploy(
     platforms = _validate_config(config)
     outputs, _templates = _render_outputs(repo_root, platforms)
     canonical_skill_sources, skill_sources = _collect_skill_sources(repo_root, config)
+
+    managed_skill_roots = tuple(
+        (repo_root / relative_root).resolve(strict=False)
+        for relative_root in skill_target_roots(platforms)
+    )
+    for name, source in skill_sources.items():
+        canonical_source = canonical_skill_sources.get(name)
+        if canonical_source is not None and _same_path(source, canonical_source):
+            continue
+        if any(_path_is_within(source, root) for root in managed_skill_roots):
+            raise AgentDeploymentError(
+                f"local Skill source is inside managed Skill root: {source}"
+            )
 
     # Validate every destination boundary before the first mutation. Parent
     # resolution catches a managed directory that is itself linked outside.
