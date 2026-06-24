@@ -2,8 +2,8 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.1.2 |
-| Date | 2026-06-16 |
+| Version | 0.1.3 |
+| Date | 2026-06-25 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Documentation-governance rules for the RTD CfgFile CLI project. Defines the two-category split, official tool name, changelog integrity, archive policy, and the authoritative cross-category documentation map. |
 
@@ -99,6 +99,7 @@ paths are relative to the repository root.
 | `agent-discipline/subagents/tester.md` | Tester role definition | AGENTS.md, test cases |
 | `agent-discipline/subagents/reviewer.md` | Reviewer role definition | AGENTS.md, agent-lessons-learned |
 | `agent-discipline/skills/external-dependency-memory/SKILL.md` | Skill for reusing local external dependency evidence across agents and conversations | AGENTS.md, source materials |
+| `agent-discipline/designs/` | Approved design records for Agent-discipline tooling and workflows | AGENTS.md, initialization Skills and platform contracts |
 | `agent-discipline/owner-review-comments.md` | Review-comment resolutions across rounds | agent-discipline/review-archive/ |
 | `agent-discipline/agent-lessons-learned.md` | Reviewer's running lessons log | — |
 | `agent-discipline/documentation-governance.md` | This document: governance rules + documentation map | — |
@@ -133,6 +134,7 @@ flowchart TD
 
 | Date | Version | Description |
 | --- | --- | --- |
+| 2026-06-25 | 0.1.3 | Added the Category B design-record directory for approved Agent-discipline tooling and workflow designs. |
 | 2026-06-16 | 0.1.2 | Replaced the script-centered agent environment document with the lightweight external-dependency-memory skill entry. |
 | 2026-06-15 | 0.1.1 | Added `agent-discipline/agent-environment.md` to the Category B documentation map for issue #11. |
 | 2026-06-15 | 0.1.0 | Created per issue #7 documentation reorganization: established the two-category split, ported and updated the authoritative documentation map from the deleted core-design `## Documentation map` section (with all paths updated to new locations), and codified the governance rules (tool name, milestone-free specs, Category A purity sweep, append-only changelogs, read-only review archive, file header convention). |
