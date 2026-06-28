@@ -202,3 +202,10 @@ Initialization passes only when all selected-platform checks succeed:
 7. `.agent-state/external-dependencies.json` is valid JSON and contains only
    non-secret evidence supplied or verified during initialization.
 8. Generated paths are ignored by Git and do not appear in `git status`.
+
+## Changelog
+
+| Version | Date | Changes |
+| --- | --- | --- |
+| 0.2.0 | 2026-06-25 | Added V2 additional Skill workflows: selected local links, user-level online install, and supplemental task boundary. |
+| 0.1.0 | 2026-06-24 | Initial platform deployment contract. |
