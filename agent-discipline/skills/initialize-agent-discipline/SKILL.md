@@ -282,8 +282,8 @@ demand under the `external-dependency-memory` rules.
 Run the focused Agent-environment tests:
 
 ```powershell
-python -m pytest tests\unit\test_init_agent_env.py `
-  tests\unit\test_deploy_agent_env.py `
+python -m pytest tests\unit\test_init_agent_env_inputs.py `
+  tests\unit\test_init_agent_env_deploy.py `
   tests\unit\test_agent_skill_contract.py -q
 git diff --check
 git status --short
