@@ -38,6 +38,12 @@ authoritative for the user-input workflow and completion criteria.
 - S32DS and RTD paths are required. On a clean checkout, both must be entered
   and verified. On an initialized checkout, valid cached values may prefill the
   GUI, but the user must confirm or replace them.
+- Python is a required external tool for this repository's initialization and
+  automation scripts. The Agent checks the active Python interpreter
+  automatically before launching the GUI, must not ask the user for a Python path,
+  and records the verified interpreter as `tool.python` in the local dependency
+  cache after deployment succeeds. If no usable Python interpreter is available,
+  stop before the GUI or any mutation and tell the user to Install Python.
 - Do not turn missing dependency paths into empty values, do not omit the cache
   entries, and do not scan broad local directories to guess installations.
 - Do not replace the repository GUI with Agent-native GUI controls, CLI text
@@ -87,7 +93,16 @@ artifacts are not subject to the Skill-directory copy prohibition.
 
 Read `.agent-state/external-dependencies.json` when present. Reuse only current,
 available `env.s32ds` and `env.rtd` evidence as GUI defaults; cached evidence
-never replaces user confirmation.
+never replaces user confirmation. Also inspect any current `tool.python` entry,
+but do not rely on stale cache evidence alone: run an automatic Python
+availability check for the interpreter that will execute the initialization
+scripts.
+
+Python is not a user input field. Use the platform's normal Python resolution
+mechanism, such as `Get-Command python.exe` on Windows or `python3`/`python` on
+POSIX shells. If no usable interpreter is found, stop immediately before the GUI
+or any filesystem mutation and report: "Install Python, then rerun Agent
+environment initialization."
 
 Inspect only these project locations:
 
@@ -117,6 +132,10 @@ the process handle, and wait for the user to submit or cancel:
 ```powershell
 $repoRoot = (Get-Location).Path
 $pythonExe = (Get-Command python.exe -ErrorAction Stop).Source
+& $pythonExe --version | Out-Null
+if ($LASTEXITCODE -ne 0) {
+    throw 'Install Python, then rerun Agent environment initialization.'
+}
 $scriptPath = (Resolve-Path '.\agent-discipline\skills\initialize-agent-discipline\scripts\init_agent_env_inputs.py').Path
 $stateDir = Join-Path $repoRoot '.agent-state'
 $pendingInput = Join-Path $stateDir 'init-input.pending.json'
@@ -224,14 +243,17 @@ to a project-local Skill link.
 Before the first mutation:
 
 1. validate all GUI answers and both dependency paths;
-2. parse every canonical subagent template once;
-3. render every selected-platform subagent output in memory;
-4. validate Claude bytes, OpenCode frontmatter/permissions, and Codex TOML;
-5. validate all managed destinations remain inside the repository;
-6. reject an ordinary directory, regular file, or wrong link at a managed
+2. verify the active Python interpreter is still usable and prepare a
+   `tool.python` cache entry without asking the user for a Python path;
+3. parse every canonical subagent template once;
+4. render every selected-platform subagent output in memory;
+5. validate Claude bytes, OpenCode frontmatter/permissions, and Codex TOML;
+6. validate all managed destinations remain inside the repository;
+7. reject an ordinary directory, regular file, or wrong link at a managed
    Skill-link destination;
-7. prepare the complete external-dependency cache update containing both
-   `env.s32ds` and `env.rtd` while preserving unrelated entries in Update mode.
+8. prepare the complete external-dependency cache update containing
+   `tool.python`, `env.s32ds`, and `env.rtd` while preserving unrelated entries
+   in Update mode.
 
 Any prevalidation failure stops the transaction before filesystem mutation.
 
@@ -269,6 +291,8 @@ For **confirmed Reset**:
 
 Use stable cache keys and conservative evidence:
 
+- `tool.python`: `status: available`, resolved interpreter path, Python version
+  evidence, timestamp, and current verifier;
 - `env.s32ds`: `status: available`, confirmed normalized S32DS root, directory
   structure verification evidence, timestamp, and current verifier;
 - `env.rtd`: `status: available`, confirmed normalized RTD root, RTD package
@@ -302,7 +326,7 @@ Confirm all of the following:
   `developer_instructions`, and the expected `sandbox_mode`;
 - known obsolete Codex/OpenCode outputs are absent;
 - `.agent-state/external-dependencies.json` is valid JSON and contains verified
-  `env.s32ds` and `env.rtd` entries;
+  `tool.python`, `env.s32ds`, and `env.rtd` entries;
 - generated project-level Agent files and caches remain ignored and unstaged.
 
 Initialization is complete only when the GUI input is complete, deployment
@@ -353,6 +377,7 @@ at session start.
 | Failure | Required action |
 | --- | --- |
 | Repository GUI unavailable or cancelled | Stop before mutation; report the exact collector error. |
+| Python unavailable | Stop before opening the GUI or mutating files; tell the user to Install Python and rerun initialization. |
 | No target platform selected | Return to the GUI; never select the current platform automatically. |
 | Operation mode not submitted | Return to the GUI; never assume Update. |
 | S32DS or RTD path missing/invalid | Return to the GUI for a corrected path; never scan or cache an empty value. |
@@ -369,6 +394,9 @@ at session start.
 ## Completion checklist
 
 - [ ] Platform contract and external-dependency-memory Skill were read.
+- [ ] Python was automatically checked, not requested from the user, and cached
+      as `tool.python`; if missing, initialization stopped with an Install
+      Python instruction.
 - [ ] Repository GUI collected an explicit platform set and operation mode.
 - [ ] S32DS and RTD paths were explicitly confirmed and verified.
 - [ ] Additional-Skill choice was explicitly collected.
@@ -380,5 +408,6 @@ at session start.
 - [ ] Skill targets are links/junctions, never copied directories.
 - [ ] Every selected platform has all four native subagent files.
 - [ ] Known obsolete generated entries were removed narrowly.
-- [ ] Dependency cache contains verified `env.s32ds` and `env.rtd` entries.
+- [ ] Dependency cache contains verified `tool.python`, `env.s32ds`, and
+      `env.rtd` entries.
 - [ ] Focused tests and Git hygiene checks pass.

@@ -592,6 +592,42 @@ def _load_cache(path: Path) -> dict[str, Any]:
     return cache
 
 
+def _require_python_interpreter() -> Path:
+    executable = str(sys.executable or "").strip()
+    if not executable:
+        raise AgentDeploymentError(
+            "Python is required for Agent environment initialization. "
+            "Install Python and rerun initialization."
+        )
+    python_path = Path(executable).expanduser().resolve(strict=False)
+    if not python_path.is_file():
+        raise AgentDeploymentError(
+            "Python is required for Agent environment initialization, but the "
+            f"current interpreter path is not usable: {python_path}. "
+            "Install Python and rerun initialization."
+        )
+    return python_path
+
+
+def _python_cache_entry(now: str, verified_by: str) -> dict[str, str]:
+    python_path = _require_python_interpreter()
+    version = (
+        f"{sys.version_info.major}.{sys.version_info.minor}."
+        f"{sys.version_info.micro}"
+    )
+    return {
+        "kind": "tool",
+        "status": "available",
+        "location": python_path.as_posix(),
+        "evidence": (
+            f"Python {version} interpreter is available and was used to run "
+            "Agent environment initialization scripts."
+        ),
+        "verified_at": now,
+        "verified_by": verified_by,
+    }
+
+
 def _update_cache(
     repo_root: Path, config: dict[str, Any], verified_by: str
 ) -> bool:
@@ -599,6 +635,10 @@ def _update_cache(
     cache = _load_cache(cache_path)
     now = datetime.now(timezone.utc).isoformat()
     changed = False
+    python_entry = _python_cache_entry(now, verified_by)
+    if cache["items"].get("tool.python") != python_entry:
+        cache["items"]["tool.python"] = python_entry
+        changed = True
     for input_key, item_key in (("s32ds_path", "env.s32ds"), ("rtd_path", "env.rtd")):
         raw_location = str(config.get(input_key, "")).strip()
         if not raw_location:
@@ -698,6 +738,7 @@ def deploy(
     verified_by: str = "agent-initializer",
 ) -> DeploymentReport:
     repo_root = repo_root.resolve(strict=True)
+    _require_python_interpreter()
     platforms = _validate_config(config)
     outputs, _templates = _render_outputs(repo_root, platforms)
     canonical_skill_sources, skill_sources = _collect_skill_sources(repo_root, config)

@@ -172,6 +172,10 @@ def test_initialize_agent_discipline_requires_gui_first_complete_input():
         "must not infer target platforms",
         "must not infer the operation mode",
         "S32DS and RTD paths are required",
+        "Python is a required external tool",
+        "tool.python",
+        "must not ask the user for a Python path",
+        "Install Python",
         "env.s32ds",
         "env.rtd",
         "Do not deploy anything until the GUI input is complete",
@@ -198,6 +202,8 @@ def test_initialize_agent_discipline_requires_gui_first_complete_input():
         "references/platform-contract.md"
     ).read_text(encoding="utf-8")
     assert "deterministic deployment script" in platform_contract
+    assert "tool.python" in platform_contract
+    assert "Python" in platform_contract
     assert "native project-local file tools" not in platform_contract
 
 

@@ -288,6 +288,23 @@ def test_cache_update_preserves_unrelated_entries(tmp_path):
     assert "tool.existing" in cache["items"]
     assert cache["items"]["env.s32ds"]["location"] == s32ds.as_posix()
     assert cache["items"]["env.rtd"]["location"] == rtd.as_posix()
+    python_entry = cache["items"]["tool.python"]
+    assert python_entry["kind"] == "tool"
+    assert python_entry["status"] == "available"
+    assert python_entry["location"] == Path(sys.executable).resolve().as_posix()
+    assert "Python" in python_entry["evidence"]
+
+
+def test_missing_python_interpreter_stops_before_any_deployment(tmp_path, monkeypatch):
+    repo = _fixture_repo(tmp_path)
+    missing_python = tmp_path / "missing-python.exe"
+    monkeypatch.setattr(init_agent_env_deploy.sys, "executable", str(missing_python))
+
+    with pytest.raises(AgentDeploymentError, match="Install Python"):
+        deploy(repo, _config("codex"))
+
+    assert not (repo / ".agents/skills/example").exists()
+    assert not (repo / ".agent-state/external-dependencies.json").exists()
 
 
 def test_unconfirmed_reset_is_rejected_before_mutation(tmp_path):

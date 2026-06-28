@@ -2,8 +2,8 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.2.0 |
-| Date | 2026-06-25 |
+| Version | 0.2.1 |
+| Date | 2026-06-29 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Authoritative project-level Skill and subagent deployment contract for Claude Code, OpenCode, and Codex. |
 
@@ -93,6 +93,19 @@ The orchestrating Agent evaluates `supplemental_task` only after deployment,
 verification, and requested online installation succeed. Out-of-scope work is
 reported and requires explicit user confirmation before it is executed as a
 separate task.
+
+## Required Python tool evidence
+
+Python is a required external tool for repository initialization scripts. The
+orchestrating Agent checks Python automatically before launching the GUI and
+must not request a Python path from the user. If Python is unavailable, the
+workflow stops before filesystem mutation and instructs the user to install
+Python.
+
+When deployment succeeds, the deterministic deployer records the active
+interpreter in `.agent-state/external-dependencies.json` as `tool.python` with
+`status: available`, the resolved interpreter path, version evidence,
+timestamp, and verifier. Preserve unrelated cache entries.
 
 ## Subagent transformations
 
@@ -200,12 +213,14 @@ Initialization passes only when all selected-platform checks succeed:
 6. The four obsolete Codex Markdown files and obsolete OpenCode
    agent-discipline Skill links are absent for selected platforms.
 7. `.agent-state/external-dependencies.json` is valid JSON and contains only
-   non-secret evidence supplied or verified during initialization.
+   non-secret evidence supplied or verified during initialization, including
+   `tool.python`, `env.s32ds`, and `env.rtd`.
 8. Generated paths are ignored by Git and do not appear in `git status`.
 
 ## Changelog
 
 | Version | Date | Changes |
 | --- | --- | --- |
+| 0.2.1 | 2026-06-29 | Added required Python check and `tool.python` cache evidence. |
 | 0.2.0 | 2026-06-25 | Added V2 additional Skill workflows: selected local links, user-level online install, and supplemental task boundary. |
 | 0.1.0 | 2026-06-24 | Initial platform deployment contract. |
