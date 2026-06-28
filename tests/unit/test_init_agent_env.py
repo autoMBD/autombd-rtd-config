@@ -50,12 +50,12 @@ import sys
 
 
 SCRIPT_PATH = Path(
-    "agent-discipline/skills/initialize-agent-discipline/scripts/init_agent_env.py"
+    "agent-discipline/skills/initialize-agent-discipline/scripts/init_agent_env_inputs.py"
 )
 
 
 def _load_init_module():
-    spec = importlib.util.spec_from_file_location("init_agent_env", SCRIPT_PATH)
+    spec = importlib.util.spec_from_file_location("init_agent_env_inputs", SCRIPT_PATH)
     assert spec is not None
     assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)
@@ -64,11 +64,11 @@ def _load_init_module():
     return module
 
 
-init_agent_env = _load_init_module()
-LocalSkillSelectionModel = init_agent_env.LocalSkillSelectionModel
-discover_local_skills = init_agent_env.discover_local_skills
-run_cli = init_agent_env.run_cli
-validate_input = init_agent_env.validate_input
+init_agent_env_inputs = _load_init_module()
+LocalSkillSelectionModel = init_agent_env_inputs.LocalSkillSelectionModel
+discover_local_skills = init_agent_env_inputs.discover_local_skills
+run_cli = init_agent_env_inputs.run_cli
+validate_input = init_agent_env_inputs.validate_input
 
 
 def _skill(parent: Path, name: str, *, manifest_name: str | None = None) -> Path:
@@ -281,18 +281,20 @@ def test_text_collector_emits_version_2_for_local_and_online_workflows(
         )
     )
     monkeypatch.setattr(
-        init_agent_env, "_choose_multi", lambda _label, _options: next(multi_answers)
+        init_agent_env_inputs,
+        "_choose_multi",
+        lambda _label, _options: next(multi_answers),
     )
     monkeypatch.setattr(
-        init_agent_env,
+        init_agent_env_inputs,
         "_choose_one",
         lambda _label, _options: "Update — preserve existing environment",
     )
     monkeypatch.setattr(
-        init_agent_env, "_ask_path_optional", lambda _prompt: next(path_answers)
+        init_agent_env_inputs, "_ask_path_optional", lambda _prompt: next(path_answers)
     )
     monkeypatch.setattr(
-        init_agent_env, "_safe_input", lambda _prompt: next(text_answers)
+        init_agent_env_inputs, "_safe_input", lambda _prompt: next(text_answers)
     )
 
     result = run_cli()

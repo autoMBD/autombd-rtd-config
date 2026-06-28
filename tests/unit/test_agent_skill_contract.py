@@ -48,10 +48,10 @@ from pathlib import Path
 
 
 INIT_SCRIPT_PATH = Path(
-    "agent-discipline/skills/initialize-agent-discipline/scripts/init_agent_env.py"
+    "agent-discipline/skills/initialize-agent-discipline/scripts/init_agent_env_inputs.py"
 )
 DEPLOY_SCRIPT_PATH = Path(
-    "agent-discipline/skills/initialize-agent-discipline/scripts/deploy_agent_env.py"
+    "agent-discipline/skills/initialize-agent-discipline/scripts/init_agent_env_deploy.py"
 )
 
 
@@ -160,9 +160,9 @@ def test_initialize_agent_discipline_requires_gui_first_complete_input():
 
     for required in (
         "repository GUI collector",
-        "agent-discipline/skills/initialize-agent-discipline/scripts/init_agent_env.py",
+        "agent-discipline/skills/initialize-agent-discipline/scripts/init_agent_env_inputs.py",
         "--gui",
-        "agent-discipline/skills/initialize-agent-discipline/scripts/deploy_agent_env.py",
+        "agent-discipline/skills/initialize-agent-discipline/scripts/init_agent_env_deploy.py",
         "Start-Process",
         "-WindowStyle Normal",
         "-PassThru",
@@ -248,9 +248,17 @@ def test_initialize_agent_discipline_keeps_scripts_inside_skill_directory():
     assert DEPLOY_SCRIPT_PATH.exists()
     assert not Path("tools/init_agent_env.py").exists()
     assert not Path("tools/deploy_agent_env.py").exists()
+    assert not Path(
+        "agent-discipline/skills/initialize-agent-discipline/scripts/init_agent_env.py"
+    ).exists()
+    assert not Path(
+        "agent-discipline/skills/initialize-agent-discipline/scripts/deploy_agent_env.py"
+    ).exists()
 
     for document in (skill, agents):
         assert INIT_SCRIPT_PATH.as_posix() in document
         assert DEPLOY_SCRIPT_PATH.as_posix() in document
         assert "tools/init_agent_env.py" not in document
         assert "tools/deploy_agent_env.py" not in document
+        assert "scripts/init_agent_env.py" not in document
+        assert "scripts/deploy_agent_env.py" not in document

@@ -37,7 +37,7 @@
 # 何权利主张、损害赔偿或其他责任承担责任。
 # =================================================================================
 # Project:     RTD CfgFile CLI <https://github.com/autoMBD/autombd-rtd-config>
-# File:        init_agent_env.py
+# File:        init_agent_env_inputs.py
 # Author:      autoMBD <tkung.lqk@foxmail.com>
 # Date:        2026-06-24
 # Version:     0.4.0

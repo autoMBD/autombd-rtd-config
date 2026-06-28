@@ -37,7 +37,7 @@
 # 何权利主张、损害赔偿或其他责任承担责任。
 # =================================================================================
 # Project:     RTD CfgFile CLI <https://github.com/autoMBD/autombd-rtd-config>
-# File:        deploy_agent_env.py
+# File:        init_agent_env_deploy.py
 # Author:      autoMBD <tkung.lqk@foxmail.com>
 # Date:        2026-06-25
 # Version:     0.2.0
@@ -784,10 +784,12 @@ def build_parser() -> argparse.ArgumentParser:
 
 def _load_and_validate_collector_input(path: str) -> dict[str, Any]:
     try:
-        from init_agent_env import load_input_file, validate_input
+        from init_agent_env_inputs import load_input_file, validate_input
     except ModuleNotFoundError:
-        collector_path = Path(__file__).with_name("init_agent_env.py")
-        spec = importlib.util.spec_from_file_location("init_agent_env", collector_path)
+        collector_path = Path(__file__).with_name("init_agent_env_inputs.py")
+        spec = importlib.util.spec_from_file_location(
+            "init_agent_env_inputs", collector_path
+        )
         if spec is None or spec.loader is None:
             raise AgentDeploymentError(
                 f"cannot load initialization collector from {collector_path}"

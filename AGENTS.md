@@ -122,9 +122,9 @@ them with Agent-native GUI controls or inferred answers.
   skills and platform-native subagent configurations. It also initializes
   `.agent-state/external-dependencies.json` with the S32DS and RTD installation
   paths. User input is collected by
-  `agent-discipline/skills/initialize-agent-discipline/scripts/init_agent_env.py --gui`;
+  `agent-discipline/skills/initialize-agent-discipline/scripts/init_agent_env_inputs.py --gui`;
   the saved input is applied by
-  `agent-discipline/skills/initialize-agent-discipline/scripts/deploy_agent_env.py`.
+  `agent-discipline/skills/initialize-agent-discipline/scripts/init_agent_env_deploy.py`.
 
 ### Trigger Conditions
 

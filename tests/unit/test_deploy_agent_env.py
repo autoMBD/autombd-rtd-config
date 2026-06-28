@@ -53,10 +53,10 @@ import tomllib
 import pytest
 
 INIT_SCRIPT_PATH = Path(
-    "agent-discipline/skills/initialize-agent-discipline/scripts/init_agent_env.py"
+    "agent-discipline/skills/initialize-agent-discipline/scripts/init_agent_env_inputs.py"
 )
 DEPLOY_SCRIPT_PATH = Path(
-    "agent-discipline/skills/initialize-agent-discipline/scripts/deploy_agent_env.py"
+    "agent-discipline/skills/initialize-agent-discipline/scripts/init_agent_env_deploy.py"
 )
 
 
@@ -70,20 +70,20 @@ def _load_script_module(name: str, path: Path):
     return module
 
 
-init_agent_env = _load_script_module("init_agent_env", INIT_SCRIPT_PATH)
-deploy_agent_env = _load_script_module("deploy_agent_env", DEPLOY_SCRIPT_PATH)
+init_agent_env_inputs = _load_script_module("init_agent_env_inputs", INIT_SCRIPT_PATH)
+init_agent_env_deploy = _load_script_module("init_agent_env_deploy", DEPLOY_SCRIPT_PATH)
 
-validate_input = init_agent_env.validate_input
-AgentDeploymentError = deploy_agent_env.AgentDeploymentError
-AgentTemplateError = deploy_agent_env.AgentTemplateError
-deploy = deploy_agent_env.deploy
-ensure_directory_link = deploy_agent_env.ensure_directory_link
-main = deploy_agent_env.main
-parse_claude_agent = deploy_agent_env.parse_claude_agent
-render_claude_agent = deploy_agent_env.render_claude_agent
-render_codex_agent = deploy_agent_env.render_codex_agent
-render_opencode_agent = deploy_agent_env.render_opencode_agent
-skill_target_roots = deploy_agent_env.skill_target_roots
+validate_input = init_agent_env_inputs.validate_input
+AgentDeploymentError = init_agent_env_deploy.AgentDeploymentError
+AgentTemplateError = init_agent_env_deploy.AgentTemplateError
+deploy = init_agent_env_deploy.deploy
+ensure_directory_link = init_agent_env_deploy.ensure_directory_link
+main = init_agent_env_deploy.main
+parse_claude_agent = init_agent_env_deploy.parse_claude_agent
+render_claude_agent = init_agent_env_deploy.render_claude_agent
+render_codex_agent = init_agent_env_deploy.render_codex_agent
+render_opencode_agent = init_agent_env_deploy.render_opencode_agent
+skill_target_roots = init_agent_env_deploy.skill_target_roots
 
 
 SOURCE = (
@@ -480,7 +480,7 @@ def test_deployer_loads_sibling_collector_without_public_tools_package(
     config["rtd_path"] = str(rtd)
     input_path = tmp_path / "init-input.json"
     input_path.write_text(json.dumps(config), encoding="utf-8")
-    monkeypatch.delitem(sys.modules, "init_agent_env", raising=False)
+    monkeypatch.delitem(sys.modules, "init_agent_env_inputs", raising=False)
     monkeypatch.setattr(
         sys,
         "path",
@@ -491,7 +491,7 @@ def test_deployer_loads_sibling_collector_without_public_tools_package(
         ],
     )
 
-    loaded = deploy_agent_env._load_and_validate_collector_input(str(input_path))
+    loaded = init_agent_env_deploy._load_and_validate_collector_input(str(input_path))
 
     assert loaded["platforms"] == ["codex"]
 
