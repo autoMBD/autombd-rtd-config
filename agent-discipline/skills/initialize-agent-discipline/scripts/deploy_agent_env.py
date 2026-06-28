@@ -49,6 +49,7 @@ from __future__ import annotations
 import argparse
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -783,9 +784,19 @@ def build_parser() -> argparse.ArgumentParser:
 
 def _load_and_validate_collector_input(path: str) -> dict[str, Any]:
     try:
-        from tools.init_agent_env import load_input_file, validate_input
-    except ModuleNotFoundError:
         from init_agent_env import load_input_file, validate_input
+    except ModuleNotFoundError:
+        collector_path = Path(__file__).with_name("init_agent_env.py")
+        spec = importlib.util.spec_from_file_location("init_agent_env", collector_path)
+        if spec is None or spec.loader is None:
+            raise AgentDeploymentError(
+                f"cannot load initialization collector from {collector_path}"
+            )
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = module
+        spec.loader.exec_module(module)
+        load_input_file = module.load_input_file
+        validate_input = module.validate_input
 
     config = load_input_file(path)
     errors = validate_input(config)

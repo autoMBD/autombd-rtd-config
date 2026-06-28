@@ -12,10 +12,12 @@ repository's Agent-discipline Skills and four role definitions to every platform
 the user selects, then records the required reusable environment evidence.
 
 This Skill is orchestrated by the Agent, but input collection and deployment are
-implemented by the repository's deterministic tools. Always use the repository
-GUI collector at `tools/init_agent_env.py`; do not substitute an Agent-native
-question window, conversational prompts, or inferred defaults. Apply the saved
-input with `tools/deploy_agent_env.py`.
+implemented by deterministic scripts bundled with this Skill. Always use the
+repository GUI collector at
+`agent-discipline/skills/initialize-agent-discipline/scripts/init_agent_env.py`;
+do not substitute an Agent-native question window, conversational prompts, or
+inferred defaults. Apply the saved input with
+`agent-discipline/skills/initialize-agent-discipline/scripts/deploy_agent_env.py`.
 
 Before deployment, read
 [`references/platform-contract.md`](references/platform-contract.md) completely.
@@ -66,8 +68,8 @@ The released `autombd-rtd/` Skill is outside this workflow and is deployed by
 | --- | --- |
 | Canonical Agent-discipline Skills | `agent-discipline/skills/<name>/SKILL.md` |
 | Canonical Claude Code subagents | `agent-discipline/subagents/<name>.md` |
-| Repository GUI collector | `tools/init_agent_env.py` |
-| Deterministic deployer | `tools/deploy_agent_env.py` |
+| Repository GUI collector | `agent-discipline/skills/initialize-agent-discipline/scripts/init_agent_env.py` |
+| Deterministic deployer | `agent-discipline/skills/initialize-agent-discipline/scripts/deploy_agent_env.py` |
 | Platform deployment contract | `agent-discipline/skills/initialize-agent-discipline/references/platform-contract.md` |
 | External-dependency rules | `agent-discipline/skills/external-dependency-memory/SKILL.md` |
 
@@ -115,7 +117,7 @@ the process handle, and wait for the user to submit or cancel:
 ```powershell
 $repoRoot = (Get-Location).Path
 $pythonExe = (Get-Command python.exe -ErrorAction Stop).Source
-$scriptPath = (Resolve-Path '.\tools\init_agent_env.py').Path
+$scriptPath = (Resolve-Path '.\agent-discipline\skills\initialize-agent-discipline\scripts\init_agent_env.py').Path
 $stateDir = Join-Path $repoRoot '.agent-state'
 $pendingInput = Join-Path $stateDir 'init-input.pending.json'
 $finalInput = Join-Path $stateDir 'init-input.json'
@@ -167,7 +169,7 @@ The Windows block already validates and promotes the pending file. Before
 deployment, the final input may be revalidated idempotently with:
 
 ```powershell
-python tools\init_agent_env.py `
+python agent-discipline\skills\initialize-agent-discipline\scripts\init_agent_env.py `
   --input .agent-state\init-input.json `
   --validate-only
 ```
@@ -238,7 +240,7 @@ Any prevalidation failure stops the transaction before filesystem mutation.
 Apply the complete validated input with the deterministic deployer:
 
 ```powershell
-python tools\deploy_agent_env.py `
+python agent-discipline\skills\initialize-agent-discipline\scripts\deploy_agent_env.py `
   --input .agent-state\init-input.json `
   --repo-root . `
   --verified-by codex

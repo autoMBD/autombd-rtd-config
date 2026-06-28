@@ -121,8 +121,10 @@ them with Agent-native GUI controls or inferred answers.
   Agent platform directories (Claude, OpenCode, Codex) using symbolic links for
   skills and platform-native subagent configurations. It also initializes
   `.agent-state/external-dependencies.json` with the S32DS and RTD installation
-  paths. User input is collected by `tools/init_agent_env.py --gui`; the saved
-  input is applied by `tools/deploy_agent_env.py`.
+  paths. User input is collected by
+  `agent-discipline/skills/initialize-agent-discipline/scripts/init_agent_env.py --gui`;
+  the saved input is applied by
+  `agent-discipline/skills/initialize-agent-discipline/scripts/deploy_agent_env.py`.
 
 ### Trigger Conditions
 

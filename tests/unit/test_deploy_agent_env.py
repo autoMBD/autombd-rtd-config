@@ -44,25 +44,46 @@
 # Description: Unit tests for deterministic Agent environment deployment.
 # =================================================================================
 
+import importlib.util
 import json
 from pathlib import Path
+import sys
 import tomllib
 
 import pytest
 
-from tools.deploy_agent_env import (
-    AgentDeploymentError,
-    AgentTemplateError,
-    deploy,
-    ensure_directory_link,
-    main,
-    parse_claude_agent,
-    render_claude_agent,
-    render_codex_agent,
-    render_opencode_agent,
-    skill_target_roots,
+INIT_SCRIPT_PATH = Path(
+    "agent-discipline/skills/initialize-agent-discipline/scripts/init_agent_env.py"
 )
-from tools.init_agent_env import validate_input
+DEPLOY_SCRIPT_PATH = Path(
+    "agent-discipline/skills/initialize-agent-discipline/scripts/deploy_agent_env.py"
+)
+
+
+def _load_script_module(name: str, path: Path):
+    spec = importlib.util.spec_from_file_location(name, path)
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+init_agent_env = _load_script_module("init_agent_env", INIT_SCRIPT_PATH)
+deploy_agent_env = _load_script_module("deploy_agent_env", DEPLOY_SCRIPT_PATH)
+
+validate_input = init_agent_env.validate_input
+AgentDeploymentError = deploy_agent_env.AgentDeploymentError
+AgentTemplateError = deploy_agent_env.AgentTemplateError
+deploy = deploy_agent_env.deploy
+ensure_directory_link = deploy_agent_env.ensure_directory_link
+main = deploy_agent_env.main
+parse_claude_agent = deploy_agent_env.parse_claude_agent
+render_claude_agent = deploy_agent_env.render_claude_agent
+render_codex_agent = deploy_agent_env.render_codex_agent
+render_opencode_agent = deploy_agent_env.render_opencode_agent
+skill_target_roots = deploy_agent_env.skill_target_roots
 
 
 SOURCE = (
@@ -445,6 +466,34 @@ def test_cli_loads_collector_json_and_deploys_native_outputs(tmp_path):
     assert (repo / ".claude/agents/reviewer.md").is_file()
     assert (repo / ".opencode/agents/reviewer.md").is_file()
     assert (repo / ".codex/agents/reviewer.toml").is_file()
+
+
+def test_deployer_loads_sibling_collector_without_public_tools_package(
+    tmp_path, monkeypatch
+):
+    s32ds = tmp_path / "S32DS.3.6.7"
+    (s32ds / "eclipse").mkdir(parents=True)
+    rtd = tmp_path / "RTD"
+    (rtd / "Platform_TS_T40D34M10I0R0").mkdir(parents=True)
+    config = _config("codex")
+    config["s32ds_path"] = str(s32ds)
+    config["rtd_path"] = str(rtd)
+    input_path = tmp_path / "init-input.json"
+    input_path.write_text(json.dumps(config), encoding="utf-8")
+    monkeypatch.delitem(sys.modules, "init_agent_env", raising=False)
+    monkeypatch.setattr(
+        sys,
+        "path",
+        [
+            item
+            for item in sys.path
+            if Path(item or ".").resolve() != INIT_SCRIPT_PATH.parent.resolve()
+        ],
+    )
+
+    loaded = deploy_agent_env._load_and_validate_collector_input(str(input_path))
+
+    assert loaded["platforms"] == ["codex"]
 
 
 def test_deployment_refuses_a_managed_parent_linked_outside_repo(tmp_path):

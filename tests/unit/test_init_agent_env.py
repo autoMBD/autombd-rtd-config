@@ -44,14 +44,31 @@
 # Description: Unit tests for Agent environment GUI input and local Skill discovery.
 # =================================================================================
 
+import importlib.util
 from pathlib import Path
+import sys
 
-from tools.init_agent_env import (
-    LocalSkillSelectionModel,
-    discover_local_skills,
-    run_cli,
-    validate_input,
+
+SCRIPT_PATH = Path(
+    "agent-discipline/skills/initialize-agent-discipline/scripts/init_agent_env.py"
 )
+
+
+def _load_init_module():
+    spec = importlib.util.spec_from_file_location("init_agent_env", SCRIPT_PATH)
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+init_agent_env = _load_init_module()
+LocalSkillSelectionModel = init_agent_env.LocalSkillSelectionModel
+discover_local_skills = init_agent_env.discover_local_skills
+run_cli = init_agent_env.run_cli
+validate_input = init_agent_env.validate_input
 
 
 def _skill(parent: Path, name: str, *, manifest_name: str | None = None) -> Path:
@@ -220,12 +237,12 @@ def test_version_2_requires_an_explicit_additional_skill_choice(tmp_path):
 
 
 def test_gui_mode_switch_does_not_pack_before_an_unmanaged_widget():
-    source = Path("tools/init_agent_env.py").read_text(encoding="utf-8")
+    source = SCRIPT_PATH.read_text(encoding="utf-8")
     assert "pack(fill=\"x\", before=" not in source
 
 
 def test_gui_can_select_local_and_online_skill_workflows_together():
-    source = Path("tools/init_agent_env.py").read_text(encoding="utf-8")
+    source = SCRIPT_PATH.read_text(encoding="utf-8")
     assert "self._local_import_var" in source
     assert "self._online_import_var" in source
     assert "self._skip_import_var" in source
@@ -233,7 +250,7 @@ def test_gui_can_select_local_and_online_skill_workflows_together():
 
 
 def test_gui_exposes_a_manual_local_skill_path_entry():
-    source = Path("tools/init_agent_env.py").read_text(encoding="utf-8")
+    source = SCRIPT_PATH.read_text(encoding="utf-8")
     assert "self._root_entry_var" in source
     assert 'text="Add"' in source
     assert 'text="Browse..."' in source
@@ -264,17 +281,18 @@ def test_text_collector_emits_version_2_for_local_and_online_workflows(
         )
     )
     monkeypatch.setattr(
-        "tools.init_agent_env._choose_multi", lambda _label, _options: next(multi_answers)
+        init_agent_env, "_choose_multi", lambda _label, _options: next(multi_answers)
     )
     monkeypatch.setattr(
-        "tools.init_agent_env._choose_one",
+        init_agent_env,
+        "_choose_one",
         lambda _label, _options: "Update — preserve existing environment",
     )
     monkeypatch.setattr(
-        "tools.init_agent_env._ask_path_optional", lambda _prompt: next(path_answers)
+        init_agent_env, "_ask_path_optional", lambda _prompt: next(path_answers)
     )
     monkeypatch.setattr(
-        "tools.init_agent_env._safe_input", lambda _prompt: next(text_answers)
+        init_agent_env, "_safe_input", lambda _prompt: next(text_answers)
     )
 
     result = run_cli()

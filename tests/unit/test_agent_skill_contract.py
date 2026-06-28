@@ -47,6 +47,14 @@
 from pathlib import Path
 
 
+INIT_SCRIPT_PATH = Path(
+    "agent-discipline/skills/initialize-agent-discipline/scripts/init_agent_env.py"
+)
+DEPLOY_SCRIPT_PATH = Path(
+    "agent-discipline/skills/initialize-agent-discipline/scripts/deploy_agent_env.py"
+)
+
+
 def _frontmatter(path: Path) -> str:
     text = path.read_text(encoding="utf-8")
     opening, frontmatter, _body = text.split("---", 2)
@@ -140,7 +148,7 @@ def test_initialize_agent_discipline_uses_native_platform_paths():
     assert 'Add `"$schema"`' not in skill
     assert "Write the template content as-is to `.agents/agents" not in skill
 
-    collector = Path("tools/init_agent_env.py").read_text(encoding="utf-8")
+    collector = INIT_SCRIPT_PATH.read_text(encoding="utf-8")
     assert '"opencode": ".opencode/skills"' not in collector
     assert '"codex": ".agents/agents"' not in collector
 
@@ -152,9 +160,9 @@ def test_initialize_agent_discipline_requires_gui_first_complete_input():
 
     for required in (
         "repository GUI collector",
-        "tools/init_agent_env.py",
+        "agent-discipline/skills/initialize-agent-discipline/scripts/init_agent_env.py",
         "--gui",
-        "tools/deploy_agent_env.py",
+        "agent-discipline/skills/initialize-agent-discipline/scripts/deploy_agent_env.py",
         "Start-Process",
         "-WindowStyle Normal",
         "-PassThru",
@@ -180,7 +188,7 @@ def test_initialize_agent_discipline_requires_gui_first_complete_input():
     ):
         assert forbidden not in skill
 
-    collector = Path("tools/init_agent_env.py").read_text(encoding="utf-8")
+    collector = INIT_SCRIPT_PATH.read_text(encoding="utf-8")
     assert "_skip_paths_var" not in collector
     assert "Skip S32DS/RTD paths" not in collector
     assert "falling back to text mode" not in collector
@@ -226,5 +234,23 @@ def test_initialize_agent_discipline_documents_multi_skill_orchestration():
     ):
         assert required in platform_contract
 
-    deployer = Path("tools/deploy_agent_env.py").read_text(encoding="utf-8")
+    deployer = DEPLOY_SCRIPT_PATH.read_text(encoding="utf-8")
     assert "npx skills" not in deployer
+
+
+def test_initialize_agent_discipline_keeps_scripts_inside_skill_directory():
+    skill = Path(
+        "agent-discipline/skills/initialize-agent-discipline/SKILL.md"
+    ).read_text(encoding="utf-8")
+    agents = Path("AGENTS.md").read_text(encoding="utf-8")
+
+    assert INIT_SCRIPT_PATH.exists()
+    assert DEPLOY_SCRIPT_PATH.exists()
+    assert not Path("tools/init_agent_env.py").exists()
+    assert not Path("tools/deploy_agent_env.py").exists()
+
+    for document in (skill, agents):
+        assert INIT_SCRIPT_PATH.as_posix() in document
+        assert DEPLOY_SCRIPT_PATH.as_posix() in document
+        assert "tools/init_agent_env.py" not in document
+        assert "tools/deploy_agent_env.py" not in document
