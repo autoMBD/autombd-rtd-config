@@ -42,6 +42,7 @@
 # Date:        2026-06-03
 # Version:     0.1.0
 # Description: Mcu module provider (peripheral clock reference dependency).
+#              Forward-hardened to full Mcu.xdm editable surface (issue #38).
 # =================================================================================
 
 from __future__ import annotations
@@ -87,6 +88,15 @@ def _load_lpuart_clock_entry(hw: str) -> "dict | None":
 
 class McuProvider:
     """Owns Mcu clock/reference configuration.
+
+    The provider plans PLL clock-tree edits and McuClockReferencePoint array
+    merges within McuClockSettingConfig_0. The full editable surface described
+    by Mcu.xdm is inventoried in the committed asset
+    ``autombd-rtd/assets/nxp/s32k3/mcu/clock.json`` (_coverage section).
+    Currently only the 160/80/40 MHz recipe is supported as a fixed
+    clock-tree configuration; the deferred surface (oscillators, clock monitors,
+    power modes, CGM muxes 1-20, etc.) is tracked in the asset's
+    ``not_yet_exposed`` inventory (issue #38).
 
     Uart and FlexIO depend on valid Mcu clock references. The Mcu provider
     owns only the Mcu config region; it never edits Port (oscillator pins) or

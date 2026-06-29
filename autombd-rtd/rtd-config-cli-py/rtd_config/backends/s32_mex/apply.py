@@ -3096,25 +3096,47 @@ _MCU_SUPPORTED_RECIPES: frozenset = frozenset({
 })
 
 # Clocks available as McuClockFrequencySelect on S32K344, grounded in the
-# S32K344 reference config and Mcu.xdm. Must stay in sync with clock.json
-# (all_selectable_clocks) and the test constant _ALL_SELECTABLE_CLOCKS.
-# Drift is caught by test_clock_json_matches_apply_code_literals (LL-012).
-# clock.json is a committed reference document for the recipe; it is NOT
-# loaded at runtime -- this constant is the runtime source of truth.
+# Mcu.xdm INVALID rules (lines 14008-14152) and the S32K344 reference config.
+# Each clock maps to a CGM0 mux divider (Mux0 has 8 dividers; Mux1..Mux20 each
+# have 1). Must stay in sync with clock.json (all_selectable_clocks) and the
+# test constant _ALL_SELECTABLE_CLOCKS. Drift is caught by
+# test_clock_json_matches_apply_code_literals (LL-012). clock.json is a
+# committed reference document for the recipe; it is NOT loaded at runtime --
+# this constant is the runtime source of truth.
 _ALL_SELECTABLE_CLOCKS: list[str] = [
+    # Mux0 dividers (8 clocks)
     "CORE_CLK",
     "AIPS_PLAT_CLK",
     "AIPS_SLOW_CLK",
+    "HSE_CLK",
+    "DCM_CLK",
+    "LBIST_CLK",
+    "QSPI_MEM_CLK",
+    "CM7_CORE_CLK",
+    # Mux1..Mux20 (one clock each)
+    "STM0_CLK",
+    "STM1_CLK",
     "FLEXCAN_PE_CLK0_2",
     "FLEXCAN_PE_CLK3_5",
+    "CLKOUT_STANDBY",
+    "CLKOUT_RUN",
     "EMAC_CLK_RX",
     "EMAC_CLK_TX",
     "EMAC_CLK_TS",
     "QuadSPI_SFCK",
-    "QSPI_MEM_CLK",
+    "TRACE_CLK",
+    "EMAC_TX_RMII_CLK",
+    "STM2_CLK",
+    "USDHC_PER_CLK",
+    "LFAST_REF_CLK",
+    "SWG_CLK",
+    "GMAC1_RMII_CLK",
+    "STM3_CLK",
+    "AES_CLK",
+    "FLEXCAN_PE_CLK8_11",
+    # Source clocks (not through CGM muxes; directly available)
     "FIRC_CLK",
     "SIRC_CLK",
-    "STM0_CLK",
 ]
 
 
@@ -3354,6 +3376,12 @@ def apply_mcu_set(doc: MexDocument, intent: Intent) -> ApplyResult:
     Implements RTD-MEX-MCU-001: 160/80/40 MHz clock tree for S32K344 using the
     16MHz FXOSC -> CORE_PLL -> PHI0 path. Only the 160/80/40 recipe is
     supported; other frequency combinations return a blocker diagnostic.
+
+    Forward-hardened (issue #38): the McuClockReferencePoint insertion now uses
+    the full 30-clock McuClockFrequencySelect enum from Mcu.xdm INVALID rules,
+    not just the 13 clocks the E2E case exercises. The complete editable surface
+    not yet exposed through the CLI is tracked in the committed asset
+    ``clock.json`` (_coverage.not_yet_exposed).
 
     Two regions are edited:
     (A) clock_settings section (top-level clocks tool, elements use id="..."):

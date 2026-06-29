@@ -81,11 +81,15 @@ B) Mcu config_set:
        McuClkMux0Div0_Divisor=0, McuClkMux0Div1_Divisor=1, McuClkMux0Div2_Divisor=3
 
 C) McuClockReferencePoint array: MERGED -- existing 2 points preserved (LPUART3_CLK,
-   FLEXIO_CLK) + 13 new points added (one per selectable clock), each named after its
-   clock with McuClockFrequencySelect == Name.  Total = 15 structs, indices 0..14.
-   Clocks added: CORE_CLK, AIPS_PLAT_CLK, AIPS_SLOW_CLK, FLEXCAN_PE_CLK0_2,
-                 FLEXCAN_PE_CLK3_5, EMAC_CLK_RX, EMAC_CLK_TX, EMAC_CLK_TS,
-                 QuadSPI_SFCK, QSPI_MEM_CLK, FIRC_CLK, SIRC_CLK, STM0_CLK
+   FLEXIO_CLK) + 30 new points added (one per selectable clock), each named after its
+   clock with McuClockFrequencySelect == Name.  Total = 32 structs, indices 0..31.
+   Clocks added: CORE_CLK, AIPS_PLAT_CLK, AIPS_SLOW_CLK, HSE_CLK, DCM_CLK,
+                 LBIST_CLK, QSPI_MEM_CLK, CM7_CORE_CLK, STM0_CLK, STM1_CLK,
+                 FLEXCAN_PE_CLK0_2, FLEXCAN_PE_CLK3_5, CLKOUT_STANDBY,
+                 CLKOUT_RUN, EMAC_CLK_RX, EMAC_CLK_TX, EMAC_CLK_TS,
+                 QuadSPI_SFCK, TRACE_CLK, EMAC_TX_RMII_CLK, STM2_CLK,
+                 USDHC_PER_CLK, LFAST_REF_CLK, SWG_CLK, GMAC1_RMII_CLK,
+                 STM3_CLK, AES_CLK, FLEXCAN_PE_CLK8_11, FIRC_CLK, SIRC_CLK
    Existing preserved: LPUART3_CLK (McuClockFrequencySelect=AIPS_SLOW_CLK),
                        FLEXIO_CLK  (McuClockFrequencySelect=CORE_CLK)
 
@@ -107,21 +111,43 @@ from rtd_config.modules.mcu import McuProvider
 from tests.fixtures import copy_uart_fixture
 
 
-# All selectable clocks verified from the S32K344 reference config
+# All selectable clocks verified from the Mcu.xdm INVALID rules (lines 14008-14152)
+# and the S32K344 reference config. Must match apply.py _ALL_SELECTABLE_CLOCKS
+# and clock.json all_selectable_clocks (LL-012 anti-drift).
 _ALL_SELECTABLE_CLOCKS = [
+    # Mux0 dividers (8 clocks)
     "CORE_CLK",
     "AIPS_PLAT_CLK",
     "AIPS_SLOW_CLK",
+    "HSE_CLK",
+    "DCM_CLK",
+    "LBIST_CLK",
+    "QSPI_MEM_CLK",
+    "CM7_CORE_CLK",
+    # Mux1..Mux20 (one clock each)
+    "STM0_CLK",
+    "STM1_CLK",
     "FLEXCAN_PE_CLK0_2",
     "FLEXCAN_PE_CLK3_5",
+    "CLKOUT_STANDBY",
+    "CLKOUT_RUN",
     "EMAC_CLK_RX",
     "EMAC_CLK_TX",
     "EMAC_CLK_TS",
     "QuadSPI_SFCK",
-    "QSPI_MEM_CLK",
+    "TRACE_CLK",
+    "EMAC_TX_RMII_CLK",
+    "STM2_CLK",
+    "USDHC_PER_CLK",
+    "LFAST_REF_CLK",
+    "SWG_CLK",
+    "GMAC1_RMII_CLK",
+    "STM3_CLK",
+    "AES_CLK",
+    "FLEXCAN_PE_CLK8_11",
+    # Source clocks (not through CGM muxes; directly available)
     "FIRC_CLK",
     "SIRC_CLK",
-    "STM0_CLK",
 ]
 
 # Pre-existing reference points in the fixture (preserved by the MERGE strategy).
@@ -132,7 +158,7 @@ _FIXTURE_EXISTING_REF_POINTS = [
     "FLEXIO_CLK",
 ]
 
-# Total after merge: existing 2 + 13 new = 15
+# Total after merge: existing 2 + 30 new = 32 (forward-harden #38: full Mcu.xdm enum)
 _EXPECTED_REF_POINT_COUNT = len(_FIXTURE_EXISTING_REF_POINTS) + len(_ALL_SELECTABLE_CLOCKS)
 
 
@@ -600,10 +626,10 @@ def test_mcu_cgm_mux0_divisors(tmp_path):
 # Section C: McuClockReferencePoint array replacement
 # ===========================================================================
 
-# Test C1: Array has exactly the expected merged count (existing 2 + 13 new = 15)
+# Test C1: Array has exactly the expected merged count (existing 2 + 30 new = 32)
 # The MERGE strategy preserves existing points (so UartClockRef paths stay resolvable)
-# and adds the 13 selectable-clock points.  Vendor gate confirmed replace-all-13
-# deletes LPUART3_CLK/FLEXIO_CLK causing SEVERE "该取值值不可用" on Uart channels.
+# and adds the 30 selectable-clock points. Vendor gate confirmed replace-all deletes
+# LPUART3_CLK/FLEXIO_CLK causing SEVERE "该取值值不可用" on Uart channels.
 def test_ref_points_count(tmp_path):
     project = copy_uart_fixture(tmp_path)
     mex = project / "Uart_Example.mex"
@@ -622,8 +648,8 @@ def test_ref_points_count(tmp_path):
 # Test C2: New clock-named reference points have Name == McuClockFrequencySelect.
 # The MERGE strategy preserves existing structs (LPUART3_CLK, FLEXIO_CLK) whose
 # Name intentionally differs from McuClockFrequencySelect (cross-references kept
-# for Uart channels).  Only the 13 NEW structs are required to have Name==FreqSelect.
-# All 13 selectable clocks must be present (vendor-confirmed requirement).
+# for Uart channels). Only the NEW structs are required to have Name==FreqSelect.
+# All 30 selectable clocks must be present (forward from Mcu.xdm; issue #38).
 def test_ref_points_named_after_clock(tmp_path):
     project = copy_uart_fixture(tmp_path)
     mex = project / "Uart_Example.mex"
@@ -651,14 +677,14 @@ def test_ref_points_named_after_clock(tmp_path):
                 f"McuClockFrequencySelect ({f!r})"
             )
 
-    # All 13 selectable clocks must be present as reference point Names
+    # All selectable clocks must be present as reference point Names
     for clk in _ALL_SELECTABLE_CLOCKS:
         assert clk in all_names, f"Clock {clk!r} missing from McuClockReferencePoint array"
 
 
 # Test C3: Struct indices are sequential from 0 across all merged structs.
-# The MERGE reorders indices 0..N-1 where N = existing + new (15 in fixture).
-# Existing structs come first (indices 0,1), new clock-named structs follow (2..14).
+# The MERGE reorders indices 0..N-1 where N = existing + new (32 in fixture).
+# Existing structs come first (indices 0,1), new clock-named structs follow (2..31).
 def test_ref_points_sequential_indices(tmp_path):
     project = copy_uart_fixture(tmp_path)
     mex = project / "Uart_Example.mex"
