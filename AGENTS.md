@@ -105,6 +105,27 @@ Keep machine-specific paths and cache workflow details out of `docs/`.
 Reference documents describe what the project depends on; the local cache
 records where those dependencies are found on this machine.
 
+## Agent Environment Initialization
+
+Before development can proceed, this project's Agent discipline — Skills,
+subagent definitions, and the external-dependency cache — must be deployed to
+each selected Agent platform's project-level directory. That work is owned by
+the `initialize-agent-discipline` Skill
+(`agent-discipline/skills/initialize-agent-discipline/SKILL.md`); its
+description defines when it applies and its body is authoritative for the
+GUI-collection, deployment, and verification workflow. The orchestrator drives
+that Skill's repository GUI collector
+(`agent-discipline/skills/initialize-agent-discipline/scripts/init_agent_env_inputs.py`)
+and deterministic deployer
+(`agent-discipline/skills/initialize-agent-discipline/scripts/init_agent_env_deploy.py`)
+and must not substitute Agent-native controls or inferred answers.
+
+When an agent starts work in a freshly cloned or otherwise uninitialized
+repository — missing project-level Agent directories (`.claude/`, `.opencode/`,
+`.agents/`), subagents, or the external-dependency cache — it MUST load and
+execute this Skill before beginning any other task, so every agent operates
+from the same project discipline.
+
 ## Subagent Roles and Collaboration
 
 The orchestrator dispatches four specialized subagents defined in
