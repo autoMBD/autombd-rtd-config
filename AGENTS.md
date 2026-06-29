@@ -233,7 +233,7 @@ Usage rules:
   `docs/specs/rtd-config-domain-truth.md` and each `<Module>.xdm`.
 - **Specs stay agent-free and milestone-free** — staging lives only in the
   roadmap.
-- **Changelogs are append-only**; `agent-discipline/review-archive/` is read-only
+- **Changelogs are append-only**; `agent-discipline/review-archive-NOT-USED-NEVER-TOUCH!!!/` is read-only
   and never a requirements source.
 - The Reviewer appends to `agent-discipline/agent-lessons-learned.md`; the owner's
   comments are tracked in `agent-discipline/owner-review-comments.md`.

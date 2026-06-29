@@ -21,7 +21,7 @@ the code.
    the header skill); project code/style standards.
 3. **Ownership & boundaries.** Module-ownership respected; `.mex` edits narrow and
    byte-faithful (no unrelated churn); runtime/development source boundary;
-   `agent-discipline/review-archive/` not used as a requirements source.
+   `agent-discipline/review-archive-NOT-USED-NEVER-TOUCH!!!/` not used as a requirements source.
 4. **Test adequacy (coverage, not execution).** Every mandatory "must" has a real,
    non-stub test. You judge whether the tests *exercise the requirement*; you do
    **not** re-run the gate — that is the Tester's authority.
