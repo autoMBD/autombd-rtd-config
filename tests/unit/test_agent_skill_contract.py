@@ -119,8 +119,8 @@ def test_subagent_templates_keep_original_claude_code_frontmatter():
         )),
         "reviewer": "\n".join((
             "name: reviewer",
-            "description: Acceptance reviewer, invoked by the main agent ONLY after the Tester's functional gate is already green and KPI evidence is recorded. Reviews every development requirement EXCEPT test execution (code standards, uniform header, missed skill triggers, ownership/boundaries, domain-value-vs-.xdm, test adequacy, KPI evidence hygiene, diff hygiene) and appends a lessons-learned entry. Read-only — reads the repository to review the diff; produces findings, not fixes.",
-            "tools: Read, Grep, Glob, Bash",
+            "description: Acceptance reviewer, invoked by the main agent ONLY after the Tester's functional gate is already green and KPI evidence is recorded. Reviews every development requirement EXCEPT test execution (code standards, uniform header, missed skill triggers, ownership/boundaries, domain-value-vs-.xdm, test adequacy, KPI evidence hygiene, diff hygiene) and appends a lessons-learned entry. Reads the repository to review the diff and produces findings, not code fixes; its only write is appending its lessons-learned entry to agent-discipline/agent-lessons-learned.md.",
+            "tools: Read, Edit, Grep, Glob, Bash",
             "model: opus",
         )),
     }
