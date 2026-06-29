@@ -105,6 +105,38 @@ Keep machine-specific paths and cache workflow details out of `docs/`.
 Reference documents describe what the project depends on; the local cache
 records where those dependencies are found on this machine.
 
+## Forward, Spec-first development
+
+Development is **forward from the descriptor, never reverse-engineered from the
+test cases.** A module's provider and its committed asset implement the module's
+**full legal editable surface** — every configurable item with its valid values,
+ranges, defaults, constraints, and cross-module dependencies — extracted from
+that module's `<Module>.xdm` (core-design G10). The `RTD-MEX-*` E2E cases
+**verify a representative slice; they never define the scope.** Building only
+what a case needs ("test-case-oriented development") is prohibited — it yields a
+provider general only within the case-exercised subset and silently leaves the
+rest of the surface unimplemented.
+
+**Development/test separation** keeps implementation from being steered by the
+specific case inputs:
+
+- the **Explorer** extracts the module's *complete* editable surface from
+  `<Module>.xdm` into the per-module asset — not only the values a case needs;
+- the **Worker** is briefed on the *capability + descriptor* ("implement the
+  editable surface for X"), **never** "make case N pass," and writes **generality
+  tests** over arbitrary valid inputs (different units, channels, counts,
+  partitions — not the case literals) so the implementation fails if it ever
+  becomes fit to the cases;
+- the **owner-governed E2E cases** only verify; a Worker never reads a case as its
+  specification.
+
+**Surface-coverage artifact + acceptance.** Each module's committed asset carries
+a `_coverage` inventory: which editable items are configurable today vs. not yet
+exposed, each traceable to `<Module>.xdm`. A module is **not "done" merely because
+its E2E cases are green** — the Reviewer confirms the full editable surface is
+implemented, or the deferred surface is explicitly recorded in `_coverage`; an
+undocumented coverage gap is a blocker.
+
 ## Agent Environment Initialization
 
 Before development can proceed, this project's Agent discipline — Skills,
@@ -134,11 +166,16 @@ The orchestrator dispatches four specialized subagents defined in
 values).
 
 - **Explorer** (read-only): establishes non-inferable ground truth — RTD enum
-  domains, pin-mux data, fixture state, exact S32DS commands — and records it in
-  domain-truth. Never edits files.
-- **Worker**: implements one scoped capability TDD-first, within module-ownership
-  and narrow / byte-faithful `.mex` edit rules. When the Tester reports a KPI
-  miss on a functionally passing case, the Worker optimizes the public
+  domains, pin-mux data, fixture state, exact S32DS commands — and, when grounding
+  a module, its **complete** editable surface from `<Module>.xdm` (the full
+  enum/range/default/constraint/dependency set, not only the values a case needs)
+  so the per-module asset can be built forward. Records cross-cutting facts in
+  domain-truth; never edits files.
+- **Worker**: implements a module's capability **forward from the descriptor/asset
+  — general over the editable surface, never fit to a specific E2E case** —
+  TDD-first, within module-ownership and narrow / byte-faithful `.mex` edit rules,
+  and adds generality tests over arbitrary valid inputs. When the Tester reports a
+  KPI miss on a functionally passing case, the Worker optimizes the public
   flow/diagnostics/assets without weakening functional correctness.
 - **Tester**: owns the convergence gate — runs the deterministic suite, S32DS
   validation (pass gate: exit 0 AND no SEVERE `[TOOL]`), and the E2E acceptance
@@ -153,8 +190,10 @@ values).
   instead of weakening a test.
 - **Reviewer** (review-only; its sole write is the append-only lessons log): runs **only after the Tester's gate is green**, and
   reviews every development requirement the gate cannot catch — domain values
-  vs each `<Module>.xdm`, uniform file header and other missed skill triggers,
-  code standards, ownership/boundaries, test adequacy (coverage, not
+  vs each `<Module>.xdm`, **surface coverage** (the full editable surface is
+  implemented or the deferral is recorded in the asset `_coverage`; flags
+  test-case-fit implementations), uniform file header and other missed skill
+  triggers, code standards, ownership/boundaries, test adequacy (coverage, not
   execution), and diff hygiene. It reads the repository (it reviews the diff)
   and appends a **lessons-learned** entry to
   `agent-discipline/agent-lessons-learned.md`.
@@ -190,7 +229,11 @@ exposes a systemic issue.
   A module is accepted only when its deterministic tests, static checks, the
   S32DS gate (exit code 0 AND no SEVERE `[TOOL]` resource problem), and its
   E2E acceptance cases (`docs/tests/rtd-config-test-cases.md`, black-box
-  protocol) all pass. The minimal system's seven modules (Mcu, BaseNXP,
+  protocol) all pass, **and its surface coverage is accounted for** (the full
+  editable surface implemented, or the deferral recorded in the asset
+  `_coverage`). The E2E cases are a verification slice, **not** the development
+  scope — development is forward from `<Module>.xdm` (see *Forward, Spec-first
+  development*). The minimal system's seven modules (Mcu, BaseNXP,
   Platform, Port, Dio, Mcl, Uart) are equal priority and land together;
   delivery staging lives only in `docs/roadmaps/rtd-config-roadmap.md`.
 - Each E2E case also has a KPI. The Tester records KPI evidence during isolated
