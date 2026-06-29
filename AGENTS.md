@@ -137,6 +137,27 @@ its E2E cases are green** — the Reviewer confirms the full editable surface is
 implemented, or the deferred surface is explicitly recorded in `_coverage`; an
 undocumented coverage gap is a blocker.
 
+## Agent Environment Initialization
+
+Before development can proceed, this project's Agent discipline — Skills,
+subagent definitions, and the external-dependency cache — must be deployed to
+each selected Agent platform's project-level directory. That work is owned by
+the `initialize-agent-discipline` Skill
+(`agent-discipline/skills/initialize-agent-discipline/SKILL.md`); its
+description defines when it applies and its body is authoritative for the
+GUI-collection, deployment, and verification workflow. The orchestrator drives
+that Skill's repository GUI collector
+(`agent-discipline/skills/initialize-agent-discipline/scripts/init_agent_env_inputs.py`)
+and deterministic deployer
+(`agent-discipline/skills/initialize-agent-discipline/scripts/init_agent_env_deploy.py`)
+and must not substitute Agent-native controls or inferred answers.
+
+When an agent starts work in a freshly cloned or otherwise uninitialized
+repository — missing project-level Agent directories (`.claude/`, `.opencode/`,
+`.agents/`), subagents, or the external-dependency cache — it MUST load and
+execute this Skill before beginning any other task, so every agent operates
+from the same project discipline.
+
 ## Subagent Roles and Collaboration
 
 The orchestrator dispatches four specialized subagents defined in
@@ -167,7 +188,7 @@ values).
   inherit repo context + filesystem). The Tester independently re-runs the vendor
   gate on the agent-produced `.mex`. Edits tests only; reports production gaps
   instead of weakening a test.
-- **Reviewer** (read-only): runs **only after the Tester's gate is green**, and
+- **Reviewer** (review-only; its sole write is the append-only lessons log): runs **only after the Tester's gate is green**, and
   reviews every development requirement the gate cannot catch — domain values
   vs each `<Module>.xdm`, **surface coverage** (the full editable surface is
   implemented or the deferral is recorded in the asset `_coverage`; flags
@@ -255,7 +276,7 @@ Usage rules:
   `docs/specs/rtd-config-domain-truth.md` and each `<Module>.xdm`.
 - **Specs stay agent-free and milestone-free** — staging lives only in the
   roadmap.
-- **Changelogs are append-only**; `agent-discipline/review-archive/` is read-only
+- **Changelogs are append-only**; `agent-discipline/review-archive-NOT-USED-NEVER-TOUCH!!!/` is read-only
   and never a requirements source.
 - The Reviewer appends to `agent-discipline/agent-lessons-learned.md`; the owner's
   comments are tracked in `agent-discipline/owner-review-comments.md`.
