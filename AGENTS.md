@@ -107,45 +107,21 @@ records where those dependencies are found on this machine.
 
 ## Agent Environment Initialization
 
-The agent discipline for this project includes skills, subagent templates, and
-an external-dependency cache that must be deployed to each Agent platform's
-project-level directory before development can proceed. The agent orchestrates
-the repository GUI collector and deterministic deployer; it must not replace
-them with Agent-native GUI controls or inferred answers.
+Before development can proceed, this project's Agent discipline — Skills,
+subagent definitions, and the external-dependency cache — must be deployed to
+each selected Agent platform's project-level directory. That work is owned by
+the `initialize-agent-discipline` Skill
+(`agent-discipline/skills/initialize-agent-discipline/SKILL.md`); its
+description defines when it applies and its body is authoritative for the
+GUI-collection, deployment, and verification workflow. The orchestrator drives
+that Skill's repository GUI collector and deterministic deployer and must not
+substitute Agent-native controls or inferred answers.
 
-### Initialization Skill
-
-- **Location:** `agent-discipline/skills/initialize-agent-discipline/SKILL.md`
-- **What it does:** The skill instructs the agent to deploy
-  `agent-discipline/skills/` and `agent-discipline/subagents/` to the selected
-  Agent platform directories (Claude, OpenCode, Codex) using symbolic links for
-  skills and platform-native subagent configurations. It also initializes
-  `.agent-state/external-dependencies.json` with the S32DS and RTD installation
-  paths. User input is collected by
-  `agent-discipline/skills/initialize-agent-discipline/scripts/init_agent_env_inputs.py --gui`;
-  the saved input is applied by
-  `agent-discipline/skills/initialize-agent-discipline/scripts/init_agent_env_deploy.py`.
-
-### Trigger Conditions
-
-Load and execute the `initialize-agent-discipline` skill when:
-
-- Starting development from a **clean clone** — no platform-specific project
-  directories (`.claude/`, `.opencode/`, `.agents/`) exist.
-- The project-level Agent environment has **not been initialized** (missing
-  skills, subagents, or external-dependency cache).
-- The user explicitly requests an **update** or **reset** of the Agent
-  discipline.
-- The user requests **importing additional skills** from local or online
-  sources.
-
-### After a Clean Clone
-
-When an agent starts work in a freshly cloned repository, it MUST check whether
-the project-level Agent environment exists. If it does not, the agent MUST load
-and execute the `initialize-agent-discipline` skill before beginning any other
-task. This ensures every agent operates from the same project discipline and
-avoids reinventing domain facts.
+When an agent starts work in a freshly cloned or otherwise uninitialized
+repository — missing project-level Agent directories (`.claude/`, `.opencode/`,
+`.agents/`), subagents, or the external-dependency cache — it MUST load and
+execute this Skill before beginning any other task, so every agent operates
+from the same project discipline.
 
 ## Subagent Roles and Collaboration
 
