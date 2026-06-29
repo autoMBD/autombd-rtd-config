@@ -2,8 +2,8 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.1.2 |
-| Date | 2026-06-16 |
+| Version | 0.1.3 |
+| Date | 2026-06-29 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Documentation-governance rules for the RTD CfgFile CLI project. Defines the two-category split, official tool name, changelog integrity, archive policy, and the authoritative cross-category documentation map. |
 
@@ -45,7 +45,7 @@ When reorganizing or auditing documentation, the Category A purity check must be
 **repo-wide over all of `docs/`** — not scoped to the files a change happened to
 touch. Grep for the agent-discipline lexicon
 (`orchestrat|explorer|worker|tester|reviewer|subagent|main agent|KPI[- ]optim|convergence gate|iteration loop`),
-excluding frozen changelog rows and `agent-discipline/review-archive/`. The only
+excluding frozen changelog rows and `agent-discipline/review-archive-NOT-USED-NEVER-TOUCH!!!/`. The only
 permitted survivors in `docs/` are the `Subagent Prompt` column name (a data
 contract parsed by `tools/blackbox_e2e.py`, its unit tests, and its help text)
 and references to `tools/blackbox_e2e.py` itself (committed project tooling).
@@ -58,10 +58,11 @@ summarize existing changelog rows. New rows are added at the top or bottom
 
 ### Review archive is read-only
 
-`agent-discipline/review-archive/` (formerly `docs/OBSOLETE_NEVER_TOUCH!!!/`)
-contains frozen review archives only. These files are unavailable as
-requirements sources and must not be read to infer current behavior, scope,
-terminology, or acceptance criteria. Their contents must never be edited.
+`agent-discipline/review-archive-NOT-USED-NEVER-TOUCH!!!/` (formerly
+`docs/OBSOLETE_NEVER_TOUCH!!!/`) contains frozen review archives only. These
+files are unavailable as requirements sources and must not be read to infer
+current behavior, scope, terminology, or acceptance criteria. Their contents
+must never be edited.
 
 ### File header convention
 
@@ -99,10 +100,10 @@ paths are relative to the repository root.
 | `agent-discipline/subagents/tester.md` | Tester role definition | AGENTS.md, test cases |
 | `agent-discipline/subagents/reviewer.md` | Reviewer role definition | AGENTS.md, agent-lessons-learned |
 | `agent-discipline/skills/external-dependency-memory/SKILL.md` | Skill for reusing local external dependency evidence across agents and conversations | AGENTS.md, source materials |
-| `agent-discipline/owner-review-comments.md` | Review-comment resolutions across rounds | agent-discipline/review-archive/ |
+| `agent-discipline/owner-review-comments.md` | Review-comment resolutions across rounds | agent-discipline/review-archive-NOT-USED-NEVER-TOUCH!!!/ |
 | `agent-discipline/agent-lessons-learned.md` | Reviewer's running lessons log | — |
 | `agent-discipline/documentation-governance.md` | This document: governance rules + documentation map | — |
-| `agent-discipline/review-archive/` | Frozen review archives — never a requirements source | — |
+| `agent-discipline/review-archive-NOT-USED-NEVER-TOUCH!!!/` | Frozen review archives — never a requirements source | — |
 
 ### Standalone deliverable
 
@@ -125,7 +126,7 @@ flowchart TD
   RM["docs/roadmaps/roadmap"]
   ROLES["agent-discipline/subagents/"] --> AGENTS
   LL["agent-discipline/agent-lessons-learned"] --> AGENTS
-  CT["agent-discipline/owner-review-comments"] -.archives.-> OBS["agent-discipline/review-archive/"]
+  CT["agent-discipline/owner-review-comments"] -.archives.-> OBS["agent-discipline/review-archive-NOT-USED-NEVER-TOUCH!!!/"]
   SKILL["autombd-rtd/SKILL.md + assets/ + CLI"] -. released deliverable .-> TC
 ```
 
@@ -133,6 +134,7 @@ flowchart TD
 
 | Date | Version | Description |
 | --- | --- | --- |
+| 2026-06-29 | 0.1.3 | Issue #35: renamed the read-only review archive to `agent-discipline/review-archive-NOT-USED-NEVER-TOUCH!!!/` to make its frozen status explicit; updated all active references (purity-sweep rule, archive policy, documentation map, mermaid diagram). Frozen changelog rows retain the historical path. |
 | 2026-06-16 | 0.1.2 | Replaced the script-centered agent environment document with the lightweight external-dependency-memory skill entry. |
 | 2026-06-15 | 0.1.1 | Added `agent-discipline/agent-environment.md` to the Category B documentation map for issue #11. |
 | 2026-06-15 | 0.1.0 | Created per issue #7 documentation reorganization: established the two-category split, ported and updated the authoritative documentation map from the deleted core-design `## Documentation map` section (with all paths updated to new locations), and codified the governance rules (tool name, milestone-free specs, Category A purity sweep, append-only changelogs, read-only review archive, file header convention). |
