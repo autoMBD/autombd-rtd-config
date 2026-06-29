@@ -151,7 +151,7 @@ values).
   inherit repo context + filesystem). The Tester independently re-runs the vendor
   gate on the agent-produced `.mex`. Edits tests only; reports production gaps
   instead of weakening a test.
-- **Reviewer** (read-only): runs **only after the Tester's gate is green**, and
+- **Reviewer** (review-only; its sole write is the append-only lessons log): runs **only after the Tester's gate is green**, and
   reviews every development requirement the gate cannot catch — domain values
   vs each `<Module>.xdm`, uniform file header and other missed skill triggers,
   code standards, ownership/boundaries, test adequacy (coverage, not
