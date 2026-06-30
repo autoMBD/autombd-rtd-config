@@ -66,7 +66,7 @@ from .modules.port import PortProvider
 from .modules.dio import DioProvider
 from .modules.adc import AdcProvider
 from .checks.static import run_static_checks
-from .backends.s32_mex.apply import apply_uart_set, apply_uart_add_flexio_channel, apply_platform_set, apply_basenxp_set, apply_mcl_set, apply_port_set, apply_dio_set, apply_mcu_set, apply_adc_set
+from .backends.s32_mex.apply import apply_uart_set, apply_uart_add_flexio_channel, apply_platform_set, apply_basenxp_set, apply_mcl_set, apply_port_set, apply_dio_set, apply_mcu_set, apply_adc_set, _load_basenxp_asset
 from .backends.s32_mex.validation import find_s32ds_root, probe_which_root, run_validation
 
 
@@ -80,6 +80,17 @@ DEFAULT_ASSET_ROOT = SKILL_ROOT / "assets"
 def emit(payload: dict) -> int:
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0 if payload.get("status") == "passed" else 1
+
+
+def _parse_bool_token(value: str) -> bool:
+    normalized = value.strip().lower()
+    if normalized in {"true", "1", "yes", "on", "enable", "enabled"}:
+        return True
+    if normalized in {"false", "0", "no", "off", "disable", "disabled"}:
+        return False
+    raise argparse.ArgumentTypeError(
+        "expected a boolean token: true/false, yes/no, on/off, enable/disable"
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -204,6 +215,13 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Enable OsIf system timer and insert one OsIfCounterConfig_0 counter.",
     )
+    basenxp_set.add_argument("--user-mode-support", type=_parse_bool_token)
+    basenxp_set.add_argument("--dev-error-detect", type=_parse_bool_token)
+    basenxp_set.add_argument("--custom-timer", type=_parse_bool_token)
+    basenxp_set.add_argument("--get-user-id", choices=("core", "custom", "GET_CORE_ID", "GET_CUSTOM_ID"))
+    basenxp_set.add_argument("--instance-id", type=int)
+    basenxp_set.add_argument("--get-physical-core-id", type=_parse_bool_token)
+    basenxp_set.add_argument("--software-semaphore", type=_parse_bool_token)
     basenxp_set.add_argument("--configure", action="store_true")
     basenxp_set.add_argument("--backup", action="store_true")
     basenxp_set.add_argument("--json", action="store_true")
@@ -644,6 +662,21 @@ def normalize_basenxp_intent(args: argparse.Namespace) -> Intent:
     payload: dict = {}
     if args.enable_system_timer:
         payload["enable_system_timer"] = True
+    for attr in (
+        "user_mode_support",
+        "dev_error_detect",
+        "custom_timer",
+        "instance_id",
+        "get_physical_core_id",
+        "software_semaphore",
+    ):
+        value = getattr(args, attr, None)
+        if value is not None:
+            payload[attr] = value
+    get_user_id = getattr(args, "get_user_id", None)
+    if get_user_id is not None:
+        enum_map = _load_basenxp_asset()["cli_enum_map"]["get_user_id"]
+        payload["get_user_id"] = enum_map[get_user_id]
     return Intent.from_dict({"module": "basenxp", "action": "set", "payload": payload})
 
 

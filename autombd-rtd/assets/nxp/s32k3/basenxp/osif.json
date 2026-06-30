@@ -1,5 +1,130 @@
 {
-  "_source": "BaseNXP.xdm (RTD 7.0.1, OsIfGeneral / OsIfCounterConfig)",
+  "_source": "S32K3 RTD 7.0.1 BaseNXP.xdm (BaseNXP_TS_T40D34M70I1R0/config/BaseNXP.xdm). Descriptor cache id: source.s32k3_rtd_xdm.basenxp. Runtime reads ONLY this committed asset -- never raw .xdm.",
+  "rtd_version": "7.0.1",
+  "module": "BaseNXP",
+
+  "_coverage": {
+    "_note": "Forward, Spec-first coverage inventory for BaseNXP.xdm. The CLI exposes the BaseNXP-owned OsIfGeneral settings that are legal to edit in the current S32K3 baremetal .mex fixtures without inventing OS/EcuC partition data. The deferred items below are real BaseNXP.xdm editable or descriptor-defined fields; they are recorded explicitly instead of being silently treated as out of scope.",
+    "configurable_today": {
+      "OsIfGeneral": [
+        "OsIfEnableUserModeSupport",
+        "OsIfDevErrorDetect",
+        "OsIfUseCustomTimer",
+        "OsIfUseGetUserId",
+        "OsIfInstanceId",
+        "OsIfGetPhysicalCoreIdEnable",
+        "OsIfSoftwareSemaphoredEnable",
+        "OsIfUseSystemTimer",
+        "OsIfCounterConfig"
+      ]
+    },
+    "not_yet_exposed": {
+      "_note": "Each item exists in BaseNXP.xdm but is not user-tunable through `basenxp set` yet because it needs cross-module OS/EcuC ownership, generated metadata ownership, or no useful user degree of freedom in the current S32K3 baremetal flow.",
+      "multicore_partition_os": [
+        "OsIfMulticoreSupport",
+        "OsIfEcucPartitionRef",
+        "OsIfCounterEcucPartitionRef",
+        "GET_PARTITION_ID mode for OsIfUseGetUserId"
+      ],
+      "autosar_os": [
+        "OsIfOperatingSystemType choices other than OsIfBaremetalType",
+        "OsIfOsCounterRef"
+      ],
+      "published_information": [
+        "CommonPublishedInformation",
+        "ModuleId",
+        "VendorId",
+        "VendorApiInfix",
+        "ArReleaseMajorVersion",
+        "ArReleaseMinorVersion",
+        "ArReleaseRevisionVersion",
+        "SwMajorVersion",
+        "SwMinorVersion",
+        "SwPatchVersion"
+      ],
+      "single_literal_or_metadata": [
+        "IMPLEMENTATION_CONFIG_VARIANT",
+        "OsIfPhysicalCoreId"
+      ]
+    },
+    "references": [
+      "issue #39 (BaseNXP forward-hardening)",
+      "issue #37 (forward Spec-first correction)",
+      "issue #30 (ADC audit exemplar)"
+    ]
+  },
+
+  "enum_domains": {
+    "IMPLEMENTATION_CONFIG_VARIANT": ["VariantPreCompile"],
+    "OsIfUseGetUserId": ["GET_CORE_ID", "GET_PARTITION_ID", "GET_CUSTOM_ID"],
+    "OsIfPhysicalCoreId": ["AUTOMATE"],
+    "OsIfOperatingSystemType": [
+      "OsIfAutosarOsType",
+      "OsIfFreeRtosType",
+      "OsIfZephyrOsType",
+      "OsIfBaremetalType"
+    ]
+  },
+
+  "cli_enum_map": {
+    "get_user_id": {
+      "core": "GET_CORE_ID",
+      "custom": "GET_CUSTOM_ID",
+      "GET_CORE_ID": "GET_CORE_ID",
+      "GET_CUSTOM_ID": "GET_CUSTOM_ID"
+    }
+  },
+
+  "OsIfGeneral": {
+    "_source": "BaseNXP.xdm:OsIfGeneral vars L86-L270. The map keys are normalized intent payload names; values are the exact .mex setting names.",
+    "boolean_settings": {
+      "user_mode_support": "OsIfEnableUserModeSupport",
+      "dev_error_detect": "OsIfDevErrorDetect",
+      "custom_timer": "OsIfUseCustomTimer",
+      "get_physical_core_id": "OsIfGetPhysicalCoreIdEnable",
+      "software_semaphore": "OsIfSoftwareSemaphoredEnable"
+    },
+    "integer_settings": {
+      "instance_id": "OsIfInstanceId"
+    },
+    "enum_settings": {
+      "get_user_id": "OsIfUseGetUserId"
+    },
+    "defaults": {
+      "OsIfMulticoreSupport": "false",
+      "OsIfEnableUserModeSupport": "false",
+      "OsIfDevErrorDetect": "false",
+      "OsIfUseSystemTimer": "false",
+      "OsIfUseCustomTimer": "false",
+      "OsIfUseGetUserId": "GET_CORE_ID",
+      "OsIfInstanceId": "0",
+      "OsIfGetPhysicalCoreIdEnable": "false",
+      "OsIfPhysicalCoreId": "AUTOMATE",
+      "OsIfSoftwareSemaphoredEnable": "false"
+    }
+  },
+
+  "constraints": {
+    "OsIfInstanceId": {
+      "min": 0,
+      "max": 255,
+      "source_ref": "BaseNXP.xdm:OsIfGeneral/OsIfInstanceId INVALID Range"
+    },
+    "OsIfUseGetUserId": {
+      "_source": "BaseNXP.xdm L198-L201: GET_PARTITION_ID requires OsIfMulticoreSupport=true and OsIfAutosarOsType.",
+      "cli_exposed_values": ["GET_CORE_ID", "GET_CUSTOM_ID"],
+      "not_yet_exposed_values": ["GET_PARTITION_ID"]
+    },
+    "OsIfCounterConfig": {
+      "constraint": "When OsIfUseSystemTimer=true and OsIfMulticoreSupport=false, OsIfCounterConfig must have EXACTLY ONE counter struct.",
+      "source_ref": "BaseNXP.xdm:OsIfGeneral/OsIfCounterConfig invalidation rule"
+    },
+    "OsIfSystemTimerClockSource": {
+      "constraint": "Baremetal counter must use either OsIfSystemTimerClockRef or OsIfSystemTimerClockFreq, never both.",
+      "source_ref": "BaseNXP.xdm:OsIfCounterConfig mutual-exclusion rule"
+    }
+  },
+
   "OsIfCounterConfig": {
     "constraint": "When OsIfUseSystemTimer=true and OsIfMulticoreSupport=false, OsIfCounterConfig must have EXACTLY ONE counter struct.",
     "source_ref": "BaseNXP.xdm:OsIfGeneral/OsIfCounterConfig invalidation rule",
@@ -23,7 +148,7 @@
         "source_ref": "BaseNXP.xdm:OsIfCounterConfig/OsIfSystemTimerClockFreq; verified via ConfigTools [SDK/DATA] type log and vendor .mex examples",
         "serialization": "Self-closed empty array <array name=\"OsIfSystemTimerClockFreq\"/>"
       },
-      "mutual_exclusion": "In baremetal, OsIfSystemTimerClockRef (populated) satisfies the constraint; OsIfSystemTimerClockFreq stays an empty array. Both are serialized as arrays — never as scalar <setting> elements.",
+      "mutual_exclusion": "In baremetal, OsIfSystemTimerClockRef (populated) satisfies the constraint; OsIfSystemTimerClockFreq stays an empty array. Both are serialized as arrays -- never as scalar <setting> elements.",
       "source_ref": "BaseNXP.xdm:OsIfCounterConfig mutual-exclusion rule; vendor .mex verification"
     }
   }

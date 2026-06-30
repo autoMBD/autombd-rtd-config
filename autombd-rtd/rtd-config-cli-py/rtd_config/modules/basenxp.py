@@ -50,6 +50,38 @@ from rtd_config.intent import Intent
 from rtd_config.plan import Plan, PlannedChange
 
 
+_GENERAL_SETTING_CHANGES = {
+    "user_mode_support": (
+        "/BaseNXP/BaseNXP/OsIfGeneral/OsIfEnableUserModeSupport",
+        "Set OsIfEnableUserModeSupport from the BaseNXP.xdm boolean surface",
+    ),
+    "dev_error_detect": (
+        "/BaseNXP/BaseNXP/OsIfGeneral/OsIfDevErrorDetect",
+        "Set OsIfDevErrorDetect from the BaseNXP.xdm boolean surface",
+    ),
+    "custom_timer": (
+        "/BaseNXP/BaseNXP/OsIfGeneral/OsIfUseCustomTimer",
+        "Set OsIfUseCustomTimer from the BaseNXP.xdm boolean surface",
+    ),
+    "get_user_id": (
+        "/BaseNXP/BaseNXP/OsIfGeneral/OsIfUseGetUserId",
+        "Set OsIfUseGetUserId to a CLI-exposed BaseNXP.xdm enum value",
+    ),
+    "instance_id": (
+        "/BaseNXP/BaseNXP/OsIfGeneral/OsIfInstanceId",
+        "Set OsIfInstanceId within the BaseNXP.xdm range [0, 255]",
+    ),
+    "get_physical_core_id": (
+        "/BaseNXP/BaseNXP/OsIfGeneral/OsIfGetPhysicalCoreIdEnable",
+        "Set OsIfGetPhysicalCoreIdEnable from the BaseNXP.xdm boolean surface",
+    ),
+    "software_semaphore": (
+        "/BaseNXP/BaseNXP/OsIfGeneral/OsIfSoftwareSemaphoredEnable",
+        "Set OsIfSoftwareSemaphoredEnable from the BaseNXP.xdm boolean surface",
+    ),
+}
+
+
 class BaseNxpProvider:
     """Owns BaseNXP/OsIf shared infrastructure.
 
@@ -62,6 +94,15 @@ class BaseNxpProvider:
 
     def plan(self, intent: Intent) -> Plan:
         changes = []
+        for key, (path, description) in _GENERAL_SETTING_CHANGES.items():
+            if key not in intent.payload:
+                continue
+            changes.append(PlannedChange(
+                module="basenxp",
+                owner="basenxp",
+                path=path,
+                description=description,
+            ))
         if intent.payload.get("enable_system_timer", False):
             # Basenxp-owned change 1: enable the OsIf system timer flag.
             changes.append(PlannedChange(
@@ -100,7 +141,7 @@ class BaseNxpProvider:
                     "(CORE_CLK preferred, else first available)"
                 ),
             ))
-        else:
+        if not changes:
             changes.append(PlannedChange(
                 module="basenxp",
                 owner="basenxp",
