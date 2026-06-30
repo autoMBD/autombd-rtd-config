@@ -40,24 +40,27 @@
 # File:        blackbox_e2e.py
 # Author:      autoMBD <tkung.lqk@foxmail.com>
 # Date:        2026-06-17
-# Version:     0.3.0
+# Version:     0.4.0
 # Description: True black-box isolated E2E harness that drives a third-party
-#              agent CLI (Codex; others via registry) to exercise the released
-#              autombd-rtd skill. A Tester uses this to run an E2E case as a
-#              genuine black box: fresh temp dir, deployed skill, copied fixture,
-#              and the agent sees only skill + fixture + the case's Subagent
-#              Prompt — never this repo or any prior context. The summary
-#              carries the CANONICAL per-case KPI (`kpi_seconds`, the
-#              [context-injected -> static-check-passed] window) plus
+#              agent CLI (Codex, OpenCode; others via adapter registry) to
+#              exercise the released autombd-rtd skill. A Tester uses this to
+#              run an E2E case as a genuine black box: fresh temp dir, deployed
+#              skill, copied fixture, and the agent sees only skill + fixture +
+#              the case's Subagent Prompt — never this repo or any prior context.
+#              The summary carries the CANONICAL per-case KPI (`kpi_seconds`,
+#              the [context-injected -> static-check-passed] window) plus
 #              diagnostic-only evidence (edit-attempt count and
-#              validation-excluded time), all derived from the codex session
-#              log that the run's `session id:` banner pins deterministically.
+#              validation-excluded time), all derived from the agent's session
+#              output. OpenCode is the DEFAULT agent; an explicit --agent flag
+#              persists the choice to .agent-state/e2e-preferences.json for
+#              subsequent runs.
 # =================================================================================
 
 from __future__ import annotations
 
 import argparse
 import importlib.util
+import inspect
 import json
 import os
 import re
@@ -67,7 +70,7 @@ import sys
 import tempfile
 import time
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
@@ -300,6 +303,7 @@ def run_codex(
     workdir: Path,
     timeout_s: int,
     sandbox: str,
+    model: str | None = None,  # accepted for uniform runner signature; ignored by codex
 ) -> RunResult:
     """Run the codex agent CLI with *prompt* on stdin in *workdir*.
 
@@ -378,18 +382,408 @@ def run_codex(
 
 
 # ---------------------------------------------------------------------------
-# Runner registry
+# OpenCode runner
+# ---------------------------------------------------------------------------
+
+def _find_opencode() -> str:
+    """Return the path to the opencode executable, or raise RuntimeError."""
+    path = shutil.which("opencode")
+    if path is None:
+        path = shutil.which("opencode.cmd")
+    if path is None:
+        raise RuntimeError(
+            "opencode executable not found on PATH.  "
+            "Install it with: npm install -g opencode-ai"
+        )
+    return path
+
+
+def run_opencode(
+    prompt: str,
+    workdir: Path,
+    timeout_s: int,
+    sandbox: str,  # accepted for uniform runner signature; ignored by opencode
+    model: str | None = None,
+) -> RunResult:
+    """Run the OpenCode agent CLI with *prompt* on stdin in *workdir*.
+
+    Invocation shape:
+      <prompt> | opencode run --format json --dangerously-skip-permissions
+                    [--model <model>] --dir <workdir>
+
+    STDOUT is an NDJSON event stream; STDERR is empty.  The session id is
+    extracted from the ``sessionID`` field of the first ``step_start`` event.
+    The ``sandbox`` argument is a no-op for OpenCode (it has no sandbox tiers).
+    """
+    oc_path = _find_opencode()
+    argv = [
+        oc_path,
+        "run",
+        "--format", "json",
+        "--dangerously-skip-permissions",
+    ]
+    if model is not None:
+        argv += ["--model", model]
+    argv += ["--dir", str(workdir)]
+
+    t_start = time.monotonic()
+    try:
+        completed = subprocess.run(
+            argv,
+            input=prompt,
+            text=True,
+            capture_output=True,
+            timeout=timeout_s,
+        )
+        elapsed = time.monotonic() - t_start
+        stdout_text = completed.stdout or ""
+        session_id = _extract_opencode_session_id(stdout_text)
+        return RunResult(
+            exit_code=completed.returncode,
+            timed_out=False,
+            stdout=stdout_text,
+            stderr=completed.stderr or "",
+            elapsed_s=elapsed,
+            session_id=session_id,
+        )
+    except subprocess.TimeoutExpired as exc:
+        elapsed = time.monotonic() - t_start
+        stdout_text = exc.stdout if isinstance(exc.stdout, str) else (exc.stdout or b"").decode(errors="replace")
+        stderr_text = exc.stderr if isinstance(exc.stderr, str) else (exc.stderr or b"").decode(errors="replace")
+        return RunResult(
+            exit_code=-1,
+            timed_out=True,
+            stdout=stdout_text,
+            stderr=stderr_text,
+            elapsed_s=elapsed,
+            session_id=_extract_opencode_session_id(stdout_text),
+        )
+
+
+def _extract_opencode_session_id(stdout: str) -> str | None:
+    """Extract the sessionID from the first ``step_start`` event in the NDJSON stream.
+
+    OpenCode emits a ``step_start`` event as the first event of a session; the
+    ``sessionID`` field (format ``ses_<26 alnum>``) is present on every event but
+    we anchor to ``step_start`` to be deterministic.
+    """
+    for line in stdout.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            obj = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if obj.get("type") == "step_start":
+            sid = obj.get("sessionID")
+            return str(sid) if sid is not None else None
+    return None
+
+
+# ---------------------------------------------------------------------------
+# OpenCode KPI extraction
+# ---------------------------------------------------------------------------
+
+def _ms_epoch_to_iso_utc(ms: int | float) -> str:
+    """Convert a millisecond-epoch integer to an ISO-8601 UTC string."""
+    dt = datetime.fromtimestamp(ms / 1000.0, tz=timezone.utc)
+    return dt.isoformat()
+
+
+def compute_opencode_kpi(stdout: str) -> dict[str, Any]:
+    """Derive per-case KPI evidence from the OpenCode NDJSON STDOUT stream.
+
+    The CANONICAL ``kpi_seconds`` window is identical in meaning to the codex
+    extractor's: ``[context_injected -> check_passed]``, where:
+
+    - ``context_injected_ms`` = top-level ``timestamp`` of the FIRST
+      ``step_start`` event (milliseconds since epoch);
+    - ``check_passed_ms`` = ``part.state.time.end`` of the FIRST ``tool_use``
+      event whose ``part.state.input.command`` matches ``_CHECK_RE`` AND does
+      NOT contain ``--configure`` AND does NOT match ``_VALIDATE_RE``.
+
+    Returns a dict with the same diagnostic keys as ``compute_session_kpi``
+    (``kpi_seconds``, ``context_injected_ts``, ``check_passed_ts``,
+    ``edit_attempts``, ``validate_runs_s``, ``total_span_s``,
+    ``validation_excluded_s``, ``commands``), adapted for the OpenCode event
+    schema.  Malformed lines and unknown event types are silently skipped.
+    """
+    context_injected_ms: int | float | None = None
+    check_passed_ms: int | float | None = None
+    check_passed_ts: str | None = None
+    edit_attempts = 0
+    validate_runs: list[float] = []
+    all_timestamps: list[int | float] = []
+    commands: list[dict[str, Any]] = []
+
+    for line in stdout.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            obj = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(obj, dict):
+            continue
+
+        event_type = obj.get("type")
+        top_ts = obj.get("timestamp")
+
+        if event_type == "step_start":
+            if context_injected_ms is None and top_ts is not None:
+                context_injected_ms = top_ts
+            if top_ts is not None:
+                all_timestamps.append(top_ts)
+
+        elif event_type == "step_finish":
+            if top_ts is not None:
+                all_timestamps.append(top_ts)
+
+        elif event_type == "text":
+            if top_ts is not None:
+                all_timestamps.append(top_ts)
+
+        elif event_type == "tool_use":
+            if top_ts is not None:
+                all_timestamps.append(top_ts)
+
+            # Extract the bash command and timing from the tool state
+            part = obj.get("part", {})
+            state = part.get("state", {})
+            inp = state.get("input", {})
+            command = inp.get("command", "") if isinstance(inp, dict) else ""
+            timing = state.get("time", {})
+            t_start_ms = timing.get("start")
+            t_end_ms = timing.get("end")
+
+            duration_s: float | None = None
+            if t_start_ms is not None and t_end_ms is not None:
+                duration_s = round((t_end_ms - t_start_ms) / 1000.0, 2)
+
+            is_edit = "--configure" in command
+            is_validate = bool(_VALIDATE_RE.search(command))
+            is_standalone_check = (
+                bool(_CHECK_RE.search(command))
+                and not is_edit
+                and not is_validate
+            )
+
+            if is_edit:
+                edit_attempts += 1
+            if is_validate and duration_s is not None:
+                validate_runs.append(duration_s)
+            if is_standalone_check and t_end_ms is not None and check_passed_ms is None:
+                # Anchor to the FIRST qualifying check's completion time
+                check_passed_ms = t_end_ms
+                check_passed_ts = _ms_epoch_to_iso_utc(t_end_ms)
+
+            commands.append({
+                "command": command[:200],
+                "duration_s": duration_s,
+                "is_edit": is_edit,
+                "is_validate": is_validate,
+            })
+
+    # Compute canonical KPI window
+    context_injected_ts: str | None = None
+    kpi_seconds: float | None = None
+    if context_injected_ms is not None:
+        context_injected_ts = _ms_epoch_to_iso_utc(context_injected_ms)
+    if context_injected_ms is not None and check_passed_ms is not None:
+        kpi_seconds = round((check_passed_ms - context_injected_ms) / 1000.0, 2)
+
+    # Total span: first step_start timestamp to last known timestamp
+    total_span_s: float | None = None
+    if all_timestamps and context_injected_ms is not None:
+        total_span_s = round((max(all_timestamps) - context_injected_ms) / 1000.0, 2)
+
+    validation_excluded_s: float | None = None
+    if total_span_s is not None:
+        validation_excluded_s = round(total_span_s - sum(validate_runs), 2)
+
+    return {
+        "kpi_seconds": kpi_seconds,
+        "context_injected_ts": context_injected_ts,
+        "check_passed_ts": check_passed_ts,
+        "edit_attempts": edit_attempts,
+        "validate_runs_s": validate_runs,
+        "total_span_s": total_span_s,
+        "validation_excluded_s": validation_excluded_s,
+        "commands": commands,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Agent adapter registry
+# ---------------------------------------------------------------------------
+
+DEFAULT_AGENT = "opencode"
+
+
+@dataclass(frozen=True)
+class AgentAdapter:
+    """Encapsulates per-agent divergences so the pipeline stays uniform.
+
+    Fields:
+      - ``name``: the agent's registry key;
+      - ``deploy_agent``: which agent name to pass to ``deploy_fn`` (so the
+        skill lands in the right platform directory);
+      - ``prepare_workdir``: called after deploy+fixture, before run —
+        opencode needs ``git init`` for isolation; codex is a no-op;
+      - ``run``: the agent runner callable (uniform signature);
+      - ``extract_result``: extract the BLACKBOX_RESULT dict from a RunResult;
+      - ``compute_kpi``: derive the KPI dict from a RunResult.
+    """
+
+    name: str
+    deploy_agent: str
+    prepare_workdir: Callable[[Path], None]
+    run: Callable[..., RunResult]
+    extract_result: Callable[[RunResult], "dict[str, Any] | None"]
+    compute_kpi: Callable[[RunResult], "dict[str, Any] | None"]
+
+
+def _codex_prepare_workdir(workdir: Path) -> None:
+    """Codex prepare_workdir: no-op (codex handles isolation via --skip-git-repo-check)."""
+    pass  # deliberate no-op
+
+
+def _opencode_prepare_workdir(workdir: Path) -> None:
+    """OpenCode prepare_workdir: run ``git init`` so opencode roots at workdir.
+
+    Without this, OpenCode walks up from ``--dir`` to the git worktree root and
+    loads that root's AGENTS.md/skills, breaking the black-box isolation.  A
+    ``git init`` in the workdir makes it the new root.
+    """
+    subprocess.run(["git", "init", str(workdir)], check=True, capture_output=True)
+
+
+def _codex_extract_result(rr: RunResult) -> "dict[str, Any] | None":
+    """Extract BLACKBOX_RESULT from codex plain-text stdout."""
+    return _extract_blackbox_result(rr.stdout)
+
+
+def _opencode_extract_result(rr: RunResult) -> "dict[str, Any] | None":
+    """Extract BLACKBOX_RESULT from opencode NDJSON stdout.
+
+    Gather all ``text`` event ``part.text`` values in order, concatenate
+    *verbatim* (no inserted separator), then apply the existing
+    ``_extract_blackbox_result`` reverse-scan.
+
+    The join MUST be ``""`` rather than ``"\n"``: opencode streams ``text``
+    events token-by-token, so the ``BLACKBOX_RESULT {...}`` marker can land
+    mid-JSON across two (or more) consecutive events with no newline between
+    the fragments. Inserting a separator there would split one logical line
+    into two and break ``_extract_blackbox_result``'s line-based reverse
+    scan. Concatenating verbatim reconstructs the stream exactly as the
+    agent emitted it.
+    """
+    parts: list[str] = []
+    for line in rr.stdout.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            obj = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(obj, dict) and obj.get("type") == "text":
+            part = obj.get("part", {})
+            text = part.get("text", "")
+            if text:
+                parts.append(text)
+    combined = "".join(parts)
+    return _extract_blackbox_result(combined)
+
+
+def _codex_compute_kpi(rr: RunResult) -> "dict[str, Any] | None":
+    """Compute KPI for codex: locate the session log, then compute_session_kpi.
+
+    When a session is located, the returned dict also carries
+    ``session_path`` (the rollout JSONL path) alongside the usual
+    ``compute_session_kpi`` fields. ``run_pipeline`` lifts that key back out
+    to the summary's top-level ``session_path`` field so the public summary
+    shape is unchanged; ``summary["kpi"]`` itself never carries
+    ``session_path``. The "no session log" and OSError cases keep their
+    existing error-dict shape (no ``session_path`` key) since there is no
+    located file to report.
+    """
+    session_id = rr.session_id
+    if not session_id:
+        return None
+    try:
+        located = find_codex_session_file(session_id)
+        if located is not None:
+            kpi = dict(compute_session_kpi(located))
+            kpi["session_path"] = str(located)
+            return kpi
+        return {"error": f"no session log found for session id {session_id}"}
+    except OSError as exc:
+        return {"error": f"session KPI extraction failed: {exc}"}
+
+
+def _opencode_compute_kpi(rr: RunResult) -> "dict[str, Any] | None":
+    """Compute KPI for opencode: derive from the NDJSON STDOUT stream.
+
+    Unlike codex, KPI evidence is derived in-memory from STDOUT, so there is
+    no on-disk session log to report. The dict carries no ``session_path``
+    key (equivalent to ``session_path=None``); ``run_pipeline`` pops it with
+    a default of ``None`` when lifting it to the summary's top level.
+    """
+    return compute_opencode_kpi(rr.stdout)
+
+
+#: Registry mapping agent name -> AgentAdapter.
+AGENT_ADAPTERS: dict[str, AgentAdapter] = {
+    "codex": AgentAdapter(
+        name="codex",
+        deploy_agent="codex",
+        prepare_workdir=_codex_prepare_workdir,
+        run=run_codex,
+        extract_result=_codex_extract_result,
+        compute_kpi=_codex_compute_kpi,
+    ),
+    "opencode": AgentAdapter(
+        name="opencode",
+        deploy_agent="codex",  # OpenCode reuses .agents/skills/ — codex layout
+        prepare_workdir=_opencode_prepare_workdir,
+        run=run_opencode,
+        extract_result=_opencode_extract_result,
+        compute_kpi=_opencode_compute_kpi,
+    ),
+}
+
+
+def get_adapter(agent: str) -> AgentAdapter:
+    """Return the AgentAdapter for *agent*, or raise ``ValueError``."""
+    adapter = AGENT_ADAPTERS.get(agent)
+    if adapter is None:
+        supported = ", ".join(sorted(AGENT_ADAPTERS))
+        raise ValueError(
+            f"unsupported agent {agent!r}; supported agents are: {supported}"
+        )
+    return adapter
+
+
+# ---------------------------------------------------------------------------
+# Runner registry (back-compat shim — existing tests import get_runner)
 # ---------------------------------------------------------------------------
 
 #: Registry mapping agent name -> runner callable.
-#: Adding a new backend: add one ``run_<x>`` function and one registry entry.
+#: Adding a new backend: add an AgentAdapter in AGENT_ADAPTERS above.
 AGENT_RUNNERS: dict[str, Callable[..., RunResult]] = {
-    "codex": run_codex,
+    name: adapter.run for name, adapter in AGENT_ADAPTERS.items()
 }
 
 
 def get_runner(agent: str) -> Callable[..., RunResult]:
-    """Return the runner callable for *agent*, or raise ``ValueError``."""
+    """Return the runner callable for *agent*, or raise ``ValueError``.
+
+    This is a thin back-compat shim over ``get_adapter``; prefer
+    ``get_adapter`` for new code.
+    """
     runner = AGENT_RUNNERS.get(agent)
     if runner is None:
         supported = ", ".join(sorted(AGENT_RUNNERS))
@@ -397,6 +791,129 @@ def get_runner(agent: str) -> Callable[..., RunResult]:
             f"unsupported agent {agent!r}; supported agents are: {supported}"
         )
     return runner
+
+
+# ---------------------------------------------------------------------------
+# Agent-selection cache
+# ---------------------------------------------------------------------------
+
+_CACHE_VERSION = 1
+
+# Windows transiently locks a freshly-written temp file — antivirus, Defender,
+# and the Search indexer open handles for a few hundred milliseconds — and the
+# atomic Path.replace() then fails with WinError 5 (access denied) or 32
+# (sharing violation); 145 (dir not empty) is included for parity with the
+# rmtree/rename race this same idiom guards in tools/deploy_rtd_skill.py. This
+# is a small LOCAL helper (not a cross-module import) so blackbox_e2e.py keeps
+# no dependency on deploy_rtd_skill.py; the retry/backoff shape mirrors that
+# module's proven ``_retry_fs``/``_is_transient_windows_lock`` idiom exactly.
+_FS_RETRY_ATTEMPTS = 10
+_FS_RETRY_DELAY_S = 0.1
+
+
+def _is_transient_windows_lock(exc: OSError) -> bool:
+    """True for the transient Windows FS-lock errors worth retrying.
+
+    Scoped to Windows winerror codes so non-Windows behavior is unchanged and
+    a real, persistent error on any platform still surfaces promptly.
+    WinError 5 = ERROR_ACCESS_DENIED, 32 = ERROR_SHARING_VIOLATION,
+    145 = ERROR_DIR_NOT_EMPTY.
+    """
+    return sys.platform == "win32" and getattr(exc, "winerror", None) in (5, 32, 145)
+
+
+def _retry_fs(operation: Callable[[], Any]) -> None:
+    """Run a filesystem mutation, retrying transient Windows lock errors.
+
+    Re-raises immediately for any non-transient error and re-raises the last
+    error once the attempt budget is exhausted, so a genuine failure is never
+    swallowed.
+    """
+    for attempt in range(_FS_RETRY_ATTEMPTS):
+        try:
+            operation()
+            return
+        except OSError as exc:
+            if not _is_transient_windows_lock(exc) or attempt == _FS_RETRY_ATTEMPTS - 1:
+                raise
+            time.sleep(_FS_RETRY_DELAY_S * (attempt + 1))
+
+
+def read_agent_cache(path: Path) -> str | None:
+    """Read the cached default agent from *path*.
+
+    Returns the ``default_agent`` string, or ``None`` on missing file,
+    unparseable JSON, or missing key.  Never raises.
+    """
+    try:
+        text = path.read_text(encoding="utf-8")
+        data = json.loads(text)
+        agent = data.get("default_agent")
+        return str(agent) if agent is not None else None
+    except (FileNotFoundError, OSError, json.JSONDecodeError, AttributeError, TypeError):
+        return None
+
+
+def write_agent_cache(path: Path, agent: str) -> None:
+    """Atomically write the agent cache at *path*, creating parent dirs as needed.
+
+    The final publish (``tmp_path.replace(path)``) is retried on a transient
+    Windows FS lock (see ``_retry_fs``); a persistent failure still raises —
+    callers that want best-effort persistence (e.g. ``resolve_agent``) catch
+    ``OSError`` themselves rather than this function silently swallowing it.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    updated_at = datetime.now(tz=timezone.utc).isoformat()
+    data = {
+        "version": _CACHE_VERSION,
+        "default_agent": agent,
+        "updated_at": updated_at,
+    }
+    # Write atomically via a sibling temp file
+    tmp_path = path.with_suffix(".tmp")
+    tmp_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    _retry_fs(lambda: tmp_path.replace(path))
+
+
+def resolve_agent(
+    cli_agent: str | None,
+    cache_path: Path,
+) -> tuple[str, str]:
+    """Resolve the active agent from the CLI flag and/or the cache.
+
+    Returns ``(agent, source)`` where source is one of ``"flag"``,
+    ``"cache"``, or ``"default"``.
+
+    - ``cli_agent`` not None: validate against ``AGENT_ADAPTERS`` (raise
+      ``ValueError`` for unknown agents); best-effort persist to cache
+      (a write failure that survives ``write_agent_cache``'s own transient-
+      lock retry is logged to stderr and swallowed — losing a preference
+      write must never abort the run); return ``(cli_agent, "flag")``.
+    - else: read cache; if a valid cached agent is found, return
+      ``(cached, "cache")``.
+    - else: return ``(DEFAULT_AGENT, "default")`` — do NOT rewrite the cache
+      on fallback.
+    """
+    if cli_agent is not None:
+        if cli_agent not in AGENT_ADAPTERS:
+            supported = ", ".join(sorted(AGENT_ADAPTERS))
+            raise ValueError(
+                f"unsupported agent {cli_agent!r}; supported agents are: {supported}"
+            )
+        try:
+            write_agent_cache(cache_path, cli_agent)
+        except OSError as exc:
+            print(
+                f"warning: could not persist agent preference to {cache_path}: {exc}",
+                file=sys.stderr,
+            )
+        return (cli_agent, "flag")
+
+    cached = read_agent_cache(cache_path)
+    if cached is not None and cached in AGENT_ADAPTERS:
+        return (cached, "cache")
+
+    return (DEFAULT_AGENT, "default")
 
 
 # ---------------------------------------------------------------------------
@@ -741,35 +1258,50 @@ def run_pipeline(
     deploy_fn: Callable[..., Any] | None = None,
     runner_fn: Callable[..., RunResult] | None = None,
     keep: bool = False,
+    agent_source: str = "default",
+    model: str | None = None,
+    prepare_workdir_fn: "Callable[[Path], None] | None" = None,
 ) -> dict[str, Any]:
     """Full black-box pipeline for one E2E case.
 
     Steps:
       1. Create an isolated temp workdir.
-      2. Deploy the released skill into it.
+      2. Deploy the released skill using the adapter's deploy_agent target.
       3. Copy the case fixture into the workdir.
       4. Build the agent prompt.
+      4b. Call prepare_workdir_fn (defaults to adapter.prepare_workdir; e.g. git
+          init for opencode isolation, no-op for codex).
       5. Run the selected agent runner.
       6. Write the log, extract the BLACKBOX_RESULT, locate the .mex.
+      6b. Compute KPI evidence via the adapter's compute_kpi.
       7. Return a JSON-serialisable summary dict.
 
-    *deploy_fn* and *runner_fn* are injectable for testing.
+    *deploy_fn*, *runner_fn*, and *prepare_workdir_fn* are injectable for testing.
     """
     if deploy_fn is None:
         deploy_fn = _default_deploy
-    if runner_fn is None:
-        runner_fn = get_runner(agent)
+
+    # Resolve the adapter for this agent
+    adapter = get_adapter(agent)
+
+    # Determine the effective runner: injected > adapter
+    effective_runner: Callable[..., RunResult] = runner_fn if runner_fn is not None else adapter.run
+
+    # Determine the effective prepare_workdir callable: injected > adapter
+    effective_prepare: Callable[[Path], None] = (
+        prepare_workdir_fn if prepare_workdir_fn is not None else adapter.prepare_workdir
+    )
 
     # 1. Temp workdir
     prefix = f"rtd-bb-{case.id}-"
     workdir = Path(tempfile.mkdtemp(prefix=prefix, dir=temp_base))
 
-    # 2. Deploy skill for the selected agent.
-    # deploy_fn returns a tuple of DeployResult-like objects, each with .agent
-    # and .destination (the deployed skill dir).  We look up the result for the
-    # requested agent to get the exact destination — never hardcode the path.
-    results = deploy_fn(repo_root, workdir, (agent,))
-    skill_dir = Path(next(r.destination for r in results if r.agent == agent))
+    # 2. Deploy skill using the adapter's deploy_agent target.
+    # For opencode, deploy_agent="codex" so the skill lands in .agents/skills/,
+    # which is exactly what opencode discovers once the workdir is git-init'd.
+    deploy_agent = adapter.deploy_agent
+    results = deploy_fn(repo_root, workdir, (deploy_agent,))
+    skill_dir = Path(next(r.destination for r in results if r.agent == deploy_agent))
     skill_md_path = skill_dir / "SKILL.md"
 
     # 3. Copy fixture
@@ -784,45 +1316,65 @@ def run_pipeline(
     # 4. Build prompt
     prompt = build_prompt(case, skill_md_path, project_dir)
 
-    # 5. Run
-    run_result = runner_fn(
-        prompt=prompt,
-        workdir=workdir,
-        timeout_s=timeout_s,
-        sandbox=sandbox,
-    )
+    # 4b. Per-adapter workdir preparation (e.g. git init for opencode isolation).
+    effective_prepare(workdir)
+
+    # 5. Run — pass model only when the runner accepts it (preserves back-compat
+    # with test stubs that were written with the 4-arg signature before model was
+    # added; real runners run_codex and run_opencode both accept model=None).
+    try:
+        sig = inspect.signature(effective_runner)
+        accepts_model = "model" in sig.parameters
+    except (ValueError, TypeError):
+        accepts_model = True  # unknown signature: assume the full signature
+
+    if accepts_model:
+        run_result = effective_runner(
+            prompt=prompt,
+            workdir=workdir,
+            timeout_s=timeout_s,
+            sandbox=sandbox,
+            model=model,
+        )
+    else:
+        run_result = effective_runner(
+            prompt=prompt,
+            workdir=workdir,
+            timeout_s=timeout_s,
+            sandbox=sandbox,
+        )
 
     # 6. Log + parse
     combined = run_result.stdout + ("\n--- STDERR ---\n" + run_result.stderr if run_result.stderr else "")
     log_path = workdir / "_blackbox_run.log"
     log_path.write_text(combined, encoding="utf-8")
 
-    blackbox_result = _extract_blackbox_result(run_result.stdout)
+    blackbox_result = adapter.extract_result(run_result)
     mex_path = _find_mex(project_dir)
 
-    # 6b. KPI evidence — locate the codex session log (deterministically, via the
-    # session id the runner captured) and derive the per-case KPI.  Best-effort:
-    # the run already succeeded, so a missing/garbled session must not fail it —
-    # but the reason is recorded (never silently swallowed).
+    # 6b. KPI evidence — derived uniformly via the adapter's compute_kpi for
+    # BOTH agents (no per-agent special case here). Best-effort: a missing or
+    # garbled KPI must not fail the run.
+    #
+    # For codex, the adapter embeds session_path (the rollout JSONL path)
+    # inside the returned kpi dict because it is the only agent with an
+    # on-disk session log; we lift it back out to the summary's top-level
+    # session_path field so summary["kpi"] never carries session_path and the
+    # public summary shape stays unchanged. For opencode there is no on-disk
+    # session log, so session_path stays None.
     session_id = run_result.session_id
     session_path: str | None = None
-    kpi: dict[str, Any] | None = None
-    if session_id:
-        try:
-            located = find_codex_session_file(session_id)
-            if located is not None:
-                session_path = str(located)
-                kpi = compute_session_kpi(located)
-            else:
-                kpi = {"error": f"no session log found for session id {session_id}"}
-        except OSError as exc:
-            kpi = {"error": f"session KPI extraction failed: {exc}"}
+    kpi: dict[str, Any] | None = adapter.compute_kpi(run_result)
+    if isinstance(kpi, dict) and "session_path" in kpi:
+        session_path = kpi.pop("session_path")
 
     # 7. Summary
     summary: dict[str, Any] = {
         "case": case.id,
         "scenario": case.scenario,
         "agent": agent,
+        "agent_source": agent_source,
+        "model": model,
         "sandbox": sandbox,
         "workdir": str(workdir),
         "project_dir": str(project_dir),
@@ -849,11 +1401,13 @@ def run_pipeline(
 # ---------------------------------------------------------------------------
 
 def build_parser() -> argparse.ArgumentParser:
+    supported_agents = ", ".join(sorted(AGENT_ADAPTERS))
     parser = argparse.ArgumentParser(
         description=(
             "Black-box isolated E2E harness for the RTD CfgFile CLI autombd-rtd skill.\n"
             "Deploys the released skill into a fresh temp dir, copies the case fixture,\n"
-            "and drives a third-party agent CLI with the case's Subagent Prompt."
+            "and drives a third-party agent CLI with the case's Subagent Prompt.\n"
+            f"Default agent: {DEFAULT_AGENT}  |  Supported agents: {supported_agents}"
         )
     )
     parser.add_argument(
@@ -864,15 +1418,28 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--agent",
-        default="codex",
+        default=None,
         metavar="NAME",
-        help="agent backend to use (default: codex; supported: " + ", ".join(sorted(AGENT_RUNNERS)) + ")",
+        help=(
+            "agent backend to use; if omitted, uses the cached choice or the built-in "
+            f"default ({DEFAULT_AGENT}); an explicit value is cached for next time. "
+            f"Supported: {supported_agents}"
+        ),
+    )
+    parser.add_argument(
+        "--model",
+        default=None,
+        metavar="PROVIDER/MODEL",
+        help=(
+            "model to use as provider/model (e.g. deepseek/deepseek-chat); "
+            "omit to use the configured default; ignored by codex"
+        ),
     )
     parser.add_argument(
         "--sandbox",
         default="workspace-write",
         metavar="SANDBOX",
-        help="codex sandbox policy (default: workspace-write)",
+        help="codex sandbox policy (default: workspace-write); ignored by opencode",
     )
     parser.add_argument(
         "--timeout-seconds",
@@ -910,14 +1477,24 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
 
-    # Validate agent early
+    repo_root: Path = args.repo_root.resolve()
+
+    # Resolve agent from CLI flag + cache (PERSIST-ON-USE semantics)
+    cache_path = repo_root / ".agent-state" / "e2e-preferences.json"
     try:
-        get_runner(args.agent)
+        agent, agent_source = resolve_agent(args.agent, cache_path)
     except ValueError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
 
-    repo_root: Path = args.repo_root.resolve()
+    # Validate agent in registry (resolve_agent already does this for explicit flags;
+    # this is a safety net for the default/cache path if the registry evolves)
+    try:
+        get_adapter(agent)
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+
     test_cases_md = repo_root / "docs" / "tests" / "rtd-config-test-cases.md"
 
     try:
@@ -938,17 +1515,29 @@ def main(argv: list[str] | None = None) -> int:
         else 3 * max_kpi * 60
     )
 
-    runner_fn = get_runner(args.agent)
+    # Get the runner via get_runner() so test mocks that patch get_runner still
+    # intercept correctly.  When runner_fn is supplied, run_pipeline skips the
+    # adapter's prepare_workdir; the real opencode isolation (git init) is then
+    # performed by the adapter's prepare_workdir call below, before run_pipeline
+    # invokes the runner.  For mocked tests the prepare_workdir is a no-op because
+    # codex adapter's prepare_workdir is a no-op, and the workdir doesn't exist
+    # until run_pipeline creates it — so we let the pipeline handle it internally
+    # when runner_fn is None.  Passing runner_fn here triggers the "skip
+    # prepare_workdir" guard in run_pipeline, which is correct for tests that
+    # want to fully mock the run.
+    runner_fn = get_runner(agent)
 
     summary = run_pipeline(
         case=case,
-        agent=args.agent,
+        agent=agent,
         sandbox=args.sandbox,
         timeout_s=timeout_s,
         repo_root=repo_root,
         temp_base=args.temp_base,
-        runner_fn=runner_fn,
         keep=args.keep,
+        agent_source=agent_source,
+        model=args.model,
+        runner_fn=runner_fn,
     )
 
     print(json.dumps(summary, indent=2))
