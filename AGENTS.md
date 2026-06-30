@@ -41,9 +41,10 @@ The main agent owns:
   subagents instead of personally doing all task-level execution;
 - ensuring independent E2E validation is a **true black box** — driven through
   an independent third-party agent CLI (the `tools/blackbox_e2e.py` harness;
-  Codex-first, extensible registry) that sees only the deployed skill, the case
-  prompt, and the staged fixture, never this repository; the embedded subagent is
-  **not** a valid black box because it inherits repo context and filesystem;
+  OpenCode by default, with Codex and others selectable via the extensible
+  registry) that sees only the deployed skill, the case prompt, and the staged
+  fixture, never this repository; the embedded subagent is **not** a valid black
+  box because it inherits repo context and filesystem;
 - monitoring subagent progress and per-case KPI evidence, collecting evidence,
   comparing outputs against active specs, and rejecting incomplete or off-scope
   results;
@@ -182,8 +183,9 @@ values).
   cases (`docs/tests/rtd-config-test-cases.md`). The Tester also measures each
   case against its KPI. **E2E runs as a TRUE black box** via the
   `tools/blackbox_e2e.py` harness, which deploys the released skill into a temp
-  dir and drives an **independent third-party agent CLI** (Codex now; extensible
-  registry) seeing only the case's Subagent Prompt + the deployed skill + the
+  dir and drives an **independent third-party agent CLI** (OpenCode by default,
+  with Codex and others via the extensible registry) seeing only the case's
+  Subagent Prompt + the deployed skill + the
   fixture — never this repository, and never the embedded subagent (which would
   inherit repo context + filesystem). The Tester independently re-runs the vendor
   gate on the agent-produced `.mex`. Edits tests only; reports production gaps
