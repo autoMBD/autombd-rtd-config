@@ -113,8 +113,8 @@ class McuProvider:
         1. PLL and CGM clock-tree configuration (clock_settings + Mcu config_set
            PLL/divider/mux settings).
         2. McuClockReferencePoint array merge: preserve existing reference points
-           and add entries for all selectable S32K344 clocks
-           (when add_all_clock_reference_points=True).
+            and add entries for the 20 fixture-safe S32K344 selectable clocks
+            (when add_all_clock_reference_points=True).
         """
         payload = intent.payload
         core_clk = payload.get("core_clk")
@@ -146,10 +146,12 @@ class McuProvider:
                 path="/Mcu/Mcu/McuModuleConfiguration/McuClockSettingConfig_0/McuClockReferencePoint",
                 description=(
                     "Merge McuClockReferencePoint array: preserve existing reference points "
-                    "and add entries for all selectable S32K344 clocks "
-                    "(CORE_CLK, AIPS_PLAT_CLK, AIPS_SLOW_CLK, FLEXCAN_PE_CLK0_2, "
-                    "FLEXCAN_PE_CLK3_5, EMAC_CLK_RX/TX/TS, QuadSPI_SFCK, QSPI_MEM_CLK, "
-                    "FIRC_CLK, SIRC_CLK, STM0_CLK) not already present by name."
+                    "and add entries for all 20 selectable S32K344 clocks "
+                    "(CORE_CLK, AIPS_PLAT_CLK, AIPS_SLOW_CLK, HSE_CLK, DCM_CLK, "
+                    "LBIST_CLK, QSPI_MEM_CLK, STM0_CLK, STM1_CLK, FLEXCAN_PE_CLK0_2, "
+                    "FLEXCAN_PE_CLK3_5, CLKOUT_STANDBY/RUN, EMAC_CLK_RX/TX/TS, "
+                    "QuadSPI_SFCK, TRACE_CLK, FIRC_CLK, SIRC_CLK) "
+                    "not already present by name."
                 ),
             ))
 

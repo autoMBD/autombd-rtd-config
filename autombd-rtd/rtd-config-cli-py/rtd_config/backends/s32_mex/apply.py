@@ -3097,14 +3097,23 @@ _MCU_SUPPORTED_RECIPES: frozenset = frozenset({
 
 # Clocks available as McuClockFrequencySelect on S32K344, grounded in the
 # Mcu.xdm INVALID rules (lines 14008-14152) and the S32K344 reference config.
-# Each clock maps to a CGM0 mux divider (Mux0 has 8 dividers; Mux1..Mux20 each
-# have 1). Must stay in sync with clock.json (all_selectable_clocks) and the
+# Each clock maps to a CGM0 mux divider.  The subset below is the 20 clocks
+# whose CGM mux dividers exist in the Uart_Example_S32K344 fixture:
+#   * Mux0 dividers Div0-Div6 (7 of 8; Div7 / CM7_CORE_CLK absent)
+#   * Mux1..Mux11 (11 clocks; Mux12-20 and their clocks absent from fixture)
+#   * FIRC_CLK + SIRC_CLK (2 source clocks)
+# Deferred clocks (Mux0 Div7 + Mux12-20): CM7_CORE_CLK, EMAC_TX_RMII_CLK,
+# STM2_CLK, USDHC_PER_CLK, LFAST_REF_CLK, SWG_CLK, GMAC1_RMII_CLK, STM3_CLK,
+# AES_CLK, FLEXCAN_PE_CLK8_11 — these cannot be inserted as reference points
+# because the required CGM mux dividers are absent from the fixture.
+#
+# Must stay in sync with clock.json (all_selectable_clocks) and the
 # test constant _ALL_SELECTABLE_CLOCKS. Drift is caught by
 # test_clock_json_matches_apply_code_literals (LL-012). clock.json is a
 # committed reference document for the recipe; it is NOT loaded at runtime --
 # this constant is the runtime source of truth.
 _ALL_SELECTABLE_CLOCKS: list[str] = [
-    # Mux0 dividers (8 clocks)
+    # Mux0 dividers (7 of 8 — Div7 absent)
     "CORE_CLK",
     "AIPS_PLAT_CLK",
     "AIPS_SLOW_CLK",
@@ -3112,8 +3121,7 @@ _ALL_SELECTABLE_CLOCKS: list[str] = [
     "DCM_CLK",
     "LBIST_CLK",
     "QSPI_MEM_CLK",
-    "CM7_CORE_CLK",
-    # Mux1..Mux20 (one clock each)
+    # Mux1..Mux11 (all present in fixture)
     "STM0_CLK",
     "STM1_CLK",
     "FLEXCAN_PE_CLK0_2",
@@ -3125,15 +3133,6 @@ _ALL_SELECTABLE_CLOCKS: list[str] = [
     "EMAC_CLK_TS",
     "QuadSPI_SFCK",
     "TRACE_CLK",
-    "EMAC_TX_RMII_CLK",
-    "STM2_CLK",
-    "USDHC_PER_CLK",
-    "LFAST_REF_CLK",
-    "SWG_CLK",
-    "GMAC1_RMII_CLK",
-    "STM3_CLK",
-    "AES_CLK",
-    "FLEXCAN_PE_CLK8_11",
     # Source clocks (not through CGM muxes; directly available)
     "FIRC_CLK",
     "SIRC_CLK",
@@ -3309,67 +3308,6 @@ def _build_merged_ref_point_array_bytes(
     return le.join(lines).encode("utf-8")
 
 
-def _insert_settings_into_struct(
-    doc: MexDocument,
-    struct_el: ET.Element,
-    settings: dict[str, str],
-) -> None:
-    """Insert new <setting name="..." value="..."/> children into a struct element.
-
-    Strategy: locate the struct's byte region, find the closing tag's line, and
-    insert the new settings before it. Uses _insert_into_parent_before_close
-    pattern adapted for config_set settings (name=... not id=...).
-    """
-    line_ending = _detect_line_ending(doc._raw)
-
-    elements = list(doc.root.iter())
-    src_index = next((i for i, e in enumerate(elements) if e is struct_el), None)
-    if src_index is None or not doc._aligned:
-        return
-
-    src = doc._sources[src_index]
-    span_end = doc._find_element_region_end(src, struct_el)
-    if span_end is None:
-        return
-
-    parent_raw = doc._raw[src.start: span_end + 1]
-    start_tag_text = parent_raw[:src.tag_end - src.start + 1].decode("utf-8", errors="replace")
-    m = re.match(r"<([A-Za-z0-9_:.\-]+)", start_tag_text)
-    if m is None:
-        return
-    close_tag = f"</{m.group(1)}>".encode("utf-8")
-
-    close_pos = parent_raw.rfind(close_tag)
-    if close_pos < 0:
-        return
-
-    # Find the line start of the close tag
-    line_start = close_pos
-    while line_start > 0 and parent_raw[line_start - 1:line_start] not in (b"\n", b"\r"):
-        line_start -= 1
-
-    # Detect indentation for the new settings: use the close-tag's line indentation
-    # and add 3 more spaces (settings are one level inside the struct).
-    close_indent_raw = parent_raw[line_start:close_pos]
-    close_spaces = len(close_indent_raw) - len(close_indent_raw.lstrip(b" "))
-    child_indent = close_spaces + 3
-
-    le = line_ending.decode("latin-1")
-    sp = " " * child_indent
-    new_lines = []
-    for name, value in settings.items():
-        new_lines.append(f'{sp}<setting name="{name}" value="{value}"/>')
-    new_bytes = le.join(new_lines).encode("utf-8")
-
-    new_parent_raw = (
-        parent_raw[:line_start]
-        + new_bytes
-        + line_ending
-        + parent_raw[line_start:]
-    )
-    doc.replace_element_region(struct_el, new_parent_raw)
-
-
 def apply_mcu_set(doc: MexDocument, intent: Intent) -> ApplyResult:
     """Apply the Mcu clock-tree PLL/divider recipe and McuClockReferencePoint array.
 
@@ -3378,8 +3316,10 @@ def apply_mcu_set(doc: MexDocument, intent: Intent) -> ApplyResult:
     supported; other frequency combinations return a blocker diagnostic.
 
     Forward-hardened (issue #38): the McuClockReferencePoint insertion now uses
-    the full 30-clock McuClockFrequencySelect enum from Mcu.xdm INVALID rules,
-    not just the 13 clocks the E2E case exercises. The complete editable surface
+    20 fixture-safe McuClockFrequencySelect values from Mcu.xdm INVALID rules
+    (all Mux0..Mux11 + source clocks), not just the 13 clocks the E2E case
+    exercises. 10 deferred clocks (Mux12-20 + CM7_CORE_CLK) are documented in
+    clock.json deferred_clocks. The complete editable surface
     not yet exposed through the CLI is tracked in the committed asset
     ``clock.json`` (_coverage.not_yet_exposed).
 
@@ -3393,7 +3333,7 @@ def apply_mcu_set(doc: MexDocument, intent: Intent) -> ApplyResult:
         - ENSURE: MC_CGM_MUX_0_DIV4.scale=4 (DCM_CLK=40 MHz), MC_CGM_MUX_0_DIV6.scale=1
                   (QSPI_MEM_CLK=160 MHz) -- idempotent if already correct; grounded in
                   example_Dio.mex verified working 160MHz example
-        - REMOVE: PLLunderMcuControl="Disabled"
+        - CHANGE: PLLunderMcuControl Disabled->Enabled
         - LEAVE UNCHANGED: CORE_MFD.scale=120, PLL_PREDIV.scale=2, PHI0.scale=3,
                            PHI1.scale=3, POSTDIV.scale=2, MC_CGM_MUX_0_DIV0.scale=1
         - NOT WRITTEN: clock_output values (ConfigTools recomputes them)
@@ -3401,11 +3341,10 @@ def apply_mcu_set(doc: MexDocument, intent: Intent) -> ApplyResult:
     (B) Mcu config_set (elements use name="..."):
         - McuPll_0: McuPLLUnderMcuControl false->true, McuPLLEnabled false->true
         - McuPll_Configuration: McuPllOdiv0_En false->true, McuPllOdiv1_En false->true
-        - McuPll_Parameter: INSERT PLL fields; CLEAR quick_selection LAST (LL-013)
-        - McuCgm0ClockMux0: McuClkMux0_Source FIRC_CLK->PLL_PHI0_CLK; INSERT divisors
+        - McuCgm0ClockMux0: McuClkMux0_Source FIRC_CLK->PLL_PHI0_CLK
         - McuGeneralConfiguration: McuNoPll true->false (GAP 1: Mcu.xdm INVALID rule)
         - McuControlledClocksConfiguration: McuPll0UnderMcuControl false->true (GAP 2)
-        - McuClockReferencePoint array: MERGE (preserve existing + add 13 clocks; GAP 3)
+        - McuClockReferencePoint array: MERGE (preserve existing + add 20 fixture-safe clocks; GAP 3)
 
     Idempotent: second apply with same intent produces the same output.
     Returns a blocker for unsupported frequency combinations.
@@ -3485,8 +3424,8 @@ def apply_mcu_set(doc: MexDocument, intent: Intent) -> ApplyResult:
     # Fixture already has DIV6.scale=1; this is idempotent (same value).
     _change_clock_setting_value(doc, "MC_CGM_MUX_0_DIV6.scale", "1")
 
-    # A3: Remove PLLunderMcuControl="Disabled"
-    _remove_clock_setting(doc, "PLLunderMcuControl")
+    # A3: Change PLLunderMcuControl from "Disabled" to "Enabled"
+    _change_clock_setting_value(doc, "PLLunderMcuControl", "Enabled")
 
     # A4-A7: Insert new settings (only if absent -- idempotency)
     for sid, val in [
@@ -3509,51 +3448,6 @@ def apply_mcu_set(doc: MexDocument, intent: Intent) -> ApplyResult:
             details={},
         ))
         return result
-
-    # --- Part B raw: McuPll_Parameter field insertion ---
-    # Find the current McuPll_Parameter struct and insert PLL fields if absent.
-    pll_param = None
-    for el in mcu_cfg.iter():
-        if el.tag.endswith("struct") and el.attrib.get("name") == "McuPll_Parameter":
-            pll_param = el
-            break
-
-    if pll_param is not None and doc.find_child_setting(pll_param, "McuPllDvRdiv") is None:
-        _insert_settings_into_struct(doc, pll_param, {
-            "McuPllDvRdiv": "2",
-            "McuPllDvMfi": "120",
-            "McuPllDvOdiv2": "2",
-            "McuPllOdiv0_Div": "2",
-            "McuPllOdiv1_Div": "1",
-        })
-        mcu_cfg = doc.find_config_set("Mcu")
-
-    # --- Part B raw: McuCgm0ClockMux0 divisor insertion ---
-    mux0 = None
-    if mcu_cfg is not None:
-        for el in mcu_cfg.iter():
-            if el.tag.endswith("struct") and el.attrib.get("name") == "McuCgm0ClockMux0":
-                mux0 = el
-                break
-
-    if mux0 is not None and doc.find_child_setting(mux0, "McuClkMux0Div0_Divisor") is None:
-        # McuClkMux0Div0/1/2_Divisor are display-only InfoSettings in the Mcu
-        # component -- ConfigTools generates the divider code from
-        # MC_CGM_MUX_0_DIV0/1/2.scale (written above in Phase 1), NOT from
-        # these fields.  These mirror the scale values for human readability:
-        #   Div0_Divisor=0 mirrors DIV0.scale=1 (CORE_CLK, divisor=scale-1=0)
-        #   Div1_Divisor=1 mirrors DIV1.scale=2 (AIPS_PLAT_CLK, /2)
-        #   Div2_Divisor=3 mirrors DIV2.scale=4 (AIPS_SLOW_CLK, /4)
-        # They produce the benign [SDK/DATA] "type ... differs ... InfoSettings"
-        # log line which can be ignored.  A future reader must NOT "fix" the
-        # MC_CGM_MUX_0_DIVx.scale values and leave these stale -- they must
-        # stay consistent with the scales.
-        _insert_settings_into_struct(doc, mux0, {
-            "McuClkMux0Div0_Divisor": "0",
-            "McuClkMux0Div1_Divisor": "1",
-            "McuClkMux0Div2_Divisor": "3",
-        })
-        mcu_cfg = doc.find_config_set("Mcu")
 
     # --- Part B raw: McuClockReferencePoint array MERGE ---
     # Strategy (GAP 3 fix): preserve existing reference points so that UartClockRef
@@ -3669,19 +3563,6 @@ def apply_mcu_set(doc: MexDocument, intent: Intent) -> ApplyResult:
                 s = doc.find_child_setting(el, "McuPll0UnderMcuControl")
                 if s is not None:
                     s.set("value", "true")
-                break
-
-    # ==================================================================
-    # PHASE 3: Mark modified + clear quick_selection LAST (LL-013 ordering).
-    # quick_selection clear must happen after all replace_element_region calls
-    # so the final _capture_sources() snapshot sees the clear.
-    # ==================================================================
-
-    if mcu_cfg is not None:
-        # Mark McuPll_Parameter and clear its quick_selection (LL-013: LAST)
-        for el in mcu_cfg.iter():
-            if el.tag.endswith("struct") and el.attrib.get("name") == "McuPll_Parameter":
-                doc.mark_modified(el)  # removes quick_selection="Default" if present
                 break
 
     result.changed_modules.append("mcu")

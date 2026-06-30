@@ -43,9 +43,9 @@
 # Version:     0.1.0
 # Description: Generality tests for the Mcu module over ARBITRARY valid inputs the
 #              RTD-MEX-MCU-001 E2E case does NOT exercise. These prove the Mcu
-#              module is forward from Mcu.xdm and not case-fit: the full
-#              McuClockFrequencySelect enum domain from Mcu.xdm INVALID rules
-#              is exercised, not just the 13 clocks the E2E case needs.
+#              module is forward from Mcu.xdm and not case-fit: the 20 fixture-safe
+#              McuClockFrequencySelect values from Mcu.xdm INVALID rules are
+#              exercised, not just the 13 clocks the E2E case needs.
 #              Forward (Spec-first) development, issues #37/#38.
 # =================================================================================
 
@@ -56,7 +56,9 @@ the *editable surface* the module supports, with inputs that are deliberately NO
 the case literals, so they fail if the module ever becomes fit to the one case.
 
 All domain values are grounded in Mcu.xdm INVALID rules (lines 14008-14152)
-and the S32K344 reference config; no value is invented here.
+and the S32K344 reference config. The 20 fixture-safe clocks are the CGM0
+Mux0..Mux11 + source subset; 10 CGM Mux12-20 + CM7_CORE_CLK clocks are
+deferred (documented in clock.json deferred_clocks). No value is invented here.
 """
 import difflib
 import json
@@ -129,7 +131,7 @@ def test_asset_has_coverage_section():
 # ---------------------------------------------------------------------------
 
 def test_asset_enum_domains_match_mcu_xdm():
-    """All 30 selectable clocks in the asset must match apply.py _ALL_SELECTABLE_CLOCKS."""
+    """All 20 selectable clocks in the asset must match apply.py _ALL_SELECTABLE_CLOCKS."""
     asset_path = (
         Path(__file__).resolve().parents[2]
         / "autombd-rtd" / "assets" / "nxp" / "s32k3" / "mcu" / "clock.json"
@@ -200,12 +202,12 @@ def test_idempotent_without_ref_points(tmp_path):
 
 # ---------------------------------------------------------------------------
 # Test G05: Merge preserves all existing reference points for any subset of
-#          selectable clocks (not just the full 30-clock set).
+#          selectable clocks (not just the full 20-clock set).
 # ---------------------------------------------------------------------------
 
 def test_merge_preserves_existing_for_arbitrary_clock_subset(tmp_path):
     """Merge must preserve LPUART3_CLK and FLEXIO_CLK when adding an arbitrary
-    small subset of selectable clocks (NOT the 30-clock full set)."""
+    small subset of selectable clocks (NOT the 20-clock full set)."""
     project = copy_uart_fixture(tmp_path)
     mex = project / "Uart_Example.mex"
 
@@ -436,7 +438,7 @@ def test_ref_points_ordered_existing_then_new(tmp_path):
         )
         clock_names_seen.append(name)
 
-    # All 30 clocks must be present
+    # All 20 clocks must be present
     for clk in _ALL_SELECTABLE_CLOCKS:
         assert clk in clock_names_seen, (
             f"Selectable clock {clk!r} missing from reference point array"
@@ -444,24 +446,26 @@ def test_ref_points_ordered_existing_then_new(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# Test G13: McuClockFrequencySelect enum coverage — all 28 CGM0-derived
-#          clocks in the full enum are represented in _ALL_SELECTABLE_CLOCKS.
+# Test G13: McuClockFrequencySelect enum coverage — all 18 CGM0-derived
+#          clocks whose mux dividers exist in the fixture are represented
+#          in _ALL_SELECTABLE_CLOCKS.
 # ---------------------------------------------------------------------------
 
 def test_cgm0_enum_coverage():
-    """Every clock appearing in Mcu.xdm INVALID rules with a CGM0 mux assignment
-    must be present in _ALL_SELECTABLE_CLOCKS (no missing CGM0 output clocks)."""
-    # These are the 28 CGM0-derivable clocks confirmed by Mcu.xdm INVALID rules
+    """Every CGM0-derived clock whose mux divider exists in the fixture
+    must be present in _ALL_SELECTABLE_CLOCKS.
+
+    Mux0 Div7 (CM7_CORE_CLK) and Mux12-20 are absent from the fixture;
+    those 10 clocks are deferred (documented in clock.json deferred_clocks).
+    """
+    # These are the 18 CGM0-derivable fixture-safe clocks
     cgm0_derivable_clocks = {
         "CORE_CLK", "AIPS_PLAT_CLK", "AIPS_SLOW_CLK", "HSE_CLK", "DCM_CLK",
-        "LBIST_CLK", "QSPI_MEM_CLK", "CM7_CORE_CLK",
+        "LBIST_CLK", "QSPI_MEM_CLK",
         "STM0_CLK", "STM1_CLK", "FLEXCAN_PE_CLK0_2", "FLEXCAN_PE_CLK3_5",
         "CLKOUT_STANDBY", "CLKOUT_RUN",
         "EMAC_CLK_RX", "EMAC_CLK_TX", "EMAC_CLK_TS",
-        "QuadSPI_SFCK", "TRACE_CLK", "EMAC_TX_RMII_CLK",
-        "STM2_CLK", "USDHC_PER_CLK", "LFAST_REF_CLK",
-        "SWG_CLK", "GMAC1_RMII_CLK", "STM3_CLK", "AES_CLK",
-        "FLEXCAN_PE_CLK8_11",
+        "QuadSPI_SFCK", "TRACE_CLK",
     }
     code_clocks = set(_ALL_SELECTABLE_CLOCKS)
     missing = cgm0_derivable_clocks - code_clocks
@@ -497,10 +501,12 @@ def test_recipe_still_pinned_after_forward_harden():
     assert recipe["aips_plat_clk"] == 80
     assert recipe["aips_slow_clk"] == 40
 
-    # Recipe must still have all original sections
+    # Recipe must still have all original sections.
+    # McuPll_Configuration field values (RDIV/MFI/ODIV2/Odiv0_Div/Odiv1_Div)
+    # are InfoSetting per Mcu.xdm; ConfigTools derives them from clock_settings
+    # + quick_selection. The recipe documents this in a _note, not as inserts.
     for key in ["clock_settings_changes", "clock_settings_inserts",
-                "clock_settings_removes", "mcu_config_set_changes",
-                "McuPll_Parameter_inserts", "McuCgm0ClockMux0_divisor_inserts"]:
+                "clock_settings_removes", "mcu_config_set_changes"]:
         assert key in recipe, f"Recipe missing key: {key}"
 
 
