@@ -122,6 +122,7 @@ history. New ADC evidence is recorded in §2 as each case is exercised.
 | --- | --- | --- |
 | 2026-06-23 | 0.25.1 | Re-measured the four ADC cases' black-box E2E + KPI after the ADC forward-hardening (shared group/trigger byte-builder + new static checks): all four remain functional PASS, 1 edit attempt, within the 2 min budget (ADC-001 80.8 s, ADC-002 75.3 s, ADC-003 106.1 s, ADC-004 65.3 s). The upward shifts on ADC-001/003 are Codex run-to-run variance (ADC-002 was flat), not a tool regression; deterministic suite (635) and the S32DS gate (all four, exit 0 + no SEVERE) were also re-confirmed post-hardening. Recorded KPIs now reflect the current (hardened) tool. |
 | 2026-06-23 | 0.25.0 | RTD-MEX-ADC-001 through ADC-004 PASS (issue #30): ADC module support delivered (interrupt software groups + watchdog, DMA streaming, BCTU single hardware trigger, dual-ADC BCTU list trigger + FIFO DMA). All four pass the black-box protocol with 1 edit attempt each and KPI under the 2 min budget (50.5 / 75.4 / 71.0 / 58.7 s), each exit 0 / 0 SEVERE / 125 generated files. Summary now 14 / 14 cases PASS; added the ADC delivery step to §4. |
+| 2026-07-01 | 0.26.0 | RTD-MEX-MCU-001 re-measured post-forward-harden (#38): 44.2 s context→check, 1 attempt, exit 0, 0 SEVERE [TOOL], 120 generated files. KPI PASS. Deferred 10 Mux12-20+CM7_CORE_CLK clocks documented in asset. |
 | 2026-06-19 | 0.24.1 | Clarified that ADC E2E cases use the ADC-ready `Autombd_Test_Adc_S32K344` fixture, while non-ADC cases keep `Uart_Example_S32K344`. |
 | 2026-06-19 | 0.24.0 | Added RTD-MEX-ADC-001 through RTD-MEX-ADC-004 as NOT RUN with the catalogued one-edit, ≤2 min KPI budget, keeping the 10/14 summary aligned with the expanded E2E catalog. |
 | 2026-06-18 | 0.23.0 | Back-filled KPI for Dio (DIO-001/002: PASS 46.1/26.3 s), Mcl (MCL-001: PASS 24.3 s), Uart (UART-001/002: PASS 32.8/28.6 s; UART-003: PASS 55.3 s after --hw auto-detect optimization). Closes #16, #17, #18. |
@@ -141,7 +142,6 @@ history. New ADC evidence is recorded in §2 as each case is exercised.
 | 2026-06-13 | 0.10.0 | RTD-MEX-UART-003 PASS. DMA capability complete — all 9 cases PASS, minimal system COMPLETE. |
 | 2026-06-13 | 0.9.0 | RTD-MEX-UART-002 PASS: `uart add-flexio-channel` creates FlexIO Tx+Rx with MCL refs. |
 | 2026-06-12 | 0.8.0 | RTD-MEX-UART-001 PASS: `uart set` 3-module orchestration (Uart + Platform + Mcu). |
-| 2026-07-01 | 0.26.0 | RTD-MEX-MCU-001 re-measured post-forward-harden (#38): 44.2 s context→check, 1 attempt, exit 0, 0 SEVERE [TOOL], 120 generated files. KPI PASS. Deferred 10 Mux12-20+CM7_CORE_CLK clocks documented in asset. |
 | 2026-06-12 | 0.7.0 | RTD-MEX-MCU-001 PASS: 160/80/40 clock tree over 3 vendor refine iterations. |
 | 2026-06-12 | 0.6.0 | RTD-MEX-DIO-001 PASS: DioChannel + Port GPIO (cross-module). Codegen verification gate (LL-013). |
 | 2026-06-12 | 0.5.0 | RTD-MEX-PORT-001 PASS: pin validation + PortPin insert. Fixed `<pin>` vs `<pin_features>` tag bug. |
