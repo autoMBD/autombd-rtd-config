@@ -224,8 +224,16 @@ def max_kpi_minutes(test_cases_md_path: Path) -> int:
 _RETURN_SUFFIX = """\
 
 ---
-When you have finished all configuration steps, run the skill's `check` and
-`validate` commands on the project, then print as your FINAL line exactly:
+When you have finished all configuration steps, run `check` before `validate`
+on the project, then print as your FINAL line exactly:
+
+1. Run the skill's standalone `check --project <project-dir> --json`
+   immediately after the configuration edit. This standalone check is required
+   for KPI audit even if `--configure` already ran static checks.
+2. Do not run `validate` before `check`.
+3. If `check` passes, run the skill's `validate --project <project-dir> --json`
+   exactly once. If `check` fails, skip `validate` and report
+   `"validate_status": "skipped"`.
 
 BLACKBOX_RESULT {"configured": <true|false>, "validate_status": "<string>", "notes": "<string>"}
 
