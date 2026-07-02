@@ -244,6 +244,20 @@ exposes a systemic issue.
   KPI-optimization iterations for the same case; after the third miss, the true
   KPI result is recorded and the case may proceed with the functional PASS
   evidence intact.
+- Any CLI module update or fix invalidates stale E2E/KPI evidence for the
+  affected module cases. This includes changes to a module provider, `.mex`
+  apply path, module assets, module-facing CLI flags/intent normalization,
+  released skill command guidance, diagnostics, or any bug fix that can change a
+  module's public behavior. Before the PR can be marked ready, the orchestrator
+  must rerun the relevant `RTD-MEX-*` black-box E2E case(s) through
+  `tools/blackbox_e2e.py`, re-measure the KPI from the fresh run, and update
+  `docs/tests/rtd-config-acceptance-report.md` with the new functional status,
+  KPI status, measured seconds, edit-attempt count, run date, and session
+  evidence. If the fresh run is functional PASS but KPI MISS, the Worker KPI
+  optimization loop is mandatory for up to three iterations, with a fresh E2E
+  and KPI measurement after each iteration. Stop early only when KPI passes; if
+  all three iterations still miss, record the true final KPI result and
+  disposition in the acceptance report before review.
 - Focused independent subagent validation should converge within 3 minutes.
   E2E subagent validation should converge within 5 minutes. A subagent run may
   continue up to 10 minutes to expose useful problem evidence; after 10
