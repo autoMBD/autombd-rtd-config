@@ -1,5 +1,182 @@
 {
-  "_source": "Mcu.xdm (S32K344 RTD 7.0.1 reference config) + example_Dio.mex verified 160 MHz working config. This file is a committed reference document pinned against apply.py by test_clock_json_matches_apply_code_literals; it is NOT loaded at runtime.",
+  "_source": "Mcu.xdm (S32K344 RTD 7.0.1) C:/NXP/S32DS.3.6.7/S32DS/software/PlatformSDK_S32K3/RTD/Mcu_TS_T40D34M70I1R0/config/Mcu.xdm + reference_configs/S32K344/Mcu.xdm + example_Dio.mex verified 160 MHz working config. This file is a committed reference document pinned against apply.py by test_clock_json_matches_apply_code_literals; it is NOT loaded at runtime.",
+  "rtd_version": "7.0.1",
+  "device": "s32k344",
+
+  "_coverage": {
+    "_note": "Honest map of the Mcu editable surface this CLI exposes today vs. the Mcu.xdm items NOT yet configurable through the `mcu set` surface. Forward (Spec-first) development tracks the deferred surface explicitly so callers know the boundary; full-surface expansion of every Mcu.xdm field is a separate, larger effort (issues #37/#38). The deferred fields below DO exist in Mcu.xdm and are currently left at fixture defaults -- they are not absent, just not user-tunable yet.",
+    "configurable_today": {
+      "clock_tree_recipe": ["160/80/40 MHz fixed recipe (PLL 480MHz VCO -> PHI0/PHI1 -> CGM Mux0 dividers)", "McuGeneralConfiguration/McuNoPll (GAP 1 fix)", "McuControlledClocksConfiguration/McuPll0UnderMcuControl (GAP 2 fix)", "McuPll_0 enable + McuPLLUnderMcuControl", "McuPll_Configuration Odiv0/Odiv1 enable", "McuPll_Configuration (Odiv0_En/Odiv1_En enable; PLL divider params RDIV/MFI/ODIV2/Odiv0_Div/Odiv1_Div are InfoSetting -- ConfigTools derives them from clock_settings + quick_selection)", "McuCgm0ClockMux0 source + divisors"],
+      "clock_reference_points": ["McuClockReferencePoint array merge (preserve existing + add selectable clocks)", "20 fixture-safe S32K344 clock reference point names (see all_selectable_clocks below; 10 deferred clocks noted in deferred_clocks)"]
+    },
+    "not_yet_exposed": {
+      "_note": "Each item is an Mcu.xdm editable field currently fixed at a fixture default or not yet wired through the CLI intent surface. Exposing any of these is future scope.",
+      "clock_settings_top_level": [
+        "CORE_MFD.scale, PLL_PREDIV.scale, PHI0.scale, PHI1.scale, POSTDIV.scale (left at fixture defaults; not user-tunable)",
+        "MC_CGM_MUX_0_DIV0.scale (CORE_CLK divisor; left at fixture default scale=1)",
+        "MC_CGM_MUX_0_DIV5.scale (LBIST_CLK; not configured)",
+        "MC_CGM_MUX_0_DIV7.divider_not_in_fixture (CM7_CORE_CLK; Div7 absent from Uart_Example.mex; CM7_CORE_CLK deferred — see deferred_clocks)",
+        "CORE_PLLODIV_2_DE, CORE_PLLODIV_3_DE (additional PLL output dividers; not configured)",
+        "clock_output values (ConfigTools computes these; CLI does not write them)",
+        "Multiple McuClockSettingConfig instances (CLI edits only _0; reference config has 2)"
+      ],
+      "oscillator_config": [
+        "McuFIRC: McuFircUnderMcuControl, McuFircDivSel, McuFIRC_Frequency, McuFircStandbyEnable",
+        "McuSIRC: McuSircUnderMcuControl, McuSIRC_Frequency, McuSircStandbyEnable",
+        "McuFXOSC: McuFxoscPowerDownCtr, McuFxoscBypass, McuFxoscMainComparator, McuFxoscCounter, McuFxoscOverdriveProtection, McuFxoscALCEnable",
+        "McuSXOSC: McuSxoscUnderMcuControl, McuSxoscCounter, McuSxoscPowerDownCtr, all SXOSC parameters"
+      ],
+      "cgm_muxes": [
+        "McuCgm0ClockMux1 through McuCgm0ClockMux20 (only Mux0 is configured today)",
+        "McuCgm0ClockMux12 through McuCgm0ClockMux20 are absent from the Uart_Example_S32K344 fixture; their 9 corresponding clocks (EMAC_TX_RMII_CLK, STM2_CLK, USDHC_PER_CLK, LFAST_REF_CLK, SWG_CLK, GMAC1_RMII_CLK, STM3_CLK, AES_CLK, FLEXCAN_PE_CLK8_11) are deferred (see deferred_clocks above)",
+        "McuCgm0ClockMux0 Div7 (CM7_CORE_CLK) absent from fixture; CM7_CORE_CLK deferred (see deferred_clocks above)",
+        "McuCgm0PcfsConfig (Progressive Clock Frequency Scaling entries)",
+        "McuRtcClockSelect",
+        "Divider trigger modes (IMMEDIATE_DIVIDER_UPDATE vs COMMON_TRIGGER_DIVIDER_UPDATE)"
+      ],
+      "pll": [
+        "McuPll_1 (AUX PLL; visible only on multi-PLL devices)",
+        "McuPllClockSelection (source select; hardcoded to FXOSC_CLK)",
+        "PLL FM/FD parameters: McuPllFmSscgbyp, McuPllFmSpreadctl, McuPllFmStepSize, McuPllFmStepNo, McuPllFdFmod, McuPllFdMdp, McuPllFdMfn, McuPllFdSdmen, McuPllFdSdm2, McuPllFdSdm3",
+        "McuPllOdiv2_En through McuPllOdiv7_En (only Odiv0/Odiv1 exposed)",
+        "McuPll_Parameter read-only outputs (PLL_PHI0/PHI1/PHI2_Frequency, VCO_Frequency; auto-calculated)"
+      ],
+      "clock_monitoring": [
+        "McuClkMonitor list (monitoring thresholds, deviation, latency per clock)",
+        "McuClockSrcFailureNotification (ENABLED/DISABLED)"
+      ],
+      "power_modes": [
+        "McuModeSettingConf list (RUN, STANDBY, FAST_STANDBY, etc.)",
+        "McuPartitionConfiguration (per-partition COFB CLKEN, core config)",
+        "McuDcmGprConfiguration (DCM register controls)",
+        "McuPeripheral list (per-peripheral clock enable + mode entry slot)"
+      ],
+      "power_control": [
+        "McuPowerControl/McuPMC_Config (LMAUTOEN, LVDIE, HVDIE, LMEN)",
+        "McuPowerControl/McuPMC_AE_Config (LIN PHY supply, voltage level select)"
+      ],
+      "ram": [
+        "McuRamSectorSettingConf list (base address, size, default value)"
+      ],
+      "general_config": [
+        "McuDevErrorDetect, McuVersionInfoApi, McuGetRamStateApi, McuEnterLowPowerMode",
+        "McuTimeout, McuEnableUserModeSupport, McuMultiPartitionSupport",
+        "McuPerformResetApi, McuCalloutBeforePerformReset, McuPerformResetCallout",
+        "McuPmcNotification, McuPmcAeNotification, McuCmuNotification",
+        "McuAlternateResetIsrUsed, McuCmuErrorIsrUsed, McuVoltageErrorIsrUsed",
+        "McuErrorIsrNotification, McuDisableRgmInit, McuDisablePmcInit",
+        "McuDisableRamWaitStatesConfig, McuDisableFlashWaitStatesConfig",
+        "McuPrepareMemoryConfig, McuTimeoutMethod, McuRegisterValuesOptimization",
+        "McuControlledClocksConfiguration: McuFxoscUnderMcuControl, McuSxoscUnderMcuControl, McuFircUnderMcuControl, McuSircUnderMcuControl, McuPll1UnderMcuControl"
+      ],
+      "debug": [
+        "McuDebugConfiguration: all 13 debug API switches"
+      ],
+      "dependencies": [
+        "McuDemEventParameterRefs (MCU_E_TIMEOUT_FAILURE, MCU_E_CLOCK_FAILURE, etc.)",
+        "McuCoreControlConfiguration/McuCoreBootAddressControl",
+        "McuEcucPartitionRef list",
+        "External crystal frequency inputs (McuCrystalFrequencyHz, McuSlowCrystalFrequencyHz, etc.)"
+      ]
+    },
+    "references": ["issue #37 (forward Spec-first correction)", "issue #38 (Mcu forward-harden)"]
+  },
+
+  "enum_domains": {
+    "_source": "Mcu.xdm McuClockFrequencySelect INVALID rules (lines 14008-14152) + reference_configs/S32K344/Mcu.xdm; each clock maps to its CGM0 divider source.",
+    "McuClockFrequencySelect": {
+      "_note": "Fixture-safe subset for S32K344 from Mcu.xdm INVALID constraints (lines 14008-14152). The full Mcu.xdm RANGE ecu:list('MCU.ClockReferencePoints.List') resolves to ~48+ literals at tool runtime (including GMAC variants, QSPI aliases, RTC_CLK, SCS_CLK, CUSTOM, etc.). This asset documents the 20 CGM0-derivable + source clocks whose mux dividers exist in the Uart_Example_S32K344 fixture; 10 additional clocks with absent mux structs (Mux12-20 + Mux0 Div7) are recorded in deferred_clocks. The all_selectable_clocks list below is the 20-clocks subset the CLI inserts as McuClockReferencePoint entries.",
+      "mux0_dividers": {
+        "CORE_CLK": {"cgm_mux": "Cgm0ClockMux0", "divider": "Div0", "desc": "Core / system clock"},
+        "AIPS_PLAT_CLK": {"cgm_mux": "Cgm0ClockMux0", "divider": "Div1", "desc": "AIPS Platform clock"},
+        "AIPS_SLOW_CLK": {"cgm_mux": "Cgm0ClockMux0", "divider": "Div2", "desc": "AIPS Slow clock"},
+        "HSE_CLK": {"cgm_mux": "Cgm0ClockMux0", "divider": "Div3", "desc": "HSE (Hardware Security Engine) clock"},
+        "DCM_CLK": {"cgm_mux": "Cgm0ClockMux0", "divider": "Div4", "desc": "DCM clock"},
+        "LBIST_CLK": {"cgm_mux": "Cgm0ClockMux0", "divider": "Div5", "desc": "LBIST clock"},
+        "QSPI_MEM_CLK": {"cgm_mux": "Cgm0ClockMux0", "divider": "Div6", "desc": "QSPI memory clock"},
+        "CM7_CORE_CLK": {"cgm_mux": "Cgm0ClockMux0", "divider": "Div7", "desc": "Cortex-M7 core clock"}
+      },
+      "mux1_20_dividers": {
+        "STM0_CLK": {"cgm_mux": "Cgm0ClockMux1", "desc": "System Timer 0"},
+        "STM1_CLK": {"cgm_mux": "Cgm0ClockMux2", "desc": "System Timer 1"},
+        "FLEXCAN_PE_CLK0_2": {"cgm_mux": "Cgm0ClockMux3", "desc": "FlexCAN PE 0-2"},
+        "FLEXCAN_PE_CLK3_5": {"cgm_mux": "Cgm0ClockMux4", "desc": "FlexCAN PE 3-5"},
+        "CLKOUT_STANDBY": {"cgm_mux": "Cgm0ClockMux5", "desc": "CLKOUT standby"},
+        "CLKOUT_RUN": {"cgm_mux": "Cgm0ClockMux6", "desc": "CLKOUT run"},
+        "EMAC_CLK_RX": {"cgm_mux": "Cgm0ClockMux7", "desc": "EMAC RX clock (S32K344 alias)"},
+        "EMAC_CLK_TX": {"cgm_mux": "Cgm0ClockMux8", "desc": "EMAC TX clock (S32K344 alias)"},
+        "EMAC_CLK_TS": {"cgm_mux": "Cgm0ClockMux9", "desc": "EMAC timestamp clock (S32K344 alias)"},
+        "QuadSPI_SFCK": {"cgm_mux": "Cgm0ClockMux10", "desc": "QuadSPI serial flash clock"},
+        "TRACE_CLK": {"cgm_mux": "Cgm0ClockMux11", "desc": "Trace clock"},
+        "EMAC_TX_RMII_CLK": {"cgm_mux": "Cgm0ClockMux12", "desc": "EMAC TX RMII clock"},
+        "STM2_CLK": {"cgm_mux": "Cgm0ClockMux13", "desc": "System Timer 2"},
+        "USDHC_PER_CLK": {"cgm_mux": "Cgm0ClockMux14", "desc": "USDHC peripheral clock"},
+        "LFAST_REF_CLK": {"cgm_mux": "Cgm0ClockMux15", "desc": "LFAST reference clock"},
+        "SWG_CLK": {"cgm_mux": "Cgm0ClockMux16", "desc": "SWG clock"},
+        "GMAC1_RMII_CLK": {"cgm_mux": "Cgm0ClockMux17", "desc": "GMAC1 RMII clock"},
+        "STM3_CLK": {"cgm_mux": "Cgm0ClockMux18", "desc": "System Timer 3"},
+        "AES_CLK": {"cgm_mux": "Cgm0ClockMux19", "desc": "AES clock"},
+        "FLEXCAN_PE_CLK8_11": {"cgm_mux": "Cgm0ClockMux20", "desc": "FlexCAN PE 8-11"}
+      },
+      "source_clocks": {
+        "FIRC_CLK": {"cgm_mux": null, "desc": "FIRC source frequency (48 MHz)"},
+        "SIRC_CLK": {"cgm_mux": null, "desc": "SIRC source frequency (~32 kHz)"},
+        "FXOSC_CLK": {"cgm_mux": null, "desc": "FXOSC source frequency"},
+        "SXOSC_CLK": {"cgm_mux": null, "desc": "SXOSC source frequency"},
+        "PLL_PHI0_CLK": {"cgm_mux": null, "desc": "PLL PHI0 output (CORE_PLL POSTDIV0)"},
+        "PLL_PHI1_CLK": {"cgm_mux": null, "desc": "PLL PHI1 output (CORE_PLL POSTDIV1)"}
+      }
+    },
+    "McuClkMux0_Source": {
+      "_note": "McuClkMux0_Source options; resolved from ecu:MCU.CGM0.ClockMux0.List at tool runtime. Verified from S32K344 reference config.",
+      "values": ["FIRC_CLK", "PLL_PHI0_CLK", "PLL_PHI1_CLK", "FXOSC_CLK", "SIRC_CLK", "SXOSC_CLK"]
+    },
+    "McuPllClockSelection": {
+      "_note": "McuPll_0 PLL source select; resolved from ecu:MCU.PLL0.PllClockSelectionSupport at tool runtime.",
+      "values": ["FXOSC_CLK", "FIRC_CLK"]
+    },
+    "McuPowerMode": {
+      "_note": "Power modes for McuModeSettingConf. Source: Mcu.xdm ENUMERATION.",
+      "values": ["RUN", "CORE_STANDBY", "SOC_PREPARE_STANDBY", "SOC_STANDBY", "STANDBY", "SOC_PREPARE_FAST_STANDBY", "SOC_FAST_STANDBY", "FAST_STANDBY", "FUNC_RESET", "DEST_RESET"]
+    },
+    "McuFircDivSel": {
+      "_note": "FIRC divider select. Source: Mcu.xdm ENUMERATION.",
+      "values": ["Div_by_1", "Div_by_2", "Div_by_16"]
+    },
+    "McuClockMonitorDeviation": {
+      "_note": "Clock monitor deviation tolerance. Partial list from Mcu.xdm HTML table.",
+      "values": ["Maximum_5_percentage_deviation", "Maximum_4_percentage_deviation", "Maximum_3_percentage_deviation", "Maximum_2_percentage_deviation", "Maximum_1_percentage_deviation"]
+    }
+  },
+
+  "constraints": {
+    "_source": "Mcu.xdm INVALID rules extracted from the descriptor. Each rule cites the Mcu.xdm source. Enforced at the S32DS vendor gate; listed here for traceability.",
+    "mcu_no_pll_vs_pll_control": {
+      "_source": "Mcu.xdm INVALID rule (~line 4104-4113): McuNoPll='true' AND McuPLLUnderMcuControl='true' -> SEVERE 'PLL cannot be under MCU control if McuNoPll is enabled'",
+      "fix": "apply_mcu_set sets McuNoPll=false when configuring PLL (GAP 1)"
+    },
+    "pll_under_mcu_control_requires_controlled_clocks": {
+      "_source": "Mcu.xdm INVALID rule: McuPLLUnderMcuControl='true' but McuControlledClocksConfiguration/McuPll0UnderMcuControl='false' -> SEVERE",
+      "fix": "apply_mcu_set sets McuPll0UnderMcuControl=true when configuring PLL (GAP 2)"
+    },
+    "clock_ref_requires_divider_enabled": {
+      "_source": "Mcu.xdm INVALID rules (lines 14008-14152): each McuClockFrequencySelect value requires its corresponding CGM0 divider to be enabled (e.g. CORE_CLK requires Div0_En=true, STM0_CLK requires Mux1 Div0_En=true)",
+      "note": "The CLI inserts reference points with Name==McuClockFrequencySelect; the fixture must already have the corresponding dividers enabled. The CLI does not currently auto-enable dividers."
+    },
+    "fxosc_frequency_range": {
+      "_source": "Mcu.xdm McuCrystalFrequencyHz: <= ecu:MCU.FXOSC.Limits.XTAL.High AND >= ecu:MCU.FXOSC.Limits.XTAL.Low",
+      "note": "The 160/80/40 recipe assumes FXOSC=16 MHz (S32K344 reference config default). Other crystal values require different PLL parameters."
+    },
+    "hse_clk_max_120mhz": {
+      "_source": "Mcu.xdm INVALID: HSE_CLK (Mux0 Div3 output) frequency must be <= 120 MHz",
+      "fix": "MC_CGM_MUX_0_DIV3.scale=2 divides 160 MHz CORE -> 80 MHz HSE_CLK, satisfying the constraint"
+    },
+    "pll_phi0_div1_scale_1": {
+      "_source": "S32K344 reference config: MC_CGM_MUX_0_DIV0.scale must be 1 (CORE_CLK undivided from Mux0 source)",
+      "note": "DIV0.scale is left at fixture default (1); not changed by the CLI"
+    }
+  },
+
   "recipes": [
     {
       "core_clk": 160,
@@ -10,7 +187,8 @@
         {"id": "MC_CGM_MUX_0_DIV2.scale", "action": "change", "value": "4", "source_ref": "example_Dio.mex / Mcu.xdm RANGE"},
         {"id": "MC_CGM_MUX_0_DIV3.scale", "action": "change", "value": "2", "source_ref": "example_Dio.mex verified 160MHz (HSE_CLK=CORE/2=80MHz, must be <=120MHz)"},
         {"id": "MC_CGM_MUX_0_DIV4.scale", "action": "change", "value": "4", "source_ref": "example_Dio.mex verified 160MHz (DCM_CLK=CORE/4=40MHz)"},
-        {"id": "MC_CGM_MUX_0_DIV6.scale", "action": "change", "value": "1", "source_ref": "example_Dio.mex verified 160MHz (QSPI_MEM_CLK=CORE/1=160MHz)"}
+        {"id": "MC_CGM_MUX_0_DIV6.scale", "action": "change", "value": "1", "source_ref": "example_Dio.mex verified 160MHz (QSPI_MEM_CLK=CORE/1=160MHz)"},
+        {"id": "PLLunderMcuControl", "action": "change", "value": "Enabled", "source_ref": "Mcu.xdm (PLLunderMcuControl must be Enabled when PLL is under MCU control)"}
       ],
       "clock_settings_inserts": [
         {"id": "CORE_PLL_PD", "value": "Power_up", "locked": "false", "source_ref": "reference_configs/S32K344/Mcu.xdm"},
@@ -18,9 +196,7 @@
         {"id": "CORE_PLLODIV_1_DE", "value": "Enabled", "locked": "false", "source_ref": "reference_configs/S32K344/Mcu.xdm"},
         {"id": "MC_CGM_MUX_0.sel", "value": "PHI0", "locked": "false", "source_ref": "reference_configs/S32K344/Mcu.xdm"}
       ],
-      "clock_settings_removes": [
-        {"id": "PLLunderMcuControl", "source_ref": "reference_configs/S32K344/Mcu.xdm (absent in working 160MHz config)"}
-      ],
+      "clock_settings_removes": [],
       "mcu_config_set_changes": {
         "McuGeneralConfiguration": {
           "McuNoPll": "false",
@@ -45,36 +221,48 @@
           "_source_ref": "reference_configs/S32K344/Mcu.xdm"
         }
       },
-      "McuPll_Parameter_inserts": {
-        "McuPllDvRdiv": "2",
-        "McuPllDvMfi": "120",
-        "McuPllDvOdiv2": "2",
-        "McuPllOdiv0_Div": "2",
-        "McuPllOdiv1_Div": "1",
-        "_source_ref": "reference_configs/S32K344/Mcu.xdm + example_Dio.mex (FXOSC=16MHz, CORE_PLL -> PHI0=480/2/1=240 -> /2=120... see code comments)"
-      },
-      "McuCgm0ClockMux0_divisor_inserts": {
-        "McuClkMux0Div0_Divisor": "0",
-        "McuClkMux0Div1_Divisor": "1",
-        "McuClkMux0Div2_Divisor": "3",
-        "_source_ref": "reference_configs/S32K344/Mcu.xdm (InfoSettings -- display-only, codegen reads MC_CGM_MUX_0_DIVx.scale)"
-      }
+      "_note": "McuPllDvRdiv/McuPllDvMfi/McuPllDvOdiv2/McuPllOdiv0_Div/McuPllOdiv1_Div are InfoSetting per Mcu.xdm component definition -- ConfigTools derives them from clock_settings (CORE_MFD.scale=120, PLL_PREDIV.scale=2, PHI0.scale=3, POSTDIV.scale=2) when quick_selection=\"Default\" is preserved on McuPll_Parameter. These fields are NOT written by the CLI; writing them as StoragePeriphsScalarSetting causes [SDK/DATA] SEVERE type-mismatch and [TOOL] SEVERE '该取值值不可用'. Grounded in S32DS 3.6.7 validation on 2026-06-30."
     }
   ],
+
   "all_selectable_clocks": [
     "CORE_CLK",
     "AIPS_PLAT_CLK",
     "AIPS_SLOW_CLK",
+    "HSE_CLK",
+    "DCM_CLK",
+    "LBIST_CLK",
+    "QSPI_MEM_CLK",
+    "STM0_CLK",
+    "STM1_CLK",
     "FLEXCAN_PE_CLK0_2",
     "FLEXCAN_PE_CLK3_5",
+    "CLKOUT_STANDBY",
+    "CLKOUT_RUN",
     "EMAC_CLK_RX",
     "EMAC_CLK_TX",
     "EMAC_CLK_TS",
     "QuadSPI_SFCK",
-    "QSPI_MEM_CLK",
+    "TRACE_CLK",
     "FIRC_CLK",
-    "SIRC_CLK",
-    "STM0_CLK"
+    "SIRC_CLK"
   ],
+
+  "deferred_clocks": {
+    "_note": "10 clocks from the full Mcu.xdm enum domain whose CGM mux dividers are absent from the Uart_Example_S32K344 fixture. These cannot currently be inserted as McuClockReferencePoint entries.",
+    "mux0_div7_missing": ["CM7_CORE_CLK"],
+    "mux12_20_missing": [
+      "EMAC_TX_RMII_CLK",
+      "STM2_CLK",
+      "USDHC_PER_CLK",
+      "LFAST_REF_CLK",
+      "SWG_CLK",
+      "GMAC1_RMII_CLK",
+      "STM3_CLK",
+      "AES_CLK",
+      "FLEXCAN_PE_CLK8_11"
+    ]
+  },
+
   "ref_point_struct_settings": ["Name", "McuClockFrequencySelect"]
 }

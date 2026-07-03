@@ -60,7 +60,7 @@ A) clock_settings section:
    - CORE_PLL_PD = Power_up    (inserted, was absent)
    - CORE_PLLODIV_0_DE = Enabled  (inserted, was absent)
    - CORE_PLLODIV_1_DE = Enabled  (inserted, was absent)
-   - PLLunderMcuControl="Disabled" REMOVED
+   - PLLunderMcuControl changed from "Disabled" to "Enabled"
    - MC_CGM_MUX_0.sel = PHI0   (inserted, was absent)
    - MC_CGM_MUX_0_DIV1.scale = 2  (changed from 1)
    - MC_CGM_MUX_0_DIV2.scale = 4  (changed from 2)
@@ -73,25 +73,31 @@ B) Mcu config_set:
    - McuPll_0 / McuPLLEnabled: false -> true
    - McuPll_Configuration / McuPllOdiv0_En: false -> true
    - McuPll_Configuration / McuPllOdiv1_En: false -> true
-   - McuPll_Parameter: quick_selection cleared; PLL fields inserted:
+    - McuPll_Configuration: quick_selection cleared; PLL fields inserted:
        McuPllDvRdiv=2, McuPllDvMfi=120, McuPllDvOdiv2=2,
        McuPllOdiv0_Div=2, McuPllOdiv1_Div=1
-   - McuCgm0ClockMux0 / McuClkMux0_Source: FIRC_CLK -> PLL_PHI0_CLK
-   - McuCgm0ClockMux0: divisors added:
-       McuClkMux0Div0_Divisor=0, McuClkMux0Div1_Divisor=1, McuClkMux0Div2_Divisor=3
+    - McuCgm0ClockMux0 / McuClkMux0_Source: FIRC_CLK -> PLL_PHI0_CLK
 
 C) McuClockReferencePoint array: MERGED -- existing 2 points preserved (LPUART3_CLK,
-   FLEXIO_CLK) + 13 new points added (one per selectable clock), each named after its
-   clock with McuClockFrequencySelect == Name.  Total = 15 structs, indices 0..14.
-   Clocks added: CORE_CLK, AIPS_PLAT_CLK, AIPS_SLOW_CLK, FLEXCAN_PE_CLK0_2,
-                 FLEXCAN_PE_CLK3_5, EMAC_CLK_RX, EMAC_CLK_TX, EMAC_CLK_TS,
-                 QuadSPI_SFCK, QSPI_MEM_CLK, FIRC_CLK, SIRC_CLK, STM0_CLK
+   FLEXIO_CLK) + 20 new points added (one per selectable clock), each named after its
+   clock with McuClockFrequencySelect == Name.  Total = 22 structs, indices 0..21.
+   Clocks added: CORE_CLK, AIPS_PLAT_CLK, AIPS_SLOW_CLK, HSE_CLK, DCM_CLK,
+                 LBIST_CLK, QSPI_MEM_CLK, STM0_CLK, STM1_CLK,
+                 FLEXCAN_PE_CLK0_2, FLEXCAN_PE_CLK3_5, CLKOUT_STANDBY,
+                 CLKOUT_RUN, EMAC_CLK_RX, EMAC_CLK_TX, EMAC_CLK_TS,
+                 QuadSPI_SFCK, TRACE_CLK, FIRC_CLK, SIRC_CLK
    Existing preserved: LPUART3_CLK (McuClockFrequencySelect=AIPS_SLOW_CLK),
                        FLEXIO_CLK  (McuClockFrequencySelect=CORE_CLK)
 
 NOT written by us:
    - clock_output values (ConfigTools computes these)
    - McuClockReferencePointFrequency
+   - McuPllDvRdiv, McuPllDvMfi, McuPllDvOdiv2, McuPllOdiv0_Div, McuPllOdiv1_Div
+     (InfoSetting per Mcu.xdm component definition; ConfigTools computes these
+     from the clock_settings recipe + quick_selection. Writing them as
+     StoragePeriphsScalarSetting causes [SDK/DATA] SEVERE type-mismatch
+     and [TOOL] SEVERE "该取值值不可用". Grounded in S32DS 3.6.7 validation
+     on 2026-06-30.)
 """
 
 import difflib
@@ -107,21 +113,33 @@ from rtd_config.modules.mcu import McuProvider
 from tests.fixtures import copy_uart_fixture
 
 
-# All selectable clocks verified from the S32K344 reference config
+# All selectable clocks verified from the Mcu.xdm INVALID rules (lines 14008-14152)
+# and the S32K344 reference config. Must match apply.py _ALL_SELECTABLE_CLOCKS
+# and clock.json all_selectable_clocks (LL-012 anti-drift).
 _ALL_SELECTABLE_CLOCKS = [
+    # Mux0 dividers (7 of 8 — Div7 absent from fixture)
     "CORE_CLK",
     "AIPS_PLAT_CLK",
     "AIPS_SLOW_CLK",
+    "HSE_CLK",
+    "DCM_CLK",
+    "LBIST_CLK",
+    "QSPI_MEM_CLK",
+    # Mux1..Mux11 (all present in fixture)
+    "STM0_CLK",
+    "STM1_CLK",
     "FLEXCAN_PE_CLK0_2",
     "FLEXCAN_PE_CLK3_5",
+    "CLKOUT_STANDBY",
+    "CLKOUT_RUN",
     "EMAC_CLK_RX",
     "EMAC_CLK_TX",
     "EMAC_CLK_TS",
     "QuadSPI_SFCK",
-    "QSPI_MEM_CLK",
+    "TRACE_CLK",
+    # Source clocks (not through CGM muxes; directly available)
     "FIRC_CLK",
     "SIRC_CLK",
-    "STM0_CLK",
 ]
 
 # Pre-existing reference points in the fixture (preserved by the MERGE strategy).
@@ -132,7 +150,7 @@ _FIXTURE_EXISTING_REF_POINTS = [
     "FLEXIO_CLK",
 ]
 
-# Total after merge: existing 2 + 13 new = 15
+# Total after merge: existing 2 + 20 new = 22
 _EXPECTED_REF_POINT_COUNT = len(_FIXTURE_EXISTING_REF_POINTS) + len(_ALL_SELECTABLE_CLOCKS)
 
 
@@ -187,13 +205,13 @@ def _mcu_struct_setting(doc: MexDocument, struct_name: str, setting_name: str) -
     return None
 
 
-def _find_pll_param_struct(doc: MexDocument) -> ET.Element | None:
-    """Return the McuPll_Parameter struct inside McuPll_0."""
+def _find_pll_cfg_struct(doc: MexDocument) -> ET.Element | None:
+    """Return the McuPll_Configuration struct inside McuPll_0."""
     mcu_cfg = _mcu_cfg(doc)
     if mcu_cfg is None:
         return None
     for el in mcu_cfg.iter():
-        if el.tag.endswith("struct") and el.attrib.get("name") == "McuPll_Parameter":
+        if el.tag.endswith("struct") and el.attrib.get("name") == "McuPll_Configuration":
             return el
     return None
 
@@ -387,8 +405,8 @@ def test_clock_setting_pllodiv1_enabled(tmp_path):
     assert val == "Enabled", f"CORE_PLLODIV_1_DE must be 'Enabled', got {val!r}"
 
 
-# Test A7: PLLunderMcuControl="Disabled" is REMOVED from clock_settings
-def test_clock_setting_pll_under_mcu_control_removed(tmp_path):
+# Test A7: PLLunderMcuControl is changed from "Disabled" to "Enabled" in clock_settings
+def test_clock_setting_pll_under_mcu_control_changed_to_enabled(tmp_path):
     project = copy_uart_fixture(tmp_path)
     mex = project / "Uart_Example.mex"
 
@@ -401,9 +419,8 @@ def test_clock_setting_pll_under_mcu_control_removed(tmp_path):
     doc.write(mex)
     after = mex.read_bytes()
 
-    assert b'PLLunderMcuControl' not in after, (
-        "PLLunderMcuControl must be removed from clock_settings after apply"
-    )
+    val = _find_clock_setting(after, "PLLunderMcuControl")
+    assert val == "Enabled", f"PLLunderMcuControl must be 'Enabled', got {val!r}"
 
 
 # Test A8: Already-correct values are NOT changed by our edits
@@ -498,8 +515,15 @@ def test_mcu_pll_odiv1_en_true(tmp_path):
     assert val == "true", f"McuPllOdiv1_En must be 'true', got {val!r}"
 
 
-# Test B5: McuPll_Parameter has PLL parameter fields written
-def test_mcu_pll_parameter_fields(tmp_path):
+# Test B5: McuPll_Configuration does NOT have PLL divider parameter fields written.
+# McuPllDvRdiv, McuPllDvMfi, McuPllDvOdiv2, McuPllOdiv0_Div, McuPllOdiv1_Div
+# are InfoSetting per Mcu.xdm (ConfigTools computes them from the clock_settings
+# recipe + quick_selection on McuPll_Parameter). Writing them as
+# StoragePeriphsScalarSetting causes:
+#   [SDK/DATA] SEVERE: type mismatch (InfoSetting in .xdm, StoragePeriphsScalarSetting in .mex)
+#   [TOOL] SEVERE: "该取值值不可用" (value not available)
+# Grounded in S32DS 3.6.7 validation on 2026-06-30.
+def test_mcu_pll_divider_fields_not_written(tmp_path):
     project = copy_uart_fixture(tmp_path)
     mex = project / "Uart_Example.mex"
     doc = MexDocument.load(mex)
@@ -509,29 +533,25 @@ def test_mcu_pll_parameter_fields(tmp_path):
     doc.write(mex2)
     doc2 = MexDocument.load(mex2)
 
-    pll_param = _find_pll_param_struct(doc2)
-    assert pll_param is not None, "McuPll_Parameter struct not found after apply"
+    pll_cfg = _find_pll_cfg_struct(doc2)
+    assert pll_cfg is not None, "McuPll_Configuration struct not found after apply"
 
-    assert doc2.find_child_setting(pll_param, "McuPllDvRdiv") is not None, \
-        "McuPllDvRdiv not written"
-    assert doc2.find_child_setting(pll_param, "McuPllDvMfi") is not None, \
-        "McuPllDvMfi not written"
-    assert doc2.find_child_setting(pll_param, "McuPllDvOdiv2") is not None, \
-        "McuPllDvOdiv2 not written"
-    assert doc2.find_child_setting(pll_param, "McuPllOdiv0_Div") is not None, \
-        "McuPllOdiv0_Div not written"
-    assert doc2.find_child_setting(pll_param, "McuPllOdiv1_Div") is not None, \
-        "McuPllOdiv1_Div not written"
-
-    assert doc2.find_child_setting(pll_param, "McuPllDvRdiv").attrib["value"] == "2"
-    assert doc2.find_child_setting(pll_param, "McuPllDvMfi").attrib["value"] == "120"
-    assert doc2.find_child_setting(pll_param, "McuPllDvOdiv2").attrib["value"] == "2"
-    assert doc2.find_child_setting(pll_param, "McuPllOdiv0_Div").attrib["value"] == "2"
-    assert doc2.find_child_setting(pll_param, "McuPllOdiv1_Div").attrib["value"] == "1"
+    # These five fields are InfoSetting — ConfigTools computes them.
+    # Our code must NOT write them (same class of bug as McuClkMux0Div*_Divisor).
+    assert doc2.find_child_setting(pll_cfg, "McuPllDvRdiv") is None, \
+        "McuPllDvRdiv must NOT be written (InfoSetting per Mcu.xdm; S32DS [TOOL] SEVERE otherwise)"
+    assert doc2.find_child_setting(pll_cfg, "McuPllDvMfi") is None, \
+        "McuPllDvMfi must NOT be written (InfoSetting per Mcu.xdm)"
+    assert doc2.find_child_setting(pll_cfg, "McuPllDvOdiv2") is None, \
+        "McuPllDvOdiv2 must NOT be written (InfoSetting per Mcu.xdm)"
+    assert doc2.find_child_setting(pll_cfg, "McuPllOdiv0_Div") is None, \
+        "McuPllOdiv0_Div must NOT be written (InfoSetting per Mcu.xdm)"
+    assert doc2.find_child_setting(pll_cfg, "McuPllOdiv1_Div") is None, \
+        "McuPllOdiv1_Div must NOT be written (InfoSetting per Mcu.xdm)"
 
 
-# Test B6: McuPll_Parameter quick_selection is cleared after apply
-def test_mcu_pll_parameter_quick_selection_cleared(tmp_path):
+# Test B6: McuPll_Parameter quick_selection is preserved after apply
+def test_mcu_pll_parameter_quick_selection_preserved(tmp_path):
     project = copy_uart_fixture(tmp_path)
     mex = project / "Uart_Example.mex"
 
@@ -546,14 +566,17 @@ def test_mcu_pll_parameter_quick_selection_cleared(tmp_path):
     doc.write(mex)
     after = mex.read_bytes()
 
-    # After apply, McuPll_Parameter must NOT carry quick_selection
+    # After apply, McuPll_Parameter must STILL carry quick_selection="Default"
+    # (McuPll_Parameter is untouched by apply_mcu_set; PLL fields are now written
+    # to McuPll_Configuration instead. The quick_selection on McuPll_Parameter
+    # is needed by ConfigTools for calculated output fields like PLL_PHI0_Frequency.)
     import re
     # Find the McuPll_Parameter struct start tag in the output
     m = re.search(rb'<[^>]*name="McuPll_Parameter"[^>]*>', after)
     assert m is not None, "McuPll_Parameter not found in written file"
     tag = m.group(0)
-    assert b"quick_selection" not in tag, (
-        f"quick_selection must be cleared from McuPll_Parameter after writing PLL fields; "
+    assert b'quick_selection="Default"' in tag, (
+        f"quick_selection must be preserved on McuPll_Parameter after apply; "
         f"tag: {tag!r}"
     )
 
@@ -570,8 +593,8 @@ def test_mcu_cgm_mux0_source_pll_phi0(tmp_path):
     assert val == "PLL_PHI0_CLK", f"McuClkMux0_Source must be 'PLL_PHI0_CLK', got {val!r}"
 
 
-# Test B8: McuCgm0ClockMux0 divisor fields written with correct values
-def test_mcu_cgm_mux0_divisors(tmp_path):
+# Test B8: McuCgm0ClockMux0 divisor fields are NOT written (removed per descriptor audit)
+def test_mcu_cgm_mux0_divisors_absent(tmp_path):
     project = copy_uart_fixture(tmp_path)
     mex = project / "Uart_Example.mex"
     doc = MexDocument.load(mex)
@@ -587,23 +610,19 @@ def test_mcu_cgm_mux0_divisors(tmp_path):
     div1 = doc2.find_child_setting(mux0, "McuClkMux0Div1_Divisor")
     div2 = doc2.find_child_setting(mux0, "McuClkMux0Div2_Divisor")
 
-    assert div0 is not None, "McuClkMux0Div0_Divisor not written"
-    assert div1 is not None, "McuClkMux0Div1_Divisor not written"
-    assert div2 is not None, "McuClkMux0Div2_Divisor not written"
-
-    assert div0.attrib["value"] == "0", f"Div0_Divisor must be '0', got {div0.attrib['value']!r}"
-    assert div1.attrib["value"] == "1", f"Div1_Divisor must be '1', got {div1.attrib['value']!r}"
-    assert div2.attrib["value"] == "3", f"Div2_Divisor must be '3', got {div2.attrib['value']!r}"
+    assert div0 is None, "McuClkMux0Div0_Divisor must NOT be written"
+    assert div1 is None, "McuClkMux0Div1_Divisor must NOT be written"
+    assert div2 is None, "McuClkMux0Div2_Divisor must NOT be written"
 
 
 # ===========================================================================
 # Section C: McuClockReferencePoint array replacement
 # ===========================================================================
 
-# Test C1: Array has exactly the expected merged count (existing 2 + 13 new = 15)
+# Test C1: Array has exactly the expected merged count (existing 2 + 20 new = 22)
 # The MERGE strategy preserves existing points (so UartClockRef paths stay resolvable)
-# and adds the 13 selectable-clock points.  Vendor gate confirmed replace-all-13
-# deletes LPUART3_CLK/FLEXIO_CLK causing SEVERE "该取值值不可用" on Uart channels.
+# and adds the 20 selectable-clock points. Vendor gate confirmed replace-all deletes
+# LPUART3_CLK/FLEXIO_CLK causing SEVERE "该取值值不可用" on Uart channels.
 def test_ref_points_count(tmp_path):
     project = copy_uart_fixture(tmp_path)
     mex = project / "Uart_Example.mex"
@@ -622,8 +641,8 @@ def test_ref_points_count(tmp_path):
 # Test C2: New clock-named reference points have Name == McuClockFrequencySelect.
 # The MERGE strategy preserves existing structs (LPUART3_CLK, FLEXIO_CLK) whose
 # Name intentionally differs from McuClockFrequencySelect (cross-references kept
-# for Uart channels).  Only the 13 NEW structs are required to have Name==FreqSelect.
-# All 13 selectable clocks must be present (vendor-confirmed requirement).
+# for Uart channels). Only the NEW structs are required to have Name==FreqSelect.
+# All 20 selectable clocks must be present (forward from Mcu.xdm; issue #38).
 def test_ref_points_named_after_clock(tmp_path):
     project = copy_uart_fixture(tmp_path)
     mex = project / "Uart_Example.mex"
@@ -641,7 +660,7 @@ def test_ref_points_named_after_clock(tmp_path):
         n = name.attrib.get("value", "")
         f = freq_sel.attrib.get("value", "")
         all_names.append(n)
-        # For NEW clock-named structs (Name is one of the 13 selectable clocks):
+        # For NEW clock-named structs (Name is one of the selectable clocks):
         # Name must equal McuClockFrequencySelect.
         # Existing preserved structs (LPUART3_CLK, FLEXIO_CLK) intentionally have
         # Name != McuClockFrequencySelect (they are cross-reference aliases).
@@ -651,14 +670,14 @@ def test_ref_points_named_after_clock(tmp_path):
                 f"McuClockFrequencySelect ({f!r})"
             )
 
-    # All 13 selectable clocks must be present as reference point Names
+    # All selectable clocks must be present as reference point Names
     for clk in _ALL_SELECTABLE_CLOCKS:
         assert clk in all_names, f"Clock {clk!r} missing from McuClockReferencePoint array"
 
 
 # Test C3: Struct indices are sequential from 0 across all merged structs.
-# The MERGE reorders indices 0..N-1 where N = existing + new (15 in fixture).
-# Existing structs come first (indices 0,1), new clock-named structs follow (2..14).
+# The MERGE reorders indices 0..N-1 where N = existing + new (32 in fixture).
+# Existing structs come first (indices 0,1), new clock-named structs follow (2..31).
 def test_ref_points_sequential_indices(tmp_path):
     project = copy_uart_fixture(tmp_path)
     mex = project / "Uart_Example.mex"
@@ -1063,10 +1082,14 @@ def test_clock_json_matches_apply_code_literals():
         "clock.json must document MC_CGM_MUX_0.sel=PHI0 insert"
     )
 
-    # --- clock_settings_removes: PLLunderMcuControl ---
-    removes = [e["id"] for e in recipe["clock_settings_removes"]]
-    assert "PLLunderMcuControl" in removes, (
-        "clock.json must document PLLunderMcuControl remove"
+    # --- clock_settings_changes: PLLunderMcuControl Disabled->Enabled ---
+    changes = [e["id"] for e in recipe["clock_settings_changes"]]
+    assert "PLLunderMcuControl" in changes, (
+        "clock.json must document PLLunderMcuControl change to Enabled"
+    )
+    pll_change = next(e for e in recipe["clock_settings_changes"] if e["id"] == "PLLunderMcuControl")
+    assert pll_change.get("value") == "Enabled", (
+        "clock.json must document PLLunderMcuControl value=Enabled"
     )
 
     # --- mcu_config_set_changes: GAP fixes + PLL + Cgm source ---
@@ -1100,19 +1123,18 @@ def test_clock_json_matches_apply_code_literals():
         "clock.json must document McuCgm0ClockMux0/McuClkMux0_Source=PLL_PHI0_CLK"
     )
 
-    # --- McuPll_Parameter_inserts ---
-    pll_param = recipe.get("McuPll_Parameter_inserts", {})
-    assert pll_param.get("McuPllDvRdiv") == "2"
-    assert pll_param.get("McuPllDvMfi") == "120"
-    assert pll_param.get("McuPllDvOdiv2") == "2"
-    assert pll_param.get("McuPllOdiv0_Div") == "2"
-    assert pll_param.get("McuPllOdiv1_Div") == "1"
-
-    # --- McuCgm0ClockMux0_divisor_inserts ---
-    div_inserts = recipe.get("McuCgm0ClockMux0_divisor_inserts", {})
-    assert div_inserts.get("McuClkMux0Div0_Divisor") == "0"
-    assert div_inserts.get("McuClkMux0Div1_Divisor") == "1"
-    assert div_inserts.get("McuClkMux0Div2_Divisor") == "3"
+    # --- McuPll_Configuration_inserts: must NOT exist ---
+    # McuPllDvRdiv/McuPllDvMfi/McuPllDvOdiv2/McuPllOdiv0_Div/McuPllOdiv1_Div
+    # are InfoSetting per Mcu.xdm (ConfigTools computes them from clock_settings
+    # recipe + quick_selection). The asset must not document writing them.
+    # S32DS 3.6.7 validation on 2026-06-30: writing them as
+    # StoragePeriphsScalarSetting causes [SDK/DATA] SEVERE type-mismatch
+    # and [TOOL] SEVERE "该取值值不可用".
+    assert "McuPll_Configuration_inserts" not in recipe, (
+        "clock.json must NOT contain McuPll_Configuration_inserts -- "
+        "McuPllDvRdiv/McuPllDvMfi/etc. are InfoSetting per Mcu.xdm; "
+        "writing them triggers [TOOL] SEVERE '该取值值不可用' (S32DS 2026-06-30)"
+    )
 
     # --- _source key exists (Fix 5) ---
     assert "_source" in asset, (

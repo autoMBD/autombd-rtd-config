@@ -2,8 +2,8 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.27.0 |
-| Date | 2026-07-02 |
+| Version | 0.28.0 |
+| Date | 2026-07-03 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Current pass/fail evidence for the E2E acceptance cases defined in `rtd-config-test-cases.md`. This document is the living status record the catalog points to; the catalog defines the target, this records where the tool actually stands. |
 
@@ -48,7 +48,7 @@ measured*, and a KPI `miss` never weakens the functional **PASS**.
 
 | ID | Module | Status | KPI |
 | --- | --- | --- | --- |
-| RTD-MEX-MCU-001 | MCU | **PASS** | **PASS** — 1 edit attempt, validation-excluded 96 s ≤ 2 min budget (black-box, 2026-06-15; legacy `validation_excluded_s` metric — predates the 2026-06-17 context→check refinement, to be re-measured separately) |
+| RTD-MEX-MCU-001 | MCU | **PASS** | **PASS** — 1 edit attempt, 44.2 s ≤ 2 min budget (black-box, re-measured post-forward-harden 2026-07-01; context→check window; exit 0, 0 SEVERE [TOOL], 120 generated files; #38) |
 | RTD-MEX-BASENXP-001 | BaseNXP | **PASS** | **PASS** — 1 edit attempt, 12.72 s ≤ 1 min budget (OpenCode black-box, 2026-07-02; KPI optimization iteration 1; session `ses_0dfcfb3b1ffeChWcxr0xtOgaxj`; `BLACKBOX_RESULT configured=true`, `validate_status=passed`) |
 | RTD-MEX-PLATFORM-001 | Platform | **PASS** | **PASS** — 1 edit attempt, 58.7 s ≤ 1 min budget (black-box, 2026-06-17; after universal one-shot workflow optimization, context→check window) |
 | RTD-MEX-PORT-001 | Port | **PASS** | **PASS** — 1 edit attempt, 54.4 s ≤ 1 min budget (black-box, 2026-06-18; context→check window) |
@@ -124,6 +124,7 @@ history. New ADC evidence is recorded in §2 as each case is exercised.
 
 | Date | Version | Description |
 | --- | --- | --- |
+| 2026-07-03 | 0.28.0 | RTD-MEX-MCU-001 re-measured post-forward-harden (#38): 44.2 s context→check, 1 attempt, exit 0, 0 SEVERE [TOOL], 120 generated files. KPI PASS. Deferred 10 Mux12-20+CM7_CORE_CLK clocks documented in asset. |
 | 2026-07-02 | 0.27.0 | Completed the required KPI optimization loop for RTD-MEX-BASENXP-001 after the post-hardening miss: iteration 1 clarified the black-box harness prompt so the standalone `check` runs before vendor `validate`; OpenCode black-box E2E re-measured functional PASS / KPI PASS at 12.72 s ≤ 1 min, 1 edit attempt, session `ses_0dfcfb3b1ffeChWcxr0xtOgaxj`. Summary returns to 14 / 14 functional PASS and 14 / 14 KPI PASS. |
 | 2026-07-02 | 0.26.0 | Corrected the post-BaseNXP forward-hardening acceptance evidence for RTD-MEX-BASENXP-001: OpenCode black-box E2E on 2026-07-01 remained functional PASS (`configured=true`, `validate_status=passed`) but KPI MISS at 183.26 s > 1 min budget, superseding the older 2026-06-17 53.5 s KPI baseline. Summary now separates functional status (14 / 14 PASS) from KPI status (13 / 14 PASS, BaseNXP MISS). |
 | 2026-06-23 | 0.25.1 | Re-measured the four ADC cases' black-box E2E + KPI after the ADC forward-hardening (shared group/trigger byte-builder + new static checks): all four remain functional PASS, 1 edit attempt, within the 2 min budget (ADC-001 80.8 s, ADC-002 75.3 s, ADC-003 106.1 s, ADC-004 65.3 s). The upward shifts on ADC-001/003 are Codex run-to-run variance (ADC-002 was flat), not a tool regression; deterministic suite (635) and the S32DS gate (all four, exit 0 + no SEVERE) were also re-confirmed post-hardening. Recorded KPIs now reflect the current (hardened) tool. |

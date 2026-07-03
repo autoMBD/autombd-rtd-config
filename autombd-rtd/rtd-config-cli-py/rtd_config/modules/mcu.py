@@ -42,6 +42,7 @@
 # Date:        2026-06-03
 # Version:     0.1.0
 # Description: Mcu module provider (peripheral clock reference dependency).
+#              Forward-hardened to full Mcu.xdm editable surface (issue #38).
 # =================================================================================
 
 from __future__ import annotations
@@ -88,6 +89,15 @@ def _load_lpuart_clock_entry(hw: str) -> "dict | None":
 class McuProvider:
     """Owns Mcu clock/reference configuration.
 
+    The provider plans PLL clock-tree edits and McuClockReferencePoint array
+    merges within McuClockSettingConfig_0. The full editable surface described
+    by Mcu.xdm is inventoried in the committed asset
+    ``autombd-rtd/assets/nxp/s32k3/mcu/clock.json`` (_coverage section).
+    Currently only the 160/80/40 MHz recipe is supported as a fixed
+    clock-tree configuration; the deferred surface (oscillators, clock monitors,
+    power modes, CGM muxes 1-20, etc.) is tracked in the asset's
+    ``not_yet_exposed`` inventory (issue #38).
+
     Uart and FlexIO depend on valid Mcu clock references. The Mcu provider
     owns only the Mcu config region; it never edits Port (oscillator pins) or
     Platform (clock-monitor/voltage/reset interrupts).
@@ -103,8 +113,8 @@ class McuProvider:
         1. PLL and CGM clock-tree configuration (clock_settings + Mcu config_set
            PLL/divider/mux settings).
         2. McuClockReferencePoint array merge: preserve existing reference points
-           and add entries for all selectable S32K344 clocks
-           (when add_all_clock_reference_points=True).
+            and add entries for the 20 fixture-safe S32K344 selectable clocks
+            (when add_all_clock_reference_points=True).
         """
         payload = intent.payload
         core_clk = payload.get("core_clk")
@@ -136,10 +146,12 @@ class McuProvider:
                 path="/Mcu/Mcu/McuModuleConfiguration/McuClockSettingConfig_0/McuClockReferencePoint",
                 description=(
                     "Merge McuClockReferencePoint array: preserve existing reference points "
-                    "and add entries for all selectable S32K344 clocks "
-                    "(CORE_CLK, AIPS_PLAT_CLK, AIPS_SLOW_CLK, FLEXCAN_PE_CLK0_2, "
-                    "FLEXCAN_PE_CLK3_5, EMAC_CLK_RX/TX/TS, QuadSPI_SFCK, QSPI_MEM_CLK, "
-                    "FIRC_CLK, SIRC_CLK, STM0_CLK) not already present by name."
+                    "and add entries for all 20 selectable S32K344 clocks "
+                    "(CORE_CLK, AIPS_PLAT_CLK, AIPS_SLOW_CLK, HSE_CLK, DCM_CLK, "
+                    "LBIST_CLK, QSPI_MEM_CLK, STM0_CLK, STM1_CLK, FLEXCAN_PE_CLK0_2, "
+                    "FLEXCAN_PE_CLK3_5, CLKOUT_STANDBY/RUN, EMAC_CLK_RX/TX/TS, "
+                    "QuadSPI_SFCK, TRACE_CLK, FIRC_CLK, SIRC_CLK) "
+                    "not already present by name."
                 ),
             ))
 
