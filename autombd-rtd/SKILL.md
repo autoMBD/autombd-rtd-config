@@ -96,52 +96,88 @@ the original to `<file>.mex.bak`.
   duplicate LPUART hardware, callback validity).
 
 ### Module configuration (`set`; add `--configure` to write)
-- **`rtd-config mcu set`** — clock tree. `--core-clk <MHz> --aips-plat-clk <MHz>
-  --aips-slow-clk <MHz>` set the PLL + MC_CGM dividers; `--add-all-clock-
-  reference-points` preserves existing reference points and adds every
-  selectable S32K344 clock by name. e.g.
-  `mcu set --project <dir> --core-clk 160 --aips-plat-clk 80 --aips-slow-clk 40 --add-all-clock-reference-points --configure`
-- **`rtd-config basenxp set`** — configure BaseNXP / OsIf shared
-  infrastructure. `--enable-system-timer` enables the OsIf system timer and
-  inserts one `OsIfCounterConfig` (the time base for driver timeouts). The
-  command also supports BaseNXP-owned OsIfGeneral scalars:
-  `--user-mode-support true|false`, `--dev-error-detect true|false`,
-  `--custom-timer true|false`, `--get-user-id core|custom`,
-  `--instance-id <0..255>`, `--get-physical-core-id true|false`, and
-  `--software-semaphore true|false`.
-- **`rtd-config platform set --peripheral <e.g. LPUART_3> --priority <n>`** —
-  set an existing interrupt's priority, keep it enabled, and confirm its ISR is
-  registered. Target by `--peripheral` or exact `--isr-name`.
-- **`rtd-config port set --peripheral <e.g. LPUART_0> --tx <PIN> --rx <PIN>`** —
-  route a peripheral's TX/RX pins (mux + electrical + direction). Pins are
-  validated against the pin database (illegal pins are rejected) — query
-  `pin-options` first.
-- **`rtd-config dio set --add-channel <NAME> --pin <PIN>`** — add a DIO channel
-  (e.g. `LED_CTRL`) on a free GPIO pad; the GPIO direction is configured on the
-  Port side automatically (`--direction output`). The pin's `DioPort` container
-  is created automatically if it does not yet exist.
-- **`rtd-config mcl set --add-flexio-logic-channel <NAME>`** — append a FlexIO
-  logic channel; the next free `CHANNEL_N`/`PIN_N` ids are computed and
-  uniqueness is enforced.
-- **`rtd-config uart set --hw <LPUART_n|FLEXIO_n>`** — configure an existing Uart
-  channel and orchestrate its dependencies. Flags: `--mode interrupt|dma`,
-  `--baud`, `--parity none|even|odd`, `--stop-bits 1|2`,
-  `--word-length 7|8|9|10`, `--callback <CIdent>`, `--priority <n>`,
-  `--tx`/`--rx` (pins), `--using LPUART_IP|FLEXIO_IP`, `--channel-id <n>`.
-  Setting the channel pulls in the Mcu peripheral-clock reference, the Platform
-  ISR (the interrupt ISR, or the DMA-completion ISR in DMA mode), and the Mcl
-  channels.
+Use **structured spec input** as the canonical module configuration API:
+
+```text
+rtd-config <module> set --project <dir> --spec <module-config.json> --configure --json
+```
+
+The JSON file may use the common envelope below. The CLI validates the optional
+`module` and `action` fields, then passes `payload` to the same intent/provider
+pipeline used by legacy flags.
+
+```json
+{
+  "module": "uart",
+  "action": "set",
+  "payload": {
+    "hw": "LPUART_3",
+    "mode": "interrupt"
+  }
+}
+```
+
+For compatibility, a raw payload object is still accepted (the original ADC
+shape). Existing module-specific flags remain available as shortcuts, but they
+normalize into the same `Intent(module, action=set, payload=...)` contract.
+
+Write the spec file inside the project directory or your current workdir, next
+to the copied fixture or agent run files. Do not write module spec files to system temp directories.
+Run exactly one mutating `set --spec ... --configure --json` command for each
+requested module configuration, then run `check`, then run `validate`.
+
+Concise payload examples:
+
+- **Mcu clock tree**:
+  ```json
+  {"core_clk": 160, "aips_plat_clk": 80, "aips_slow_clk": 40,
+   "add_all_clock_reference_points": true}
+  ```
+- **BaseNXP / OsIf**:
+  ```json
+  {"enable_system_timer": true, "user_mode_support": true,
+   "dev_error_detect": false, "custom_timer": false,
+   "get_user_id": "GET_CORE_ID", "instance_id": 0,
+   "get_physical_core_id": true, "software_semaphore": false}
+  ```
+- **Platform interrupt**:
+  ```json
+  {"peripheral": "LPUART_3", "priority": 2}
+  ```
+- **Port pin routing**:
+  ```json
+  {"peripheral": "LPUART_3", "pins": {"tx": "PTB10", "rx": "PTB11"}}
+  ```
+- **Dio channel + Port GPIO dependency**:
+  ```json
+  {"add_channel": "LED_CTRL", "pin": "PTA5", "direction": "output"}
+  ```
+- **Mcl FlexIO logic channel**:
+  ```json
+  {"add_flexio_logic_channel": "UART2_TX"}
+  ```
+- **Uart channel and dependencies**:
+  ```json
+  {"hw": "LPUART_3", "mode": "interrupt", "baud": 115200,
+   "pins": {"tx": "PTB10", "rx": "PTB11"}, "using": "LPUART_IP",
+   "channel_id": 0, "callback": "Autombd_UartCallback",
+   "parity": "LPUART_UART_IP_PARITY_DISABLED",
+   "stop_bits": "LPUART_UART_IP_ONE_STOP_BIT",
+   "word_length": "LPUART_UART_IP_8_BITS_PER_CHAR", "priority": 2}
+  ```
+
+For Port/Uart pin choices, query `pin-options` before writing the spec.
+
 - **`rtd-config uart add-flexio-channel`** — create a **new** FlexIO-backed Uart
   Tx+Rx channel pair plus their two Mcl FlexIO logic channels, with consistent
   references and a callback. `--baud` (default 921600), `--word-length 8`,
   `--callback`, `--tx-name`/`--rx-name`. The shared FlexIO ISR + clock reference
   are ensured idempotently.
-- **`rtd-config adc set --spec <path.json>`** — configure an ADC Hardware Unit
-  from a single JSON spec: the target unit, transfer mode, per-group sampling
+- **Adc Hardware Unit** — configure the target unit, transfer mode, per-group sampling
   time (**derived** into `AdcSamplingDuration` from the ADC source clock +
   prescale — never written as a literal), one or more conversion groups, and
   per-channel watchdog thresholds. One `adc set --spec X --configure` expresses
-  a full case. The spec object:
+  a full case. The payload object:
   ```json
   {
     "unit": "ADC1",

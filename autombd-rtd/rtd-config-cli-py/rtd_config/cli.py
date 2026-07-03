@@ -93,6 +93,54 @@ def _parse_bool_token(value: str) -> bool:
     )
 
 
+def _add_spec_argument(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--spec",
+        metavar="PATH",
+        help=(
+            "Path to a module JSON spec. Canonical shape: "
+            '{"module":"<module>","action":"set","payload":{...}}. '
+            "For compatibility, a raw payload object is also accepted."
+        ),
+    )
+
+
+def _load_spec_payload(args: argparse.Namespace, module: str, action: str = "set") -> dict | None:
+    spec_path = getattr(args, "spec", None)
+    if not spec_path:
+        return None
+
+    try:
+        raw = json.loads(Path(spec_path).read_text(encoding="utf-8"))
+    except OSError as exc:
+        raise SystemExit(f"failed to read --spec {spec_path}: {exc}") from exc
+    except json.JSONDecodeError as exc:
+        raise SystemExit(f"failed to parse --spec {spec_path} as JSON: {exc}") from exc
+
+    if not isinstance(raw, dict):
+        raise SystemExit("--spec must contain a JSON object")
+
+    if "payload" not in raw:
+        return raw
+
+    spec_module = raw.get("module")
+    if spec_module is not None and spec_module != module:
+        raise SystemExit(
+            f"--spec module mismatch: expected {module!r}, got {spec_module!r}"
+        )
+
+    spec_action = raw.get("action")
+    if spec_action is not None and spec_action != action:
+        raise SystemExit(
+            f"--spec action mismatch: expected {action!r}, got {spec_action!r}"
+        )
+
+    payload = raw["payload"]
+    if not isinstance(payload, dict):
+        raise SystemExit("--spec payload must be a JSON object")
+    return payload
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="rtd-config")
     parser.add_argument("--version", action="store_true")
@@ -151,6 +199,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--priority", type=int,
         help="ISR priority for the Platform interrupt entry (default 2).",
     )
+    _add_spec_argument(uart_set)
     uart_set.add_argument("--configure", action="store_true")
     uart_set.add_argument("--backup", action="store_true")
     uart_set.add_argument("--json", action="store_true")
@@ -202,6 +251,7 @@ def build_parser() -> argparse.ArgumentParser:
     platform_set.add_argument("--peripheral")
     platform_set.add_argument("--isr-name")
     platform_set.add_argument("--priority", type=int)
+    _add_spec_argument(platform_set)
     platform_set.add_argument("--configure", action="store_true")
     platform_set.add_argument("--backup", action="store_true")
     platform_set.add_argument("--json", action="store_true")
@@ -222,6 +272,7 @@ def build_parser() -> argparse.ArgumentParser:
     basenxp_set.add_argument("--instance-id", type=int)
     basenxp_set.add_argument("--get-physical-core-id", type=_parse_bool_token)
     basenxp_set.add_argument("--software-semaphore", type=_parse_bool_token)
+    _add_spec_argument(basenxp_set)
     basenxp_set.add_argument("--configure", action="store_true")
     basenxp_set.add_argument("--backup", action="store_true")
     basenxp_set.add_argument("--json", action="store_true")
@@ -239,6 +290,7 @@ def build_parser() -> argparse.ArgumentParser:
             "are computed dynamically (uniqueness enforced per Mcl.xdm)."
         ),
     )
+    _add_spec_argument(mcl_set)
     mcl_set.add_argument("--configure", action="store_true")
     mcl_set.add_argument("--backup", action="store_true")
     mcl_set.add_argument("--json", action="store_true")
@@ -249,11 +301,11 @@ def build_parser() -> argparse.ArgumentParser:
     port_set.add_argument("--project", required=True)
     port_set.add_argument(
         "--peripheral",
-        required=True,
         help="Peripheral whose TX/RX pins to configure, e.g. LPUART_0.",
     )
     port_set.add_argument("--tx", metavar="PIN", help="TX pin signal name, e.g. PTA27.")
     port_set.add_argument("--rx", metavar="PIN", help="RX pin signal name, e.g. PTA28.")
+    _add_spec_argument(port_set)
     port_set.add_argument("--configure", action="store_true")
     port_set.add_argument("--backup", action="store_true")
     port_set.add_argument("--json", action="store_true")
@@ -281,6 +333,7 @@ def build_parser() -> argparse.ArgumentParser:
         choices=["output"],
         help="Pin direction (default: output). Only 'output' is currently supported.",
     )
+    _add_spec_argument(dio_set)
     dio_set.add_argument("--configure", action="store_true")
     dio_set.add_argument("--backup", action="store_true")
     dio_set.add_argument("--json", action="store_true")
@@ -315,6 +368,7 @@ def build_parser() -> argparse.ArgumentParser:
             "selectable S32K344 clocks not already present by name."
         ),
     )
+    _add_spec_argument(mcu_set)
     mcu_set.add_argument("--configure", action="store_true")
     mcu_set.add_argument("--backup", action="store_true")
     mcu_set.add_argument("--json", action="store_true")
@@ -332,14 +386,7 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     adc_set.add_argument("--project", required=True)
-    adc_set.add_argument(
-        "--spec",
-        metavar="PATH",
-        help=(
-            "Path to a JSON file describing the ADC config delta. Object shape: "
-            '{"unit","transfer","sampling_time_us","groups":[...],"watchdog":[...]}.'
-        ),
-    )
+    _add_spec_argument(adc_set)
     adc_set.add_argument("--configure", action="store_true")
     adc_set.add_argument("--backup", action="store_true")
     adc_set.add_argument("--json", action="store_true")
@@ -360,6 +407,10 @@ def normalize_uart_intent(args: argparse.Namespace) -> Intent:
       --priority N            -> priority (ISR priority, default 2)
     """
     from rtd_config.backends.s32_mex.apply import _load_uart_asset
+
+    spec_payload = _load_spec_payload(args, "uart")
+    if spec_payload is not None:
+        return Intent.from_dict({"module": "uart", "action": "set", "payload": spec_payload})
 
     payload: dict = {
         "hw": args.hw or "",
@@ -632,6 +683,10 @@ def _configure_module(args: argparse.Namespace, intent: Intent, plan, apply_fn) 
 
 def normalize_platform_intent(args: argparse.Namespace) -> Intent:
     """Normalize `platform set` CLI arguments into the JSON intent contract."""
+    spec_payload = _load_spec_payload(args, "platform")
+    if spec_payload is not None:
+        return Intent.from_dict({"module": "platform", "action": "set", "payload": spec_payload})
+
     payload: dict = {}
     if args.peripheral:
         payload["peripheral"] = args.peripheral
@@ -659,6 +714,10 @@ def cmd_platform_set(args: argparse.Namespace) -> int:
 
 def normalize_basenxp_intent(args: argparse.Namespace) -> Intent:
     """Normalize `basenxp set` CLI arguments into the JSON intent contract."""
+    spec_payload = _load_spec_payload(args, "basenxp")
+    if spec_payload is not None:
+        return Intent.from_dict({"module": "basenxp", "action": "set", "payload": spec_payload})
+
     payload: dict = {}
     if args.enable_system_timer:
         payload["enable_system_timer"] = True
@@ -697,6 +756,10 @@ def cmd_basenxp_set(args: argparse.Namespace) -> int:
 
 def normalize_mcl_intent(args: argparse.Namespace) -> Intent:
     """Normalize `mcl set` CLI arguments into the JSON intent contract."""
+    spec_payload = _load_spec_payload(args, "mcl")
+    if spec_payload is not None:
+        return Intent.from_dict({"module": "mcl", "action": "set", "payload": spec_payload})
+
     payload: dict = {}
     channel = getattr(args, "add_flexio_logic_channel", None)
     if channel:
@@ -721,6 +784,10 @@ def cmd_mcl_set(args: argparse.Namespace) -> int:
 
 def normalize_port_intent(args: argparse.Namespace) -> Intent:
     """Normalize `port set` CLI arguments into the JSON intent contract."""
+    spec_payload = _load_spec_payload(args, "port")
+    if spec_payload is not None:
+        return Intent.from_dict({"module": "port", "action": "set", "payload": spec_payload})
+
     payload: dict = {}
     if args.peripheral:
         payload["peripheral"] = args.peripheral
@@ -751,6 +818,10 @@ def cmd_port_set(args: argparse.Namespace) -> int:
 
 def normalize_dio_intent(args: argparse.Namespace) -> Intent:
     """Normalize `dio set` CLI arguments into the JSON intent contract."""
+    spec_payload = _load_spec_payload(args, "dio")
+    if spec_payload is not None:
+        return Intent.from_dict({"module": "dio", "action": "set", "payload": spec_payload})
+
     payload: dict = {}
     add_channel = getattr(args, "add_channel", None)
     if add_channel:
@@ -766,6 +837,10 @@ def normalize_dio_intent(args: argparse.Namespace) -> Intent:
 
 def normalize_mcu_intent(args: argparse.Namespace) -> Intent:
     """Normalize `mcu set` CLI arguments into the JSON intent contract."""
+    spec_payload = _load_spec_payload(args, "mcu")
+    if spec_payload is not None:
+        return Intent.from_dict({"module": "mcu", "action": "set", "payload": spec_payload})
+
     payload: dict = {}
     core_clk = getattr(args, "core_clk", None)
     if core_clk is not None:
@@ -821,10 +896,7 @@ def normalize_adc_intent(args: argparse.Namespace) -> Intent:
     derivation) are resolved/validated downstream in apply_adc_set against the
     committed adc.json asset -- the CLI does not invent or transform them here.
     """
-    payload: dict = {}
-    spec_path = getattr(args, "spec", None)
-    if spec_path:
-        payload = json.loads(Path(spec_path).read_text(encoding="utf-8"))
+    payload: dict = _load_spec_payload(args, "adc") or {}
     return Intent.from_dict({"module": "adc", "action": "set", "payload": payload})
 
 

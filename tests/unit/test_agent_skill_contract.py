@@ -69,10 +69,22 @@ def test_rtd_config_skill_documents_public_cli_and_module_surface():
     assert "rtd-config inspect" in skill
     assert "rtd-config pin-options" in skill
     assert "validate" in skill
-    # Documents the full seven-module configure surface, not uart alone.
+    # Documents the uniform spec-first configure surface and each module's
+    # payload shape without regressing to a long bespoke flag catalog.
+    assert "rtd-config <module> set --project <dir> --spec" in skill
+    assert "module-specific flags remain available as shortcuts" in skill
+    assert "Write the spec file inside the project directory or your current workdir" in skill
+    assert "Do not write module spec files to system temp directories" in skill
+    assert "Run exactly one mutating `set --spec ... --configure --json` command" in skill
     for fragment in (
-        "mcu set", "basenxp set", "platform set", "port set",
-        "dio set", "mcl set", "uart set",
+        "Mcu clock tree",
+        "BaseNXP / OsIf",
+        "Platform interrupt",
+        "Port pin routing",
+        "Dio channel",
+        "Mcl FlexIO logic channel",
+        "Uart channel",
+        "Adc Hardware Unit",
     ):
         assert fragment in skill, f"SKILL.md must document `{fragment}`"
     # DMA is a supported Uart mode now; the milestone-era rejection is gone.

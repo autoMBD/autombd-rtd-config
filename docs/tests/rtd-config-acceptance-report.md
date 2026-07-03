@@ -2,7 +2,7 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.28.0 |
+| Version | 0.29.0 |
 | Date | 2026-07-03 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Current pass/fail evidence for the E2E acceptance cases defined in `rtd-config-test-cases.md`. This document is the living status record the catalog points to; the catalog defines the target, this records where the tool actually stands. |
@@ -48,33 +48,32 @@ measured*, and a KPI `miss` never weakens the functional **PASS**.
 
 | ID | Module | Status | KPI |
 | --- | --- | --- | --- |
-| RTD-MEX-MCU-001 | MCU | **PASS** | **PASS** — 1 edit attempt, 44.2 s ≤ 2 min budget (black-box, re-measured post-forward-harden 2026-07-01; context→check window; exit 0, 0 SEVERE [TOOL], 120 generated files; #38) |
-| RTD-MEX-BASENXP-001 | BaseNXP | **PASS** | **PASS** — 1 edit attempt, 12.72 s ≤ 1 min budget (OpenCode black-box, 2026-07-02; KPI optimization iteration 1; session `ses_0dfcfb3b1ffeChWcxr0xtOgaxj`; `BLACKBOX_RESULT configured=true`, `validate_status=passed`) |
-| RTD-MEX-PLATFORM-001 | Platform | **PASS** | **PASS** — 1 edit attempt, 58.7 s ≤ 1 min budget (black-box, 2026-06-17; after universal one-shot workflow optimization, context→check window) |
-| RTD-MEX-PORT-001 | Port | **PASS** | **PASS** — 1 edit attempt, 54.4 s ≤ 1 min budget (black-box, 2026-06-18; context→check window) |
-| RTD-MEX-DIO-001 | Dio | **PASS** | **PASS** — 1 edit attempt, 46.1 s ≤ 1 min budget (black-box, 2026-06-18; context→check window) |
-| RTD-MEX-DIO-002 | Dio | **PASS** | **PASS** — 1 edit attempt, 26.3 s ≤ 1 min budget (black-box, 2026-06-18; context→check window) |
-| RTD-MEX-MCL-001 | Mcl | **PASS** | **PASS** — 1 edit attempt, 24.3 s ≤ 1 min budget (black-box, 2026-06-18; context→check window) |
-| RTD-MEX-UART-001 | UART | **PASS** | **PASS** — 1 edit attempt, 32.8 s ≤ 1 min budget (black-box, 2026-06-18; context→check window) |
-| RTD-MEX-UART-002 | UART | **PASS** | **PASS** — 1 edit attempt, 28.6 s ≤ 1 min budget (black-box, 2026-06-18; context→check window) |
-| RTD-MEX-UART-003 | UART | **PASS** | **PASS** — 1 edit attempt, 55.3 s ≤ 3 min budget (black-box, 2026-06-18; context→check window; auto-detect HW after --hw optional) |
-| RTD-MEX-ADC-001 | ADC | **PASS** | **PASS** — 1 edit attempt, 80.8 s ≤ 2 min budget (black-box, re-measured post-hardening 2026-06-23; context→check window; exit 0, 0 SEVERE, 125 generated files) |
-| RTD-MEX-ADC-002 | ADC | **PASS** | **PASS** — 1 edit attempt, 75.3 s ≤ 2 min budget (black-box, re-measured post-hardening 2026-06-23; context→check window; exit 0, 0 SEVERE, 125 generated files) |
-| RTD-MEX-ADC-003 | ADC | **PASS** | **PASS** — 1 edit attempt, 106.1 s ≤ 2 min budget (black-box, re-measured post-hardening 2026-06-23; context→check window; exit 0, 0 SEVERE, 125 generated files) |
-| RTD-MEX-ADC-004 | ADC | **PASS** | **PASS** — 1 edit attempt, 65.3 s ≤ 2 min budget (black-box, re-measured post-hardening 2026-06-23; context→check window; exit 0, 0 SEVERE, 125 generated files) |
+| RTD-MEX-MCU-001 | MCU | **PASS** | **PASS** — 1 edit attempt, 55.79 s ≤ 2 min budget (OpenCode black-box, 2026-07-03, post-#53 unified `--spec` CLI; context→check window; harness exit 0; session `ses_0d76c5063ffepV5EexAhUX7Umc`) |
+| RTD-MEX-BASENXP-001 | BaseNXP | **PASS** | **PASS** — 1 edit attempt, 22.19 s ≤ 1 min budget (OpenCode black-box, 2026-07-03, post-#53 unified `--spec` CLI; context→check window; harness exit 0; session `ses_0d76a4b48ffeF9RtyH9vav9LCq`) |
+| RTD-MEX-PLATFORM-001 | Platform | **PASS** | **PASS** — 1 edit attempt, 22.85 s ≤ 1 min budget (OpenCode black-box, 2026-07-03, post-#53 unified `--spec` CLI; context→check window; harness exit 0; session `ses_0d76d9851ffeFQhqRpz1AfbG6p`; `BLACKBOX_RESULT configured=true`, `validate_status=passed`) |
+| RTD-MEX-PORT-001 | Port | **PASS** | **PASS** — 1 edit attempt, 31.80 s ≤ 1 min budget (OpenCode black-box, 2026-07-03, post-#53 unified `--spec` CLI; context→check window; harness exit 0; session `ses_0d7694981ffe9pmhAFE4AUz5Ak`) |
+| RTD-MEX-DIO-001 | Dio | **PASS** | **PASS** — 1 edit attempt, 34.61 s ≤ 1 min budget (OpenCode black-box, 2026-07-03, post-#53 unified `--spec` CLI; context→check window; harness exit 0; session `ses_0d768261fffesBZuAvSRiIikTg`) |
+| RTD-MEX-DIO-002 | Dio | **PASS** | **PASS** — 1 edit attempt, 31.41 s ≤ 1 min budget (OpenCode black-box, 2026-07-03, post-#53 unified `--spec` CLI; KPI optimization iteration 1 after an initial 2-edit-attempt run; context→check window; harness exit 0; session `ses_0d7586cedffeIBH0qRJnbaq3g2`) |
+| RTD-MEX-MCL-001 | Mcl | **PASS** | **PASS** — 1 edit attempt, 51.95 s ≤ 1 min budget (OpenCode black-box, 2026-07-03, post-#53 unified `--spec` CLI; context→check window; harness exit 0; session `ses_0d765c32affecYoVO88i4EHTmK`; `BLACKBOX_RESULT configured=true`, `validate_status=passed`) |
+| RTD-MEX-UART-001 | UART | **PASS** | **PASS** — 1 edit attempt, 47.64 s ≤ 1 min budget (OpenCode black-box, 2026-07-03, post-#53 unified `--spec` CLI; context→check window; harness exit 0; session `ses_0d7645379ffeFIQkR7MQ4Rj3r1`) |
+| RTD-MEX-UART-002 | UART | **PASS** | **PASS** — 1 edit attempt, 22.76 s ≤ 1 min budget (OpenCode black-box, 2026-07-03, post-#53 unified `--spec` CLI; context→check window; harness exit 0; session `ses_0d762fea0ffecjL6VRgVWvZ6az`; `BLACKBOX_RESULT configured=true`, `validate_status=passed`) |
+| RTD-MEX-UART-003 | UART | **PASS** | **PASS** — 1 edit attempt, 62.24 s ≤ 3 min budget (OpenCode black-box, 2026-07-03, post-#53 unified `--spec` CLI; context→check window; harness exit 0; session `ses_0d76209b5ffeF8QPG4OZfbkY0g`; `BLACKBOX_RESULT configured=true`, `validate_status=passed`) |
+| RTD-MEX-ADC-001 | ADC | **PASS** | **PASS** — 1 edit attempt, 20.59 s ≤ 2 min budget (OpenCode black-box, 2026-07-03, post-#53 unified `--spec` CLI; context→check window; harness exit 0; session `ses_0d760437effebkcKyjJj6P1lHk`) |
+| RTD-MEX-ADC-002 | ADC | **PASS** | **PASS** — 1 edit attempt, 30.11 s ≤ 2 min budget (OpenCode black-box, 2026-07-03, post-#53 unified `--spec` CLI; context→check window; harness exit 0; session `ses_0d75f0ed7ffeVFwJE8BpcQwgSm`; `BLACKBOX_RESULT configured=true`, `validate_status=passed`) |
+| RTD-MEX-ADC-003 | ADC | **PASS** | **PASS** — 1 edit attempt, 73.44 s ≤ 2 min budget (OpenCode black-box, 2026-07-03, post-#53 unified `--spec` CLI; context→check window; harness exit 0; session `ses_0d75db2d1ffe5TqqOCISfeNbqe`; `BLACKBOX_RESULT configured=true`, `validate_status=passed`) |
+| RTD-MEX-ADC-004 | ADC | **PASS** | **PASS** — 1 edit attempt, 30.33 s ≤ 2 min budget (OpenCode black-box, 2026-07-03, post-#53 unified `--spec` CLI; context→check window; harness exit 0; session `ses_0d75b9bfaffewQYBGo27IY27dM`) |
 
 **Summary: 14 / 14 cases functional PASS; 14 / 14 KPI PASS.** The seven-module
-minimal system plus the ADC module have functional acceptance evidence
-(deterministic suite, static checks, the S32DS vendor gate, and code-generation
-evidence). The post-BaseNXP forward-hardening KPI miss (183.26 s on 2026-07-01)
-was sent through the required KPI optimization loop and converged on iteration 1:
-the black-box prompt now requires the standalone `check` before vendor
-`validate`, and RTD-MEX-BASENXP-001 re-measured at 12.72 s. All four ADC cases —
-interrupt software groups + watchdog (ADC-001), DMA streaming (ADC-002), BCTU
-single hardware trigger + new-data + watchdog (ADC-003), and dual-ADC BCTU list
-trigger + FIFO DMA (ADC-004) — pass the black-box protocol with one edit attempt
-each and KPI under the 2 min budget (80.8 / 75.3 / 106.1 / 65.3 s, re-measured
-after the forward-hardening), each exit 0 with 125 generated files and no SEVERE.
+minimal system plus the ADC module have fresh post-#53 OpenCode black-box
+evidence after the unified structured `--spec` CLI contract changed the released
+skill and module-facing CLI behavior. All 14 cases completed with harness exit
+0, one final edit attempt, and KPI within budget. DIO-002 initially passed
+functionally but used two edit attempts; the released skill was tightened to
+require an in-workdir spec file and exactly one mutating `set --spec` command,
+then KPI optimization iteration 1 re-measured DIO-002 at 31.41 s with one edit
+attempt. Local fixture vendor gates were also re-confirmed on 2026-07-03:
+`Uart_Example_S32K344` exit 0 / 120 generated files / no SEVERE `[TOOL]`, and
+`Autombd_Test_Adc_S32K344` exit 0 / 125 generated files / no SEVERE `[TOOL]`.
 
 ## 3. Cross-cutting blockers (critical path)
 
@@ -124,6 +123,7 @@ history. New ADC evidence is recorded in §2 as each case is exercised.
 
 | Date | Version | Description |
 | --- | --- | --- |
+| 2026-07-03 | 0.29.0 | Issue #53 unified module configuration around structured `--spec` input. Refreshed all 14 OpenCode black-box E2E/KPI cases post-CLI/skill change: all functional PASS, all KPI PASS. DIO-002 needed KPI optimization iteration 1 after an initial 2-edit-attempt run; final evidence is 31.41 s / 1 edit attempt. |
 | 2026-07-03 | 0.28.0 | RTD-MEX-MCU-001 re-measured post-forward-harden (#38): 44.2 s context→check, 1 attempt, exit 0, 0 SEVERE [TOOL], 120 generated files. KPI PASS. Deferred 10 Mux12-20+CM7_CORE_CLK clocks documented in asset. |
 | 2026-07-02 | 0.27.0 | Completed the required KPI optimization loop for RTD-MEX-BASENXP-001 after the post-hardening miss: iteration 1 clarified the black-box harness prompt so the standalone `check` runs before vendor `validate`; OpenCode black-box E2E re-measured functional PASS / KPI PASS at 12.72 s ≤ 1 min, 1 edit attempt, session `ses_0dfcfb3b1ffeChWcxr0xtOgaxj`. Summary returns to 14 / 14 functional PASS and 14 / 14 KPI PASS. |
 | 2026-07-02 | 0.26.0 | Corrected the post-BaseNXP forward-hardening acceptance evidence for RTD-MEX-BASENXP-001: OpenCode black-box E2E on 2026-07-01 remained functional PASS (`configured=true`, `validate_status=passed`) but KPI MISS at 183.26 s > 1 min budget, superseding the older 2026-06-17 53.5 s KPI baseline. Summary now separates functional status (14 / 14 PASS) from KPI status (13 / 14 PASS, BaseNXP MISS). |
