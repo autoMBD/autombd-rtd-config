@@ -322,6 +322,17 @@ class TestBuildPrompt:
         assert "validate_status" in prompt
         assert "notes" in prompt
 
+    def test_suffix_requires_check_before_validate_for_kpi(self, tmp_path):
+        mod = load_module()
+        skill_md = tmp_path / "SKILL.md"
+        skill_md.write_text("# skill\n", encoding="utf-8")
+        project_dir = tmp_path / "MyProject"
+
+        prompt = mod.build_prompt(self._make_case(mod), skill_md, project_dir)
+
+        assert "run `check` before `validate`" in prompt
+        assert "Do not run `validate` before `check`" in prompt
+
     def test_instructs_how_to_invoke_skill_cli(self, tmp_path):
         mod = load_module()
         skill_md = tmp_path / "SKILL.md"

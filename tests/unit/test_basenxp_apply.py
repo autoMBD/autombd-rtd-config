@@ -61,6 +61,7 @@ and verifies byte-narrowness and idempotency.
 """
 import difflib
 import json
+from pathlib import Path
 import subprocess
 import sys
 import xml.etree.ElementTree as ET
@@ -73,6 +74,18 @@ from tests.fixtures import copy_uart_fixture
 
 def _intent(**payload) -> Intent:
     return Intent.from_dict({"module": "basenxp", "action": "set", "payload": payload})
+
+
+def _asset_path() -> Path:
+    return (
+        Path(__file__).resolve().parents[2]
+        / "autombd-rtd"
+        / "assets"
+        / "nxp"
+        / "s32k3"
+        / "basenxp"
+        / "osif.json"
+    )
 
 
 def _osif_cfg(doc: MexDocument) -> ET.Element | None:
@@ -118,6 +131,132 @@ def _changed_lines(before: bytes, after: bytes) -> list[str]:
         line for line in diff
         if line.startswith(("+", "-")) and not line.startswith(("+++", "---"))
     ]
+
+
+# ---------------------------------------------------------------------------
+# Forward surface coverage: osif.json must account for the BaseNXP.xdm surface.
+# ---------------------------------------------------------------------------
+def test_osif_json_asset_has_forward_surface_coverage():
+    asset = json.loads(_asset_path().read_text(encoding="utf-8"))
+
+    assert "BaseNXP.xdm" in asset["_source"]
+    coverage = asset["_coverage"]
+
+    configurable = coverage["configurable_today"]
+    osif_general = configurable["OsIfGeneral"]
+    for item in (
+        "OsIfEnableUserModeSupport",
+        "OsIfDevErrorDetect",
+        "OsIfUseCustomTimer",
+        "OsIfUseGetUserId",
+        "OsIfInstanceId",
+        "OsIfGetPhysicalCoreIdEnable",
+        "OsIfSoftwareSemaphoredEnable",
+        "OsIfUseSystemTimer",
+        "OsIfCounterConfig",
+    ):
+        assert item in osif_general
+
+    not_yet = coverage["not_yet_exposed"]
+    assert "OsIfMulticoreSupport" in not_yet["multicore_partition_os"]
+    assert "OsIfEcucPartitionRef" in not_yet["multicore_partition_os"]
+    assert "OsIfOsCounterRef" in not_yet["autosar_os"]
+    assert "CommonPublishedInformation" in not_yet["published_information"]
+
+    assert asset["enum_domains"]["OsIfUseGetUserId"] == [
+        "GET_CORE_ID",
+        "GET_PARTITION_ID",
+        "GET_CUSTOM_ID",
+    ]
+    assert asset["constraints"]["OsIfInstanceId"] == {
+        "min": 0,
+        "max": 255,
+        "source_ref": "BaseNXP.xdm:OsIfGeneral/OsIfInstanceId INVALID Range",
+    }
+
+
+# ---------------------------------------------------------------------------
+# Generality: arbitrary valid BaseNXP-owned OsIfGeneral values, not E2E literals.
+# ---------------------------------------------------------------------------
+def test_apply_sets_arbitrary_valid_osif_general_values(tmp_path):
+    project = copy_uart_fixture(tmp_path)
+    mex = project / "Uart_Example.mex"
+    doc = MexDocument.load(mex)
+
+    result = apply_basenxp_set(doc, _intent(
+        user_mode_support=True,
+        dev_error_detect=False,
+        custom_timer=True,
+        get_user_id="GET_CUSTOM_ID",
+        instance_id=42,
+        get_physical_core_id=True,
+        software_semaphore=True,
+    ))
+    doc.write(mex)
+
+    assert not result.blocked, [d.to_dict() for d in result.diagnostics]
+    assert "basenxp" in result.changed_modules
+
+    reloaded = MexDocument.load(mex)
+    cfg = _osif_cfg(reloaded)
+    assert cfg is not None
+    assert _child_setting_value(reloaded, cfg, "OsIfEnableUserModeSupport") == "true"
+    assert _child_setting_value(reloaded, cfg, "OsIfDevErrorDetect") == "false"
+    assert _child_setting_value(reloaded, cfg, "OsIfUseCustomTimer") == "true"
+    assert _child_setting_value(reloaded, cfg, "OsIfUseGetUserId") == "GET_CUSTOM_ID"
+    assert _child_setting_value(reloaded, cfg, "OsIfInstanceId") == "42"
+    assert _child_setting_value(reloaded, cfg, "OsIfGetPhysicalCoreIdEnable") == "true"
+    assert _child_setting_value(reloaded, cfg, "OsIfSoftwareSemaphoredEnable") == "true"
+    assert _use_system_timer_value(reloaded) == "false"
+    assert len(_counter_structs(reloaded)) == 0
+
+
+def test_apply_rejects_instance_id_outside_xdm_range(tmp_path):
+    project = copy_uart_fixture(tmp_path)
+    mex = project / "Uart_Example.mex"
+    doc = MexDocument.load(mex)
+
+    result = apply_basenxp_set(doc, _intent(instance_id=256))
+
+    assert result.blocked
+    assert [d.code for d in result.diagnostics] == ["basenxp_instance_id_out_of_range"]
+    assert _child_setting_value(doc, _osif_cfg(doc), "OsIfInstanceId") == "0"
+
+
+def test_cli_basenxp_set_general_osif_values_configure(tmp_path):
+    project = copy_uart_fixture(tmp_path)
+    mex = project / "Uart_Example.mex"
+
+    result = subprocess.run(
+        [
+            sys.executable, "-m", "rtd_config", "basenxp", "set",
+            "--project", str(project),
+            "--user-mode-support", "true",
+            "--dev-error-detect", "false",
+            "--custom-timer", "true",
+            "--get-user-id", "custom",
+            "--instance-id", "42",
+            "--get-physical-core-id", "true",
+            "--software-semaphore", "true",
+            "--configure", "--json",
+        ],
+        text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False,
+    )
+
+    payload = json.loads(result.stdout)
+    assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+    assert payload["status"] == "passed", payload
+
+    reloaded = MexDocument.load(mex)
+    cfg = _osif_cfg(reloaded)
+    assert cfg is not None
+    assert _child_setting_value(reloaded, cfg, "OsIfEnableUserModeSupport") == "true"
+    assert _child_setting_value(reloaded, cfg, "OsIfDevErrorDetect") == "false"
+    assert _child_setting_value(reloaded, cfg, "OsIfUseCustomTimer") == "true"
+    assert _child_setting_value(reloaded, cfg, "OsIfUseGetUserId") == "GET_CUSTOM_ID"
+    assert _child_setting_value(reloaded, cfg, "OsIfInstanceId") == "42"
+    assert _child_setting_value(reloaded, cfg, "OsIfGetPhysicalCoreIdEnable") == "true"
+    assert _child_setting_value(reloaded, cfg, "OsIfSoftwareSemaphoredEnable") == "true"
 
 
 # ---------------------------------------------------------------------------

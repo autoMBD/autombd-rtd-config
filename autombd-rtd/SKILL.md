@@ -101,8 +101,14 @@ the original to `<file>.mex.bak`.
   reference-points` preserves existing reference points and adds every
   selectable S32K344 clock by name. e.g.
   `mcu set --project <dir> --core-clk 160 --aips-plat-clk 80 --aips-slow-clk 40 --add-all-clock-reference-points --configure`
-- **`rtd-config basenxp set --enable-system-timer`** — enable the OsIf system
-  timer and insert one `OsIfCounterConfig` (the time base for driver timeouts).
+- **`rtd-config basenxp set`** — configure BaseNXP / OsIf shared
+  infrastructure. `--enable-system-timer` enables the OsIf system timer and
+  inserts one `OsIfCounterConfig` (the time base for driver timeouts). The
+  command also supports BaseNXP-owned OsIfGeneral scalars:
+  `--user-mode-support true|false`, `--dev-error-detect true|false`,
+  `--custom-timer true|false`, `--get-user-id core|custom`,
+  `--instance-id <0..255>`, `--get-physical-core-id true|false`, and
+  `--software-semaphore true|false`.
 - **`rtd-config platform set --peripheral <e.g. LPUART_3> --priority <n>`** —
   set an existing interrupt's priority, keep it enabled, and confirm its ISR is
   registered. Target by `--peripheral` or exact `--isr-name`.
