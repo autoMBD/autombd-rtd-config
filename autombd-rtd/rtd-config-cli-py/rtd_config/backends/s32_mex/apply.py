@@ -100,6 +100,12 @@ def _load_uart_asset() -> dict:
     return json.loads(asset_path.read_text(encoding="utf-8"))
 
 
+def _load_basenxp_asset() -> dict:
+    """Load the committed BaseNXP osif.json asset. Never reads raw .xdm."""
+    asset_path = _ASSET_ROOT / "nxp" / "s32k3" / "basenxp" / "osif.json"
+    return json.loads(asset_path.read_text(encoding="utf-8"))
+
+
 def _lookup_lpuart_irq_clock(hw: str) -> "dict | None":
     """Return the irq_name/isr_handler/clock_select entry for an LPUART instance.
 
@@ -1427,14 +1433,146 @@ def _build_counter_array_bytes(
     return le.join(lines).encode("utf-8")
 
 
+def _find_osif_general_struct(
+    doc: MexDocument,
+    basenxp_cfg: ET.Element,
+) -> ET.Element | None:
+    for el in basenxp_cfg.iter():
+        if el.tag.endswith("struct") and el.attrib.get("name") == "OsIfGeneral":
+            return el
+    return None
+
+
+def _basenxp_supported_general_payload_keys(asset: dict) -> set[str]:
+    osif = asset["OsIfGeneral"]
+    return (
+        set(osif["boolean_settings"])
+        | set(osif["integer_settings"])
+        | set(osif["enum_settings"])
+    )
+
+
+def _validate_basenxp_payload(payload: dict, asset: dict) -> list[Diagnostic]:
+    diagnostics: list[Diagnostic] = []
+
+    bool_settings = asset["OsIfGeneral"]["boolean_settings"]
+    for key in bool_settings:
+        if key in payload and not isinstance(payload[key], bool):
+            diagnostics.append(Diagnostic(
+                severity="blocker",
+                code="basenxp_boolean_value_invalid",
+                module="basenxp",
+                message=f"BaseNXP payload '{key}' must be a boolean.",
+                details={"field": key, "value": payload[key]},
+            ))
+
+    if "instance_id" in payload:
+        value = payload["instance_id"]
+        rng = asset["constraints"]["OsIfInstanceId"]
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, int)
+            or value < int(rng["min"])
+            or value > int(rng["max"])
+        ):
+            diagnostics.append(Diagnostic(
+                severity="blocker",
+                code="basenxp_instance_id_out_of_range",
+                module="basenxp",
+                message=(
+                    "OsIfInstanceId must be an integer in the BaseNXP.xdm range "
+                    f"[{rng['min']}, {rng['max']}]."
+                ),
+                details={"field": "OsIfInstanceId", "value": value, "range": rng},
+            ))
+
+    if "get_user_id" in payload:
+        value = payload["get_user_id"]
+        domain = asset["enum_domains"]["OsIfUseGetUserId"]
+        exposed = asset["constraints"]["OsIfUseGetUserId"]["cli_exposed_values"]
+        if value not in domain:
+            diagnostics.append(Diagnostic(
+                severity="blocker",
+                code="basenxp_get_user_id_invalid",
+                module="basenxp",
+                message=(
+                    "OsIfUseGetUserId must be one of the BaseNXP.xdm enum "
+                    f"values: {', '.join(domain)}."
+                ),
+                details={"field": "OsIfUseGetUserId", "value": value, "domain": domain},
+            ))
+        elif value not in exposed:
+            diagnostics.append(Diagnostic(
+                severity="blocker",
+                code="basenxp_get_user_id_not_exposed",
+                module="basenxp",
+                message=(
+                    "GET_PARTITION_ID is a legal BaseNXP.xdm enum but requires "
+                    "Autosar OS and multicore/EcuC partition references, which "
+                    "are tracked in osif.json _coverage.not_yet_exposed."
+                ),
+                details={
+                    "field": "OsIfUseGetUserId",
+                    "value": value,
+                    "not_yet_exposed": asset["_coverage"]["not_yet_exposed"]["multicore_partition_os"],
+                },
+            ))
+
+    return diagnostics
+
+
+def _apply_basenxp_osif_general_payload(
+    doc: MexDocument,
+    osif_general: ET.Element,
+    payload: dict,
+    asset: dict,
+) -> tuple[list[ET.Element], list[Diagnostic]]:
+    modified: list[ET.Element] = []
+
+    writes: dict[str, str] = {}
+    for key, setting_name in asset["OsIfGeneral"]["boolean_settings"].items():
+        if key in payload:
+            writes[setting_name] = "true" if payload[key] else "false"
+    for key, setting_name in asset["OsIfGeneral"]["integer_settings"].items():
+        if key in payload:
+            writes[setting_name] = str(payload[key])
+    for key, setting_name in asset["OsIfGeneral"]["enum_settings"].items():
+        if key in payload:
+            writes[setting_name] = str(payload[key])
+
+    diagnostics: list[Diagnostic] = []
+    for setting_name, value in writes.items():
+        setting = doc.find_child_setting(osif_general, setting_name)
+        if setting is None:
+            diagnostics.append(Diagnostic(
+                severity="blocker",
+                code="basenxp_setting_not_found",
+                module="basenxp",
+                message=f"No BaseNXP OsIfGeneral setting named {setting_name} found.",
+                details={"setting": setting_name},
+            ))
+            continue
+        if setting.attrib.get("value") == value:
+            continue
+        setting.set("value", value)
+        doc.mark_modified(setting)
+        carrier = doc.find_nearest_quick_selection_ancestor(setting)
+        if carrier is not None:
+            doc.mark_modified(carrier)
+        modified.append(setting)
+
+    return modified, diagnostics
+
+
 def apply_basenxp_set(doc: MexDocument, intent: Intent) -> ApplyResult:
-    """Apply owned BaseNXP/OsIf edits: enable system timer and insert one counter.
+    """Apply owned BaseNXP/OsIf edits.
 
     Edits are grounded in the BaseNXP osif.json asset (derived from BaseNXP.xdm)
     and the Mcu config set (for OsIfSystemTimerClockRef path discovery).
-    Two changes are made:
-    1. Set OsIfUseSystemTimer from false -> true (attribute edit on existing element).
-    2. If OsIfCounterConfig is an empty self-closed array, replace it with a
+    Supported edits:
+    1. Set arbitrary exposed OsIfGeneral scalar settings in place.
+    2. Set OsIfUseSystemTimer from false -> true (attribute edit on existing element).
+    3. If OsIfCounterConfig is an empty self-closed array, replace it with a
        populated array containing exactly one counter struct (element insertion via
        replace_element_region). The counter's OsIfSystemTimerClockRef is populated
        with a dynamically-discovered McuClockReferencePoint path (CORE_CLK preferred).
@@ -1444,9 +1582,19 @@ def apply_basenxp_set(doc: MexDocument, intent: Intent) -> ApplyResult:
     McuClockReferencePoint exists in the Mcu config set.
     """
     result = ApplyResult()
+    payload = intent.payload
+    asset = _load_basenxp_asset()
+    supported_general = _basenxp_supported_general_payload_keys(asset)
+    requested_general = any(key in payload for key in supported_general)
+    enable_system_timer = payload.get("enable_system_timer", False)
 
-    if not intent.payload.get("enable_system_timer", False):
+    if not enable_system_timer and not requested_general:
         # Nothing requested; return empty result (no-op).
+        return result
+
+    payload_diagnostics = _validate_basenxp_payload(payload, asset)
+    if payload_diagnostics:
+        result.diagnostics.extend(payload_diagnostics)
         return result
 
     basenxp_cfg = doc.find_config_set("BaseNXP")
@@ -1464,7 +1612,7 @@ def apply_basenxp_set(doc: MexDocument, intent: Intent) -> ApplyResult:
     # Do this BEFORE the timer attribute edit so that replace_element_region
     # (which reloads the tree) does not discard the timer_setting mutation.
     counter_array = _find_osif_counter_array(doc, basenxp_cfg)
-    if counter_array is not None:
+    if enable_system_timer and counter_array is not None:
         existing_structs = [c for c in counter_array if c.tag.endswith("struct")]
         if len(existing_structs) == 0:
             # Discover the Mcu clock reference path before splicing.
@@ -1505,19 +1653,43 @@ def apply_basenxp_set(doc: MexDocument, intent: Intent) -> ApplyResult:
     # ---- Step 2: Set OsIfUseSystemTimer = true (attribute edit on fresh ref) ----
     timer_setting = doc.find_child_setting(basenxp_cfg, "OsIfUseSystemTimer") \
         if basenxp_cfg is not None else None
-    if timer_setting is not None:
+    if enable_system_timer and timer_setting is not None:
         timer_setting.set("value", "true")
 
-    # Mark modified elements and strip stale quick_selection from nearest ancestor.
+    # ---- Step 3: Set arbitrary exposed OsIfGeneral scalar values ----
+    osif_general = _find_osif_general_struct(doc, basenxp_cfg) \
+        if basenxp_cfg is not None else None
+    if osif_general is None:
+        result.diagnostics.append(Diagnostic(
+            severity="blocker",
+            code="basenxp_osif_general_not_found",
+            module="basenxp",
+            message="No BaseNXP OsIfGeneral struct found.",
+            details={},
+        ))
+        return result
+
     modified: list[ET.Element] = []
-    if timer_setting is not None:
+    if enable_system_timer and timer_setting is not None:
         doc.mark_modified(timer_setting)
         carrier = doc.find_nearest_quick_selection_ancestor(timer_setting)
         if carrier is not None:
             doc.mark_modified(carrier)
         modified.append(timer_setting)
 
-    if counter_array is not None:
+    general_modified, general_diagnostics = _apply_basenxp_osif_general_payload(
+        doc=doc,
+        osif_general=osif_general,
+        payload=payload,
+        asset=asset,
+    )
+    if general_diagnostics:
+        result.diagnostics.extend(general_diagnostics)
+        return result
+    modified.extend(general_modified)
+
+    # Mark modified elements and strip stale quick_selection from nearest ancestor.
+    if enable_system_timer and counter_array is not None:
         doc.mark_modified(counter_array)
         carrier = doc.find_nearest_quick_selection_ancestor(counter_array)
         if carrier is not None:
