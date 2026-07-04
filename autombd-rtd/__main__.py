@@ -40,7 +40,7 @@
 # File:        __main__.py
 # Author:      autoMBD <tkung.lqk@foxmail.com>
 # Date:        2026-06-06
-# Version:     0.1.2
+# Version:     0.1.3
 # Description: Zero-config launcher for the bundled RTD CfgFile CLI. Lets the
 #              skill run self-contained as `python <skill-dir> <command>` from any
 #              working directory, with no PYTHONPATH setup and no install.

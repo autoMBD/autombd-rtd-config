@@ -76,22 +76,59 @@ def test_rtd_config_skill_documents_public_cli_and_module_surface():
     assert "Write the spec file inside the project directory or your current workdir" in skill
     assert "Do not write module spec files to system temp directories" in skill
     assert "Run exactly one mutating `set --spec ... --configure --json` command" in skill
-    for fragment in (
-        "Mcu clock tree",
-        "BaseNXP / OsIf",
-        "Platform interrupt",
-        "Port pin routing",
-        "Dio channel",
-        "Mcl FlexIO logic channel",
-        "Uart channel",
-        "Adc Hardware Unit",
-    ):
-        assert fragment in skill, f"SKILL.md must document `{fragment}`"
+    assert "Fast path for one-module configuration" in skill
+    assert "For a single-module configuration request, do not explore" in skill
+    assert "Reference loading" in skill
+    assert "Do not read every reference up front" in skill
+    assert "Use the module named by the user request or E2E case" in skill
+    assert "Do not run another module's `set` command" in skill
+    assert "Do not run `<module> set --help`" in skill
+    assert "Do not run `inspect`, list the skill tree, or read bundled assets" in skill
+    for module in ("mcu", "basenxp", "platform", "port", "dio", "mcl", "uart", "adc"):
+        assert f"reference/{module}-spec.md" in skill
+    assert "Concise payload examples" not in skill
+    assert "BCTU_EMIOS" not in skill
+    assert '"core_clk": 160' not in skill
+    assert '"hw": "LPUART_3"' not in skill
     # DMA is a supported Uart mode now; the milestone-era rejection is gone.
     assert "DMA" in skill
     assert "dma_not_supported_in_m1" not in skill
     # Active docs stay milestone-free; guard against regression to M1 wording.
     assert "Milestone 1" not in skill
+
+
+def test_rtd_config_module_payload_details_live_in_references():
+    expected = {
+        "mcu": "core_clk",
+        "basenxp": "enable_system_timer",
+        "platform": "peripheral",
+        "port": "pins",
+        "dio": "add_channel",
+        "mcl": "add_flexio_logic_channel",
+        "uart": "LPUART_3",
+        "adc": "BCTU_EMIOS_1_20",
+    }
+
+    for module, payload_marker in expected.items():
+        path = Path("autombd-rtd/reference") / f"{module}-spec.md"
+        text = path.read_text(encoding="utf-8")
+        assert text.startswith("# "), path
+        assert "| Field | Value |" in text
+        assert "| Version | 0.1.0 |" in text
+        assert "| Date | 2026-07-04 |" in text
+        assert "## Changelog" in text
+        assert f'"module": "{module}"' in text
+        assert payload_marker in text
+
+    platform = Path("autombd-rtd/reference/platform-spec.md").read_text(encoding="utf-8")
+    assert "do not configure Uart" in platform
+    assert "do not read\nUart assets" in platform
+    mcl = Path("autombd-rtd/reference/mcl-spec.md").read_text(encoding="utf-8")
+    assert "do not run `inspect`" in mcl
+    assert "provider enables/coheres the required Mcl-side" in mcl
+    uart = Path("autombd-rtd/reference/uart-spec.md").read_text(encoding="utf-8")
+    assert "do not run `uart set --help`" in uart
+    assert "do\nnot read `assets/nxp/s32k3/uart/uart.json`" in uart
 
 
 def test_external_dependency_memory_skill_is_lightweight_contract():

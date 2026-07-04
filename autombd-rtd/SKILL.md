@@ -1,15 +1,11 @@
 ---
 name: autombd-rtd
-version: 0.1.2
+version: 0.1.3
 description: >-
   Configure NXP S32K3 RTD 7.0.1 .mex automotive projects through the bundled RTD
-  CfgFile CLI. Use when a user asks to inspect a project, query pin options, or
-  plan/configure any supported module — Mcu (clock tree), BaseNXP (OsIf system
-  timer), Platform (interrupts/ISR), Port (pin mux), Dio (channels), Mcl
-  (FlexIO/DMA logic channels), Uart (LPUART or FlexIO channels, interrupt or DMA
-  mode), or Adc (Hardware Unit groups, channels, sampling-time derivation, and
-  watchdog thresholds) — run static checks, or run S32DS headless validation on
-  an S32 ConfigTools .mex project.
+  CfgFile CLI. Use when a user asks to inspect a project, query pin options,
+  plan/configure supported RTD modules, run static checks, or run S32DS
+  headless validation on an S32 ConfigTools .mex project.
 license: MIT
 ---
 
@@ -21,6 +17,22 @@ public CLI; never edit `.mex` XML by hand, and never read Excel workbooks, raw
 RTD `.xdm` descriptors, or local RTD installation scans to answer a request —
 the committed assets bundled with the skill already carry every value the tool
 needs.
+
+## Fast path for one-module configuration
+
+For a single-module configuration request, do not explore. The requested module
+is the command module. Read only that module's reference if payload fields are
+needed, write one spec JSON file near the project/workdir, then run:
+
+```text
+rtd-config <module> set --project <dir> --spec <module-config.json> --configure --json
+rtd-config check --project <dir> --json
+rtd-config validate --project <dir> --json
+```
+
+Do not run `inspect`, `<module> set --help`, directory listings, bundled-asset
+queries, or another module's `set` command unless the selected module reference
+explicitly requires that extra command.
 
 ## Running the bundled CLI
 
@@ -42,45 +54,73 @@ as `rtd-config <command>`; run each as `python <skill-dir> <command>`.
 single `.mex`), never the `.mex` file path. Add `--json` to any command for
 machine-readable output.
 
-## The plan → configure → validate workflow
+## Reference loading
 
-Every module command is **`<module> set`**. `--configure` does three things in
-one call: it normalizes the request, makes the narrow byte-faithful edit, and
-immediately runs the static checks.
+Keep this file as the general operating contract. Read a module reference only
+when the user asks for that module or when you need that module's payload
+fields, token domains, side effects, or diagnostics.
 
-### Universal one-shot (default — for simple single-edit cases)
+| Module | Reference |
+| --- | --- |
+| `mcu` | `reference/mcu-spec.md` |
+| `basenxp` | `reference/basenxp-spec.md` |
+| `platform` | `reference/platform-spec.md` |
+| `port` | `reference/port-spec.md` |
+| `dio` | `reference/dio-spec.md` |
+| `mcl` | `reference/mcl-spec.md` |
+| `uart` | `reference/uart-spec.md` |
+| `adc` | `reference/adc-spec.md` |
 
-A **simple case** is a straightforward modification to one module: change a
-value, set a priority, enable a feature. **Do not explore.** Follow this pattern:
+Do not read every reference up front. Select the smallest set needed for the
+requested module configuration.
 
-1. Read the module's entry in the [command reference](#module-configuration-set-add---configure-to-write)
-   below for the exact flag names.
-2. Construct the command from the user's request and the flag reference:
-   ```
-   <module> set --project <dir> [flags from the user's request] --configure
-   ```
-3. Run `validate --project <dir> --json` to confirm with the vendor gate.
+## The plan -> configure -> validate workflow
 
-**Done.** That is the whole workflow — one `set --configure` call + one `validate`.
+Every module configuration command is **`<module> set`**. Use structured spec
+input as the canonical API:
 
-**Never** do any of these for a simple case (they waste time, `--configure`
-already handles everything):
-- ❌ `inspect` — `--configure` validates its own input.
-- ❌ `<module> set --help` — the flag reference below is sufficient.
-- ❌ `<module> set …` without `--configure` as a "dry-run preview" — wasted
-  round-trip; add `--json` to `--configure` if you want machine-readable output.
-- ❌ A second `validate` — one pass confirms the vendor gate.
-- ❌ A separate `check` — `--configure` already runs it; re-running is harmless
-  but redundant.
+```text
+rtd-config <module> set --project <dir> --spec <module-config.json> --configure --json
+```
 
-### Plan-first (for cross-module orchestration or when you want to review first)
+The JSON file may use the common envelope below. The CLI validates the optional
+`module` and `action` fields, then passes `payload` to the same intent/provider
+pipeline used by legacy flags.
 
-When multiple modules are involved or you are unsure about the side effects, run
-`<module> set …` *without* `--configure` — it writes nothing and prints the plan,
-including the cross-module dependencies it will satisfy. Review, then add
-**`--configure`** to apply. Compose several `--configure` calls in sequence on the
-same project, then `validate` once at the end. Add **`--backup`** to first copy
-the original to `<file>.mex.bak`.
+```json
+{"module": "<module>", "action": "set", "payload": {}}
+```
+
+For compatibility, a raw payload object is still accepted. Existing
+module-specific flags remain available as shortcuts, but canonical agent use is
+`--spec`.
+
+Write the spec file inside the project directory or your current workdir, next
+to the copied fixture or agent run files. Do not write module spec files to system temp directories.
+
+For a single requested module:
+
+1. Use the module named by the user request or E2E case as the command module.
+   Read only that module's reference file when payload fields or token domains
+   are needed.
+2. Write one JSON spec file near the project/workdir.
+3. Run exactly one mutating `set --spec ... --configure --json` command.
+4. Run `check --project <dir> --json`.
+5. Run `validate --project <dir> --json`.
+
+Do not run another module's `set` command to prepare or probe dependencies
+unless the user explicitly requested that other module; providers handle their
+declared dependencies. Do not run `<module> set --help` to discover payload
+fields; the selected reference file is the authoritative payload guide.
+Do not run `inspect`, list the skill tree, or read bundled assets to discover
+payload fields for a single-module request. Only run extra discovery commands
+when the selected reference explicitly requires them, such as `pin-options` for
+pin routing.
+
+For multiple modules, repeat the one mutating `set --spec ... --configure
+--json` command per requested module, then run one final `check` and one final
+`validate`. Add `--backup` to the first mutating command when a `.mex.bak` copy
+is required.
 
 ## Public commands
 
@@ -95,180 +135,12 @@ the original to `<file>.mex.bak`.
   `quick_selection` conflicts, FlexIO reference coherence, DMA coherence,
   duplicate LPUART hardware, callback validity).
 
-### Module configuration (`set`; add `--configure` to write)
-Use **structured spec input** as the canonical module configuration API:
-
-```text
-rtd-config <module> set --project <dir> --spec <module-config.json> --configure --json
-```
-
-The JSON file may use the common envelope below. The CLI validates the optional
-`module` and `action` fields, then passes `payload` to the same intent/provider
-pipeline used by legacy flags.
-
-```json
-{
-  "module": "uart",
-  "action": "set",
-  "payload": {
-    "hw": "LPUART_3",
-    "mode": "interrupt"
-  }
-}
-```
-
-For compatibility, a raw payload object is still accepted (the original ADC
-shape). Existing module-specific flags remain available as shortcuts, but they
-normalize into the same `Intent(module, action=set, payload=...)` contract.
-
-Write the spec file inside the project directory or your current workdir, next
-to the copied fixture or agent run files. Do not write module spec files to system temp directories.
-Run exactly one mutating `set --spec ... --configure --json` command for each
-requested module configuration, then run `check`, then run `validate`.
-
-Concise payload examples:
-
-- **Mcu clock tree**:
-  ```json
-  {"core_clk": 160, "aips_plat_clk": 80, "aips_slow_clk": 40,
-   "add_all_clock_reference_points": true}
-  ```
-- **BaseNXP / OsIf**:
-  ```json
-  {"enable_system_timer": true, "user_mode_support": true,
-   "dev_error_detect": false, "custom_timer": false,
-   "get_user_id": "GET_CORE_ID", "instance_id": 0,
-   "get_physical_core_id": true, "software_semaphore": false}
-  ```
-- **Platform interrupt**:
-  ```json
-  {"peripheral": "LPUART_3", "priority": 2}
-  ```
-- **Port pin routing**:
-  ```json
-  {"peripheral": "LPUART_3", "pins": {"tx": "PTB10", "rx": "PTB11"}}
-  ```
-- **Dio channel + Port GPIO dependency**:
-  ```json
-  {"add_channel": "LED_CTRL", "pin": "PTA5", "direction": "output"}
-  ```
-- **Mcl FlexIO logic channel**:
-  ```json
-  {"add_flexio_logic_channel": "UART2_TX"}
-  ```
-- **Uart channel and dependencies**:
-  ```json
-  {"hw": "LPUART_3", "mode": "interrupt", "baud": 115200,
-   "pins": {"tx": "PTB10", "rx": "PTB11"}, "using": "LPUART_IP",
-   "channel_id": 0, "callback": "Autombd_UartCallback",
-   "parity": "LPUART_UART_IP_PARITY_DISABLED",
-   "stop_bits": "LPUART_UART_IP_ONE_STOP_BIT",
-   "word_length": "LPUART_UART_IP_8_BITS_PER_CHAR", "priority": 2}
-  ```
-
-For Port/Uart pin choices, query `pin-options` before writing the spec.
-
-- **`rtd-config uart add-flexio-channel`** — create a **new** FlexIO-backed Uart
-  Tx+Rx channel pair plus their two Mcl FlexIO logic channels, with consistent
-  references and a callback. `--baud` (default 921600), `--word-length 8`,
-  `--callback`, `--tx-name`/`--rx-name`. The shared FlexIO ISR + clock reference
-  are ensured idempotently.
-- **Adc Hardware Unit** — configure the target unit, transfer mode, per-group sampling
-  time (**derived** into `AdcSamplingDuration` from the ADC source clock +
-  prescale — never written as a literal), one or more conversion groups, and
-  per-channel watchdog thresholds. One `adc set --spec X --configure` expresses
-  a full case. The payload object:
-  ```json
-  {
-    "unit": "ADC1",
-    "transfer": "interrupt",
-    "sampling_time_us": 1,
-    "groups": [
-      {"name": "AdcGroup_0", "trigger": "sw", "access": "single",
-       "conv": "oneshot", "num_samples": 1,
-       "notification": "Autombd_AdcNotifi0", "channels": ["VREFL", "S10"]},
-      {"trigger": "sw", "access": "streaming", "conv": "continuous",
-       "num_samples": 10, "notification": "Autombd_AdcNotifi1",
-       "channels": ["VREFH", "P5"]}
-    ],
-    "watchdog": [
-      {"channel": "P5", "high": 3000, "low": 20,
-       "notification": "Autombd_AdcNotifiWdg"}
-    ]
-  }
-  ```
-  Token domains: `transfer` ∈ `interrupt|dma`; `trigger` ∈ `sw|hw`; `access` ∈
-  `single|streaming`; `conv` ∈ `oneshot|continuous`. **Channels** accept the
-  short name (`VREFL`, `S10`, `P5`) or the full literal (`S10_ChanNum34`);
-  S-channels start at **S8** (there is no S0–S7). The tool resolves channel
-  name→id, derives the sampling duration, picks the smallest valid prescaler,
-  adds the unit's `AdcHwConfiguration` (interrupt/watchdog coherence), and flips
-  `AdcEnableWatchdogApi` when a watchdog is requested. It also enforces the
-  vendor rule that a software-triggered **streaming** group must be
-  `continuous` (a SW streaming one-shot group is coerced to continuous).
-  Run, e.g.:
-  `adc set --project <dir> --spec adc001.json --configure --json`
-
-  **BCTU hardware trigger (optional `bctu` block).** Add a `bctu` object to the
-  spec to wire a Body Cross-Triggering Unit trigger. The tool repoints
-  `AdcHwTrigger_0` to the chosen trigger source, populates the `BctuHwUnit`
-  subtree, and flips the gating APIs (`AdcHwTriggerApi`,
-  `AdcEnableCtuControlModeApi`, and — for FIFO DMA — `CtuEnableDmaTransferMode`).
-  Two modes:
-  - **`single`** — one BCTU-triggered conversion of one channel into a data
-    register or FIFO. Use the single-`unit` spec above plus:
-    ```json
-    "bctu": {
-      "trigger_source": "BCTU_EMIOS_2_15",
-      "mode": "single",
-      "target": "ADC1",
-      "channel": "S10",
-      "destination": "data_reg",
-      "new_data_notification": "Autombd_BctuNewDataNotifi"
-    }
-    ```
-    (A full ADC-003 spec is the single-`unit` form above with this `bctu` block;
-    the unit needs the BCTU `channel` in one of its groups so the trigger can
-    reference it.)
-  - **`list`** — a conversion *list* dispatched to one or more ADC units, with
-    results in a FIFO and an optional DMA request. Use the **multi-unit** spec
-    form (`units: [{unit, sampling_time_us}, …]` instead of a single `unit`) plus
-    a `list` `bctu`. The tool creates each unit (each gets its list channels as
-    `AdcChannel` structs via one SW group so the list can enumerate them) and
-    wires one shared BCTU. Worked ADC-004 (dual-ADC LIST + FIFO DMA):
-    ```json
-    {
-      "units": [
-        {"unit": "ADC1", "sampling_time_us": 5},
-        {"unit": "ADC2", "sampling_time_us": 6}
-      ],
-      "transfer": "interrupt",
-      "bctu": {
-        "trigger_source": "BCTU_EMIOS_1_20",
-        "mode": "list",
-        "targets": ["ADC1", "ADC2"],
-        "list": ["VREFH", "VREFL", "S20", "S20", "P1", "P2", "P3", "P4"],
-        "trigger_order": [2, 2, 4],
-        "destination": "fifo1",
-        "fifo_dma": true,
-        "fifo_notification": "Autombd_BctuFifoNotifi"
-      }
-    }
-    ```
-  `bctu` token domains: `trigger_source` ∈ the device BCTU tokens
-  `BCTU_EMIOS_{0,1,2}_{0..22}` (plus `EXT_TRIG` / `AUX_EXT_TRIG`); `mode` ∈
-  `single|list`; `destination` ∈ `data_reg|fifo1|fifo2`. Single keys: `target`
-  (one ADC), `channel` (one device channel), `new_data_notification`. List keys:
-  `targets` (the ADC units the list drives, e.g. `["ADC1","ADC2"]`), `list` (the
-  ordered device channels — repeats allowed, e.g. `S20, S20`), `trigger_order`
-  (a partition of the list whose parts sum to the list length; the list halts
-  for a re-trigger after each part except the last — `[2,2,4]` over 8 items
-  triggers 2 then 2 then 4 channels), `fifo_dma` (`true` raises a FIFO DMA
-  request and consumes an Mcl DMA logic channel — `changed_modules` then includes
-  `mcl`), and `fifo_notification` (the FIFO watermark callback). When `fifo_dma`
-  is on, the tool disables FIFO interrupt notifications (mutually exclusive with
-  DMA) and sets the watermark so the final sample of the batch raises the
-  request.
+### Module configuration
+- `rtd-config <module> set --project <dir> --spec <module-config.json>
+  --configure --json` — configure one supported module through the common spec
+  contract. Read the selected module reference before authoring the payload.
+- `rtd-config uart add-flexio-channel` — legacy helper retained for compatibility;
+  read `reference/uart-spec.md` before using it.
 - `rtd-config validate --project <dir> --json` — run S32DS / S32 ConfigTools
   **headless** validation. The tool **auto-discovers** a standard S32DS install
   (e.g. `C:\NXP\S32DS.<version>`, or `s32dsc.exe` on `PATH`); override with
@@ -282,47 +154,9 @@ For Port/Uart pin choices, query `pin-options` before writing the spec.
 
 ## Module ownership
 
-Each provider edits only its own module region; cross-module needs are explicit
-declared dependencies, never silent edits:
-
-- **Mcu** owns the clock tree and the peripheral clock reference points.
-- **Port** owns TX/RX pin mux/electrical/direction (consumers request pins).
-- **Platform** owns the interrupt entries and ISR registration.
-- **Mcl** owns the FlexIO common resources, the FlexIO logic channels, and the
-  DMA logic channels/instance.
-- **BaseNXP** owns the OsIf system-timer counter.
-- **Uart** owns channel settings and the Uart-side references, and declares the
-  Mcu / Port / Platform / Mcl dependencies above.
-- **Adc** owns the `AdcHwUnit` configuration tree (channels, groups,
-  `AdcThresholdControl` entries), the unit's `AdcHwConfiguration` entry, and the
-  Adc-global `AdcEnableWatchdogApi` switch — all inside `<config_set name="Adc">`.
-  Interrupt mode is internal to the ADC peripheral (no Platform IRQ dependency
-  for the interrupt-software-group case).
-
-## Interrupt and DMA modes
-
-RTD 7.0.1 models the Uart asynchronous method as **interrupt or DMA only** —
-there is no "polling" value (blocking/polling is an application-level
-driver-call pattern, not a `.mex` setting). Both modes are fully supported:
-
-- **Interrupt** (`--mode interrupt`, the default): the Platform LPUART/FlexIO
-  ISR is enabled and registered with the chosen priority.
-- **DMA** (`--mode dma`): the tool sets the Uart DMA method, enables
-  `UartDmaEnable`, points the Tx/Rx references at Mcl DMA logic channels,
-  enables `MclEnableDma` with the DMA channels/instance, and registers the
-  Platform DMATCD completion ISRs. Coherence is enforced by the static checks
-  (`dma_mcl_not_enabled`, `dma_refs_incomplete`).
-
-## Clock outputs are ConfigTools-derived
-
-`mcu set` writes the authoritative clock **inputs** — the PLL configuration, the
-MC_CGM dividers, and the clock reference points. The Clocks-view `clock_output`
-numbers are a **derived display cache that ConfigTools owns and recomputes**;
-the tool deliberately does not recompute them (re-deriving the full clock tree
-outside ConfigTools would risk diverging from it). The cache refreshes when the
-project is opened in S32DS or when `validate` generates code. A Clocks-view
-figure that still shows an old value right after `mcu set` is expected — do not
-hand-edit it, and do not patch the tool to write it.
+Each provider edits only its own module region. Cross-module needs are explicit
+declared dependencies, never silent edits. Module-specific ownership and
+dependency details live in the selected module reference.
 
 ## Scope
 
@@ -335,61 +169,16 @@ non-S32K3 devices are out of scope.
 
 ## JSON intent contract
 
-Shortcut commands and JSON intents converge on one shape:
+Shortcut commands, structured specs, and JSON intents converge on one abstract
+shape:
 
 ```json
-{
-  "module": "uart",
-  "action": "set",
-  "payload": {"hw": "LPUART_3", "mode": "dma", "baud": 921600,
-              "callback": "Autombd_UartCallback"}
-}
+{"module": "<module>", "action": "set", "payload": {}}
 ```
 
 ## Diagnostics
 
 Results are JSON with a `status` (`passed` / `blocked`) and a `diagnostics`
-list. Read diagnostics instead of guessing. Key codes:
-
-- `quick_selection_conflict` — a modified element still carries a
-  `quick_selection`; ConfigTools may revert it. **Highest-risk case:** a Uart
-  out-of-range error after adding a FlexIO Uart usually traces to a stale
-  `quick_selection` on `<config_set name="Mcl">`, not to the Uart fields —
-  check Mcl first.
-- `dma_mcl_not_enabled` / `dma_refs_incomplete` — a DMA Uart needs
-  `MclEnableDma=true` and complete Tx/Rx DMA channel references.
-- `missing_mcl_flexio_logic_channel` / `stale_flexio_uart_hw_channel_ref` — a
-  FlexIO Uart's `UartHwChannelRef` must point at an existing Mcl FlexIO logic
-  channel; plan Mcl and Uart together.
-- `duplicate_lpuart_hw_channel` — two active LPUART channels share one instance.
-- `port_illegal_pin` — the requested pin is not valid for that peripheral
-  signal; query `pin-options`.
-- `invalid_uart_callback` — the callback is not a valid C identifier
-  (`NULL_PTR` is rejected).
-- `adc_channel_not_in_device` — an ADC channel name is not in the device enum
-  (remember S-channels start at S8; use a name from `adc.json`/`pin-options`).
-- `adc_sampling_out_of_range` — the requested sampling time cannot be encoded as
-  a valid `AdcSamplingDuration` (8–255) at any prescaler; lower the ADC source
-  clock (Mcu) or change the sampling time.
-- `adc_interrupt_not_enabled` — an interrupt-transfer unit lacks
-  `AdcHwConfiguration/AdcNormalInterruptEnable=true`.
-- `adc_watchdog_api_disabled` / `adc_unit_wdg_threshold_disabled` /
-  `adc_threshold_ref_incomplete` / `adc_watchdog_notification_invalid` — a
-  channel with watchdog thresholds needs `AdcEnableWatchdogApi=true`, the unit's
-  `WdgThresholdEnable=true`, a valid `AdcThresholdRegister` ref to a matching
-  `AdcThresholdControl` on the same unit, and a valid `AdcWdogNotification`.
-- `adc_dma_mcl_not_enabled` / `adc_dma_refs_incomplete` — an `ADC_DMA` unit, or a
-  BCTU result FIFO with `BctuFifoDmaEnable=true`, needs `MclEnableDma=true` and a
-  non-empty DMA channel ref (`AdcDmaChannelId` / `BctuFifoDmaChannelId`).
-- `adc_bctu_trigger_source_not_in_device` / `adc_bctu_channel_not_in_device` /
-  `adc_bctu_list_channel_not_in_device` — a `bctu` `trigger_source`, single
-  `channel`, or `list` channel is not a valid device token; use a
-  `BCTU_EMIOS_{0,1,2}_{0..22}` source and device channel names.
-- `adc_bctu_trigger_order_mismatch` — the `list` `trigger_order` parts do not sum
-  to the `list` length.
-- `*_config_set_not_found` / `*_not_found` (e.g. `uart_channel_not_found`,
-  `platform_isr_not_found`, `mcu_config_set_not_found`) — the targeted existing
-  instance was not found; the tool edits existing instances, it does not create
-  them.
-- `s32ds_root_not_configured` — `validate` found no S32DS install; pass
-  `--s32ds-root` or set `RTD_CONFIG_S32DS_ROOT`.
+list. Read diagnostics instead of guessing. Module-specific diagnostic meaning
+lives in the selected reference. `s32ds_root_not_configured` means `validate`
+found no S32DS install; pass `--s32ds-root` or set `RTD_CONFIG_S32DS_ROOT`.
