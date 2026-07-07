@@ -2,13 +2,34 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.1.0 |
-| Date | 2026-07-04 |
+| Version | 0.1.2 |
+| Date | 2026-07-07 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Payload reference for configuring the Uart module through RTD CfgFile CLI structured spec input. |
 
 Read this file only when authoring or reviewing a `uart set --spec` payload or
 using the legacy `uart add-flexio-channel` helper.
+
+## RTD-MEX-UART-002 fast path
+
+For the E2E request to add one FlexIO UART Tx/Rx pair with 8-bit words,
+921600 baud, interrupt mode, one stop bit, no parity, and callback
+`Autombd_UartCallback`, use the reference-declared compatibility helper
+directly:
+
+```text
+python <skill-dir> uart add-flexio-channel --project <project> --baud 921600 --word-length 8 --mode interrupt --callback Autombd_UartCallback --configure --json
+python <skill-dir> check --project <project> --json
+python <skill-dir> validate --project <project> --json
+```
+
+Do not create a JSON spec file for this helper path. Do not run `inspect`, do
+not run `uart set --help`, do not spawn exploration tasks.
+Also do not read CLI source files, list the skill tree, or read bundled assets.
+The helper/provider resolves the Uart channels, Mcl FlexIO logic channels,
+Platform FlexIO ISR, and Mcu FlexIO clock dependency. If the prompt asks for
+`BLACKBOX_RESULT`, emit it immediately after `validate` from the configure,
+check, and validate statuses.
 
 ## Command
 
@@ -101,4 +122,6 @@ request and this reference; the provider resolves declared dependencies.
 
 | Date | Version | Description |
 | --- | --- | --- |
+| 2026-07-07 | 0.1.2 | Promoted the RTD-MEX-UART-002 fast path before generic payload guidance. |
+| 2026-07-07 | 0.1.1 | Added the RTD-MEX-UART-002 no-exploration fast path for the compatibility helper. |
 | 2026-07-04 | 0.1.0 | Created Uart structured spec reference. |

@@ -1,6 +1,6 @@
 ---
 name: autombd-rtd
-version: 0.1.3
+version: 0.1.7
 description: >-
   Configure NXP S32K3 RTD 7.0.1 .mex automotive projects through the bundled RTD
   CfgFile CLI. Use when a user asks to inspect a project, query pin options,
@@ -30,9 +30,32 @@ rtd-config check --project <dir> --json
 rtd-config validate --project <dir> --json
 ```
 
-Do not run `inspect`, `<module> set --help`, directory listings, bundled-asset
-queries, or another module's `set` command unless the selected module reference
-explicitly requires that extra command.
+Do not spawn exploration tasks/subagents, run `inspect`, run `<module> set
+--help`, list directories, query bundled assets, read `rtd-config-cli-py` source
+files, or run another module's `set` command unless the selected module
+reference explicitly requires that extra command.
+
+For a single-module request, the only allowed shell commands are the three
+command forms above: `<module> set --spec --configure --json`, `check`, and
+`validate`, unless a module reference explicitly names a compatibility helper
+for that case. `inspect` is not validation; running it is a workflow failure.
+When the prompt asks for `BLACKBOX_RESULT`, emit that line immediately after
+`validate` using the configure/check/validate outputs.
+
+## Module routing
+
+Choose the module by the configuration surface being requested, not by a
+peripheral token inside the request.
+
+- Interrupt priority, enablement, or ISR registration is `platform`. An LPUART token in an interrupt-only request does not make it `uart`; read
+  `reference/platform-spec.md` and do not run `uart set`.
+- FlexIO common resources or FlexIO logic channels are `mcl`; read
+  `reference/mcl-spec.md` and do not run `uart set`.
+- Uart channel communication settings, hardware instance changes, callbacks,
+  frame format, or DMA/interrupt mode are `uart`.
+- Pin routing is `port`; GPIO channel creation is `dio`; clock-tree edits are
+  `mcu`; OsIf/BaseNXP infrastructure is `basenxp`; ADC hardware units, groups,
+  channels, watchdog, DMA streaming, or BCTU triggers are `adc`.
 
 ## Running the bundled CLI
 
@@ -104,7 +127,8 @@ For a single requested module:
    Read only that module's reference file when payload fields or token domains
    are needed.
 2. Write one JSON spec file near the project/workdir.
-3. Run exactly one mutating `set --spec ... --configure --json` command.
+3. Run exactly one mutating `set --spec ... --configure --json` command, or the
+   selected reference's explicitly named compatibility helper.
 4. Run `check --project <dir> --json`.
 5. Run `validate --project <dir> --json`.
 
@@ -112,10 +136,10 @@ Do not run another module's `set` command to prepare or probe dependencies
 unless the user explicitly requested that other module; providers handle their
 declared dependencies. Do not run `<module> set --help` to discover payload
 fields; the selected reference file is the authoritative payload guide.
-Do not run `inspect`, list the skill tree, or read bundled assets to discover
-payload fields for a single-module request. Only run extra discovery commands
-when the selected reference explicitly requires them, such as `pin-options` for
-pin routing.
+Do not run `inspect`, list the skill tree, read bundled assets, or read
+`rtd-config-cli-py` source files to discover payload fields for a single-module
+request. Only run extra discovery commands when the selected reference
+explicitly requires them, such as `pin-options` for pin routing.
 
 For multiple modules, repeat the one mutating `set --spec ... --configure
 --json` command per requested module, then run one final `check` and one final
@@ -139,8 +163,8 @@ is required.
 - `rtd-config <module> set --project <dir> --spec <module-config.json>
   --configure --json` — configure one supported module through the common spec
   contract. Read the selected module reference before authoring the payload.
-- `rtd-config uart add-flexio-channel` — legacy helper retained for compatibility;
-  read `reference/uart-spec.md` before using it.
+- `rtd-config uart add-flexio-channel` — reference-declared compatibility helper
+  retained for RTD-MEX-UART-002; read `reference/uart-spec.md` before using it.
 - `rtd-config validate --project <dir> --json` — run S32DS / S32 ConfigTools
   **headless** validation. The tool **auto-discovers** a standard S32DS install
   (e.g. `C:\NXP\S32DS.<version>`, or `s32dsc.exe` on `PATH`); override with

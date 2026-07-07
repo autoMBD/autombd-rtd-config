@@ -40,8 +40,8 @@
 # File:        __init__.py
 # Author:      autoMBD <tkung.lqk@foxmail.com>
 # Date:        2026-06-03
-# Version:     0.1.3
+# Version:     0.1.7
 # Description: Package root for the RTD CfgFile CLI; exposes the package version.
 # =================================================================================
 
-__version__ = "0.1.3"
+__version__ = "0.1.7"

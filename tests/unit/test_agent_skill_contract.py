@@ -45,6 +45,7 @@
 # =================================================================================
 
 from pathlib import Path
+import re
 
 
 INIT_SCRIPT_PATH = Path(
@@ -60,6 +61,25 @@ def _frontmatter(path: Path) -> str:
     opening, frontmatter, _body = text.split("---", 2)
     assert opening == ""
     return frontmatter.strip()
+
+
+def _reference_metadata(text: str) -> dict[str, str]:
+    rows: dict[str, str] = {}
+    metadata_block = text.split("\n## ", 1)[0]
+    for line in metadata_block.splitlines():
+        match = re.match(r"\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|", line)
+        if match:
+            rows[match.group(1).strip()] = match.group(2).strip()
+    return rows
+
+
+def _latest_changelog_row(text: str) -> tuple[str, str]:
+    changelog = text.split("## Changelog", 1)[1]
+    for line in changelog.splitlines():
+        match = re.match(r"\|\s*(\d{4}-\d{2}-\d{2})\s*\|\s*([0-9.]+)\s*\|", line)
+        if match:
+            return match.group(1), match.group(2)
+    raise AssertionError("missing changelog row")
 
 
 def test_rtd_config_skill_documents_public_cli_and_module_surface():
@@ -81,9 +101,19 @@ def test_rtd_config_skill_documents_public_cli_and_module_surface():
     assert "Reference loading" in skill
     assert "Do not read every reference up front" in skill
     assert "Use the module named by the user request or E2E case" in skill
+    assert "Interrupt priority, enablement, or ISR registration is `platform`" in skill
+    assert "An LPUART token in an interrupt-only request does not make it `uart`" in skill
+    assert "FlexIO common resources or FlexIO logic channels are `mcl`" in skill
     assert "Do not run another module's `set` command" in skill
     assert "Do not run `<module> set --help`" in skill
-    assert "Do not run `inspect`, list the skill tree, or read bundled assets" in skill
+    assert "Do not spawn exploration tasks/subagents" in skill
+    assert "read `rtd-config-cli-py` source" in skill
+    assert "only allowed shell commands are the three" in skill
+    assert "`inspect` is not validation" in skill
+    assert "BLACKBOX_RESULT" in skill
+    assert "Do not run `inspect`, list the skill tree, read bundled assets, or read" in skill
+    assert "`rtd-config-cli-py` source files" in skill
+    assert "unless a module reference explicitly names a compatibility helper" in skill
     for module in ("mcu", "basenxp", "platform", "port", "dio", "mcl", "uart", "adc"):
         assert f"reference/{module}-spec.md" in skill
     assert "Concise payload examples" not in skill
@@ -114,21 +144,45 @@ def test_rtd_config_module_payload_details_live_in_references():
         text = path.read_text(encoding="utf-8")
         assert text.startswith("# "), path
         assert "| Field | Value |" in text
-        assert "| Version | 0.1.0 |" in text
-        assert "| Date | 2026-07-04 |" in text
         assert "## Changelog" in text
         assert f'"module": "{module}"' in text
         assert payload_marker in text
+        latest_date, latest_version = _latest_changelog_row(text)
+        metadata = _reference_metadata(text)
+        assert metadata["Version"] == latest_version, path
+        assert metadata["Date"] == latest_date, path
 
     platform = Path("autombd-rtd/reference/platform-spec.md").read_text(encoding="utf-8")
     assert "do not configure Uart" in platform
-    assert "do not read\nUart assets" in platform
+    assert "do not read Uart\nassets" in platform or "do not read\nUart assets" in platform
+    assert "CLI source files" in platform
+    assert "do not spawn exploration tasks" in platform
+    assert "Do not run `inspect`" in platform
+    assert "RTD-MEX-PLATFORM-001 fast path" in platform
+    assert "platform-001.json" in platform
+    assert "python <skill-dir> platform set --project <project> --spec platform-001.json --configure --json" in platform
     mcl = Path("autombd-rtd/reference/mcl-spec.md").read_text(encoding="utf-8")
     assert "do not run `inspect`" in mcl
     assert "provider enables/coheres the required Mcl-side" in mcl
+    assert "Mcl-only fast path" in mcl
+    assert "<logic-channel-name>" in mcl
+    assert '"add_flexio_logic_channel": "<logic-channel-name>"' in mcl
+    assert "do not probe the existing Mcl tree" in mcl
+    assert "do not configure Uart" in mcl
+    assert "do not run `uart set`" in mcl
+    assert "python <skill-dir> mcl set --project <project> --spec mcl-flexio-channel.json --configure --json" in mcl
     uart = Path("autombd-rtd/reference/uart-spec.md").read_text(encoding="utf-8")
     assert "do not run `uart set --help`" in uart
     assert "do\nnot read `assets/nxp/s32k3/uart/uart.json`" in uart
+    assert "RTD-MEX-UART-002 fast path" in uart
+    assert "python <skill-dir> uart add-flexio-channel --project <project>" in uart
+    assert "--baud 921600 --word-length 8 --mode interrupt" in uart
+    assert "--callback Autombd_UartCallback --configure --json" in uart
+    assert "do not spawn exploration tasks" in uart
+    assert "do not read CLI source files" in uart
+    assert "Do not run `inspect`" in uart
+    assert "reference-declared compatibility helper" in uart
+    assert uart.index("## RTD-MEX-UART-002 fast path") < uart.index("## Command")
 
 
 def test_external_dependency_memory_skill_is_lightweight_contract():
