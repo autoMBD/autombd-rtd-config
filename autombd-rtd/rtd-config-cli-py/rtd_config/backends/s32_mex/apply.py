@@ -229,6 +229,79 @@ def apply_uart_set(doc: MexDocument, intent: Intent) -> ApplyResult:
         ))
         return result
 
+    # ── LPUART enum-domain validation ─────────────────────────────────────
+    # Validate baud/word_length/parity/stop_bits against the committed
+    # uart.json enum domains.  Only for the LPUART path; FlexIO baud
+    # validation already exists upstream (FlexioDesireBaudrate).
+    if not want_flexio:
+        asset = _load_uart_asset()
+        domains = asset.get("enum_domains", {})
+
+        # Baud rate (numeric -> enum string)
+        if baud is not None:
+            baud_enum = f"LPUART_UART_BAUDRATE_{baud}"
+            valid_bauds = domains.get("DesireBaudrate", [])
+            if baud_enum not in valid_bauds:
+                result.diagnostics.append(Diagnostic(
+                    severity="blocker",
+                    code="unsupported_lpuart_baud",
+                    module="uart",
+                    message=(
+                        f"Baud rate {baud} ({baud_enum}) is not a supported "
+                        f"LPUART baud rate. Supported values: {valid_bauds}"
+                    ),
+                    details={"baud": baud, "supported": valid_bauds},
+                ))
+                return result
+
+        # Word length (full enum string)
+        if word_length is not None:
+            valid_wls = domains.get("UartWordLength", [])
+            if word_length not in valid_wls:
+                result.diagnostics.append(Diagnostic(
+                    severity="blocker",
+                    code="unsupported_lpuart_word_length",
+                    module="uart",
+                    message=(
+                        f"Word length '{word_length}' is not a supported "
+                        f"LPUART word length. Supported values: {valid_wls}"
+                    ),
+                    details={"word_length": word_length, "supported": valid_wls},
+                ))
+                return result
+
+        # Parity type (full enum string)
+        if parity is not None:
+            valid_pars = domains.get("UartParityType", [])
+            if parity not in valid_pars:
+                result.diagnostics.append(Diagnostic(
+                    severity="blocker",
+                    code="unsupported_lpuart_parity",
+                    module="uart",
+                    message=(
+                        f"Parity type '{parity}' is not a supported "
+                        f"LPUART parity. Supported values: {valid_pars}"
+                    ),
+                    details={"parity": parity, "supported": valid_pars},
+                ))
+                return result
+
+        # Stop bits (full enum string)
+        if stop_bits is not None:
+            valid_sbs = domains.get("UartStopBitNumber", [])
+            if stop_bits not in valid_sbs:
+                result.diagnostics.append(Diagnostic(
+                    severity="blocker",
+                    code="unsupported_lpuart_stop_bits",
+                    module="uart",
+                    message=(
+                        f"Stop bits '{stop_bits}' is not a supported "
+                        f"LPUART stop-bit count. Supported values: {valid_sbs}"
+                    ),
+                    details={"stop_bits": stop_bits, "supported": valid_sbs},
+                ))
+                return result
+
     uart_cfg = doc.find_config_set("Uart")
     if uart_cfg is None:
         result.diagnostics.append(Diagnostic(

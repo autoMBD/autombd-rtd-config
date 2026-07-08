@@ -2,7 +2,7 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.31.0 |
+| Version | 0.34.0 |
 | Date | 2026-07-08 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Current pass/fail evidence for the E2E acceptance cases defined in `rtd-config-test-cases.md`. This document is the living status record the catalog points to; the catalog defines the target, this records where the tool actually stands. |
@@ -55,28 +55,23 @@ measured*, and a KPI `miss` never weakens the functional **PASS**.
 | RTD-MEX-DIO-001 | Dio | **PASS** | **PASS** — 1 edit attempt, 46.1 s ≤ 1 min budget (black-box, 2026-06-18; context→check window) |
 | RTD-MEX-DIO-002 | Dio | **PASS** | **PASS** — 1 edit attempt, 26.3 s ≤ 1 min budget (black-box, 2026-06-18; context→check window) |
 | RTD-MEX-MCL-001 | Mcl | **PASS** | **PASS** — 1 edit attempt, 24.3 s ≤ 1 min budget (black-box, 2026-06-18; context→check window) |
-| RTD-MEX-UART-001 | UART | **PASS** | **PASS** — 1 edit attempt, 17.65 s ≤ 1 min budget (OpenCode black-box, re-measured post-uart.json-descriptor-fix 2026-07-08; context→check window; `BLACKBOX_RESULT configured=true`, `validate_status=passed`; session `ses_0bdce5973ffencyT8qviKBb4nv`) |
-| RTD-MEX-UART-002 | UART | **PASS** | **PASS** — 1 edit attempt, 52.05 s ≤ 1 min budget (OpenCode black-box, 2026-07-08; KPI optimization iteration 2/3; context→check window; `validate_runs_s=[0.04]`; session `ses_0bdbb3d2cffelTKyoWKJz3qo79`) |
-| RTD-MEX-UART-003 | UART | **PASS** | **PASS** — 1 edit attempt, 59.91 s ≤ 3 min budget (OpenCode black-box, re-measured post-uart.json-descriptor-fix 2026-07-08; context→check window; `BLACKBOX_RESULT configured=true`, `validate_status=passed`; session `ses_0bdd1a605ffeoJs5Omgcvrug4Q`) |
+| RTD-MEX-UART-001 | UART | **PASS** | **MISS** — 1 edit attempt, 96.96 s > 1 min budget (OpenCode black-box, post-rebase convergence gate 2026-07-08; context→check window; independent vendor gate verified: exit 0, 0 SEVERE [TOOL], 120 generated files; session `ses_0bda4a5e2ffeVwCnBWiZzLcR6O`) |
+| RTD-MEX-UART-002 | UART | **PASS** | **PASS** — 1 edit attempt, 47.76 s ≤ 1 min budget (OpenCode black-box, post-rebase convergence gate 2026-07-08; context→check window; independent vendor gate verified: exit 0, 0 SEVERE [TOOL], 120 generated files; session `ses_0bda13571ffe0dl1KVTKnasjUY`) |
+| RTD-MEX-UART-003 | UART | **PASS** | **PASS** — 1 edit attempt, 158.7 s ≤ 3 min budget (OpenCode black-box, post-rebase convergence gate 2026-07-08; context→check window; `BLACKBOX_RESULT configured=true`, `validate_status=passed`; independent vendor gate verified: exit 0, 0 SEVERE [TOOL], 120 generated files; session `ses_0bd9f026affe7M6X2o8jDajTNt`) |
 | RTD-MEX-ADC-001 | ADC | **PASS** | **PASS** — 1 edit attempt, 80.8 s ≤ 2 min budget (black-box, re-measured post-hardening 2026-06-23; context→check window; exit 0, 0 SEVERE, 125 generated files) |
 | RTD-MEX-ADC-002 | ADC | **PASS** | **PASS** — 1 edit attempt, 75.3 s ≤ 2 min budget (black-box, re-measured post-hardening 2026-06-23; context→check window; exit 0, 0 SEVERE, 125 generated files) |
 | RTD-MEX-ADC-003 | ADC | **PASS** | **PASS** — 1 edit attempt, 106.1 s ≤ 2 min budget (black-box, re-measured post-hardening 2026-06-23; context→check window; exit 0, 0 SEVERE, 125 generated files) |
 | RTD-MEX-ADC-004 | ADC | **PASS** | **PASS** — 1 edit attempt, 65.3 s ≤ 2 min budget (black-box, re-measured post-hardening 2026-06-23; context→check window; exit 0, 0 SEVERE, 125 generated files) |
 
-**Summary: 14 / 14 cases functional PASS; 14 / 14 KPI PASS.** The
+**Summary: 14 / 14 cases functional PASS; 13 / 14 KPI PASS (UART-001 MISS).** The
 seven-module minimal system plus the ADC module have functional acceptance evidence
 (deterministic suite, static checks, the S32DS vendor gate, and code-generation
-evidence). The post-BaseNXP forward-hardening KPI miss (183.26 s on 2026-07-01)
-was sent through the required KPI optimization loop and converged on iteration 1:
-the black-box prompt now requires the standalone `check` before vendor
-`validate`, and RTD-MEX-BASENXP-001 re-measured at 12.72 s. All four ADC cases —
-interrupt software groups + watchdog (ADC-001), DMA streaming (ADC-002), BCTU
-single hardware trigger + new-data + watchdog (ADC-003), and dual-ADC BCTU list
-trigger + FIFO DMA (ADC-004) — pass the black-box protocol with one edit attempt
-each and KPI under the 2 min budget (80.8 / 75.3 / 106.1 / 65.3 s, re-measured
-after the forward-hardening), each exit 0 with 125 generated files and no SEVERE.
-UART-002 KPI optimization converged on iteration 2: OpenCode black-box re-measured at
-52.05 s ≤ 1 min, 1 edit attempt, session `ses_0bdbb3d2cffelTKyoWKJz3qo79`.
+evidence). Deterministic suite: 843 passed, 4 failed (UART LPUART validation tests —
+`apply_uart_set` missing enum-domain blocking for baud/word_length/parity/stop_bits;
+production code gap, tests are correct). UART-001 KPI measured at 96.96 s > 1 min
+budget (MISS) — OpenCode agent spent significant time exploring the skill structure
+before executing. UART-002/003 KPI PASS (47.76 / 158.7 s). All functional gates
+re-verified independently (vendor gate exit 0, 0 SEVERE [TOOL], 120 generated files each).
 
 ## 3. Cross-cutting blockers (critical path)
 
@@ -126,6 +121,9 @@ history. New ADC evidence is recorded in §2 as each case is exercised.
 
 | Date | Version | Description |
 | --- | --- | --- |
+| 2026-07-08 | 0.34.0 | Fresh convergence gate post-rebase onto origin/master (v0.33.0). Deterministic suite: 843 passed, 4 failed — UART LPUART validation tests (`test_unsupported_baud_returns_blocker`, `test_unsupported_word_length_returns_blocker`, `test_unsupported_parity_returns_blocker`, `test_unsupported_stop_bits_returns_blocker`) fail because `apply_uart_set` has no enum-domain blocking for baud/word_length/parity/stop_bits (production code gap; tests correct per uart.json `DesireBaudrate`/`UartWordLength`/`UartParityType`/`UartStopBitNumber` domains). E2E black-box re-measured: UART-001 functional PASS / KPI MISS (96.96 s > 1 min budget, 1 edit attempt, session `ses_0bda4a5e2ffeVwCnBWiZzLcR6O`), UART-002 functional PASS / KPI PASS (47.76 s ≤ 1 min, session `ses_0bda13571ffe0dl1KVTKnasjUY`), UART-003 functional PASS / KPI PASS (158.7 s ≤ 3 min, session `ses_0bd9f026affe7M6X2o8jDajTNt`). All three independently vendor-gate verified (exit 0, 0 SEVERE [TOOL], 120 generated files each). Summary: 14/14 functional PASS, 13/14 KPI PASS. |
+| 2026-07-08 | 0.33.0 | Rebased branch onto origin/master. UART forward-harden (#44) landed with new LPUART validation tests for baud/word_length/parity/stop_bits enum-domain coverage. Spec input fast-paths (#53) landed. |
+| 2026-07-08 | 0.32.0 | Intermediate version: pre-rebase intermediate state; E2E evidence carried forward. |
 | 2026-07-08 | 0.31.0 | UART-002 KPI optimization iteration 2/3 converged: re-measured at 52.05 s (1 edit attempt, ≤ 1 min budget) — KPI PASS. Worker added `suggested_command` to plan JSON and improved CLI help. All 14 cases now functional PASS + KPI PASS. Deterministic suite 830 passed. Fixture verified clean (`git checkout` restored uncontaminated fixture). |
 | 2026-07-08 | 0.30.0 | UART forward-descriptor (#46) re-measured after uart.json descriptor fix (5 enum domains completed, 4 hallucinated fields removed, numeric_domains + constraints added): UART-001 17.65 s KPI PASS (1 attempt), UART-002 67.05 s KPI MISS (2 attempts, >1 min budget), UART-003 59.91 s KPI PASS (1 attempt). All three functional PASS (vendor gate: exit 0, `validate_status=passed`). Deterministic suite 830 passed. Summary 14/14 functional PASS, 13/14 KPI PASS. UART-002 KPI MISS requires Worker optimization iteration. |
 | 2026-07-04 | 0.29.0 | UART forward-hardening (#44) re-measured: UART-001 30.37 s, UART-002 38.15 s, UART-003 54.63 s — all functional PASS (independent vendor gate: exit 0, 0 SEVERE [TOOL], 120 generated files each), all KPI PASS (≤ catalog budget), 1 edit attempt each. Deterministic suite 805 passed. Summary 14 / 14 functional PASS, 14 / 14 KPI PASS. |
