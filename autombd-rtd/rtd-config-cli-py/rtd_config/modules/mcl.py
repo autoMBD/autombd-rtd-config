@@ -71,9 +71,12 @@ class MclProvider:
                 owner="mcl",
                 path="/Mcl/Mcl/MclConfig/FlexioCommon_0/FlexioMclLogicChannels",
                 description=(
-                    f"Append FlexIO logic channel '{channel_name}' to "
-                    "FlexioMclLogicChannels with next-available CHANNEL_N and PIN_N ids "
-                    "(uniqueness enforced per Mcl.xdm constraint)"
+                    f"Mcl-only fast path: append FlexIO logic channel '{channel_name}' to "
+                    "FlexioMclLogicChannels; MclEnableFlexioCommon=true and "
+                    "FlexioCommon_0 are provider-owned preconditions; no inspect required, "
+                    "no existing Mcl tree probe, and no Uart configuration. "
+                    "Use first-unused legal CHANNEL_N/PIN_N ids from the Mcl.xdm "
+                    "domains (uniqueness enforced per Mcl.xdm constraint)."
                 ),
             ))
         else:

@@ -45,6 +45,8 @@
 # =================================================================================
 
 from rtd_config.intent import Intent
+from rtd_config.modules import platform as platform_module
+from rtd_config.modules.platform import PlatformProvider
 from rtd_config.modules.uart import UartProvider
 
 
@@ -66,3 +68,28 @@ def test_uart_plan_declares_dependencies_without_owning_other_modules():
     assert "platform" in owners
     assert "port" in owners
     assert "mcu" in owners
+
+
+def test_platform_plan_uses_platform_payload_without_cross_module_asset_probe(monkeypatch):
+    def fail_if_uart_asset_is_loaded(_hw: str):
+        raise AssertionError("platform-only plan must not probe Uart assets")
+
+    monkeypatch.setattr(platform_module, "_load_lpuart_irq_entry", fail_if_uart_asset_is_loaded)
+    intent = Intent.from_dict({
+        "module": "platform",
+        "action": "set",
+        "payload": {
+            "peripheral": "LPUART_5",
+            "priority": 4,
+        },
+    })
+
+    plan = PlatformProvider().plan(intent)
+    payload = plan.to_dict()
+
+    assert [item["owner"] for item in payload["changes"]] == ["platform"]
+    assert payload["changes"][0]["module"] == "platform"
+    assert "LPUART_5" in payload["changes"][0]["description"]
+    assert "LPUART5_IRQn" in payload["changes"][0]["description"]
+    assert "preserve existing IsrHandler" in payload["changes"][0]["description"]
+    assert "priority=4" in payload["changes"][0]["description"]

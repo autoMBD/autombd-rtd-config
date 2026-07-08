@@ -57,15 +57,24 @@ import difflib
 import json
 import subprocess
 import sys
+from pathlib import Path
 
 from rtd_config.backends.s32_mex.document import MexDocument
 from rtd_config.backends.s32_mex.apply import apply_platform_set
 from rtd_config.intent import Intent
+from rtd_config.modules.platform import PlatformProvider
 from tests.fixtures import copy_uart_fixture
 
 
 def _intent(**payload) -> Intent:
     return Intent.from_dict({"module": "platform", "action": "set", "payload": payload})
+
+
+def _asset_path() -> Path:
+    return (
+        Path(__file__).resolve().parents[2]
+        / "autombd-rtd" / "assets" / "nxp" / "s32k3" / "platform" / "interrupts.json"
+    )
 
 
 def _isr_entry(doc: MexDocument, isr_name: str):
@@ -84,6 +93,24 @@ def _isr_entry(doc: MexDocument, isr_name: str):
 def _setting_value(doc: MexDocument, entry, name: str) -> str | None:
     setting = doc.find_child_setting(entry, name)
     return setting.attrib.get("value") if setting is not None else None
+
+
+def test_platform_json_asset_has_forward_surface_coverage():
+    asset = json.loads(_asset_path().read_text(encoding="utf-8"))
+
+    assert "Platform.xdm" in asset["source"]
+    coverage = asset["_coverage"]
+
+    isr_surface = coverage["configurable_today"]["IntCtrlConfig/PlatformIsrConfig"]
+    for item in ("IsrName", "IsrEnabled", "IsrPriority", "IsrHandler"):
+        assert item in isr_surface
+
+    assert "PlatformNvicEcucPartitionRef" in coverage["not_yet_exposed"]["partitioning"]
+    assert "SystemIsrConfig" in coverage["not_yet_exposed"]["system_interrupts"]
+    assert coverage["references"] == [
+        "Platform.xdm:IntCtrlConfig/PlatformIsrConfig",
+        "issue #53 Platform KPI route correction",
+    ]
 
 
 def test_set_priority_by_peripheral(tmp_path):
@@ -168,6 +195,17 @@ def test_negative_priority_rejected(tmp_path):
 
     assert result.blocked
     assert "platform_priority_out_of_range" in [d.code for d in result.diagnostics]
+
+
+def test_plan_for_spec_payload_names_target_irq_and_priority():
+    plan = PlatformProvider().plan(_intent(peripheral="LPUART_3", priority=2))
+
+    assert len(plan.changes) == 1
+    change = plan.changes[0]
+    assert change.owner == "platform"
+    assert "LPUART3_IRQn" in change.description
+    assert "priority=2" in change.description
+    assert "Configure interrupt entry for " not in change.description
 
 
 def test_cli_platform_set_configure(tmp_path):

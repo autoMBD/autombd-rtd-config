@@ -150,3 +150,11 @@ RTD 7.0.1; recheck before generalizing to other RTD versions or device families.
 | 2026-06-11 | 0.1.2 | Added LL-009: vendor gate silently failed (Flow A timeout); adopted Flow B. |
 | 2026-06-10 | 0.1.1 | Added LL-008: spec altitude + changelog integrity rules. |
 | 2026-06-03 | 0.1.0 | Created log; seeded LL-001..007 from M1 Uart-reference work. |
+
+## LL-030 - Platform/Mcl KPI Fast-Path Review (2026-07-04)
+
+What happened -> The Platform/Mcl KPI optimization produced fresh green black-box evidence, but cold review still exposed non-test risk: Mcl's "next-available" FlexIO allocation is described as generic while the apply path uses fixture-shaped `max + 1` ids without checking the XDM enum bounds/gaps, and the Platform/Mcl assets still need explicit `_coverage` inventories before Reviewer can prove the full editable surface is implemented or deferred. Root cause -> KPI work optimized the agent route and plan wording, while tests mostly proved the current fixture and route discipline rather than descriptor-bound edge cases and asset surface accounting. Durable guard -> Any KPI fast path that claims generic module behavior must carry XDM-bound generality tests for gapped/exhausted enum domains, and each touched per-module asset must include `_coverage` before approval so deferred surface is recorded instead of hidden behind green E2E.
+
+## LL-031 - Reference Metadata Version Drift (2026-07-07)
+
+What happened -> Review caught module reference changelogs advancing while the metadata table still said `Version 0.1.0`, and the contract test explicitly asserted the stale value. Root cause -> The split/reference tests checked that references existed and carried payload details, but did not tie the top metadata version/date to the newest changelog row. Durable guard -> Reference contract tests should parse each reference's first changelog row and require the metadata `Version`/`Date` to match it whenever that reference is edited.

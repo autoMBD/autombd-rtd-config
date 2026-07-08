@@ -106,6 +106,12 @@ def _load_basenxp_asset() -> dict:
     return json.loads(asset_path.read_text(encoding="utf-8"))
 
 
+def _load_mcl_asset() -> dict:
+    """Load the committed Mcl mcl.json asset. Never reads raw .xdm."""
+    asset_path = _ASSET_ROOT / "nxp" / "s32k3" / "mcl" / "mcl.json"
+    return json.loads(asset_path.read_text(encoding="utf-8"))
+
+
 def _lookup_lpuart_irq_clock(hw: str) -> "dict | None":
     """Return the irq_name/isr_handler/clock_select entry for an LPUART instance.
 
@@ -1743,6 +1749,20 @@ def _extract_pin_index(value: str) -> int | None:
     return None
 
 
+def _mcl_flexio_enum_values(field_name: str) -> list[str]:
+    fields = _load_mcl_asset().get("FlexioMclLogicChannel", {}).get("fields", {})
+    values = fields.get(field_name, {}).get("enum_values", [])
+    return [str(value) for value in values]
+
+
+def _first_unused_mcl_flexio_enum(field_name: str, used_values: set[str]) -> str | None:
+    """Return the first unused legal enum literal from the descriptor-derived asset."""
+    for value in _mcl_flexio_enum_values(field_name):
+        if value not in used_values:
+            return value
+    return None
+
+
 def _build_flexio_channel_struct_bytes(
     struct_index: int,
     channel_id: str,
@@ -1810,8 +1830,9 @@ def apply_mcl_set(doc: MexDocument, intent: Intent) -> ApplyResult:
 
     Intent payload must carry ``add_flexio_logic_channel`` (string: the new
     channel's Name). The next-available struct index, FlexioMclChannelId, and
-    FlexioMclPinId are computed dynamically from the existing entries to satisfy
-    the Mcl.xdm uniqueness constraint (no hardcoded indices).
+    FlexioMclPinId are computed dynamically from the first unused legal values
+    in the committed Mcl.xdm-derived asset to satisfy the Mcl.xdm uniqueness and
+    range constraints (no hardcoded or invented indices).
 
     Idempotent: if a channel with the same Name already exists, returns without
     modifying the document (no-op, no error).
@@ -1819,6 +1840,7 @@ def apply_mcl_set(doc: MexDocument, intent: Intent) -> ApplyResult:
     Returns a blocker Diagnostic if:
     - No Mcl <config_set> is found.
     - No FlexioCommon container (and thus no FlexioMclLogicChannels array) exists.
+    - No legal FlexioMclChannelId/FlexioMclPinId remains unused.
     """
     result = ApplyResult()
     channel_name = intent.payload.get("add_flexio_logic_channel")
@@ -1859,29 +1881,55 @@ def apply_mcl_set(doc: MexDocument, intent: Intent) -> ApplyResult:
         if name_setting is not None and name_setting.attrib.get("value") == channel_name:
             return result  # already present -- silent no-op
 
-    # Compute next-available indices dynamically.
+    # Compute next-available values from the descriptor-derived legal domains.
     # struct name = count of existing structs (sequential 0-based).
     new_struct_index = len(existing_structs)
 
-    # FlexioMclChannelId: max existing channel index + 1
-    max_channel = -1
+    used_channels: set[str] = set()
     for struct in existing_structs:
         ch_setting = doc.find_child_setting(struct, "FlexioMclChannelId")
         if ch_setting is not None:
-            idx = _extract_channel_index(ch_setting.attrib.get("value", ""))
-            if idx is not None and idx > max_channel:
-                max_channel = idx
-    new_channel_id = f"CHANNEL_{max_channel + 1}"
+            used_channels.add(ch_setting.attrib.get("value", ""))
+    new_channel_id = _first_unused_mcl_flexio_enum("FlexioMclChannelId", used_channels)
+    if new_channel_id is None:
+        legal_values = _mcl_flexio_enum_values("FlexioMclChannelId")
+        result.diagnostics.append(Diagnostic(
+            severity="blocker",
+            code="mcl_flexio_channel_id_exhausted",
+            module="mcl",
+            message=(
+                "No unused legal FlexioMclChannelId remains in the "
+                "Mcl.xdm FlexioChannels enum domain."
+            ),
+            details={
+                "used_values": sorted(used_channels),
+                "legal_values": legal_values,
+            },
+        ))
+        return result
 
-    # FlexioMclPinId: max existing pin index + 1
-    max_pin = -1
+    used_pins: set[str] = set()
     for struct in existing_structs:
         pin_setting = doc.find_child_setting(struct, "FlexioMclPinId")
         if pin_setting is not None:
-            idx = _extract_pin_index(pin_setting.attrib.get("value", ""))
-            if idx is not None and idx > max_pin:
-                max_pin = idx
-    new_pin_id = f"PIN_{max_pin + 1}"
+            used_pins.add(pin_setting.attrib.get("value", ""))
+    new_pin_id = _first_unused_mcl_flexio_enum("FlexioMclPinId", used_pins)
+    if new_pin_id is None:
+        legal_values = _mcl_flexio_enum_values("FlexioMclPinId")
+        result.diagnostics.append(Diagnostic(
+            severity="blocker",
+            code="mcl_flexio_pin_id_exhausted",
+            module="mcl",
+            message=(
+                "No unused legal FlexioMclPinId remains in the "
+                "Mcl.xdm FlexioPins enum domain."
+            ),
+            details={
+                "used_values": sorted(used_pins),
+                "legal_values": legal_values,
+            },
+        ))
+        return result
 
     # Detect indentation from the last existing struct to match sibling formatting.
     last_struct = existing_structs[-1] if existing_structs else None

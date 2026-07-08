@@ -54,13 +54,15 @@ The Uart_Example_S32K344 fixture has:
     struct 1: Name=UART_RX, FlexioMclChannelId=CHANNEL_1, FlexioMclPinId=PIN_1
 
 The case appends struct 2: Name=FLEXIO_UART_CH0, CHANNEL_2, PIN_2.
-Next-available ids are computed dynamically (max+1), not hardcoded.
+Next-available ids are computed from the first unused legal XDM enum values,
+not hardcoded or invented outside the descriptor domain.
 """
 import difflib
 import json
 import subprocess
 import sys
 import xml.etree.ElementTree as ET
+from pathlib import Path
 
 from rtd_config.backends.s32_mex.document import MexDocument
 from rtd_config.backends.s32_mex.apply import (
@@ -75,6 +77,13 @@ from tests.fixtures import copy_uart_fixture
 
 def _intent(**payload) -> Intent:
     return Intent.from_dict({"module": "mcl", "action": "set", "payload": payload})
+
+
+def _asset_path() -> Path:
+    return (
+        Path(__file__).resolve().parents[2]
+        / "autombd-rtd" / "assets" / "nxp" / "s32k3" / "mcl" / "mcl.json"
+    )
 
 
 def _mcl_cfg(doc: MexDocument) -> ET.Element | None:
@@ -112,6 +121,76 @@ def _changed_lines(before: bytes, after: bytes) -> list[str]:
         line for line in diff
         if line.startswith(("+", "-")) and not line.startswith(("+++", "---"))
     ]
+
+
+def _flexio_stub(entries: list[tuple[str, str, str]]) -> bytes:
+    structs: list[str] = []
+    for index, (name, channel_id, pin_id) in enumerate(entries):
+        structs.append(
+            f"""                <mex:struct name="{index}">
+                  <mex:setting name="Name" value="{name}"/>
+                  <mex:setting name="FlexioMclChannelId" value="{channel_id}"/>
+                  <mex:setting name="FlexioMclPinId" value="{pin_id}"/>
+                  <mex:setting name="FlexioMclAddPinEnable" value="false"/>
+                  <mex:setting name="FlexioMclAddPinId" value="PIN_0"/>
+                  <mex:setting name="FlexioMclAddChannelEnable" value="false"/>
+                  <mex:setting name="FlexioMclAddChannelId" value="CHANNEL_0"/>
+                </mex:struct>"""
+        )
+    joined = "\n".join(structs)
+    return f"""<?xml version="1.0" encoding= "UTF-8" ?>
+<mex:mex_configuration xmlns:mex="http://mcuxpresso.nxp.com/XSD/mex_configuration_18">
+  <mex:instance name="Mcl" enabled="true">
+    <mex:config_set name="Mcl">
+      <mex:setting name="MclEnableFlexioCommon" value="true"/>
+      <mex:array name="MclConfig">
+        <mex:struct name="0">
+          <mex:setting name="Name" value="MclConfig_0"/>
+          <mex:array name="FlexioCommon">
+            <mex:struct name="0">
+              <mex:setting name="Name" value="FlexioCommon_0"/>
+              <mex:array name="FlexioMclLogicChannels">
+{joined}
+              </mex:array>
+            </mex:struct>
+          </mex:array>
+        </mex:struct>
+      </mex:array>
+    </mex:config_set>
+  </mex:instance>
+</mex:mex_configuration>
+""".encode("utf-8")
+
+
+# ---------------------------------------------------------------------------
+# Forward surface coverage: mcl.json must account for the Mcl.xdm surface.
+# ---------------------------------------------------------------------------
+def test_mcl_json_asset_has_forward_surface_coverage():
+    asset = json.loads(_asset_path().read_text(encoding="utf-8"))
+
+    assert "Mcl.xdm" in asset["_source"]
+    coverage = asset["_coverage"]
+    configurable = coverage["configurable_today"]
+
+    assert "MclGeneral/MclFlexioCommon" in configurable
+    assert "MclEnableFlexioCommon" in configurable["MclGeneral/MclFlexioCommon"]
+
+    logic_channels = configurable["MclConfig/FlexioCommon/FlexioMclLogicChannels"]
+    for item in (
+        "Name",
+        "FlexioMclChannelId",
+        "FlexioMclPinId",
+        "FlexioMclAddPinEnable",
+        "FlexioMclAddPinId",
+        "FlexioMclAddChannelEnable",
+        "FlexioMclAddChannelId",
+    ):
+        assert item in logic_channels
+
+    assert "MclConfig/FlexioCommon/FlexioMclLogicChannels" in coverage["not_yet_exposed"]
+    algorithm = asset["FlexioMclLogicChannel"]["next_id_algorithm"]
+    assert "first unused legal" in algorithm
+    assert "max_existing" not in algorithm
 
 
 # ---------------------------------------------------------------------------
@@ -269,6 +348,22 @@ def test_plan_describes_channel_creation(tmp_path):
     )
     assert ch_change.module == "mcl"
     assert ch_change.owner == "mcl"
+    assert "MclEnableFlexioCommon=true" in ch_change.description
+    assert "no inspect required" in ch_change.description
+    assert "first-unused legal CHANNEL_N/PIN_N" in ch_change.description
+
+
+def test_plan_for_arbitrary_single_channel_declares_no_probe_no_uart_fast_path():
+    """Mcl-only fast-path guidance must not be tied to an E2E channel literal."""
+    channel_name = "FLEXIO_DIAG_TX0"
+    plan = MclProvider().plan(_intent(add_flexio_logic_channel=channel_name))
+
+    descriptions = "\n".join(c.description for c in plan.changes)
+    assert channel_name in descriptions
+    assert "Mcl-only" in descriptions
+    assert "no inspect" in descriptions
+    assert "no existing Mcl tree probe" in descriptions
+    assert "no Uart configuration" in descriptions
 
 
 # ---------------------------------------------------------------------------
@@ -405,10 +500,10 @@ def test_sequential_ids_prove_dynamic_computation(tmp_path):
     )
     assert _setting_value(doc3, ch1, "Name") == "FLEXIO_UART_CH1"
     assert _setting_value(doc3, ch1, "FlexioMclChannelId") == "CHANNEL_3", (
-        "Second channel must be CHANNEL_3 (max+1), not a constant"
+        "Second channel must be the next unused legal enum, not a constant"
     )
     assert _setting_value(doc3, ch1, "FlexioMclPinId") == "PIN_3", (
-        "Second channel must be PIN_3 (max+1), not a constant"
+        "Second pin must be the next unused legal enum, not a constant"
     )
 
     # All four ChannelIds and PinIds must be unique across the array
@@ -416,6 +511,52 @@ def test_sequential_ids_prove_dynamic_computation(tmp_path):
     pin_ids = [_setting_value(doc3, s, "FlexioMclPinId") for s in structs]
     assert len(set(channel_ids)) == 4, f"ChannelIds not unique: {channel_ids}"
     assert len(set(pin_ids)) == 4, f"PinIds not unique: {pin_ids}"
+
+
+def test_gapped_flexio_ids_reuse_first_unused_legal_channel_and_pin(tmp_path):
+    """A gapped project must fill CHANNEL_1/PIN_1, not emit max+1."""
+    project = copy_uart_fixture(tmp_path)
+    mex = project / "Uart_Example.mex"
+    raw = mex.read_bytes()
+    raw = raw.replace(
+        b'<setting name="FlexioMclChannelId" value="CHANNEL_1"/>',
+        b'<setting name="FlexioMclChannelId" value="CHANNEL_2"/>',
+        1,
+    )
+    raw = raw.replace(
+        b'<setting name="FlexioMclPinId" value="PIN_1"/>',
+        b'<setting name="FlexioMclPinId" value="PIN_2"/>',
+        1,
+    )
+    mex.write_bytes(raw)
+
+    doc = MexDocument.load(mex)
+    result = apply_mcl_set(doc, _intent(add_flexio_logic_channel="FLEXIO_GAP_FILL"))
+
+    assert not result.blocked, [d.to_dict() for d in result.diagnostics]
+    structs = _channel_structs(doc)
+    new_struct = structs[-1]
+    assert _setting_value(doc, new_struct, "FlexioMclChannelId") == "CHANNEL_1"
+    assert _setting_value(doc, new_struct, "FlexioMclPinId") == "PIN_1"
+
+
+def test_exhausted_flexio_channel_domain_blocks_without_inventing_enum(tmp_path):
+    """The XDM channel enum is CHANNEL_0..CHANNEL_7; CHANNEL_8 is illegal."""
+    entries = [
+        (f"USED_{idx}", f"CHANNEL_{idx}", f"PIN_{idx}")
+        for idx in range(8)
+    ]
+    mex = tmp_path / "exhausted.mex"
+    mex.write_bytes(_flexio_stub(entries))
+
+    doc = MexDocument.load(mex)
+    result = apply_mcl_set(doc, _intent(add_flexio_logic_channel="FLEXIO_TOO_MANY"))
+
+    assert result.blocked
+    diagnostic = next(d for d in result.diagnostics if d.module == "mcl")
+    assert diagnostic.code == "mcl_flexio_channel_id_exhausted"
+    assert diagnostic.details["legal_values"] == [f"CHANNEL_{idx}" for idx in range(8)]
+    assert "CHANNEL_8" not in diagnostic.message
 
 
 # ---------------------------------------------------------------------------

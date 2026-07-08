@@ -58,6 +58,7 @@ from rtd_config.plan import Plan, PlannedChange
 # parents[3] is autombd-rtd/
 _MODULE_FILE = Path(__file__).resolve()
 _UART_ASSET_PATH = _MODULE_FILE.parents[3] / "assets" / "nxp" / "s32k3" / "uart" / "uart.json"
+_PLATFORM_ASSET_PATH = _MODULE_FILE.parents[3] / "assets" / "nxp" / "s32k3" / "platform" / "interrupts.json"
 
 
 def _load_lpuart_irq_entry(hw: str) -> "dict | None":
@@ -77,6 +78,32 @@ def _load_lpuart_irq_entry(hw: str) -> "dict | None":
         return None
 
 
+def _lpuart_key_from_isr_name(isr_name: str) -> str | None:
+    match = re.fullmatch(r"LPUART(\d+)_IRQn", isr_name.strip())
+    if match is None:
+        return None
+    return f"LPUART_{match.group(1)}"
+
+
+def _load_platform_asset() -> dict:
+    try:
+        return json.loads(_PLATFORM_ASSET_PATH.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+def _derive_platform_isr_name(peripheral: str) -> str | None:
+    patterns = _load_platform_asset().get("isr_name_patterns", {})
+    text = peripheral.strip().upper()
+    match = re.fullmatch(r"LPUART_?(\d+)", text)
+    if match is not None:
+        pattern = patterns.get("LPUART_<n>")
+        return pattern.replace("<n>", match.group(1)) if pattern else None
+    if text.startswith("FLEXIO"):
+        return patterns.get("FLEXIO_<x>")
+    return None
+
+
 class PlatformProvider:
     """Owns Platform interrupt-controller configuration.
 
@@ -88,9 +115,50 @@ class PlatformProvider:
     name = "platform"
 
     def plan(self, intent: Intent) -> Plan:
-        return Plan([self.irq_dependency(intent.payload.get("hw", ""))])
+        return Plan([self.platform_request_change(intent.payload)])
 
-    def irq_dependency(self, hw: str) -> PlannedChange:
+    def platform_request_change(self, payload: dict) -> PlannedChange:
+        """Return the single Platform-owned change requested by ``platform set``."""
+        target = payload.get("peripheral") or payload.get("hw") or ""
+        priority = payload.get("priority")
+        isr_name = payload.get("isr_name")
+        if isr_name is None and target:
+            isr_name = _derive_platform_isr_name(target)
+        elif isr_name and not target:
+            target = _lpuart_key_from_isr_name(isr_name) or isr_name
+
+        priority_text = f", priority={priority}" if priority is not None else ""
+        handler_text = ", preserve existing IsrHandler registration"
+        if target and isr_name:
+            description = (
+                f"Update existing PlatformIsrConfig for {target}: "
+                f"IsrName={isr_name}, IsrEnabled=true{priority_text}{handler_text}"
+            )
+        elif isr_name:
+            description = (
+                f"Update existing PlatformIsrConfig: "
+                f"IsrName={isr_name}, IsrEnabled=true{priority_text}{handler_text}"
+            )
+        else:
+            description = (
+                f"Update existing PlatformIsrConfig for "
+                f"{target or 'requested interrupt'}{priority_text}{handler_text}"
+            )
+
+        return PlannedChange(
+            module="platform",
+            owner="platform",
+            path="/Platform/Platform/IntCtrlConfig",
+            description=description,
+        )
+
+    def irq_dependency(
+        self,
+        hw: str,
+        *,
+        priority: int | None = None,
+        isr_name: str | None = None,
+    ) -> PlannedChange:
         """Return the Platform-owned IRQ dependency a consumer requires.
 
         The description names the concrete IsrName and ISR handler derived from
@@ -103,9 +171,25 @@ class PlatformProvider:
         if entry is not None:
             irq_name = entry["irq_name"]
             isr_handler = entry["isr_handler"]
+            priority_text = (
+                f", priority={priority}"
+                if priority is not None
+                else ""
+            )
             description = (
                 f"Insert PlatformIsrConfig for {hw}: "
-                f"IsrName={irq_name}, IsrHandler={isr_handler}, IsrEnabled=true"
+                f"IsrName={irq_name}, IsrHandler={isr_handler}, "
+                f"IsrEnabled=true{priority_text}"
+            )
+        elif isr_name:
+            priority_text = (
+                f", priority={priority}"
+                if priority is not None
+                else ""
+            )
+            description = (
+                f"Update existing PlatformIsrConfig: "
+                f"IsrName={isr_name}, IsrEnabled=true{priority_text}"
             )
         else:
             description = f"Configure interrupt entry for {hw}"
