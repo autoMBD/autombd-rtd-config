@@ -1,5 +1,29 @@
 {
   "_source": "Installed-RTD-derived (S32K3 RTD 7.0.1 Uart.xdm / Platform.xdm / .epd), S32K344 IRQ header (S32K344_IRQ.h from SDK), fixture Uart_Example_S32K344 (committed: tests/fixtures/nxp/ds/s32k3/Uart_Example_S32K344). Uart.xdm is not committed in this repo; all field/enum values are fixture-verified and pinned by test_uart_apply.py::TestUartAsset and test_uart_flexio_add_channel.py::TestUartAssetFlexioEnums (LL-012, LL-012b).",
+
+  "_coverage": {
+    "_note": "Honest map of the Uart editable surface this CLI exposes today vs. the Uart.xdm items NOT yet configurable through the `uart set` surface. Forward (Spec-first) development tracks the deferred surface explicitly so callers know the boundary; full-surface expansion of every Uart.xdm field is a separate, larger effort (issue #44). The deferred fields below DO exist in Uart.xdm and are currently emitted at byte-faithful fixture defaults by the apply builders -- they are not absent, just not user-tunable yet.",
+    "configurable_today": {
+      "lpuart_channel": ["UartHwChannel (hw instance LPUART_0..15)", "DesireBaudrate (16 standard/CUSTOM baud rates; validated against DesireBaudrate enum domain)", "UartInteruptDmaMethod (interrupt/dma)", "UartWordLength (7/8/9/10 bits; validated against UartWordLength enum domain)", "UartParityType (disabled/even/odd; validated against UartParityType enum domain)", "UartStopBitNumber (1/2 stop bits; validated against UartStopBitNumber enum domain)", "UartClockRef -> Mcu clock reference point (derived from instance_irq_clock_map)", "UartDmaTxChannelRef / UartDmaRxChannelRef (DMA path; Mcl-wired)", "UartDmaEnable (DMA path)"],
+      "flexio_channel": ["FlexioUartInteruptDmaMethod (interrupt)", "DesireBaudrate (FlexIO 16 baud rates; validated against FlexioDesireBaudrate enum domain)", "bitCount (8-bit only)", "driverDirection (tx/rx)", "CustomTimerDecrement (full 3-value domain)", "CustomBaudrateDivider", "FlexioDmaChannelRef", "UartHwChannelRef"],
+      "general_config": ["UartCallbackCapability (bool)", "UartCallback[0] (callback function name)"],
+      "cross_module_orchestration": ["Platform ISR insertion (LPUART + DMATCD ISRs, grounded in uart.json + dma_hw_channel_irq_map)", "Mcu clock reference point insertion (grounded in uart.json instance_irq_clock_map)", "Mcl DMA logic channel insertion (dmaLogicChannel_Type_0 for TX, _Type_1 for RX; grounded in mcl_dma_channel_template)", "changed_modules tracking (uart/platform/mcu, +mcl for DMA path)", "static checks (post-apply vendor validation)"]
+    },
+    "not_yet_exposed": {
+      "_note": "Each item is a Uart.xdm editable field currently fixed at a byte-faithful fixture default. Exposing any of these is future scope.",
+      "per_channel": ["UartInternalLoopbackEnable (DetailModuleConfiguration)", "UartTimeoutEnable (DetailModuleConfiguration)", "CustomBaudrateMantissa (DetailModuleConfiguration)", "CustomBaudrateDivisor (DetailModuleConfiguration)"],
+      "general_configuration": ["UartDevErrorDetect (GeneralConfiguration)", "DisableUartRuntimeErrorDetect (GeneralConfiguration)", "UartMultipartitionSupport (GeneralConfiguration)", "UartEnableUserModeSupport (GeneralConfiguration)", "UartTimeoutMethod (GeneralConfiguration)", "UartTimeoutDuration (GeneralConfiguration)", "UartVersionInfoApi (GeneralConfiguration)"],
+      "flexio_channel": ["FlexioDmaChannelRef (currently empty)"],
+      "dma_channel": ["dmaLogicChannel full field set beyond the activation template (EnableTransferConfig, ScatterGather, transfer descriptors, source/destination addresses, TCD sizing, loop counts)"]
+    },
+    "unconfirmed_from_xdm": {
+      "_note": "Uart.xdm contains ~31 constraint rules and ~11 numeric vars NOT yet fully extracted from Uart.xdm -- these are marked as unconfirmed. The 14 enum domains currently tracked in this asset (UartWordLength, UartParityType, UartStopBitNumber, UartInteruptDmaMethod, DesireBaudrate, FlexioUartInteruptDmaMethod, FlexioDesireBaudrate, FlexioBitCount, FlexioDriverDirection, FlexioCustomTimerDecrement, UartTimeoutMethod, UartHwUsing, UartImplementationConfigVariant, and the CLI maps) represent the fully validated subset verified against both Uart.xdm and the fixture.",
+      "missing_constraint_rules": 31,
+      "missing_numeric_vars": 11
+    },
+    "references": ["issue #44 (Uart module forward-hardening)"]
+  },
+
   "enum_domains": {
     "UartWordLength": [
       "LPUART_UART_IP_7_BITS_PER_CHAR",
@@ -21,34 +45,44 @@
       "LPUART_UART_IP_USING_DMA"
     ],
     "DesireBaudrate": [
+      "LPUART_UART_BAUDRATE_CUSTOM",
       "LPUART_UART_BAUDRATE_1200",
       "LPUART_UART_BAUDRATE_2400",
       "LPUART_UART_BAUDRATE_4800",
+      "LPUART_UART_BAUDRATE_7200",
       "LPUART_UART_BAUDRATE_9600",
+      "LPUART_UART_BAUDRATE_14400",
       "LPUART_UART_BAUDRATE_19200",
+      "LPUART_UART_BAUDRATE_28800",
       "LPUART_UART_BAUDRATE_38400",
       "LPUART_UART_BAUDRATE_57600",
       "LPUART_UART_BAUDRATE_115200",
       "LPUART_UART_BAUDRATE_230400",
       "LPUART_UART_BAUDRATE_460800",
-      "LPUART_UART_BAUDRATE_921600"
+      "LPUART_UART_BAUDRATE_921600",
+      "LPUART_UART_BAUDRATE_1843200"
     ],
     "FlexioUartInteruptDmaMethod": [
       "FLEXIO_UART_IP_DRIVER_TYPE_INTERRUPTS",
       "FLEXIO_UART_IP_DRIVER_TYPE_DMA"
     ],
     "FlexioDesireBaudrate": [
+      "FLEXIO_UART_BAUDRATE_CUSTOM",
       "FLEXIO_UART_BAUDRATE_1200",
       "FLEXIO_UART_BAUDRATE_2400",
       "FLEXIO_UART_BAUDRATE_4800",
+      "FLEXIO_UART_BAUDRATE_7200",
       "FLEXIO_UART_BAUDRATE_9600",
+      "FLEXIO_UART_BAUDRATE_14400",
       "FLEXIO_UART_BAUDRATE_19200",
+      "FLEXIO_UART_BAUDRATE_28800",
       "FLEXIO_UART_BAUDRATE_38400",
       "FLEXIO_UART_BAUDRATE_57600",
       "FLEXIO_UART_BAUDRATE_115200",
       "FLEXIO_UART_BAUDRATE_230400",
       "FLEXIO_UART_BAUDRATE_460800",
-      "FLEXIO_UART_BAUDRATE_921600"
+      "FLEXIO_UART_BAUDRATE_921600",
+      "FLEXIO_UART_BAUDRATE_1843200"
     ],
     "FlexioBitCount": [
       "FLEXIO_UART_IP_8_BITS_PER_CHAR"
@@ -56,6 +90,24 @@
     "FlexioDriverDirection": [
       "FLEXIO_UART_IP_DIRECTION_TX",
       "FLEXIO_UART_IP_DIRECTION_RX"
+    ],
+    "FlexioCustomTimerDecrement": [
+      "FLEXIO_TIMER_DECREMENT_FXIO_CLK_SHIFT_TMR",
+      "FLEXIO_TIMER_DECREMENT_FXIO_CLK_DIV_16",
+      "FLEXIO_TIMER_DECREMENT_FXIO_CLK_DIV_256"
+    ],
+    "UartTimeoutMethod": [
+      "OSIF_COUNTER_DUMMY",
+      "OSIF_COUNTER_SYSTEM",
+      "OSIF_COUNTER_CUSTOM"
+    ],
+    "UartHwUsing": [
+      "LPUART_IP",
+      "FLEXIO_IP"
+    ],
+    "UartImplementationConfigVariant": [
+      "VariantPostBuild",
+      "VariantPreCompile"
     ],
     "parity_cli_to_enum": {
       "none":  "LPUART_UART_IP_PARITY_DISABLED",
@@ -71,6 +123,34 @@
       "8":  "LPUART_UART_IP_8_BITS_PER_CHAR",
       "9":  "LPUART_UART_IP_9_BITS_PER_CHAR",
       "10": "LPUART_UART_IP_10_BITS_PER_CHAR"
+    }
+  },
+  "numeric_domains": {
+    "CustomBaudrateMantissa": {"range": [1, 8191], "default": 1, "editable_when": "DesireBaudrate=CUSTOM"},
+    "CustomBaudrateDivisor": {"range": [4, 32], "default": 4, "editable_when": "DesireBaudrate=CUSTOM"},
+    "CustomBaudrateDividerFlexio": {"range": [2, 512], "default": 32, "constraint": "must be even", "editable_when": "DesireBaudrate=CUSTOM"},
+    "UartTimeoutDuration": {"range": [0, 4294967295], "default": 1000}
+  },
+  "constraints": {
+    "_note": "Extracted from Uart.xdm (RTD 7.0.1). The CLI enforces a subset; remaining constraints are caught by the S32DS vendor gate.",
+    "enforced_by_cli": {
+      "uart_interrupt_dma_method": "LPUART_UART_IP_USING_DMA / FLEXIO_UART_IP_DRIVER_TYPE_DMA require UartDmaEnable=true + populated Tx/Rx DMA channel refs + MCL DMA channels + Platform DMATCD ISRs",
+      "flexio_method": "FLEXIO_UART_IP_DRIVER_TYPE_INTERRUPTS only (DMA deferred)",
+      "lpuart_baud_validation": "DesireBaudrate validated against DesireBaudrate enum domain",
+      "flexio_baud_validation": "FlexioDesireBaudrate validated against FlexioDesireBaudrate enum domain"
+    },
+    "vendor_gate_only": {
+      "custom_baudrate_computation": "LPUART: CustomBaudrateValue must match ClockFreq/(Mantissa*Divisor) when DesireBaudrate=CUSTOM",
+      "flexio_custom_baudrate_computation": "FlexIO: CustomBaudrateValue must match ClockFreq/(TimerDecrementFactor*Divider) when DesireBaudrate=CUSTOM",
+      "flexio_divider_even": "FlexIO CustomBaudrateDivider must be even (mod 2 = 0)",
+      "hw_channel_uniqueness": "UartHwChannel must be unique across all Uart channels; must not conflict with Lin driver",
+      "flexio_hw_channel_ref_uniqueness": "UartHwChannelRef must be unique across all FlexIO Uart channels",
+      "uart_channel_id_uniqueness": "UartChannelId must be unique and match positional index",
+      "timeout_method_coherence": "OSIF_COUNTER_CUSTOM requires OsIfUseCustomTimer=true; OSIF_COUNTER_SYSTEM requires OsIfUseSystemTimer=true",
+      "ecuc_partition_coherence": "UartMultipartitionSupport gates EcucPartitionRef validity and required count",
+      "dma_ref_validity": "UartDmaTxChannelRef/UartDmaRxChannelRef must be non-empty and valid when DMA selected",
+      "flexio_dma_ref_validity": "FlexioDmaChannelRef must be non-empty and valid when FlexIO DMA selected",
+      "callback_coherence": "UartCallbackCapability=true requires at least one UartCallback; UartCallback editable only when capability enabled"
     }
   },
   "callback_fields": {
