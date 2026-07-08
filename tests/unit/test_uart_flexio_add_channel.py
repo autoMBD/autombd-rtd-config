@@ -323,6 +323,45 @@ class TestUartAssetFlexioEnums:
         bauds = data["enum_domains"]["FlexioDesireBaudrate"]
         assert "FLEXIO_UART_BAUDRATE_921600" in bauds
 
+    def test_flexio_baud_7200_present(self):
+        data = json.loads(_UART_ASSET.read_text(encoding="utf-8"))
+        bauds = data["enum_domains"]["FlexioDesireBaudrate"]
+        assert "FLEXIO_UART_BAUDRATE_7200" in bauds
+
+    def test_flexio_baud_14400_present(self):
+        data = json.loads(_UART_ASSET.read_text(encoding="utf-8"))
+        bauds = data["enum_domains"]["FlexioDesireBaudrate"]
+        assert "FLEXIO_UART_BAUDRATE_14400" in bauds
+
+    def test_flexio_baud_28800_present(self):
+        data = json.loads(_UART_ASSET.read_text(encoding="utf-8"))
+        bauds = data["enum_domains"]["FlexioDesireBaudrate"]
+        assert "FLEXIO_UART_BAUDRATE_28800" in bauds
+
+    def test_flexio_baud_1843200_present(self):
+        data = json.loads(_UART_ASSET.read_text(encoding="utf-8"))
+        bauds = data["enum_domains"]["FlexioDesireBaudrate"]
+        assert "FLEXIO_UART_BAUDRATE_1843200" in bauds
+
+    def test_flexio_baud_custom_present(self):
+        data = json.loads(_UART_ASSET.read_text(encoding="utf-8"))
+        bauds = data["enum_domains"]["FlexioDesireBaudrate"]
+        assert "FLEXIO_UART_BAUDRATE_CUSTOM" in bauds
+
+    def test_flexio_baud_count_is_16(self):
+        data = json.loads(_UART_ASSET.read_text(encoding="utf-8"))
+        bauds = data["enum_domains"]["FlexioDesireBaudrate"]
+        assert len(bauds) == 16, f"Expected 16 FlexIO baud rates, got {len(bauds)}"
+
+    def test_flexio_custom_timer_decrement_enum_present(self):
+        data = json.loads(_UART_ASSET.read_text(encoding="utf-8"))
+        enums = data.get("enum_domains", {})
+        assert "FlexioCustomTimerDecrement" in enums
+        values = enums["FlexioCustomTimerDecrement"]
+        assert "FLEXIO_TIMER_DECREMENT_FXIO_CLK_SHIFT_TMR" in values
+        assert "FLEXIO_TIMER_DECREMENT_FXIO_CLK_DIV_16" in values
+        assert "FLEXIO_TIMER_DECREMENT_FXIO_CLK_DIV_256" in values
+
     def test_flexio_bit_count_enum_present(self):
         data = json.loads(_UART_ASSET.read_text(encoding="utf-8"))
         enums = data.get("enum_domains", {})

@@ -171,7 +171,14 @@ def build_parser() -> argparse.ArgumentParser:
 
     uart_parser = subparsers.add_parser("uart")
     uart_actions = uart_parser.add_subparsers(dest="action")
-    uart_set = uart_actions.add_parser("set")
+    uart_set = uart_actions.add_parser(
+        "set",
+        help="Modify an EXISTING Uart channel (LPUART or FlexIO). Does NOT create new channels.",
+        description="Modify an EXISTING Uart channel's settings (baud, mode, HW instance, "
+        "callback, frame parameters). Cross-module orchestration (Platform ISR, Mcu clock "
+        "ref, Mcl/DMA channels) is handled automatically. To CREATE a NEW FlexIO channel "
+        "pair, use 'uart add-flexio-channel' instead.",
+    )
     uart_set.add_argument("--project", required=True)
     uart_set.add_argument("--hw", required=False)
     # RTD 7.0.1 has no polling async-method value; interrupt and DMA are supported.
@@ -207,11 +214,25 @@ def build_parser() -> argparse.ArgumentParser:
     uart_add_flexio = uart_actions.add_parser(
         "add-flexio-channel",
         help=(
-            "Create a FlexIO UART Tx+Rx channel pair (RTD-MEX-UART-002). "
-            "Inserts 2 MCL FlexIO logic channels and 2 Uart FlexIO channels "
-            "with the given communication parameters and callback. "
-            "The shared FLEXIO_IRQn/MCL_FLEXIO_ISR Platform ISR and "
-            "FLEXIO_CLK Mcu clock reference are ensured (idempotent)."
+            "Create a FlexIO UART Tx+Rx channel pair. Handles ALL cross-module "
+            "orchestration (MCL logic channels, Platform ISR, Mcu clock) automatically."
+        ),
+        description=(
+            "Create a FlexIO UART Tx+Rx channel pair (RTD-MEX-UART-002)."
+        ),
+        epilog=(
+            "Examples:\n"
+            "  Plan only (no edits, see what will happen):\n"
+            "    python -m rtd_config uart add-flexio-channel --project <PROJECT_DIR> --callback Autombd_UartCallback --json\n"
+            "\n"
+            "  Execute (plan + apply + static check):\n"
+            "    python -m rtd_config uart add-flexio-channel --project <PROJECT_DIR> --callback Autombd_UartCallback --configure --json\n"
+            "\n"
+            "Cross-module orchestration (all automatic, idempotent):\n"
+            "  - MCL: 2 FlexioMclLogicChannels structs (UART2_TX, UART2_RX) with next-available CHANNEL_N/PIN_N\n"
+            "  - Uart: 2 UartChannel structs with UartHwUsing=FLEXIO_IP, FlexioModuleConfiguration\n"
+            "  - Platform: ensure FLEXIO_IRQn/MCL_FLEXIO_ISR ISR is present+enabled (no-op if already present)\n"
+            "  - Mcu: ensure FLEXIO_CLK/CORE_CLK McuClockReferencePoint is present (no-op if already present)\n"
         ),
     )
     uart_add_flexio.add_argument("--project", required=True)
@@ -610,17 +631,41 @@ def normalize_uart_add_flexio_intent(args: argparse.Namespace) -> Intent:
     return Intent.from_dict({"module": "uart", "action": "add_flexio_channel", "payload": payload})
 
 
+def _build_add_flexio_suggested_command(args: argparse.Namespace) -> str:
+    """Build a ready-to-use `--configure --json` command from the current args."""
+    parts = [
+        "python", "-m", "rtd_config", "uart", "add-flexio-channel",
+        "--project", str(args.project),
+    ]
+    if args.baud != 921600:
+        parts.extend(["--baud", str(args.baud)])
+    if getattr(args, "word_length", 8) != 8:
+        parts.extend(["--word-length", str(args.word_length)])
+    if getattr(args, "mode", "interrupt") != "interrupt":
+        parts.extend(["--mode", args.mode])
+    if args.callback is not None:
+        parts.extend(["--callback", args.callback])
+    if getattr(args, "tx_name", "UART2_TX") != "UART2_TX":
+        parts.extend(["--tx-name", args.tx_name])
+    if getattr(args, "rx_name", "UART2_RX") != "UART2_RX":
+        parts.extend(["--rx-name", args.rx_name])
+    parts.extend(["--configure", "--json"])
+    return " ".join(parts)
+
+
 def cmd_uart_add_flexio_channel(args: argparse.Namespace) -> int:
     intent = normalize_uart_add_flexio_intent(args)
     plan = UartProvider().plan(intent)
 
     if not args.configure:
-        return emit({
+        result = {
             "status": "passed",
             "command": "plan",
             "normalized_intent": _intent_dict(intent),
             "plan": plan.to_dict(),
-        })
+            "suggested_command": _build_add_flexio_suggested_command(args),
+        }
+        return emit(result)
 
     return _configure_module(args, intent, plan, apply_uart_add_flexio_channel)
 

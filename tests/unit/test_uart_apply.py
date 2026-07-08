@@ -254,6 +254,143 @@ class TestUartAsset:
         assert cb.get("capability_setting") == "UartCallbackCapability"
         assert cb.get("callback_array") == "UartCallback"
 
+    def test_baud_7200_in_asset(self):
+        data = json.loads(_UART_ASSET.read_text(encoding="utf-8"))
+        bauds = data["enum_domains"]["DesireBaudrate"]
+        assert "LPUART_UART_BAUDRATE_7200" in bauds
+
+    def test_baud_14400_in_asset(self):
+        data = json.loads(_UART_ASSET.read_text(encoding="utf-8"))
+        bauds = data["enum_domains"]["DesireBaudrate"]
+        assert "LPUART_UART_BAUDRATE_14400" in bauds
+
+    def test_baud_28800_in_asset(self):
+        data = json.loads(_UART_ASSET.read_text(encoding="utf-8"))
+        bauds = data["enum_domains"]["DesireBaudrate"]
+        assert "LPUART_UART_BAUDRATE_28800" in bauds
+
+    def test_baud_1843200_in_asset(self):
+        data = json.loads(_UART_ASSET.read_text(encoding="utf-8"))
+        bauds = data["enum_domains"]["DesireBaudrate"]
+        assert "LPUART_UART_BAUDRATE_1843200" in bauds
+
+    def test_baud_custom_in_asset(self):
+        data = json.loads(_UART_ASSET.read_text(encoding="utf-8"))
+        bauds = data["enum_domains"]["DesireBaudrate"]
+        assert "LPUART_UART_BAUDRATE_CUSTOM" in bauds
+
+    def test_desire_baudrate_count_is_16(self):
+        data = json.loads(_UART_ASSET.read_text(encoding="utf-8"))
+        bauds = data["enum_domains"]["DesireBaudrate"]
+        assert len(bauds) == 16, f"Expected 16 baud rates including CUSTOM, got {len(bauds)}"
+
+    def test_flexio_custom_timer_decrement_enum_present(self):
+        data = json.loads(_UART_ASSET.read_text(encoding="utf-8"))
+        enums = data.get("enum_domains", {})
+        assert "FlexioCustomTimerDecrement" in enums
+        values = enums["FlexioCustomTimerDecrement"]
+        assert "FLEXIO_TIMER_DECREMENT_FXIO_CLK_SHIFT_TMR" in values
+        assert "FLEXIO_TIMER_DECREMENT_FXIO_CLK_DIV_16" in values
+        assert "FLEXIO_TIMER_DECREMENT_FXIO_CLK_DIV_256" in values
+
+    def test_uart_timeout_method_enum_present(self):
+        data = json.loads(_UART_ASSET.read_text(encoding="utf-8"))
+        enums = data.get("enum_domains", {})
+        assert "UartTimeoutMethod" in enums
+        values = enums["UartTimeoutMethod"]
+        assert "OSIF_COUNTER_DUMMY" in values
+        assert "OSIF_COUNTER_SYSTEM" in values
+        assert "OSIF_COUNTER_CUSTOM" in values
+
+    def test_uart_hw_using_enum_present(self):
+        data = json.loads(_UART_ASSET.read_text(encoding="utf-8"))
+        enums = data.get("enum_domains", {})
+        assert "UartHwUsing" in enums
+        values = enums["UartHwUsing"]
+        assert "LPUART_IP" in values
+        assert "FLEXIO_IP" in values
+
+    def test_uart_implementation_config_variant_enum_present(self):
+        data = json.loads(_UART_ASSET.read_text(encoding="utf-8"))
+        enums = data.get("enum_domains", {})
+        assert "UartImplementationConfigVariant" in enums
+        values = enums["UartImplementationConfigVariant"]
+        assert "VariantPostBuild" in values
+        assert "VariantPreCompile" in values
+
+    def test_numeric_domains_section_present(self):
+        data = json.loads(_UART_ASSET.read_text(encoding="utf-8"))
+        nd = data.get("numeric_domains", {})
+        assert "CustomBaudrateMantissa" in nd
+        assert "CustomBaudrateDivisor" in nd
+        assert "CustomBaudrateDividerFlexio" in nd
+        assert "UartTimeoutDuration" in nd
+
+    def test_numeric_domains_correct_ranges(self):
+        data = json.loads(_UART_ASSET.read_text(encoding="utf-8"))
+        nd = data["numeric_domains"]
+        assert nd["CustomBaudrateMantissa"]["range"] == [1, 8191]
+        assert nd["CustomBaudrateMantissa"]["default"] == 1
+        assert nd["CustomBaudrateDivisor"]["range"] == [4, 32]
+        assert nd["CustomBaudrateDivisor"]["default"] == 4
+        assert nd["CustomBaudrateDividerFlexio"]["range"] == [2, 512]
+        assert nd["CustomBaudrateDividerFlexio"]["default"] == 32
+        assert nd["UartTimeoutDuration"]["range"] == [0, 4294967295]
+        assert nd["UartTimeoutDuration"]["default"] == 1000
+
+    def test_constraints_section_present(self):
+        data = json.loads(_UART_ASSET.read_text(encoding="utf-8"))
+        const = data.get("constraints", {})
+        assert "enforced_by_cli" in const
+        assert "vendor_gate_only" in const
+
+    def test_constraints_enforced_by_cli_has_baud_validation(self):
+        data = json.loads(_UART_ASSET.read_text(encoding="utf-8"))
+        enforced = data["constraints"]["enforced_by_cli"]
+        assert "lpuart_baud_validation" in enforced
+        assert "flexio_baud_validation" in enforced
+
+    def test_constraints_vendor_gate_has_key_rules(self):
+        data = json.loads(_UART_ASSET.read_text(encoding="utf-8"))
+        vendor = data["constraints"]["vendor_gate_only"]
+        assert "custom_baudrate_computation" in vendor
+        assert "hw_channel_uniqueness" in vendor
+        assert "callback_coherence" in vendor
+
+    def test_coverage_no_hallucinated_fields(self):
+        """Ensure UartIctEnable etc. are NOT in not_yet_exposed."""
+        data = json.loads(_UART_ASSET.read_text(encoding="utf-8"))
+        nye = data["_coverage"]["not_yet_exposed"]
+        per_ch_str = json.dumps(nye["per_channel"])
+        assert "UartIctEnable" not in per_ch_str
+        assert "UartRtsPolEnable" not in per_ch_str
+        assert "UartCtsPolEnable" not in per_ch_str
+        gen_cfg_str = json.dumps(nye["general_configuration"])
+        assert "GeneralCallback" not in gen_cfg_str
+
+    def test_coverage_per_channel_has_expected_fields(self):
+        data = json.loads(_UART_ASSET.read_text(encoding="utf-8"))
+        per_ch = data["_coverage"]["not_yet_exposed"]["per_channel"]
+        per_ch_str = json.dumps(per_ch)
+        assert "UartInternalLoopbackEnable" in per_ch_str
+        assert "UartTimeoutEnable" in per_ch_str
+        assert "CustomBaudrateMantissa" in per_ch_str
+        assert "CustomBaudrateDivisor" in per_ch_str
+        assert len(per_ch) == 4, f"Expected 4 per_channel entries, got {len(per_ch)}: {per_ch}"
+
+    def test_coverage_general_configuration_has_expected_fields(self):
+        data = json.loads(_UART_ASSET.read_text(encoding="utf-8"))
+        gen_cfg = data["_coverage"]["not_yet_exposed"]["general_configuration"]
+        gen_cfg_str = json.dumps(gen_cfg)
+        assert "UartDevErrorDetect" in gen_cfg_str
+        assert "DisableUartRuntimeErrorDetect" in gen_cfg_str
+        assert "UartMultipartitionSupport" in gen_cfg_str
+        assert "UartEnableUserModeSupport" in gen_cfg_str
+        assert "UartTimeoutMethod" in gen_cfg_str
+        assert "UartTimeoutDuration" in gen_cfg_str
+        assert "UartVersionInfoApi" in gen_cfg_str
+        assert len(gen_cfg) == 7, f"Expected 7 general_configuration entries, got {len(gen_cfg)}: {gen_cfg}"
+
 
 # ---------------------------------------------------------------------------
 # Channel field edits (LPUART_8, baud 921600, word/parity/stop/method)
@@ -826,3 +963,307 @@ class TestCliIntegration:
         assert result.returncode == 0, result.stderr
         assert payload["status"] == "passed", payload
         assert "uart" in payload["changed_modules"]
+
+
+# ===========================================================================
+# LPUART enum validation (forward-hardening: validate baud/word_length/
+# parity/stop_bits against uart.json enum domains — not dependent on
+# particular E2E case literals).
+# ===========================================================================
+
+def _load_asset() -> dict:
+    """Return the uart.json asset as a dict."""
+    return json.loads(_UART_ASSET.read_text(encoding="utf-8"))
+
+
+class TestLpuartBaudValidation:
+    """LPUART baud rate must be validated against DesireBaudrate enum domain."""
+
+    def test_unsupported_baud_returns_blocker(self, tmp_path):
+        """An unsupported baud rate (e.g. 999) returns a blocker diagnostic."""
+        project = copy_uart_fixture(tmp_path / "baud_invalid")
+        doc = MexDocument.load(project / "Uart_Example.mex")
+        result = apply_uart_set(doc, _intent(
+            hw="LPUART_8", baud=999, mode="interrupt",
+        ))
+        assert result.blocked
+        codes = {d.code for d in result.diagnostics}
+        assert "unsupported_lpuart_baud" in codes
+        diag = next(d for d in result.diagnostics if d.code == "unsupported_lpuart_baud")
+        assert "baud" in diag.details
+        assert "supported" in diag.details
+        assert isinstance(diag.details["supported"], list)
+        # The supported list must include standard bauds from the asset
+        asset = _load_asset()
+        std_bauds = asset["enum_domains"]["DesireBaudrate"]
+        assert set(diag.details["supported"]) == set(std_bauds)
+
+    def test_all_standard_baud_rates_accepted(self, tmp_path):
+        """Every numeric baud rate in DesireBaudrate must be accepted without blocker.
+        CUSTOM is skipped because it is not a numeric baud rate and requires
+        separate CustomBaudrateMantissa/Divisor support (future work)."""
+        asset = _load_asset()
+        std_bauds = asset["enum_domains"]["DesireBaudrate"]
+        for idx, enum_val in enumerate(std_bauds):
+            # Extract numeric baud from e.g. "LPUART_UART_BAUDRATE_921600"
+            parts = enum_val.rsplit("_", 1)
+            if parts[1] == "CUSTOM":
+                continue  # CUSTOM requires separate support (future work)
+            baud_int = int(parts[1])
+            project = copy_uart_fixture(tmp_path / f"baud_{idx}")
+            doc = MexDocument.load(project / "Uart_Example.mex")
+            result = apply_uart_set(doc, _intent(
+                hw="LPUART_8", baud=baud_int, mode="interrupt",
+            ))
+            assert not result.blocked, (
+                f"Standard baud {baud_int} ({enum_val}) blocked: "
+                f"{[d.to_dict() for d in result.diagnostics]}"
+            )
+
+    def test_valid_baud_written_to_mex_field(self, tmp_path):
+        """An arbitrary valid baud (115200) is written correctly to DesireBaudrate."""
+        project = copy_uart_fixture(tmp_path / "baud_write")
+        doc = MexDocument.load(project / "Uart_Example.mex")
+        result = apply_uart_set(doc, _intent(
+            hw="LPUART_8", baud=115200, mode="interrupt",
+        ))
+        assert not result.blocked
+        ch = _uart_channel_0(doc)
+        assert _detail_setting(doc, ch, "DesireBaudrate") == "LPUART_UART_BAUDRATE_115200"
+
+
+class TestLpuartWordLengthValidation:
+    """LPUART word length must be validated against UartWordLength enum domain."""
+
+    def test_unsupported_word_length_returns_blocker(self, tmp_path):
+        """An unsupported word_length returns a blocker diagnostic."""
+        project = copy_uart_fixture(tmp_path / "wl_invalid")
+        doc = MexDocument.load(project / "Uart_Example.mex")
+        result = apply_uart_set(doc, _intent(
+            hw="LPUART_8", baud=115200, mode="interrupt",
+            word_length="LPUART_UART_IP_12_BITS_PER_CHAR",
+        ))
+        assert result.blocked
+        codes = {d.code for d in result.diagnostics}
+        assert "unsupported_lpuart_word_length" in codes
+        diag = next(d for d in result.diagnostics if d.code == "unsupported_lpuart_word_length")
+        assert "word_length" in diag.details
+        assert "supported" in diag.details
+        asset = _load_asset()
+        assert set(diag.details["supported"]) == set(asset["enum_domains"]["UartWordLength"])
+
+    def test_all_standard_word_lengths_accepted(self, tmp_path):
+        """Every word_length in UartWordLength must be accepted without blocker."""
+        asset = _load_asset()
+        wls = asset["enum_domains"]["UartWordLength"]
+        for idx, wl in enumerate(wls):
+            project = copy_uart_fixture(tmp_path / f"wl_{idx}")
+            doc = MexDocument.load(project / "Uart_Example.mex")
+            result = apply_uart_set(doc, _intent(
+                hw="LPUART_8", baud=115200, mode="interrupt",
+                word_length=wl,
+            ))
+            assert not result.blocked, (
+                f"Standard word_length {wl} blocked: "
+                f"{[d.to_dict() for d in result.diagnostics]}"
+            )
+
+    def test_nine_bit_written_correctly(self, tmp_path):
+        """9-bit word length is written correctly to UartWordLength."""
+        project = copy_uart_fixture(tmp_path / "wl_write")
+        doc = MexDocument.load(project / "Uart_Example.mex")
+        result = apply_uart_set(doc, _intent(
+            hw="LPUART_8", baud=115200, mode="interrupt",
+            word_length="LPUART_UART_IP_9_BITS_PER_CHAR",
+        ))
+        assert not result.blocked
+        ch = _uart_channel_0(doc)
+        assert _detail_setting(doc, ch, "UartWordLength") == "LPUART_UART_IP_9_BITS_PER_CHAR"
+
+
+class TestLpuartParityValidation:
+    """LPUART parity type must be validated against UartParityType enum domain."""
+
+    def test_unsupported_parity_returns_blocker(self, tmp_path):
+        """An unsupported parity returns a blocker diagnostic."""
+        project = copy_uart_fixture(tmp_path / "par_invalid")
+        doc = MexDocument.load(project / "Uart_Example.mex")
+        result = apply_uart_set(doc, _intent(
+            hw="LPUART_8", baud=115200, mode="interrupt",
+            parity="LPUART_UART_IP_PARITY_MARK",
+        ))
+        assert result.blocked
+        codes = {d.code for d in result.diagnostics}
+        assert "unsupported_lpuart_parity" in codes
+        diag = next(d for d in result.diagnostics if d.code == "unsupported_lpuart_parity")
+        assert "parity" in diag.details
+        assert "supported" in diag.details
+        asset = _load_asset()
+        assert set(diag.details["supported"]) == set(asset["enum_domains"]["UartParityType"])
+
+    def test_all_parity_types_accepted(self, tmp_path):
+        """Every parity type in UartParityType must be accepted without blocker."""
+        asset = _load_asset()
+        pars = asset["enum_domains"]["UartParityType"]
+        for idx, par in enumerate(pars):
+            project = copy_uart_fixture(tmp_path / f"par_{idx}")
+            doc = MexDocument.load(project / "Uart_Example.mex")
+            result = apply_uart_set(doc, _intent(
+                hw="LPUART_8", baud=115200, mode="interrupt",
+                parity=par,
+            ))
+            assert not result.blocked, (
+                f"Standard parity {par} blocked: "
+                f"{[d.to_dict() for d in result.diagnostics]}"
+            )
+
+    def test_even_parity_written_correctly(self, tmp_path):
+        """Even parity is written correctly to UartParityType."""
+        project = copy_uart_fixture(tmp_path / "par_write")
+        doc = MexDocument.load(project / "Uart_Example.mex")
+        result = apply_uart_set(doc, _intent(
+            hw="LPUART_8", baud=115200, mode="interrupt",
+            parity="LPUART_UART_IP_PARITY_EVEN",
+        ))
+        assert not result.blocked
+        ch = _uart_channel_0(doc)
+        assert _detail_setting(doc, ch, "UartParityType") == "LPUART_UART_IP_PARITY_EVEN"
+
+
+class TestLpuartStopBitsValidation:
+    """LPUART stop bits must be validated against UartStopBitNumber enum domain."""
+
+    def test_unsupported_stop_bits_returns_blocker(self, tmp_path):
+        """An unsupported stop_bits returns a blocker diagnostic."""
+        project = copy_uart_fixture(tmp_path / "sb_invalid")
+        doc = MexDocument.load(project / "Uart_Example.mex")
+        result = apply_uart_set(doc, _intent(
+            hw="LPUART_8", baud=115200, mode="interrupt",
+            stop_bits="LPUART_UART_IP_THREE_STOP_BIT",
+        ))
+        assert result.blocked
+        codes = {d.code for d in result.diagnostics}
+        assert "unsupported_lpuart_stop_bits" in codes
+        diag = next(d for d in result.diagnostics if d.code == "unsupported_lpuart_stop_bits")
+        assert "stop_bits" in diag.details
+        assert "supported" in diag.details
+        asset = _load_asset()
+        assert set(diag.details["supported"]) == set(asset["enum_domains"]["UartStopBitNumber"])
+
+    def test_both_stop_bit_values_accepted(self, tmp_path):
+        """Both stop-bit values in UartStopBitNumber must be accepted."""
+        asset = _load_asset()
+        sbs = asset["enum_domains"]["UartStopBitNumber"]
+        for idx, sb in enumerate(sbs):
+            project = copy_uart_fixture(tmp_path / f"sb_{idx}")
+            doc = MexDocument.load(project / "Uart_Example.mex")
+            result = apply_uart_set(doc, _intent(
+                hw="LPUART_8", baud=115200, mode="interrupt",
+                stop_bits=sb,
+            ))
+            assert not result.blocked, (
+                f"Standard stop_bits {sb} blocked: "
+                f"{[d.to_dict() for d in result.diagnostics]}"
+            )
+
+    def test_two_stop_bits_written_correctly(self, tmp_path):
+        """2 stop bits is written correctly to UartStopBitNumber."""
+        project = copy_uart_fixture(tmp_path / "sb_write")
+        doc = MexDocument.load(project / "Uart_Example.mex")
+        result = apply_uart_set(doc, _intent(
+            hw="LPUART_8", baud=115200, mode="interrupt",
+            stop_bits="LPUART_UART_IP_TWO_STOP_BIT",
+        ))
+        assert not result.blocked
+        ch = _uart_channel_0(doc)
+        assert _detail_setting(doc, ch, "UartStopBitNumber") == "LPUART_UART_IP_TWO_STOP_BIT"
+
+
+class TestUartCoverageAsset:
+    """uart.json must carry a _coverage section documenting the editable surface."""
+
+    def test_coverage_section_exists(self):
+        asset = _load_asset()
+        assert "_coverage" in asset, "uart.json must have a _coverage section"
+
+    def test_coverage_has_configurable_and_not_exposed(self):
+        asset = _load_asset()
+        cov = asset["_coverage"]
+        assert "configurable_today" in cov
+        assert "not_yet_exposed" in cov
+
+    def test_configurable_mentions_core_channel_fields(self):
+        """configurable_today must mention LPUART channel fields."""
+        asset = _load_asset()
+        today = asset["_coverage"]["configurable_today"]
+        today_flat = json.dumps(today)
+        assert "baud" in today_flat.lower() or "Baud" in today_flat or "LPUART" in today_flat
+        assert "word" in today_flat.lower() or "UartWordLength" in today_flat or "frame" in today_flat.lower()
+
+    def test_not_yet_exposed_has_per_channel_entries(self):
+        """not_yet_exposed must document per-channel gaps."""
+        asset = _load_asset()
+        nye = asset["_coverage"]["not_yet_exposed"]
+        # Check either as a dict with sub-keys or as a flat description string
+        nye_flat = json.dumps(nye) if isinstance(nye, dict) else str(nye)
+        assert "channel" in nye_flat.lower() or "DetailModuleConfiguration" in nye_flat
+
+    def test_not_yet_exposed_has_general_configuration_entries(self):
+        """not_yet_exposed must document GeneralConfiguration gaps."""
+        asset = _load_asset()
+        nye = asset["_coverage"]["not_yet_exposed"]
+        nye_flat = json.dumps(nye) if isinstance(nye, dict) else str(nye)
+        assert "general" in nye_flat.lower() or "GeneralConfiguration" in nye_flat
+
+    def test_references_cite_issue_44(self):
+        asset = _load_asset()
+        refs = asset["_coverage"].get("references", [])
+        refs_text = json.dumps(refs)
+        assert "#44" in refs_text, f"references must cite issue #44, got: {refs_text}"
+
+
+class TestAllLpuartInstances:
+    """All 16 LPUART_0..15 must be configurable via apply_uart_set."""
+
+    def test_all_sixteen_in_instance_map(self):
+        """instance_irq_clock_map must contain LPUART_0 through LPUART_15."""
+        asset = _load_asset()
+        mapping = asset["instance_irq_clock_map"]
+        for n in range(16):
+            key = f"LPUART_{n}"
+            assert key in mapping, f"Missing LPUART instance: {key}"
+
+    def test_lpuart_0_and_8_are_plat_clk(self):
+        """LPUART_0 and LPUART_8 use AIPS_PLAT_CLK."""
+        asset = _load_asset()
+        mapping = asset["instance_irq_clock_map"]
+        assert mapping["LPUART_0"]["clock_select"] == "AIPS_PLAT_CLK"
+        assert mapping["LPUART_8"]["clock_select"] == "AIPS_PLAT_CLK"
+
+    def test_other_lpuarts_are_slow_clk(self):
+        """LPUART_1..7 and LPUART_9..15 use AIPS_SLOW_CLK."""
+        asset = _load_asset()
+        mapping = asset["instance_irq_clock_map"]
+        plat = {0, 8}
+        for n in range(16):
+            if n in plat:
+                continue
+            key = f"LPUART_{n}"
+            assert mapping[key]["clock_select"] == "AIPS_SLOW_CLK", (
+                f"LPUART_{n} clock_select expected AIPS_SLOW_CLK, "
+                f"got {mapping[key]['clock_select']}"
+            )
+
+    def test_every_lpuart_configurable_without_blockers(self, tmp_path):
+        """Every LPUART_0..15 configurable via apply_uart_set with no blockers."""
+        for n in range(16):
+            hw = f"LPUART_{n}"
+            project = copy_uart_fixture(tmp_path / f"inst_{n}")
+            doc = MexDocument.load(project / "Uart_Example.mex")
+            result = apply_uart_set(doc, _intent(
+                hw=hw, baud=115200, mode="interrupt",
+            ))
+            assert not result.blocked, (
+                f"apply_uart_set blocked for {hw}: "
+                f"{[d.to_dict() for d in result.diagnostics]}"
+            )
