@@ -200,6 +200,129 @@ def test_external_dependency_memory_skill_is_lightweight_contract():
     assert "environment-verification.json" not in skill
 
 
+def test_interrupted_task_recovery_skill_contract():
+    skill_path = Path("agent-discipline/skills/interrupted-task-recovery/SKILL.md")
+    assert skill_path.exists()
+    assert "name: interrupted-task-recovery" in _frontmatter(skill_path)
+
+    skill = skill_path.read_text(encoding="utf-8")
+    required_markers = (
+        "mandatory entry gate",
+        "skip criteria",
+        ".agent-state/tasks/<task-id>.md",
+        "Task-state template",
+        "Scope and acceptance criteria",
+        "Current status",
+        "Last verified evidence",
+        "Subagent handoffs",
+        "Evidence decision",
+        "accepted | rejected | deferred",
+        "rationale",
+        "Git checkpoints",
+        "Open risks and blockers",
+        "every 30 minutes",
+        "before compaction",
+        "before unattended execution",
+        "inspect `git status --short`",
+        "inspect the relevant diff",
+        "WIP commit",
+        "must not include secrets",
+        "must not include temp artifacts",
+        "unrelated user edits",
+        "push only",
+        "Resume handshake",
+        "must not edit files",
+        "read `AGENTS.md`",
+        "read this Skill",
+        "read the task-state file",
+        "reconstruct",
+        "concise recovery summary",
+        "continue only if safe",
+        "Goal mode",
+        "done criteria",
+        "task-state and Git checkpoints",
+        "Heartbeat automation",
+        "best-effort recurring wakeup",
+        "heartbeat prompt",
+        "stop conditions",
+        "pause conditions",
+        "archive conditions",
+        "local app limitation",
+        "rate-limit limitation",
+        "path limitation",
+        "safe retry interval",
+        "Trusted hooks/events",
+        "session start/resume",
+        "stop/pause",
+        "pre/post compact",
+        "long command start/finish",
+        "subagent handoff start/finish",
+        "review before use",
+        "Orchestrator owns",
+        "Tester evidence is stale",
+        "Reviewer runs after",
+        "black-box E2E protocol is unchanged",
+        "Category B only",
+        "docs/ stays agent-agnostic",
+        "deferred until the #57 workflow-routing Skill exists",
+    )
+    missing = [marker for marker in required_markers if marker not in skill]
+    assert missing == []
+
+
+def test_agents_charter_requires_interrupted_task_recovery_protocol():
+    agents = Path("AGENTS.md").read_text(encoding="utf-8")
+
+    assert "## Interrupted Task Recovery" in agents
+    assert "agent-discipline/skills/interrupted-task-recovery/SKILL.md" in agents
+    assert "MUST load and follow" in agents
+    assert "long-running, unattended, quota-risk, or compaction-risk work" in agents
+    assert ".agent-state/tasks/<task-id>.md" in agents
+    assert "resume handshake" in agents
+    assert "checkpoint and heartbeat" in agents
+
+
+def test_documentation_governance_maps_interrupted_task_recovery_skill():
+    governance = Path("agent-discipline/documentation-governance.md").read_text(
+        encoding="utf-8"
+    )
+
+    metadata = _reference_metadata(governance)
+    assert metadata["Version"] == "0.1.4"
+    assert metadata["Date"] == "2026-07-08"
+    assert (
+        "`agent-discipline/skills/interrupted-task-recovery/SKILL.md`"
+        in governance
+    )
+    assert "long-running Agent task recovery protocol" in governance
+    assert "interrupted-task-recovery|task-state|resume handshake|heartbeat|checkpoint cadence" in governance
+    assert "ITR[\"agent-discipline/skills/interrupted-task-recovery\"]" in governance
+    assert "AGENTS --> ITR" in governance
+    assert (
+        "| 2026-07-08 | 0.1.4 | Issue #59: added the interrupted-task recovery Skill"
+        in governance
+    )
+
+
+def test_docs_do_not_gain_interrupted_task_recovery_pointers():
+    forbidden_markers = (
+        "interrupted-task-recovery",
+        "Interrupted Task Recovery",
+        "task-state",
+        "heartbeat",
+        "checkpoint cadence",
+        "resume handshake",
+    )
+    offenders = []
+    for path in Path("docs").rglob("*.md"):
+        text = path.read_text(encoding="utf-8")
+        matches = [marker for marker in forbidden_markers if marker in text]
+        if matches:
+            offenders.append(f"{path.as_posix()}: {', '.join(matches)}")
+
+    assert offenders == []
+
+
 def test_subagent_templates_keep_original_claude_code_frontmatter():
     expected = {
         "explorer": "\n".join((
