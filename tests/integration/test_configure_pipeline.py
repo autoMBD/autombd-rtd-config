@@ -47,8 +47,13 @@
 import json
 import subprocess
 import sys
+from argparse import Namespace
+from types import SimpleNamespace
 
-from rtd_config.backends.s32_mex.document import MexDocument
+from rtd_config import cli
+from rtd_config.backends.s32_mex.apply import ApplyResult
+from rtd_config.backends.s32_mex.document import MexDocument, MexWriteError
+from rtd_config.intent import Intent
 from tests.fixtures import copy_uart_fixture
 
 
@@ -126,3 +131,40 @@ def test_configure_static_blocker_leaves_original_mex_bytes_unchanged(tmp_path):
     assert mex.read_bytes() == original, (
         "static-check rejection must not leave the applied Uart/Platform/Mcu edits on disk"
     )
+
+
+def test_configure_writer_blocker_leaves_original_mex_bytes_unchanged(
+    tmp_path,
+    monkeypatch,
+    capsys,
+):
+    """A narrow-writer blocker must be returned as JSON and never publish staging."""
+    project = copy_uart_fixture(tmp_path)
+    mex = project / "Uart_Example.mex"
+    original = mex.read_bytes()
+
+    class FailingDoc:
+        def write(self, path):
+            assert str(path).endswith(".tmp")
+            raise MexWriteError("narrow .mex render unavailable: element count changed")
+
+    def apply_ok(_doc, _intent):
+        return ApplyResult(changed_modules=["uart"])
+
+    monkeypatch.setattr(cli, "find_single_mex", lambda _project: mex)
+    monkeypatch.setattr(cli.MexDocument, "load", staticmethod(lambda _mex: FailingDoc()))
+
+    rc = cli._configure_module(
+        Namespace(project=project, backup=False),
+        Intent.from_dict({"module": "uart", "action": "set", "payload": {}}),
+        SimpleNamespace(to_dict=lambda: {"summary": "fake plan"}),
+        apply_ok,
+    )
+    payload = json.loads(capsys.readouterr().out)
+
+    assert rc == 1
+    assert payload["status"] == "blocked"
+    assert payload["diagnostics"][0]["code"] == "narrow_mex_write_unavailable"
+    assert payload["diagnostics"][0]["module"] == "backend"
+    assert mex.read_bytes() == original
+    assert not list(mex.parent.glob(f".{mex.name}.*.tmp"))

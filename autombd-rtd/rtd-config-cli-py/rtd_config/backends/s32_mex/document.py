@@ -76,6 +76,10 @@ class _ElementSource:
     attrib: dict
 
 
+class MexWriteError(RuntimeError):
+    """Raised when a .mex edit cannot be written byte-faithfully and narrowly."""
+
+
 @dataclass
 class MexDocument:
     path: Path
@@ -84,7 +88,7 @@ class MexDocument:
     # write() can rewrite only the start tags that actually changed and copy
     # everything else verbatim. _aligned is False when the expat start-tag count
     # does not match the ElementTree element count (unexpected document shape),
-    # in which case write() falls back to full reserialization.
+    # in which case write() fails closed instead of reserializing the full file.
     _raw: bytes = field(default=b"", repr=False, compare=False)
     _sources: list[_ElementSource] = field(default_factory=list, repr=False, compare=False)
     _aligned: bool = field(default=False, repr=False, compare=False)
@@ -258,7 +262,7 @@ class MexDocument:
             None,
         )
         if src_index is None or not self._aligned:
-            # Cannot locate; mark as not aligned so write() falls back.
+            # Cannot locate; mark as not aligned so write() fails closed.
             self._aligned = False
             return
 
@@ -341,59 +345,69 @@ class MexDocument:
 
     def write(self, path: Path | None = None) -> None:
         target = Path(path) if path is not None else self.path
-        data = self._render_minimal() if self._aligned else None
-        if data is not None:
-            target.write_bytes(data)
-            return
-        # Fallback: full reserialization. Well-formed but not byte-faithful; only
-        # reached for documents whose shape we could not map at load time.
-        self.tree.write(target, encoding="utf-8", xml_declaration=True)
+        if not self._aligned:
+            raise MexWriteError(
+                "narrow .mex render unavailable: source byte mapping is not aligned"
+            )
+        target.write_bytes(self._render_minimal())
 
-    def _render_minimal(self) -> bytes | None:
+    def _render_minimal(self) -> bytes:
         """Rebuild the file bytes, rewriting only start tags that changed.
 
-        Returns None to request the reserialization fallback if the element set
-        diverged from the captured spans or a tag could not be edited in place.
+        Raises ``MexWriteError`` if the element set diverged from the captured
+        spans or a tag cannot be edited in place. Full-tree serialization is not
+        a safe fallback for production .mex edits because it can rewrite
+        declarations, namespaces, whitespace, ordering, and unowned regions.
         """
         elements = list(self.root.iter())
         if len(elements) != len(self._sources):
-            return None
+            raise MexWriteError(
+                "narrow .mex render unavailable: element count changed "
+                f"from {len(self._sources)} to {len(elements)}"
+            )
         out = bytearray()
         cursor = 0
         for element, src in zip(elements, self._sources):
             if element.attrib == src.attrib:
                 continue  # unchanged: bytes copied verbatim in the next bulk slice
             new_tag = self._rewrite_start_tag(src, element.attrib)
-            if new_tag is None:
-                return None
             out += self._raw[cursor:src.start]
             out += new_tag
             cursor = src.tag_end + 1
         out += self._raw[cursor:]
         return bytes(out)
 
-    def _rewrite_start_tag(self, src: _ElementSource, new_attrib: dict) -> bytes | None:
+    def _rewrite_start_tag(self, src: _ElementSource, new_attrib: dict) -> bytes:
         """Apply attribute value changes / removals to an original start tag.
 
         Edits are surgical: only the targeted attribute's value text or the
         removed attribute is touched, preserving the original quote characters,
-        attribute order, and whitespace of everything else. Returns None (force
-        fallback) if an attribute was added, which narrow edits never do.
+        attribute order, and whitespace of everything else. Raises
+        ``MexWriteError`` if an attribute was added or cannot be located in the
+        original start tag, which cannot be placed byte-faithfully.
         """
         tag = self._raw[src.start : src.tag_end + 1].decode("utf-8")
         old = src.attrib
         for name, value in new_attrib.items():
             if name not in old:
-                return None  # attribute added; cannot place it faithfully
+                raise MexWriteError(
+                    f"narrow .mex render unavailable: added attribute {name!r}"
+                )
             if old[name] != value:
                 tag = _sub_attr_value(tag, name, value)
                 if tag is None:
-                    return None
+                    raise MexWriteError(
+                        "narrow .mex render unavailable: "
+                        f"attribute {name!r} could not be rewritten"
+                    )
         for name in old:
             if name not in new_attrib:
                 tag = _remove_attr(tag, name)
                 if tag is None:
-                    return None
+                    raise MexWriteError(
+                        "narrow .mex render unavailable: "
+                        f"attribute {name!r} could not be removed"
+                    )
         return tag.encode("utf-8")
 
 

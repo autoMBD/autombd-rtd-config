@@ -54,7 +54,7 @@ from pathlib import Path
 
 from . import __version__
 from .config import RuntimeConfig
-from .backends.s32_mex.document import MexDocument
+from .backends.s32_mex.document import MexDocument, MexWriteError
 from .backends.s32_mex.locate import find_single_mex
 from .resources.pins import pin_options
 from .intent import Intent
@@ -69,6 +69,7 @@ from .modules.adc import AdcProvider
 from .checks.static import run_static_checks
 from .backends.s32_mex.apply import apply_uart_set, apply_uart_add_flexio_channel, apply_platform_set, apply_basenxp_set, apply_mcl_set, apply_port_set, apply_dio_set, apply_mcu_set, apply_adc_set, _load_basenxp_asset
 from .backends.s32_mex.validation import find_s32ds_root, probe_which_root, run_validation
+from .diagnostics import Diagnostic
 
 
 # Skill root, used to resolve committed runtime assets independently of cwd.
@@ -682,6 +683,31 @@ def _configure_module(args: argparse.Namespace, intent: Intent, plan, apply_fn) 
             "runtime_verification": {
                 "static_check": static_result.to_dict(),
             },
+        })
+    except MexWriteError as exc:
+        diagnostics = apply_result.diagnostics + [
+            Diagnostic(
+                severity="blocker",
+                code="narrow_mex_write_unavailable",
+                module="backend",
+                message=(
+                    "The pending .mex edit could not be written with the "
+                    "byte-faithful narrow writer. The original file was left "
+                    "unchanged."
+                ),
+                details={
+                    "mex_file": str(mex),
+                    "reason": str(exc),
+                },
+            )
+        ]
+        return emit({
+            "status": "blocked",
+            "command": "configure",
+            "normalized_intent": _intent_dict(intent),
+            "plan": plan.to_dict(),
+            "changed_modules": apply_result.changed_modules,
+            "diagnostics": [d.to_dict() for d in diagnostics],
         })
     finally:
         if staging is not None:
