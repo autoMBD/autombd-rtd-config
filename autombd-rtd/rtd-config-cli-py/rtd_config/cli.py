@@ -49,6 +49,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import tempfile
 from pathlib import Path
 
 from . import __version__
@@ -626,7 +627,7 @@ def cmd_uart_add_flexio_channel(args: argparse.Namespace) -> int:
 
 
 def _configure_module(args: argparse.Namespace, intent: Intent, plan, apply_fn) -> int:
-    """Shared configure pipeline: apply an owned edit, write, then static-check.
+    """Shared configure pipeline: apply an owned edit, preflight, then commit.
 
     ``apply_fn(doc, intent) -> ApplyResult`` is the module's localized backend
     edit. The pipeline is module-agnostic; per-module specifics live in the
@@ -647,38 +648,60 @@ def _configure_module(args: argparse.Namespace, intent: Intent, plan, apply_fn) 
             "diagnostics": [d.to_dict() for d in apply_result.diagnostics],
         })
 
-    # Optional safety backup of the original .mex before writing. Default
-    # behaviour creates no backup.
-    if args.backup:
-        backup = mex.with_name(mex.name + ".bak")
-        backup.write_bytes(mex.read_bytes())
+    staging: Path | None = None
+    try:
+        staging = _write_configure_staging(doc, mex)
 
-    doc.write(mex)
+        # Runtime verification runs before the original project file is
+        # replaced. The in-memory document carries the pending edit, while the
+        # path keeps project-level checks anchored to the real single-.mex file.
+        static_result = run_static_checks(
+            mex,
+            doc=doc,
+            modified_elements=apply_result.modified_elements,
+            requested_callback=intent.payload.get("callback"),
+        )
 
-    # Runtime verification: static check runs first on the written file. We pass
-    # the in-memory document (now identical to disk) so the quick_selection
-    # conflict check can inspect the exact elements we modified, while
-    # well-formedness is still re-read from the written path.
-    static_result = run_static_checks(
-        mex,
-        doc=doc,
-        modified_elements=apply_result.modified_elements,
-        requested_callback=intent.payload.get("callback"),
-    )
+        diagnostics = apply_result.diagnostics + static_result.diagnostics
+        status = "passed" if static_result.status == "passed" else "blocked"
+        if status == "passed":
+            # Optional safety backup of the original .mex before committing.
+            # Default behaviour creates no backup.
+            if args.backup:
+                backup = mex.with_name(mex.name + ".bak")
+                backup.write_bytes(mex.read_bytes())
+            os.replace(staging, mex)
+            staging = None
+        return emit({
+            "status": status,
+            "command": "configure",
+            "normalized_intent": _intent_dict(intent),
+            "plan": plan.to_dict(),
+            "changed_modules": apply_result.changed_modules,
+            "diagnostics": [d.to_dict() for d in diagnostics],
+            "runtime_verification": {
+                "static_check": static_result.to_dict(),
+            },
+        })
+    finally:
+        if staging is not None:
+            staging.unlink(missing_ok=True)
 
-    diagnostics = apply_result.diagnostics + static_result.diagnostics
-    status = "passed" if static_result.status == "passed" else "blocked"
-    return emit({
-        "status": status,
-        "command": "configure",
-        "normalized_intent": _intent_dict(intent),
-        "plan": plan.to_dict(),
-        "changed_modules": apply_result.changed_modules,
-        "diagnostics": [d.to_dict() for d in diagnostics],
-        "runtime_verification": {
-            "static_check": static_result.to_dict(),
-        },
-    })
+
+def _write_configure_staging(doc: MexDocument, mex: Path) -> Path:
+    with tempfile.NamedTemporaryFile(
+        prefix=f".{mex.name}.",
+        suffix=".tmp",
+        dir=mex.parent,
+        delete=False,
+    ) as handle:
+        staging = Path(handle.name)
+    try:
+        doc.write(staging)
+    except BaseException:
+        staging.unlink(missing_ok=True)
+        raise
+    return staging
 
 
 def normalize_platform_intent(args: argparse.Namespace) -> Intent:

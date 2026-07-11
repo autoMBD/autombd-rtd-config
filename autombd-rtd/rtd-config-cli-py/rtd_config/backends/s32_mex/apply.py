@@ -67,7 +67,7 @@ import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from rtd_config.backends.s32_mex.document import MexDocument
+from rtd_config.backends.s32_mex.document import MexDocument, xml_attr
 from rtd_config.diagnostics import Diagnostic
 from rtd_config.intent import Intent
 
@@ -568,13 +568,13 @@ def _build_dma_logic_channel_struct_bytes(
         f'{sp4}<setting name="dmaLogicChannelConfig_enDestinationOffset" value="false"/>',
         f'{sp4}<setting name="dmaLogicChannelConfig_OffsetValueType" value="0"/>',
         f'{sp4}<setting name="dmaLogicChannelConfig_enMinorLoopLinkCh" value="false"/>',
-        f'{sp4}<setting name="dynamic_dmaLogicChannelConfig_MinorLoopLinkChValueType" value="{self_ref}"/>',
+        f'{sp4}<setting name="dynamic_dmaLogicChannelConfig_MinorLoopLinkChValueType" value="{xml_attr(self_ref)}"/>',
         f'{sp4}<setting name="dmaLogicChannelConfig_MinorLoopSizeType" value="0"/>',
         f'{sp3}</struct>',
         f'{sp3}<struct name="dmaLogicChannelConfig_TransferMajorLoopType">',
         f'{sp4}<setting name="Name" value="dmaLogicChannelConfig_TransferMajorLoopType"/>',
         f'{sp4}<setting name="dmaLogicChannelConfig_enMajorLoopLinkCh" value="false"/>',
-        f'{sp4}<setting name="dynamic_dmaLogicChannelConfig_MajorLoopLinkChValueType" value="{self_ref}"/>',
+        f'{sp4}<setting name="dynamic_dmaLogicChannelConfig_MajorLoopLinkChValueType" value="{xml_attr(self_ref)}"/>',
         f'{sp4}<setting name="dmaLogicChannelConfig_MajorLoopCountType" value="0"/>',
         f'{sp3}</struct>',
         f'{sp2}</struct>',
@@ -712,7 +712,7 @@ def _build_dma_channel_ref_array_bytes(
     sp_close = " " * array_indent
     lines = [
         f'<array name="{array_name}">',
-        f'{sp_child}<setting name="0" value="{ref_path}"/>',
+        f'{sp_child}<setting name="0" value="{xml_attr(ref_path)}"/>',
         f'{sp_close}</array>',
     ]
     return le.join(lines).encode("utf-8")
@@ -1028,8 +1028,8 @@ def _build_mcu_clock_ref_struct_bytes(
     sp_child = " " * (struct_indent + 3)
     lines = [
         f'{sp_struct}<struct name="{struct_index}">',
-        f'{sp_child}<setting name="Name" value="{name}"/>',
-        f'{sp_child}<setting name="McuClockFrequencySelect" value="{clock_select}"/>',
+        f'{sp_child}<setting name="Name" value="{xml_attr(name)}"/>',
+        f'{sp_child}<setting name="McuClockFrequencySelect" value="{xml_attr(clock_select)}"/>',
         f'{sp_struct}</struct>',
     ]
     return le.join(lines).encode("utf-8")
@@ -1119,11 +1119,11 @@ def _build_platform_isr_struct_bytes(
     config_name = f"PlatformIsrConfig_{struct_index}"
     lines = [
         f'{sp_struct}<struct name="{struct_index}">',
-        f'{sp_child}<setting name="Name" value="{config_name}"/>',
-        f'{sp_child}<setting name="IsrName" value="{irq_name}"/>',
+        f'{sp_child}<setting name="Name" value="{xml_attr(config_name)}"/>',
+        f'{sp_child}<setting name="IsrName" value="{xml_attr(irq_name)}"/>',
         f'{sp_child}<setting name="IsrEnabled" value="true"/>',
-        f'{sp_child}<setting name="IsrPriority" value="{priority}"/>',
-        f'{sp_child}<setting name="IsrHandler" value="{isr_handler}"/>',
+        f'{sp_child}<setting name="IsrPriority" value="{xml_attr(priority)}"/>',
+        f'{sp_child}<setting name="IsrHandler" value="{xml_attr(isr_handler)}"/>',
         f'{sp_struct}</struct>',
     ]
     return le.join(lines).encode("utf-8")
@@ -1429,7 +1429,7 @@ def _build_counter_array_bytes(
         f'{sp2}<setting name="Name" value="OsIfCounterConfig_0"/>',
         f'{sp2}<array name="OsIfCounterEcucPartitionRef"/>',
         f'{sp2}<array name="OsIfSystemTimerClockRef">',
-        f'{sp3}<setting name="0" value="{clock_ref_path}"/>',
+        f'{sp3}<setting name="0" value="{xml_attr(clock_ref_path)}"/>',
         f'{sp2}</array>',
         f'{sp2}<array name="OsIfSystemTimerClockFreq"/>',
         f'{sp2}<array name="OsIfOsCounterRef"/>',
@@ -1790,9 +1790,9 @@ def _build_flexio_channel_struct_bytes(
     sp_child = " " * (indent + 3)
     lines = [
         f'{sp_struct}<struct name="{struct_index}">',
-        f'{sp_child}<setting name="Name" value="{channel_name}"/>',
-        f'{sp_child}<setting name="FlexioMclChannelId" value="{channel_id}"/>',
-        f'{sp_child}<setting name="FlexioMclPinId" value="{pin_id}"/>',
+        f'{sp_child}<setting name="Name" value="{xml_attr(channel_name)}"/>',
+        f'{sp_child}<setting name="FlexioMclChannelId" value="{xml_attr(channel_id)}"/>',
+        f'{sp_child}<setting name="FlexioMclPinId" value="{xml_attr(pin_id)}"/>',
         f'{sp_child}<setting name="FlexioMclAddPinEnable" value="false"/>',
         f'{sp_child}<setting name="FlexioMclAddPinId" value="PIN_0"/>',
         f'{sp_child}<setting name="FlexioMclAddChannelEnable" value="false"/>',
@@ -2199,7 +2199,7 @@ def _build_portpin_struct_bytes(
     sp_child = " " * (indent + 3)
     lines = [
         f'{sp_struct}<struct name="{struct_index}">',
-        f'{sp_child}<setting name="Name" value="{portpin_name}"/>',
+        f'{sp_child}<setting name="Name" value="{xml_attr(portpin_name)}"/>',
         f'{sp_child}<setting name="PortPinPue" value="false"/>',
         f'{sp_child}<setting name="PortPinPus" value="false"/>',
         f'{sp_child}<setting name="PortPinSafeMode" value="false"/>',
@@ -2211,7 +2211,7 @@ def _build_portpin_struct_bytes(
         f'{sp_child}<setting name="PortPinModeChangeable" value="true"/>',
         f'{sp_child}<setting name="PortPinInvertControl" value="false"/>',
         f'{sp_child}<setting name="PortPinSiul2Instance" value="SIUL2_0"/>',
-        f'{sp_child}<setting name="PortPinId" value="{portpin_id}"/>',
+        f'{sp_child}<setting name="PortPinId" value="{xml_attr(portpin_id)}"/>',
         f'{sp_child}<setting name="PortPinInitialMode" value="PORT_GPIO_MODE"/>',
         f'{sp_child}<setting name="OBEGroupSelect" value="NO_OBE_GROUP"/>',
         f'{sp_child}<setting name="MscrPdacSlot" value="VIRTUAL_WRAPPER_PDAC0"/>',
@@ -2786,7 +2786,7 @@ def _build_gpio_portpin_struct_bytes(
     sp_child = " " * (indent + 3)
     lines = [
         f'{sp_struct}<struct name="{struct_index}">',
-        f'{sp_child}<setting name="Name" value="{portpin_name}"/>',
+        f'{sp_child}<setting name="Name" value="{xml_attr(portpin_name)}"/>',
         f'{sp_child}<setting name="PortPinPue" value="false"/>',
         f'{sp_child}<setting name="PortPinPus" value="false"/>',
         f'{sp_child}<setting name="PortPinSafeMode" value="false"/>',
@@ -2798,7 +2798,7 @@ def _build_gpio_portpin_struct_bytes(
         f'{sp_child}<setting name="PortPinModeChangeable" value="false"/>',
         f'{sp_child}<setting name="PortPinInvertControl" value="false"/>',
         f'{sp_child}<setting name="PortPinSiul2Instance" value="SIUL2_0"/>',
-        f'{sp_child}<setting name="PortPinId" value="{portpin_id}"/>',
+        f'{sp_child}<setting name="PortPinId" value="{xml_attr(portpin_id)}"/>',
         f'{sp_child}<setting name="PortPinInitialMode" value="PORT_GPIO_MODE"/>',
         f'{sp_child}<setting name="OBEGroupSelect" value="NO_OBE_GROUP"/>',
         f'{sp_child}<setting name="MscrPdacSlot" value="VIRTUAL_WRAPPER_PDAC0"/>',
@@ -2830,8 +2830,8 @@ def _build_dio_channel_array_bytes(
     lines = [
         f'<array name="DioChannel">',
         f'{sp_struct}<struct name="0">',
-        f'{sp_child}<setting name="Name" value="{channel_name}"/>',
-        f'{sp_child}<setting name="DioChannelId" value="{channel_id}"/>',
+        f'{sp_child}<setting name="Name" value="{xml_attr(channel_name)}"/>',
+        f'{sp_child}<setting name="DioChannelId" value="{xml_attr(channel_id)}"/>',
         f'{sp_child}<setting name="PDACSlot" value="VIRTUAL_WRAPPER_PDAC0"/>',
         f'{sp_child}<array name="DioChannelEcucPartitionRef"/>',
         f'{sp_struct}</struct>',
@@ -2899,7 +2899,7 @@ def _build_dio_port_struct_bytes(
     lines = [
         f'{sp}<struct name="{array_index}">',
         f'{sp_child}<setting name="Name" value="DioPort_{array_index}"/>',
-        f'{sp_child}<setting name="DioPortId" value="{port_id}"/>',
+        f'{sp_child}<setting name="DioPortId" value="{xml_attr(port_id)}"/>',
         f'{sp_child}<array name="DioChannel"/>',
         f'{sp_child}<array name="DioChannelGroup"/>',
         f'{sp_child}<array name="DioPortEcucPartitionRef"/>',
@@ -3429,7 +3429,10 @@ def _insert_clock_setting(doc: MexDocument, setting_id: str, value: str, locked:
 
     new_setting_bytes = (
         le + (b" " * indent)
-        + f'<setting id="{setting_id}" value="{value}" locked="{locked}"/>'.encode("utf-8")
+        + (
+            f'<setting id="{xml_attr(setting_id)}" '
+            f'value="{xml_attr(value)}" locked="{xml_attr(locked)}"/>'
+        ).encode("utf-8")
     )
     insert_pos = last_match.end()
     new_raw = raw[:insert_pos] + new_setting_bytes + raw[insert_pos:]
@@ -3521,8 +3524,10 @@ def _build_merged_ref_point_array_bytes(
     lines: list[str] = ['<array name="McuClockReferencePoint">']
     for i, (name, freq) in enumerate(entries):
         lines.append(f'{sp_struct}<struct name="{i}">')
-        lines.append(f'{sp_child}<setting name="Name" value="{name}"/>')
-        lines.append(f'{sp_child}<setting name="McuClockFrequencySelect" value="{freq}"/>')
+        lines.append(f'{sp_child}<setting name="Name" value="{xml_attr(name)}"/>')
+        lines.append(
+            f'{sp_child}<setting name="McuClockFrequencySelect" value="{xml_attr(freq)}"/>'
+        )
         lines.append(f'{sp_struct}</struct>')
     lines.append(f'{sp_array}</array>')
     return le.join(lines).encode("utf-8")
@@ -3875,14 +3880,14 @@ def _build_flexio_uart_channel_bytes(
 
     lines = [
         f'{sp}<struct name="{struct_index}">',
-        f'{sp1}<setting name="Name" value="{channel_name}"/>',
+        f'{sp1}<setting name="Name" value="{xml_attr(channel_name)}"/>',
         f'{sp1}<setting name="UartHwUsing" value="FLEXIO_IP"/>',
-        f'{sp1}<setting name="UartChannelId" value="{uart_channel_id}"/>',
-        f'{sp1}<setting name="UartClockRef" value="{clock_ref_path}"/>',
+        f'{sp1}<setting name="UartChannelId" value="{xml_attr(uart_channel_id)}"/>',
+        f'{sp1}<setting name="UartClockRef" value="{xml_attr(clock_ref_path)}"/>',
         f'{sp1}<array name="UartChannelEcucPartitionRef"/>',
         f'{sp1}<struct name="DetailModuleConfiguration">',
         f'{sp2}<setting name="Name" value="DetailModuleConfiguration"/>',
-        f'{sp2}<setting name="UartHwChannel" value="{dummy_lpuart}"/>',
+        f'{sp2}<setting name="UartHwChannel" value="{xml_attr(dummy_lpuart)}"/>',
         f'{sp2}<setting name="DesireBaudrate" value="LPUART_UART_BAUDRATE_9600"/>',
         f'{sp2}<setting name="CustomBaudrateMantissa" value="1"/>',
         f'{sp2}<setting name="CustomBaudrateDivisor" value="4"/>',
@@ -3891,20 +3896,20 @@ def _build_flexio_uart_channel_bytes(
         f'{sp2}<array name="UartDmaRxChannelRef"/>',
         f'{sp2}<setting name="UartParityType" value="LPUART_UART_IP_PARITY_DISABLED"/>',
         f'{sp2}<setting name="UartStopBitNumber" value="LPUART_UART_IP_ONE_STOP_BIT"/>',
-        f'{sp2}<setting name="UartWordLength" value="{bit_count_enum}"/>',
+        f'{sp2}<setting name="UartWordLength" value="{xml_attr(bit_count_enum)}"/>',
         f'{sp2}<setting name="UartInternalLoopbackEnable" value="false"/>',
         f'{sp2}<setting name="UartTimeoutEnable" value="false"/>',
         f'{sp1}</struct>',
         f'{sp1}<struct name="FlexioModuleConfiguration">',
         f'{sp2}<setting name="Name" value="FlexioModuleConfiguration"/>',
-        f'{sp2}<setting name="UartHwChannelRef" value="{mcl_channel_ref}"/>',
+        f'{sp2}<setting name="UartHwChannelRef" value="{xml_attr(mcl_channel_ref)}"/>',
         f'{sp2}<setting name="FlexioUartInteruptDmaMethod" value="FLEXIO_UART_IP_DRIVER_TYPE_INTERRUPTS"/>',
         f'{sp2}<array name="FlexioDmaChannelRef"/>',
-        f'{sp2}<setting name="DesireBaudrate" value="{baud_enum}"/>',
+        f'{sp2}<setting name="DesireBaudrate" value="{xml_attr(baud_enum)}"/>',
         f'{sp2}<setting name="CustomTimerDecrement" value="FLEXIO_TIMER_DECREMENT_FXIO_CLK_SHIFT_TMR"/>',
         f'{sp2}<setting name="CustomBaudrateDivider" value="0"/>',
-        f'{sp2}<setting name="bitCount" value="{bit_count_enum}"/>',
-        f'{sp2}<setting name="driverDirection" value="{direction_enum}"/>',
+        f'{sp2}<setting name="bitCount" value="{xml_attr(bit_count_enum)}"/>',
+        f'{sp2}<setting name="driverDirection" value="{xml_attr(direction_enum)}"/>',
         f'{sp1}</struct>',
         f'{sp}</struct>',
     ]
@@ -4644,9 +4649,9 @@ def _build_adc_channel_struct_bytes(
     lines = [
         f'{sp}<struct name="{struct_index}">',
         f'{spc}<setting name="Name" value="AdcChannel_{struct_index}"/>',
-        f'{spc}<setting name="AdcLogicalChannelId" value="{logical_id}"/>',
-        f'{spc}<setting name="AdcChannelName" value="{channel_name}"/>',
-        f'{spc}<setting name="AdcChannelId" value="{channel_id}"/>',
+        f'{spc}<setting name="AdcLogicalChannelId" value="{xml_attr(logical_id)}"/>',
+        f'{spc}<setting name="AdcChannelName" value="{xml_attr(channel_name)}"/>',
+        f'{spc}<setting name="AdcChannelId" value="{xml_attr(channel_id)}"/>',
         f'{spc}<array name="AdcChannelConvTime"/>',
         f'{spc}<array name="AdcChannelLimitCheck"/>',
         f'{spc}<array name="AdcChannelHighLimit"/>',
@@ -4663,9 +4668,9 @@ def _build_adc_channel_struct_bytes(
         lines += [
             f'{spc}<setting name="AdcEnableThresholds" value="true"/>',
             f'{spc}<array name="AdcThresholdRegister">',
-            f'{spc}   <setting name="0" value="{ref_path}"/>',
+            f'{spc}   <setting name="0" value="{xml_attr(ref_path)}"/>',
             f'{spc}</array>',
-            f'{spc}<setting name="AdcWdogNotification" value="{watchdog["notification"]}"/>',
+            f'{spc}<setting name="AdcWdogNotification" value="{xml_attr(watchdog["notification"])}"/>',
         ]
     else:
         lines += [
@@ -4721,22 +4726,22 @@ def _build_adc_group_struct_bytes(
 
     lines = [
         f'{sp}<struct name="{struct_index}">',
-        f'{spc}<setting name="Name" value="{name}"/>',
-        f'{spc}<setting name="AdcGroupAccessMode" value="{access}"/>',
-        f'{spc}<setting name="AdcGroupConversionMode" value="{conv}"/>',
-        f'{spc}<setting name="AdcGroupConversionType" value="{conv_type}"/>',
-        f'{spc}<setting name="AdcGroupId" value="{group_id}"/>',
+        f'{spc}<setting name="Name" value="{xml_attr(name)}"/>',
+        f'{spc}<setting name="AdcGroupAccessMode" value="{xml_attr(access)}"/>',
+        f'{spc}<setting name="AdcGroupConversionMode" value="{xml_attr(conv)}"/>',
+        f'{spc}<setting name="AdcGroupConversionType" value="{xml_attr(conv_type)}"/>',
+        f'{spc}<setting name="AdcGroupId" value="{xml_attr(group_id)}"/>',
         f'{spc}<array name="AdcGroupPriority"/>',
         f'{spc}<array name="AdcGroupReplacement"/>',
-        f'{spc}<setting name="AdcGroupTriggSrc" value="{trigg}"/>',
-        f'{spc}<setting name="AdcGroupHwTriggerSource" value="{hw_trigger_ref}"/>',
+        f'{spc}<setting name="AdcGroupTriggSrc" value="{xml_attr(trigg)}"/>',
+        f'{spc}<setting name="AdcGroupHwTriggerSource" value="{xml_attr(hw_trigger_ref)}"/>',
         f'{spc}<array name="AdcHwTrigSignal"/>',
         f'{spc}<array name="AdcHwTrigTimer"/>',
     ]
     if notification:
         lines += [
             f'{spc}<array name="AdcNotification">',
-            f'{spc}   <setting name="0" value="{notification}"/>',
+            f'{spc}   <setting name="0" value="{xml_attr(notification)}"/>',
             f'{spc}</array>',
         ]
     else:
@@ -4747,7 +4752,7 @@ def _build_adc_group_struct_bytes(
         f'{spc}<setting name="AdcStreamingBufferMode" value="ADC_STREAM_BUFFER_LINEAR"/>',
         f'{spc}<setting name="AdcEnableOptimizeDmaStreamingGroups" value="false"/>',
         f'{spc}<setting name="AdcEnableHalfInterrupt" value="false"/>',
-        f'{spc}<setting name="AdcStreamingNumSamples" value="{num_samples}"/>',
+        f'{spc}<setting name="AdcStreamingNumSamples" value="{xml_attr(num_samples)}"/>',
         f'{spc}<setting name="AdcStreamResultGroup" value="false"/>',
         f'{spc}<setting name="AdcEnableChDisableChGroup" value="false"/>',
         f'{spc}<setting name="AdcWithoutInterrupts" value="false"/>',
@@ -4757,22 +4762,24 @@ def _build_adc_group_struct_bytes(
         f'{spc}   <setting name="Name" value="AdcGroupConversionConfiguration"/>',
         f'{spc}   <setting name="AdcGroupHardwareAverageEnable" value="false"/>',
         f'{spc}   <setting name="AdcGroupHardwareAverageSelect" value="SAMPLES_4"/>',
-        f'{spc}   <setting name="AdcSamplingDuration0" value="{sampling_duration}"/>',
-        f'{spc}   <setting name="AdcSamplingDuration1" value="{sampling_duration}"/>',
-        f'{spc}   <setting name="AdcSamplingDuration2" value="{sampling_duration}"/>',
+        f'{spc}   <setting name="AdcSamplingDuration0" value="{xml_attr(sampling_duration)}"/>',
+        f'{spc}   <setting name="AdcSamplingDuration1" value="{xml_attr(sampling_duration)}"/>',
+        f'{spc}   <setting name="AdcSamplingDuration2" value="{xml_attr(sampling_duration)}"/>',
         f'{spc}</struct>',
         f'{spc}<struct name="AdcAlternateGroupConvTimings">',
         f'{spc}   <setting name="Name" value="AdcAlternateGroupConvTimings"/>',
         f'{spc}   <setting name="AdcGroupAltHardwareAverageEnable" value="false"/>',
         f'{spc}   <setting name="AdcGroupAltHardwareAverageSelect" value="SAMPLES_4"/>',
-        f'{spc}   <setting name="AdcAltGroupSamplingDuration0" value="{alt_default}"/>',
-        f'{spc}   <setting name="AdcAltGroupSamplingDuration1" value="{alt_default}"/>',
-        f'{spc}   <setting name="AdcAltGroupSamplingDuration2" value="{alt_default}"/>',
+        f'{spc}   <setting name="AdcAltGroupSamplingDuration0" value="{xml_attr(alt_default)}"/>',
+        f'{spc}   <setting name="AdcAltGroupSamplingDuration1" value="{xml_attr(alt_default)}"/>',
+        f'{spc}   <setting name="AdcAltGroupSamplingDuration2" value="{xml_attr(alt_default)}"/>',
         f'{spc}</struct>',
         f'{spc}<array name="AdcGroupDefinition">',
     ]
     for ref_index, ref in enumerate(channel_refs):
-        lines.append(f'{spc}   <setting name="{ref_index}" value="{ref}"/>')
+        lines.append(
+            f'{spc}   <setting name="{xml_attr(ref_index)}" value="{xml_attr(ref)}"/>'
+        )
     lines += [
         f'{spc}</array>',
         f'{spc}<array name="AdcGroupEcucPartitionRef"/>',
@@ -4795,9 +4802,9 @@ def _build_adc_threshold_control_struct_bytes(
     lines = [
         f'{sp}<struct name="{struct_index}">',
         f'{spc}<setting name="Name" value="AdcThresholdControl_{struct_index}"/>',
-        f'{spc}<setting name="AdcThresholdControlRegister" value="{register}"/>',
-        f'{spc}<setting name="AdcHighThreshold" value="{watchdog["high"]}"/>',
-        f'{spc}<setting name="AdcLowThreshold" value="{watchdog["low"]}"/>',
+        f'{spc}<setting name="AdcThresholdControlRegister" value="{xml_attr(register)}"/>',
+        f'{spc}<setting name="AdcHighThreshold" value="{xml_attr(watchdog["high"])}"/>',
+        f'{spc}<setting name="AdcLowThreshold" value="{xml_attr(watchdog["low"])}"/>',
         f'{sp}</struct>',
     ]
     return le.join(lines).encode("utf-8")
@@ -4846,7 +4853,8 @@ def _build_adc_hw_unit_struct_bytes(
         if not values:
             return f'{spc}<array name="{name}"/>'
         inner = le.join(
-            f'{spc}   <setting name="{i}" value="{v}"/>' for i, v in enumerate(values)
+        f'{spc}   <setting name="{xml_attr(i)}" value="{xml_attr(v)}"/>'
+        for i, v in enumerate(values)
         )
         return f'{spc}<array name="{name}">{le}{inner}{le}{spc}</array>'
 
@@ -4856,10 +4864,10 @@ def _build_adc_hw_unit_struct_bytes(
 
     lines = [
         f'{sp}<struct name="{struct_index}">',
-        f'{spc}<setting name="Name" value="{unit_name}"/>',
-        f'{spc}<setting name="AdcHwUnitId" value="{unit_id}"/>',
-        f'{spc}<setting name="AdcLogicalUnitId" value="{logical_unit_id}"/>',
-        f'{spc}<setting name="AdcTransferType" value="{transfer_enum}"/>',
+        f'{spc}<setting name="Name" value="{xml_attr(unit_name)}"/>',
+        f'{spc}<setting name="AdcHwUnitId" value="{xml_attr(unit_id)}"/>',
+        f'{spc}<setting name="AdcLogicalUnitId" value="{xml_attr(logical_unit_id)}"/>',
+        f'{spc}<setting name="AdcTransferType" value="{xml_attr(transfer_enum)}"/>',
         _value_array("AdcDmaChannelId", dma_refs),
         _value_array("AdcCountingDmaChannelId", counting_refs),
         f'{spc}<array name="AdcClockSource"/>',
@@ -4925,13 +4933,13 @@ def _build_adc_hw_config_struct_bytes(
     lines = [
         f'{sp}<struct name="{struct_index}">',
         f'{spc}<setting name="Name" value="AdcHwConfiguration_{struct_index}"/>',
-        f'{spc}<setting name="AdcHwConfiguredId" value="{configured_id}"/>',
-        f'{spc}<setting name="AdcNormalInterruptEnable" value="{ni}"/>',
+        f'{spc}<setting name="AdcHwConfiguredId" value="{xml_attr(configured_id)}"/>',
+        f'{spc}<setting name="AdcNormalInterruptEnable" value="{xml_attr(ni)}"/>',
         f'{spc}<setting name="AdcInjectedInterruptEnable" value="true"/>',
         f'{spc}<setting name="AdcFifoFullInterruptEnable" value="false"/>',
         f'{spc}<setting name="CtuFifoOfInterruptEnable" value="true"/>',
-        f'{spc}<setting name="WdgThresholdEnable" value="{wt}"/>',
-        f'{spc}<setting name="DmaTransferEnable" value="{dt}"/>',
+        f'{spc}<setting name="WdgThresholdEnable" value="{xml_attr(wt)}"/>',
+        f'{spc}<setting name="DmaTransferEnable" value="{xml_attr(dt)}"/>',
         f'{sp}</struct>',
     ]
     return le.join(lines).encode("utf-8")
@@ -4968,19 +4976,19 @@ def _build_bctu_internal_trigger_struct_bytes(
     lines = [
         f'{sp2}<struct name="{struct_index}">',
         f'{sp3}<setting name="Name" value="BctuInternalTrigger_{struct_index}"/>',
-        f'{sp3}<setting name="BctuTriggerSource" value="{trigger_source_ref}"/>',
+        f'{sp3}<setting name="BctuTriggerSource" value="{xml_attr(trigger_source_ref)}"/>',
         f'{sp3}<setting name="BctuTriggerLoop" value="false"/>',
-        f'{sp3}<setting name="BctuDataDestination" value="{data_destination}"/>',
+        f'{sp3}<setting name="BctuDataDestination" value="{xml_attr(data_destination)}"/>',
         f'{sp3}<setting name="BctuHwTriggerEnable" value="true"/>',
-        f'{sp3}<setting name="BctuTriggerConversionMode" value="{conversion_mode}"/>',
-        f'{sp3}<setting name="BctuAdcTargetMask" value="{target_mask}"/>',
+        f'{sp3}<setting name="BctuTriggerConversionMode" value="{xml_attr(conversion_mode)}"/>',
+        f'{sp3}<setting name="BctuAdcTargetMask" value="{xml_attr(target_mask)}"/>',
     ]
     if channel_single_ref is not None:
         lines.append(
-            f'{sp3}<setting name="BctuAdcChannelSingle" value="{channel_single_ref}"/>'
+            f'{sp3}<setting name="BctuAdcChannelSingle" value="{xml_attr(channel_single_ref)}"/>'
         )
     lines += [
-        f'{sp3}<setting name="BctuConversionListStartIndex" value="{list_start_index}"/>',
+        f'{sp3}<setting name="BctuConversionListStartIndex" value="{xml_attr(list_start_index)}"/>',
         f'{sp2}</struct>',
     ]
     return le.join(lines).encode("utf-8")
@@ -5009,9 +5017,9 @@ def _build_bctu_list_item_struct_bytes(
     lines = [
         f'{sp}<struct name="{struct_index}">',
         f'{spc}<setting name="Name" value="BctuListItems_{struct_index}"/>',
-        f'{spc}<setting name="BctuAdcChannelList" value="{channel_literal}"/>',
-        f'{spc}<setting name="BctuNextChannelWaitOnTrig" value="{wt}"/>',
-        f'{spc}<setting name="BctuLastChannel" value="{lc}"/>',
+        f'{spc}<setting name="BctuAdcChannelList" value="{xml_attr(channel_literal)}"/>',
+        f'{spc}<setting name="BctuNextChannelWaitOnTrig" value="{xml_attr(wt)}"/>',
+        f'{spc}<setting name="BctuLastChannel" value="{xml_attr(lc)}"/>',
         f'{sp}</struct>',
     ]
     return le.join(lines).encode("utf-8")
@@ -5045,19 +5053,19 @@ def _build_bctu_result_fifo_struct_bytes(
     lines = [
         f'{sp}<struct name="{struct_index}">',
         f'{spc}<setting name="Name" value="BctuResultFifos_{struct_index}"/>',
-        f'{spc}<setting name="BctuResultFifoIndex" value="{fifo_index}"/>',
-        f'{spc}<setting name="BctuWatermarkValue" value="{watermark}"/>',
+        f'{spc}<setting name="BctuResultFifoIndex" value="{xml_attr(fifo_index)}"/>',
+        f'{spc}<setting name="BctuWatermarkValue" value="{xml_attr(watermark)}"/>',
         f'{spc}<setting name="BctuFifoNotificationsEnable" value="false"/>',
-        f'{spc}<setting name="BctuWatermarkNotification" value="{notification}"/>',
+        f'{spc}<setting name="BctuWatermarkNotification" value="{xml_attr(notification)}"/>',
         f'{spc}<setting name="BctuUnderrunNotification" value="NULL_PTR"/>',
         f'{spc}<setting name="BctuOverrunNotification" value="NULL_PTR"/>',
-        f'{spc}<setting name="BctuFifoDmaEnable" value="{de}"/>',
-        f'{spc}<setting name="BctuFifoDmaBuffer" value="{dma_buffer}"/>',
+        f'{spc}<setting name="BctuFifoDmaEnable" value="{xml_attr(de)}"/>',
+        f'{spc}<setting name="BctuFifoDmaBuffer" value="{xml_attr(dma_buffer)}"/>',
     ]
     if dma_channel_ref:
         lines += [
             f'{spc}<array name="BctuFifoDmaChannelId">',
-            f'{spc}   <setting name="0" value="{dma_channel_ref}"/>',
+            f'{spc}   <setting name="0" value="{xml_attr(dma_channel_ref)}"/>',
             f'{spc}</array>',
         ]
     else:
@@ -5170,8 +5178,8 @@ def _build_bctu_adc_notification_struct_bytes(
     lines = [
         f'{sp}<struct name="{struct_index}">',
         f'{spc}<setting name="Name" value="BctuAdcNotifications_{struct_index}"/>',
-        f'{spc}<setting name="BctuAdcNotificationsAdcIndex" value="{adc_index_ref}"/>',
-        f'{spc}<setting name="BctuAdcNewDataNotification" value="{new_data_notification}"/>',
+        f'{spc}<setting name="BctuAdcNotificationsAdcIndex" value="{xml_attr(adc_index_ref)}"/>',
+        f'{spc}<setting name="BctuAdcNewDataNotification" value="{xml_attr(new_data_notification)}"/>',
         f'{spc}<setting name="BctuDataOverrunNotification" value="NULL_PTR"/>',
         f'{spc}<setting name="BctuListLastConversionNotification" value="NULL_PTR"/>',
         f'{sp}</struct>',
@@ -5857,8 +5865,8 @@ def _adc_bctu_ensure_hw_trigger(
     spc = " " * (struct_indent + 3)
     new_struct = (
         f'{sp}<struct name="{index}">{le}'
-        f'{spc}<setting name="Name" value="{trigger_name}"/>{le}'
-        f'{spc}<setting name="AdcHwTrigSrc" value="{source_token}"/>{le}'
+        f'{spc}<setting name="Name" value="{xml_attr(trigger_name)}"/>{le}'
+        f'{spc}<setting name="AdcHwTrigSrc" value="{xml_attr(source_token)}"/>{le}'
         f'{sp}</struct>'
     ).encode("utf-8")
     if existing:

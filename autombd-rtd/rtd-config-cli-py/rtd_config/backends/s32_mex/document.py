@@ -397,8 +397,42 @@ class MexDocument:
         return tag.encode("utf-8")
 
 
+def _validate_xml_chars(value: str) -> None:
+    for char in value:
+        codepoint = ord(char)
+        if (
+            codepoint == 0x09
+            or codepoint == 0x0A
+            or codepoint == 0x0D
+            or 0x20 <= codepoint <= 0xD7FF
+            or 0xE000 <= codepoint <= 0xFFFD
+            or 0x10000 <= codepoint <= 0x10FFFF
+        ):
+            continue
+        raise ValueError(
+            "XML attribute value contains invalid XML character "
+            f"U+{codepoint:04X}"
+        )
+
+
+def xml_attr(value: object) -> str:
+    """Return ``value`` escaped for use inside an XML attribute."""
+    text = str(value)
+    _validate_xml_chars(text)
+    return (
+        text.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+        .replace("'", "&apos;")
+        .replace("\t", "&#9;")
+        .replace("\n", "&#10;")
+        .replace("\r", "&#13;")
+    )
+
+
 def _xml_escape_attr(value: str) -> str:
-    return value.replace("&", "&amp;").replace("<", "&lt;").replace('"', "&quot;")
+    return xml_attr(value)
 
 
 def _sub_attr_value(tag: str, name: str, new_value: str) -> str | None:

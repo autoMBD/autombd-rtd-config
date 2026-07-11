@@ -39,22 +39,27 @@
 # Project:     RTD CfgFile CLI <https://github.com/autoMBD/autombd-rtd-config>
 # File:        test_deploy_rtd_skill.py
 # Author:      autoMBD <tkung.lqk@foxmail.com>
-# Date:        2026-06-13
-# Version:     0.1.0
+# Date:        2026-07-11
+# Version:     0.3.0
 # Description: Unit tests for deploying the RTD CfgFile CLI companion skill.
 # =================================================================================
 
 from __future__ import annotations
 
 import importlib.util
+import re
 import sys
 from pathlib import Path
 
 import pytest
 
 
+REPO_ROOT = Path(__file__).resolve().parents[2]
+SOURCE_SKILL_ROOT = REPO_ROOT / "autombd-rtd"
+
+
 def load_deploy_module():
-    module_path = Path(__file__).resolve().parents[2] / "tools" / "deploy_rtd_skill.py"
+    module_path = REPO_ROOT / "tools" / "deploy_rtd_skill.py"
     spec = importlib.util.spec_from_file_location("deploy_rtd_skill", module_path)
     assert spec is not None
     assert spec.loader is not None
@@ -119,11 +124,44 @@ def test_project_cli_and_skill_versions_match():
     deploy.parse_version_tuple(versions.skill)  # must be a valid semver (raises otherwise)
 
 
+def required_module_reference_paths() -> tuple[Path, ...]:
+    """Return the complete module-reference inventory required by the Skill."""
+    skill = (SOURCE_SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+    required = {
+        Path(relative)
+        for relative in re.findall(
+            r"`(reference/[a-z0-9_-]+-spec\.md)`",
+            skill,
+        )
+    }
+    source_inventory = {
+        path.relative_to(SOURCE_SKILL_ROOT)
+        for path in (SOURCE_SKILL_ROOT / "reference").glob("*-spec.md")
+    }
+
+    assert required == source_inventory, (
+        "SKILL.md module-reference links and source reference inventory differ: "
+        f"required={sorted(path.as_posix() for path in required)}, "
+        f"source={sorted(path.as_posix() for path in source_inventory)}"
+    )
+    return tuple(sorted(required, key=lambda path: path.as_posix()))
+
+
 def assert_released_payload(installed: Path):
     assert (installed / "SKILL.md").is_file()
     assert (installed / "__main__.py").is_file()
     assert (installed / "rtd-config-cli-py" / "rtd_config" / "cli.py").is_file()
     assert (installed / "assets" / "nxp" / "s32k3" / "uart" / "uart.json").is_file()
+    assert (installed / "reference").is_dir(), (
+        "deployed Skill is missing reference/ required by SKILL.md"
+    )
+    for relative in required_module_reference_paths():
+        deployed = installed / relative
+        source = SOURCE_SKILL_ROOT / relative
+        assert deployed.is_file(), f"deployed Skill is missing {relative.as_posix()}"
+        assert deployed.read_bytes() == source.read_bytes(), (
+            f"deployed Skill reference differs from source: {relative.as_posix()}"
+        )
     assert not (installed / "docs").exists()
     assert not (installed / "tests").exists()
     assert not (installed / "tools").exists()
@@ -132,6 +170,145 @@ def assert_released_payload(installed: Path):
 def assert_link_points_to(link: Path, target: Path):
     assert link.exists()
     assert link.resolve() == target.resolve()
+
+
+def create_complete_installed_payload(installed: Path, deploy, *, version: str) -> None:
+    """Create the smallest installed tree satisfying the released-file contract."""
+    for relative in deploy.SKILL_PAYLOAD_REQUIRED_FILES:
+        target = installed / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.touch()
+    (installed / "SKILL.md").write_text(
+        f"---\nname: autombd-rtd\nversion: {version}\n---\n# installed\n",
+        encoding="utf-8",
+    )
+
+
+def create_source_payload(source: Path, deploy) -> None:
+    for item in deploy.SKILL_PAYLOAD_ITEMS:
+        target = source / item
+        if Path(item).suffix:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(item, encoding="utf-8")
+        else:
+            target.mkdir(parents=True, exist_ok=True)
+    for relative in deploy.SKILL_PAYLOAD_REQUIRED_FILES:
+        target = source / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if not target.exists():
+            target.write_text(relative.as_posix(), encoding="utf-8")
+
+
+def test_ensure_link_windows_symlink_failure_with_metachar_path_never_invokes_cmd(
+    tmp_path,
+    monkeypatch,
+):
+    deploy = load_deploy_module()
+    source = tmp_path / "canonical"
+    source.mkdir()
+    destination = tmp_path / "safe&whoami"
+    assert not hasattr(deploy, "subprocess")
+
+    def deny_symlink(_self, _target, *, target_is_directory=False):
+        raise OSError("symbolic-link privilege unavailable")
+
+    monkeypatch.setattr(deploy.sys, "platform", "win32")
+    monkeypatch.setattr(Path, "symlink_to", deny_symlink)
+
+    with pytest.raises(RuntimeError, match="Developer Mode|elevated|symlink"):
+        deploy.ensure_link(source, destination)
+
+
+def test_ensure_link_symlink_failure_preserves_existing_destination(
+    tmp_path,
+    monkeypatch,
+):
+    deploy = load_deploy_module()
+    source = tmp_path / "canonical"
+    source.mkdir()
+    destination = tmp_path / "installed"
+    destination.mkdir()
+    sentinel = destination / "keep.txt"
+    sentinel.write_text("old install", encoding="utf-8")
+
+    def deny_symlink(_self, _target, *, target_is_directory=False):
+        raise OSError("symbolic-link privilege unavailable")
+
+    monkeypatch.setattr(deploy.sys, "platform", "win32")
+    monkeypatch.setattr(Path, "symlink_to", deny_symlink)
+
+    with pytest.raises(RuntimeError, match="Developer Mode|elevated|symlink"):
+        deploy.ensure_link(source, destination)
+
+    assert sentinel.read_text(encoding="utf-8") == "old install"
+
+
+def test_copy_released_payload_preserves_existing_install_when_publish_rename_fails(
+    tmp_path,
+    monkeypatch,
+):
+    deploy = load_deploy_module()
+    source = tmp_path / "source"
+    destination = tmp_path / "installed"
+    create_source_payload(source, deploy)
+    destination.mkdir()
+    old_skill = destination / "SKILL.md"
+    old_skill.write_text("old payload", encoding="utf-8")
+
+    real_rename = deploy.Path.rename
+
+    def fail_publish_rename(self, target):
+        if (
+            self.name.startswith(f".{destination.name}.deploying.")
+            and Path(target) == destination
+        ):
+            raise PermissionError("destination locked")
+        return real_rename(self, target)
+
+    monkeypatch.setattr(deploy.Path, "rename", fail_publish_rename)
+
+    with pytest.raises(PermissionError):
+        deploy.copy_released_payload(source, destination)
+
+    assert old_skill.read_text(encoding="utf-8") == "old payload"
+    assert not list(destination.parent.glob(f".{destination.name}.deploying.*"))
+
+
+def test_copy_released_payload_recovers_legacy_previous_before_copy_failure(
+    tmp_path,
+):
+    deploy = load_deploy_module()
+    source = tmp_path / "source"
+    source.mkdir()
+    destination = tmp_path / "installed"
+    previous = tmp_path / f".{destination.name}.previous"
+    previous.mkdir()
+    old_skill = previous / "SKILL.md"
+    old_skill.write_text("old payload", encoding="utf-8")
+
+    with pytest.raises(FileNotFoundError):
+        deploy.copy_released_payload(source, destination)
+
+    assert (destination / "SKILL.md").read_text(encoding="utf-8") == "old payload"
+
+
+def test_copy_released_payload_rejects_incomplete_staging_without_replacing_existing(
+    tmp_path,
+):
+    deploy = load_deploy_module()
+    source = tmp_path / "source"
+    destination = tmp_path / "installed"
+    create_source_payload(source, deploy)
+    (source / "reference" / "adc-spec.md").unlink()
+    destination.mkdir()
+    old_skill = destination / "SKILL.md"
+    old_skill.write_text("old payload", encoding="utf-8")
+
+    with pytest.raises(RuntimeError, match="staged Skill payload is incomplete"):
+        deploy.copy_released_payload(source, destination)
+
+    assert old_skill.read_text(encoding="utf-8") == "old payload"
+    assert not list(destination.parent.glob(f".{destination.name}.deploying.*"))
 
 
 def test_deploy_defaults_to_codex_and_claude_project_skill_indexes(tmp_path):
@@ -222,20 +399,30 @@ def test_deploy_skips_when_installed_version_is_current_or_newer(tmp_path):
     deploy = load_deploy_module()
     repo_root = Path(__file__).resolve().parents[2]
     installed = tmp_path / ".agents" / "skills" / "autombd-rtd"
-    installed.mkdir(parents=True)
-    (installed / "SKILL.md").write_text(
-        "---\nname: autombd-rtd\nversion: 9.9.9\n---\n# newer\n",
-        encoding="utf-8",
-    )
-    (installed / "__main__.py").write_text("# launcher\n", encoding="utf-8")
-    (installed / "rtd-config-cli-py").mkdir()
-    (installed / "assets").mkdir()
+    create_complete_installed_payload(installed, deploy, version="9.9.9")
     sentinel = installed / "keep.txt"
     sentinel.write_text("must stay", encoding="utf-8")
 
+    assert deploy.installed_payload_complete(installed)
     result = deploy.deploy_one(repo_root, tmp_path, "codex")
 
     assert result.action == "skipped"
     assert result.agent == "codex"
     assert result.reason == "installed_version_is_current_or_newer"
     assert sentinel.read_text(encoding="utf-8") == "must stay"
+
+
+def test_deploy_replaces_newer_install_when_required_reference_is_missing(tmp_path):
+    deploy = load_deploy_module()
+    repo_root = Path(__file__).resolve().parents[2]
+    installed = tmp_path / ".agents" / "skills" / "autombd-rtd"
+    create_complete_installed_payload(installed, deploy, version="9.9.9")
+    missing_reference = installed / "reference" / "mcu-spec.md"
+    missing_reference.unlink()
+
+    assert not deploy.installed_payload_complete(installed)
+    result = deploy.deploy_one(repo_root, tmp_path, "codex")
+
+    assert result.action == "deployed"
+    assert result.reason == "installed_payload_incomplete"
+    assert_released_payload(installed)
