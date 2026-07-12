@@ -53,8 +53,11 @@ rule requires that an owned edit touch only the lines it actually changes and
 leave every unrelated byte intact. These tests pin that contract.
 """
 import difflib
+import xml.etree.ElementTree as ET
 
-from rtd_config.backends.s32_mex.document import MexDocument
+import pytest
+
+from rtd_config.backends.s32_mex.document import MexDocument, MexWriteError
 from rtd_config.backends.s32_mex.apply import apply_uart_set
 from rtd_config.intent import Intent
 from tests.fixtures import copy_uart_fixture
@@ -220,6 +223,63 @@ def test_quick_selection_removal_is_a_narrow_byte_edit(tmp_path):
             assert "quick_selection" not in line
 
     MexDocument.load(mex)  # still well-formed
+
+
+def test_write_fails_closed_when_document_is_not_aligned(tmp_path):
+    project = copy_uart_fixture(tmp_path)
+    mex = project / "Uart_Example.mex"
+    original = mex.read_bytes()
+
+    doc = MexDocument.load(mex)
+    doc._aligned = False
+
+    with pytest.raises(MexWriteError, match="narrow"):
+        doc.write(mex)
+
+    assert mex.read_bytes() == original
+
+
+def test_write_fails_closed_when_element_count_drifts(tmp_path):
+    project = copy_uart_fixture(tmp_path)
+    mex = project / "Uart_Example.mex"
+    original = mex.read_bytes()
+
+    doc = MexDocument.load(mex)
+    doc.root.append(ET.Element("unexpected"))
+
+    with pytest.raises(MexWriteError, match="element count"):
+        doc.write(mex)
+
+    assert mex.read_bytes() == original
+
+
+def test_write_fails_closed_when_attribute_is_added(tmp_path):
+    project = copy_uart_fixture(tmp_path)
+    mex = project / "Uart_Example.mex"
+    original = mex.read_bytes()
+
+    doc = MexDocument.load(mex)
+    doc.root.attrib["new_attribute"] = "must not trigger full serialization"
+
+    with pytest.raises(MexWriteError, match="added attribute"):
+        doc.write(mex)
+
+    assert mex.read_bytes() == original
+
+
+def test_write_fails_closed_after_unsupported_element_replacement(tmp_path):
+    project = copy_uart_fixture(tmp_path)
+    mex = project / "Uart_Example.mex"
+    original = mex.read_bytes()
+
+    doc = MexDocument.load(mex)
+    orphan = ET.Element("orphan")
+    doc.replace_element_region(orphan, b"<orphan/>")
+
+    with pytest.raises(MexWriteError, match="narrow"):
+        doc.write(mex)
+
+    assert mex.read_bytes() == original
 
 
 # ---------------------------------------------------------------------------

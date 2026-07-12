@@ -2,8 +2,8 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.33.0 |
-| Date | 2026-07-07 |
+| Version | 0.34.0 |
+| Date | 2026-07-12 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Current pass/fail evidence for the E2E acceptance cases defined in `rtd-config-test-cases.md`. This document is the living status record the catalog points to; the catalog defines the target, this records where the tool actually stands. |
 
@@ -48,27 +48,29 @@ measured*, and a KPI `miss` never weakens the functional **PASS**.
 
 | ID | Module | Status | KPI |
 | --- | --- | --- | --- |
-| RTD-MEX-MCU-001 | MCU | **PASS** | **PASS** — 1 edit attempt, 55.60 s ≤ 2 min budget (OpenCode black-box, 2026-07-04, post-skill reference split; context→check window; harness exit 0; session `ses_0d5b66d1dffeq1BE2jXkUYZ1l8`; `BLACKBOX_RESULT configured=true`, `validate_status=passed`) |
-| RTD-MEX-BASENXP-001 | BaseNXP | **PASS** | **PASS** — 1 edit attempt, 41.26 s ≤ 1 min budget (OpenCode black-box, 2026-07-04, post-skill reference split; context→check window; harness exit 0; session `ses_0d5b4b48affetVC3ufMpkw4LAT`) |
-| RTD-MEX-PLATFORM-001 | Platform | **PASS** | **PASS** — functional PASS with `BLACKBOX_RESULT configured=true`, `validate_status=passed` in session `ses_0d25e2755ffej3g3Kb8rJ6H0FW`; latest KPI run after no-source/no-inspect optimization measured 1 edit attempt, 49.10 s ≤ 1 min budget (OpenCode black-box, 2026-07-04; context→check window; harness exit 0; session `ses_0d24f1e42ffeInbRFKaREs776x`; command trace is `platform set` → `check` → `validate`; harness did not parse a final `BLACKBOX_RESULT` line in that KPI run) |
-| RTD-MEX-PORT-001 | Port | **PASS** | **PASS** — 1 edit attempt, 46.41 s ≤ 1 min budget (OpenCode black-box, 2026-07-04, post-skill reference split; context→check window; harness exit 0; session `ses_0d5a87320ffeFB3m3HUDZCDCyc`) |
-| RTD-MEX-DIO-001 | Dio | **PASS** | **PASS** — 1 edit attempt, 47.54 s ≤ 1 min budget (OpenCode black-box, 2026-07-04, post-skill reference split; context→check window; harness exit 0; session `ses_0d5a6b17cffeG6krf0jgZD9ojo`) |
-| RTD-MEX-DIO-002 | Dio | **PASS** | **PASS** — 1 edit attempt, 48.94 s ≤ 1 min budget (OpenCode black-box, 2026-07-04, post-skill reference split; context→check window; harness exit 0; session `ses_0d5a52579ffeeFGHZaxujd0QbW`) |
-| RTD-MEX-MCL-001 | Mcl | **PASS** | **PASS** — 1 edit attempt, 54.78 s ≤ 1 min budget (OpenCode black-box, 2026-07-07, after Mcl allocator/asset legality fix; context→check window; harness exit 0; session `ses_0c4bcc13effejDypVDWraYJm6y`; command trace is `mcl set` → `check` → `validate`; harness did not parse a final `BLACKBOX_RESULT` line in this run) |
-| RTD-MEX-UART-001 | UART | **PASS** | **PASS** — 1 edit attempt, 40.43 s ≤ 1 min budget (OpenCode black-box, 2026-07-04, post-skill reference split; KPI optimization iteration 2 after an initial 73.43 s miss; context→check window; harness exit 0; session `ses_0d4914046ffeHlCzVBcLTQT7Y5`) |
-| RTD-MEX-UART-002 | UART | **PASS** | **PASS** — 1 edit attempt, 32.21 s ≤ 1 min budget (OpenCode black-box, 2026-07-07; KPI optimization iteration 2 after a post-Mcl-fix 113.74 s miss and a 60.01 s boundary miss; context→check window; harness exit 0; session `ses_0c4afe382ffeT485KxDapiIIPC`; command trace is `uart add-flexio-channel` → `check` → `validate`; functional `BLACKBOX_RESULT configured=true`, `validate_status=passed` was observed in iteration 1 session `ses_0c4b316f8ffev61cjbVgVng6ov`) |
-| RTD-MEX-UART-003 | UART | **PASS** | **PASS** — 1 edit attempt, 121.01 s ≤ 3 min budget (OpenCode black-box, 2026-07-04, post-skill reference split; context→check window; harness exit 0; session `ses_0d58b3b06ffeWuFVbtZji3inHE`) |
-| RTD-MEX-ADC-001 | ADC | **PASS** | **PASS** — 1 edit attempt, 47.12 s ≤ 2 min budget (OpenCode black-box, 2026-07-04, post-skill reference split; context→check window; harness exit 0; session `ses_0d48e7931ffeWEhGJX9L9azpWv`) |
-| RTD-MEX-ADC-002 | ADC | **PASS** | **PASS** — 1 edit attempt, 67.04 s ≤ 2 min budget (OpenCode black-box, 2026-07-04, post-skill reference split; context→check window; harness exit 0; session `ses_0d48d1ddfffe8Ko8Cec6RAxtE7`; `BLACKBOX_RESULT configured=true`, `validate_status=passed`) |
-| RTD-MEX-ADC-003 | ADC | **PASS** | **PASS** — 1 edit attempt, 101.08 s ≤ 2 min budget (OpenCode black-box, 2026-07-04, post-skill reference split; KPI optimization iteration 1 after an initial 131.91 s miss; context→check window; harness exit 0; session `ses_0d486fa8dffeokfQ08enxVFmIM`; `BLACKBOX_RESULT configured=true`, `validate_status=passed`) |
-| RTD-MEX-ADC-004 | ADC | **PASS** | **PASS** — 1 edit attempt, 65.95 s ≤ 2 min budget (OpenCode black-box, 2026-07-04, post-skill reference split; context→check window; harness exit 0; session `ses_0d488ef75ffeOe3SvjMNVBho8O`) |
+| RTD-MEX-MCU-001 | MCU | **PASS** | **PASS** — 1 edit attempt, 30.10 s ≤ 2 min budget (OpenCode black-box, 2026-07-12, post-#75 P0 release-safety hardening; context→check window; harness exit 0; session `ses_0ac49de5effeztO3n04L0NsMpN`; `BLACKBOX_RESULT configured=true`, `validate_status=passed`) |
+| RTD-MEX-BASENXP-001 | BaseNXP | **PASS** | **PASS** — 1 edit attempt, 25.59 s ≤ 1 min budget (OpenCode black-box, 2026-07-12, post-#75 P0 release-safety hardening; context→check window; harness exit 0; session `ses_0ac47b00affe8qNc2nTfKmsQ6Z`; `BLACKBOX_RESULT configured=true`, `validate_status=passed`) |
+| RTD-MEX-PLATFORM-001 | Platform | **PASS** | **PASS** — 1 edit attempt, 23.83 s ≤ 1 min budget (OpenCode black-box, 2026-07-12, post-#75 P0 release-safety hardening; context→check window; harness exit 0; session `ses_0ac46ac2affeVmomDptWqmKbXu`; `BLACKBOX_RESULT configured=true`, `validate_status=passed`) |
+| RTD-MEX-PORT-001 | Port | **PASS** | **PASS** — 1 edit attempt, 21.02 s ≤ 1 min budget (OpenCode black-box, 2026-07-12, post-#75 P0 release-safety hardening; context→check window; harness exit 0; session `ses_0ac45ab89ffemvUxYUxzskm34e`; `BLACKBOX_RESULT configured=true`, `validate_status=passed`) |
+| RTD-MEX-DIO-001 | Dio | **PASS** | **PASS** — 1 edit attempt, 30.88 s ≤ 1 min budget (OpenCode black-box, 2026-07-12, post-#75 P0 release-safety hardening; context→check window; harness exit 0; session `ses_0ac44d3bdffepR7IW7MU2QDNtp`; `BLACKBOX_RESULT configured=true`, `validate_status=passed`) |
+| RTD-MEX-DIO-002 | Dio | **PASS** | **PASS** — 1 edit attempt, 29.14 s ≤ 1 min budget (OpenCode black-box, 2026-07-12, post-#75 P0 release-safety hardening; context→check window; harness exit 0; session `ses_0ac43bcc8ffemN9IgbXD7CLW0g`; `BLACKBOX_RESULT configured=true`, `validate_status=passed`) |
+| RTD-MEX-MCL-001 | Mcl | **PASS** | **PASS** — 1 edit attempt, 28.68 s ≤ 1 min budget (OpenCode black-box, 2026-07-12, post-#75 P0 release-safety hardening; context→check window; harness exit 0; session `ses_0ac42a3efffe812Cw4dkFhWT5o`; `BLACKBOX_RESULT configured=true`, `validate_status=passed`) |
+| RTD-MEX-UART-001 | UART | **PASS** | **PASS** — 1 edit attempt, 29.17 s ≤ 1 min budget (OpenCode black-box, 2026-07-12, post-#75 P0 release-safety hardening; context→check window; harness exit 0; session `ses_0ac419a6effe3Zxa57FtSMSsNO`; `BLACKBOX_RESULT configured=true`, `validate_status=passed`) |
+| RTD-MEX-UART-002 | UART | **PASS** | **PASS** — 1 edit attempt, 22.12 s ≤ 1 min budget (OpenCode black-box, 2026-07-12, post-#75 P0 release-safety hardening; context→check window; harness exit 0; session `ses_0ac408cd1ffePLpke4pqKmw4h8`; `BLACKBOX_RESULT configured=true`, `validate_status=passed`) |
+| RTD-MEX-UART-003 | UART | **PASS** | **PASS** — 1 edit attempt, 67.25 s ≤ 3 min budget (OpenCode black-box, 2026-07-12, post-#75 P0 release-safety hardening; context→check window; harness exit 0; session `ses_0ac3f8e8cffeESW3QbhvHZMCgy`; `BLACKBOX_RESULT configured=true`, `validate_status=passed`) |
+| RTD-MEX-ADC-001 | ADC | **PASS** | **PASS** — 1 edit attempt, 39.84 s ≤ 2 min budget (OpenCode black-box, 2026-07-12, post-#75 P0 release-safety hardening and ADC BCTU reference clarification; context→check window; harness exit 0; session `ses_0ac35267dffe3Ged6h7Qp4Lbka`; `BLACKBOX_RESULT configured=true`, `validate_status=passed`) |
+| RTD-MEX-ADC-002 | ADC | **PASS** | **PASS** — 1 edit attempt, 29.64 s ≤ 2 min budget (OpenCode black-box, 2026-07-12, post-#75 P0 release-safety hardening and ADC BCTU reference clarification; context→check window; harness exit 0; session `ses_0ac33dff4ffeC1bXhhKWO8AOJz`; `BLACKBOX_RESULT configured=true`, `validate_status=passed`) |
+| RTD-MEX-ADC-003 | ADC | **PASS** | **PASS** — 1 edit attempt, 23.59 s ≤ 2 min budget (OpenCode black-box, 2026-07-12, KPI optimization iteration 1 after an initial post-#75 2-edit attempt miss; ADC BCTU single-trigger reference now includes the required target-channel group; context→check window; harness exit 0; session `ses_0ac364610ffeylFcv48cIK5TRv`; `BLACKBOX_RESULT configured=true`, `validate_status=passed`) |
+| RTD-MEX-ADC-004 | ADC | **PASS** | **PASS** — 1 edit attempt, 33.74 s ≤ 2 min budget (OpenCode black-box, 2026-07-12, post-#75 P0 release-safety hardening and ADC BCTU reference clarification; context→check window; harness exit 0; session `ses_0ac319088ffeEJ64et0T1QEhtc`; `BLACKBOX_RESULT configured=true`, `validate_status=passed`) |
 
-**Summary: 14 / 14 functional PASS and 14 / 14 KPI PASS.** Platform, Mcl, and
-UART-002 now have fresh post-review OpenCode black-box evidence after the
-no-source/no-inspect guidance, Mcl allocator legality fix, and UART-002
-reference fast-path optimization. UART-002 required two KPI optimization
-iterations after the fresh post-Mcl-fix rerun; the final measured window is
-32.21 s with one edit attempt.
+**Summary: 14 / 14 functional PASS and 14 / 14 KPI PASS.** All cases now have
+fresh OpenCode black-box evidence after the #75 P0 release-safety hardening
+(complete Skill reference payload, transactional configure writes, XML attribute
+escaping, and fail-closed narrow `.mex` writes). ADC-003 initially remained
+functional PASS but missed the one-edit KPI because the BCTU single-trigger
+reference did not state that the target channel must also be present in a group;
+after clarifying `adc-spec.md`, ADC-003 re-measured at 23.59 s with one edit
+attempt.
 
 ## 3. Cross-cutting blockers (critical path)
 
@@ -118,6 +120,7 @@ history. New ADC evidence is recorded in §2 as each case is exercised.
 
 | Date | Version | Description |
 | --- | --- | --- |
+| 2026-07-12 | 0.34.0 | Refreshed all 14 OpenCode black-box E2E/KPI cases after #75's P0 release-safety hardening. All functional gates pass and all KPIs pass. ADC-003 initially produced a functional PASS but a KPI MISS because the first spec omitted the target-channel group required by BCTU single conversion; `adc-spec.md` 0.1.1 now shows the complete ADC1/S10 BCTU + watchdog payload, and ADC-003 re-measured PASS at 23.59 s / 1 edit / session `ses_0ac364610ffeylFcv48cIK5TRv`. |
 | 2026-07-07 | 0.33.0 | Refreshed the post-review OpenCode black-box evidence that was stale in 0.32.0. Mcl now passes at 54.78 s / 1 edit / session `ses_0c4bcc13effejDypVDWraYJm6y`. UART-002 initially missed after the Mcl allocator fix (113.74 s), then missed the boundary after fast-path guidance (60.01 s), and passed after promoting the UART-002 reference fast path to the top of `uart-spec.md` (32.21 s / 1 edit / session `ses_0c4afe382ffeT485KxDapiIIPC`). Summary returns to 14 / 14 functional PASS and 14 / 14 KPI PASS. |
 | 2026-07-04 | 0.32.0 | Recorded the true post-review validation state after fixing Mcl allocator legality and tightening the OpenCode KPI workflow. Platform re-measured KPI PASS at 49.10 s / 1 edit / session `ses_0d24f1e42ffeInbRFKaREs776x` after removing source/explore/inspect behavior. Mcl and UART-002 evidence is explicitly marked stale pending fresh OpenCode reruns; the rerun is blocked by OpenCode usage-limit/escalation and a workspace-XDG hang. |
 | 2026-07-04 | 0.31.0 | Completed real KPI optimization for Platform and Mcl after the 0.30.0 misses. Platform route handling now treats interrupt priority/enablement/ISR registration as `platform` even when the prompt names LPUART; Mcl now has a tested Mcl-only FlexIO logic-channel fast path. Fresh OpenCode black-box E2E: Platform 31.66 s / 1 edit / session `ses_0d277eb15ffeJWEohdcCnm7ktA`; Mcl 40.01 s / 1 edit / session `ses_0d274c51affePwH9ymXYM4TWUQ`. Summary returns to 14 / 14 functional PASS and 14 / 14 KPI PASS. |

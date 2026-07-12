@@ -48,16 +48,44 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import contextmanager
+import os
 import re
 import shutil
-import subprocess
 import sys
 import time
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 
 SKILL_NAME = "autombd-rtd"
-SKILL_PAYLOAD_ITEMS = ("SKILL.md", "__main__.py", "rtd-config-cli-py", "assets")
+SKILL_PAYLOAD_ITEMS = (
+    "SKILL.md",
+    "__main__.py",
+    "rtd-config-cli-py",
+    "assets",
+    "reference",
+)
+MODULE_REFERENCE_FILES = tuple(
+    Path("reference") / f"{module}-spec.md"
+    for module in (
+        "mcu",
+        "basenxp",
+        "platform",
+        "port",
+        "dio",
+        "mcl",
+        "uart",
+        "adc",
+    )
+)
+SKILL_PAYLOAD_REQUIRED_FILES = (
+    Path("SKILL.md"),
+    Path("__main__.py"),
+    Path("rtd-config-cli-py") / "rtd_config" / "cli.py",
+    Path("assets") / "nxp" / "s32k3" / "uart" / "uart.json",
+    *MODULE_REFERENCE_FILES,
+)
 SUPPORTED_AGENTS = ("codex", "claude")
 CANONICAL_AGENT = "codex"
 AGENT_SKILL_DIRS = {
@@ -176,7 +204,10 @@ def resolve_agent_skills_dir(target_project: Path, agent: str) -> Path:
 
 
 def installed_payload_complete(destination: Path) -> bool:
-    return all((destination / item).exists() for item in SKILL_PAYLOAD_ITEMS)
+    return all((destination / item).exists() for item in SKILL_PAYLOAD_ITEMS) and all(
+        (destination / required_file).is_file()
+        for required_file in SKILL_PAYLOAD_REQUIRED_FILES
+    )
 
 
 def should_deploy(source_version: str, destination: Path) -> tuple[bool, str]:
@@ -198,6 +229,8 @@ def should_deploy(source_version: str, destination: Path) -> tuple[bool, str]:
 # backoff clears these races without masking a genuine, persistent failure.
 _FS_RETRY_ATTEMPTS = 10
 _FS_RETRY_DELAY_S = 0.1
+_DEPLOYMENT_LOCK_TIMEOUT_S = 10.0
+_DEPLOYMENT_LOCK_STALE_S = 300.0
 
 
 def _is_transient_windows_lock(exc: OSError) -> bool:
@@ -228,26 +261,112 @@ def _retry_fs(operation) -> None:
             time.sleep(_FS_RETRY_DELAY_S * (attempt + 1))
 
 
-def copy_released_payload(source_skill_root: Path, destination: Path) -> None:
+def path_present(path: Path) -> bool:
+    return path.exists() or path.is_symlink()
+
+
+def transaction_path(destination: Path, role: str) -> Path:
+    return destination.parent / f".{destination.name}.{role}.{uuid.uuid4().hex}"
+
+
+def remove_path_best_effort(path: Path) -> None:
+    try:
+        remove_path(path)
+    except OSError:
+        pass
+
+
+@contextmanager
+def deployment_lock(destination: Path):
     parent = destination.parent
     parent.mkdir(parents=True, exist_ok=True)
-    staging = parent / f".{destination.name}.deploying"
-    remove_path(staging)
-    staging.mkdir()
+    lock = parent / f".{destination.name}.deploy.lock"
+    deadline = time.monotonic() + _DEPLOYMENT_LOCK_TIMEOUT_S
 
-    for item in SKILL_PAYLOAD_ITEMS:
-        source = source_skill_root / item
-        target = staging / item
-        if source.is_dir():
-            shutil.copytree(source, target)
-        else:
-            shutil.copy2(source, target)
+    while True:
+        try:
+            lock.mkdir()
+            (lock / "owner.txt").write_text(
+                f"pid={os.getpid()}\nstarted={time.time():.6f}\n",
+                encoding="utf-8",
+            )
+            break
+        except FileExistsError:
+            try:
+                stale = time.time() - lock.stat().st_mtime > _DEPLOYMENT_LOCK_STALE_S
+            except OSError:
+                stale = False
+            if stale:
+                remove_path_best_effort(lock)
+                continue
+            if time.monotonic() >= deadline:
+                raise RuntimeError(
+                    f"another deployment is already updating {destination}"
+                )
+            time.sleep(_FS_RETRY_DELAY_S)
 
-    remove_path(destination)
-    # Atomic publish: the staged tree is renamed onto the destination. On Windows
-    # this is the step most exposed to the transient post-copy/post-delete lock
-    # window, so it is retried.
-    _retry_fs(lambda: staging.rename(destination))
+    try:
+        yield
+    finally:
+        remove_path_best_effort(lock)
+
+
+def recover_interrupted_publish(destination: Path) -> None:
+    if path_present(destination):
+        return
+
+    parent = destination.parent
+    legacy_previous = parent / f".{destination.name}.previous"
+    candidates = []
+    if path_present(legacy_previous):
+        candidates.append(legacy_previous)
+    candidates.extend(
+        candidate
+        for candidate in parent.glob(f".{destination.name}.previous.*")
+        if path_present(candidate)
+    )
+    if not candidates:
+        return
+    if len(candidates) != 1:
+        raise RuntimeError(
+            f"cannot recover interrupted deployment for {destination}; "
+            f"multiple rollback candidates exist"
+        )
+    _retry_fs(lambda: candidates[0].rename(destination))
+
+
+def copy_released_payload(source_skill_root: Path, destination: Path) -> None:
+    with deployment_lock(destination):
+        recover_interrupted_publish(destination)
+        staging = transaction_path(destination, "deploying")
+        previous = transaction_path(destination, "previous")
+        staging.mkdir()
+
+        moved_previous = False
+        try:
+            for item in SKILL_PAYLOAD_ITEMS:
+                source = source_skill_root / item
+                target = staging / item
+                if source.is_dir():
+                    shutil.copytree(source, target)
+                else:
+                    shutil.copy2(source, target)
+
+            if not installed_payload_complete(staging):
+                raise RuntimeError(
+                    f"staged Skill payload is incomplete: {source_skill_root}"
+                )
+
+            if path_present(destination):
+                _retry_fs(lambda: destination.rename(previous))
+                moved_previous = True
+            _retry_fs(lambda: staging.rename(destination))
+        except BaseException:
+            if moved_previous and path_present(previous) and not path_present(destination):
+                _retry_fs(lambda: previous.rename(destination))
+            remove_path_best_effort(staging)
+            raise
+        remove_path(previous)
 
 
 def remove_path(path: Path) -> None:
@@ -262,25 +381,28 @@ def ensure_link(source: Path, destination: Path) -> str:
     source = source.resolve()
     if destination.exists() and destination.resolve() == source:
         return "installed_link_is_current"
-    remove_path(destination)
-    try:
-        destination.symlink_to(source, target_is_directory=True)
+    with deployment_lock(destination):
+        if destination.exists() and destination.resolve() == source:
+            return "installed_link_is_current"
+        candidate = transaction_path(destination, "linking")
+        previous = transaction_path(destination, "previous")
+        moved_previous = False
+        try:
+            candidate.symlink_to(source, target_is_directory=True)
+            if path_present(destination):
+                _retry_fs(lambda: destination.rename(previous))
+                moved_previous = True
+            _retry_fs(lambda: candidate.rename(destination))
+        except OSError as exc:
+            if moved_previous and path_present(previous) and not path_present(destination):
+                _retry_fs(lambda: previous.rename(destination))
+            remove_path_best_effort(candidate)
+            message = "failed to create directory symlink"
+            if sys.platform == "win32":
+                message += "; enable Developer Mode or run from an elevated shell"
+            raise RuntimeError(message) from exc
+        remove_path(previous)
         return "symlink_to_canonical_skill"
-    except OSError as exc:
-        if sys.platform != "win32":
-            raise RuntimeError("failed to create directory symlink") from exc
-        result = subprocess.run(
-            ["cmd", "/c", "mklink", "/J", str(destination), str(source)],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        if result.returncode != 0:
-            raise RuntimeError(
-                "failed to create directory symlink or Windows junction; "
-                "enable Developer Mode or run the deployment from an elevated shell"
-            ) from exc
-        return "junction_to_canonical_skill"
 
 
 def deploy_canonical(repo_root: Path, target_project: Path) -> DeployResult:
