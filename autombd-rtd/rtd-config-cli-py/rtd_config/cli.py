@@ -49,7 +49,10 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import sys
 import tempfile
+import traceback
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 from . import __version__
@@ -69,7 +72,8 @@ from .modules.adc import AdcProvider
 from .checks.static import run_static_checks
 from .backends.s32_mex.apply import apply_uart_set, apply_uart_add_flexio_channel, apply_platform_set, apply_basenxp_set, apply_mcl_set, apply_port_set, apply_dio_set, apply_mcu_set, apply_adc_set, _load_basenxp_asset
 from .backends.s32_mex.validation import find_s32ds_root, probe_which_root, run_validation
-from .diagnostics import Diagnostic
+from .diagnostics import Diagnostic, render_failure
+from .errors import CliFailure
 
 
 # Skill root, used to resolve committed runtime assets independently of cwd.
@@ -82,6 +86,19 @@ DEFAULT_ASSET_ROOT = SKILL_ROOT / "assets"
 def emit(payload: dict) -> int:
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0 if payload.get("status") == "passed" else 1
+
+
+class RaisingArgumentParser(argparse.ArgumentParser):
+    """Argument parser whose errors participate in the CLI failure boundary."""
+
+    def error(self, message: str) -> None:
+        raise CliFailure(
+            code="invalid_arguments",
+            message=message,
+            module="cli",
+            details={"usage": self.format_usage().strip()},
+            exit_code=2,
+        )
 
 
 def _parse_bool_token(value: str) -> bool:
@@ -114,37 +131,65 @@ def _load_spec_payload(args: argparse.Namespace, module: str, action: str = "set
 
     try:
         raw = json.loads(Path(spec_path).read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise CliFailure(
+            code="spec_not_found",
+            message=f"Spec file does not exist: {spec_path}",
+            module=module,
+            details={"spec": str(spec_path)},
+        ) from exc
+    except PermissionError as exc:
+        raise CliFailure(
+            code="permission_denied",
+            message=f"Permission denied while reading spec: {spec_path}",
+            module=module,
+            details={"spec": str(spec_path)},
+        ) from exc
     except OSError as exc:
-        raise SystemExit(f"failed to read --spec {spec_path}: {exc}") from exc
+        raise CliFailure(
+            code="spec_read_failed",
+            message=f"Failed to read spec: {spec_path}",
+            module=module,
+            details={"spec": str(spec_path), "reason": str(exc)},
+        ) from exc
     except json.JSONDecodeError as exc:
-        raise SystemExit(f"failed to parse --spec {spec_path} as JSON: {exc}") from exc
+        raise CliFailure(
+            code="spec_invalid",
+            message=f"Spec is not valid JSON: {spec_path}",
+            module=module,
+            details={"spec": str(spec_path), "line": exc.lineno, "column": exc.colno},
+        ) from exc
 
     if not isinstance(raw, dict):
-        raise SystemExit("--spec must contain a JSON object")
+        raise CliFailure("spec_invalid", "Spec must contain a JSON object.", module=module)
 
     if "payload" not in raw:
         return raw
 
     spec_module = raw.get("module")
     if spec_module is not None and spec_module != module:
-        raise SystemExit(
-            f"--spec module mismatch: expected {module!r}, got {spec_module!r}"
+        raise CliFailure(
+            "spec_invalid",
+            f"Spec module mismatch: expected {module!r}, got {spec_module!r}.",
+            module=module,
         )
 
     spec_action = raw.get("action")
     if spec_action is not None and spec_action != action:
-        raise SystemExit(
-            f"--spec action mismatch: expected {action!r}, got {spec_action!r}"
+        raise CliFailure(
+            "spec_invalid",
+            f"Spec action mismatch: expected {action!r}, got {spec_action!r}.",
+            module=module,
         )
 
     payload = raw["payload"]
     if not isinstance(payload, dict):
-        raise SystemExit("--spec payload must be a JSON object")
+        raise CliFailure("spec_invalid", "Spec payload must be a JSON object.", module=module)
     return payload
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="rtd-config")
+    parser = RaisingArgumentParser(prog="rtd-config")
     parser.add_argument("--version", action="store_true")
     parser.add_argument("--json", action="store_true")
 
@@ -460,12 +505,27 @@ def normalize_uart_intent(args: argparse.Namespace) -> Intent:
 
 
 def cmd_pin_options(args: argparse.Namespace) -> int:
-    options = pin_options(
-        data_root=DEFAULT_ASSET_ROOT,
-        device=args.device,
-        package=args.package,
-        peripheral=args.peripheral,
-    )
+    try:
+        options = pin_options(
+            data_root=DEFAULT_ASSET_ROOT,
+            device=args.device,
+            package=args.package,
+            peripheral=args.peripheral,
+        )
+    except FileNotFoundError as exc:
+        raise CliFailure(
+            "asset_not_found",
+            "Required pin-mapping asset was not found.",
+            module="port",
+            details={"asset": str(exc.filename) if exc.filename else None},
+        ) from exc
+    except json.JSONDecodeError as exc:
+        raise CliFailure(
+            "asset_invalid",
+            "Pin-mapping asset is not valid JSON.",
+            module="port",
+            details={"line": exc.lineno, "column": exc.colno},
+        ) from exc
     return emit({
         "status": "passed",
         "command": "pin-options",
@@ -964,9 +1024,7 @@ def cmd_adc_set(args: argparse.Namespace) -> int:
     return _configure_module(args, intent, plan, apply_adc_set)
 
 
-def main(argv: list[str] | None = None) -> int:
-    parser = build_parser()
-    args = parser.parse_args(argv)
+def _dispatch(args: argparse.Namespace, parser: argparse.ArgumentParser) -> int:
 
     if args.command == "pin-options":
         return cmd_pin_options(args)
@@ -1017,3 +1075,91 @@ def main(argv: list[str] | None = None) -> int:
 
     parser.print_help()
     return 0
+
+
+def _command_from_argv(argv: list[str]) -> str:
+    if "--version" in argv:
+        return "version"
+    for token in argv:
+        if not token.startswith("-"):
+            return token
+    return "unknown"
+
+
+def _map_exception(exc: Exception) -> CliFailure:
+    if isinstance(exc, CliFailure):
+        return exc
+    if isinstance(exc, PermissionError):
+        return CliFailure(
+            "permission_denied",
+            "The operation was denied by the operating system.",
+            module="cli",
+            details={"reason": str(exc)},
+        )
+    if isinstance(exc, FileNotFoundError):
+        filename = str(exc.filename) if exc.filename else None
+        return CliFailure(
+            "asset_not_found" if filename and "assets" in Path(filename).parts else "resource_not_found",
+            "A required runtime asset was not found."
+            if filename and "assets" in Path(filename).parts
+            else "A required file or directory was not found.",
+            module="cli",
+            details={"path": filename},
+        )
+    if isinstance(exc, json.JSONDecodeError):
+        return CliFailure(
+            "asset_invalid",
+            "A required runtime asset is not valid JSON.",
+            module="cli",
+            details={"line": exc.lineno, "column": exc.colno},
+        )
+    if isinstance(exc, ET.ParseError):
+        return CliFailure(
+            "project_xml_invalid",
+            "The project .mex file is malformed XML.",
+            module="backend",
+            details={"reason": str(exc)},
+        )
+    if isinstance(exc, OSError):
+        return CliFailure(
+            "io_error",
+            "The operation failed because of an operating-system I/O error.",
+            module="cli",
+            details={"reason": str(exc)},
+        )
+    if isinstance(exc, ValueError):
+        return CliFailure(
+            "invalid_request",
+            str(exc),
+            module="cli",
+        )
+    return CliFailure(
+        "internal_error",
+        "An unexpected internal error occurred.",
+        module="cli",
+    )
+
+
+def main(argv: list[str] | None = None) -> int:
+    raw_argv = list(sys.argv[1:] if argv is None else argv)
+    json_mode = "--json" in raw_argv
+    debug_mode = "--debug" in raw_argv
+    parse_argv = [item for item in raw_argv if item not in {"--json", "--debug"}]
+    command = _command_from_argv(parse_argv)
+
+    try:
+        parser = build_parser()
+        args = parser.parse_args(parse_argv)
+        args.json = json_mode
+        args.debug = debug_mode
+        return _dispatch(args, parser)
+    except Exception as exc:
+        failure = _map_exception(exc)
+        payload = render_failure(failure, command)
+        if json_mode:
+            print(json.dumps(payload, ensure_ascii=False, indent=2))
+        else:
+            print(f"{failure.code}: {failure.message}", file=sys.stderr)
+        if debug_mode:
+            traceback.print_exc(file=sys.stderr)
+        return failure.exit_code

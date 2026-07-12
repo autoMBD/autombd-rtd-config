@@ -49,6 +49,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
+from .errors import CliFailure
+
 Severity = Literal["blocker", "error", "warning", "info"]
 Status = Literal["passed", "failed", "blocked"]
 
@@ -86,3 +88,22 @@ class Result:
         }
         payload.update(self.data)
         return payload
+
+
+def render_failure(failure: CliFailure, command: str) -> dict[str, Any]:
+    """Render a typed failure using the stable public result contract."""
+
+    severity: Severity = "blocker" if failure.status == "blocked" else "error"
+    return Result(
+        status=failure.status,
+        command=command,
+        diagnostics=[
+            Diagnostic(
+                severity=severity,
+                code=failure.code,
+                module=failure.module or "cli",
+                message=failure.message,
+                details=dict(failure.details),
+            )
+        ],
+    ).to_dict()
