@@ -2,8 +2,8 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.1.0 |
-| Date | 2026-07-04 |
+| Version | 0.1.1 |
+| Date | 2026-07-12 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Payload reference for configuring the Adc module through RTD CfgFile CLI structured spec input. |
 
@@ -110,14 +110,47 @@ FIFO DMA, `CtuEnableDmaTransferMode`.
 Single mode fields: `trigger_source`, `mode`, `target`, `channel`,
 `destination`, and `new_data_notification`.
 
+For a BCTU single-conversion trigger, the `channel` must also be present in one
+of the target unit's `groups`. Do not author a BCTU-only payload: the provider
+will block it with `adc_bctu_channel_not_on_unit` because the trigger cannot
+reference a channel that the unit does not own. Use a one-shot hardware group
+for the BCTU channel when the user prompt does not request another group.
+
 ```json
 {
-  "trigger_source": "BCTU_EMIOS_2_15",
-  "mode": "single",
-  "target": "ADC1",
-  "channel": "S10",
-  "destination": "data_reg",
-  "new_data_notification": "Autombd_BctuNewDataNotifi"
+  "module": "adc",
+  "action": "set",
+  "payload": {
+    "unit": "ADC1",
+    "transfer": "interrupt",
+    "sampling_time_us": 2,
+    "groups": [
+      {
+        "name": "AdcGroup_0",
+        "trigger": "hw",
+        "access": "single",
+        "conv": "oneshot",
+        "num_samples": 1,
+        "channels": ["S10"]
+      }
+    ],
+    "bctu": {
+      "trigger_source": "BCTU_EMIOS_2_15",
+      "mode": "single",
+      "target": "ADC1",
+      "channel": "S10",
+      "destination": "data_reg",
+      "new_data_notification": "Autombd_BctuNewDataNotifi"
+    },
+    "watchdog": [
+      {
+        "channel": "S10",
+        "high": 3000,
+        "low": 20,
+        "notification": "Autombd_AdcNotifiWdg"
+      }
+    ]
+  }
 }
 ```
 
@@ -180,4 +213,5 @@ it does not imply a Platform IRQ dependency.
 
 | Date | Version | Description |
 | --- | --- | --- |
+| 2026-07-12 | 0.1.1 | Clarified BCTU single-trigger payloads: the target channel must be present in the target unit's groups, and the example now shows the complete ADC1/S10 BCTU + watchdog payload to avoid a diagnostic-driven second edit attempt. |
 | 2026-07-04 | 0.1.0 | Created ADC structured spec reference. |
