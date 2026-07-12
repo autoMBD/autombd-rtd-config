@@ -220,13 +220,30 @@ def test_adc_set_accepts_legacy_raw_payload_spec(tmp_path):
     assert intent.payload == payload
 
 
-def test_spec_envelope_rejects_wrong_module(tmp_path):
+def test_spec_envelope_wrong_module_uses_public_json_failure_boundary(
+    tmp_path, capsys
+):
     project = tmp_path / "project"
     project.mkdir()
     spec = _write_spec(tmp_path, "dio", {"add_channel": "LED_CTRL"})
 
-    parser = cli.build_parser()
-    args = parser.parse_args(["port", "set", "--project", str(project), "--spec", spec])
+    exit_code = cli.main(
+        [
+            "port",
+            "set",
+            "--project",
+            str(project),
+            "--spec",
+            spec,
+            "--json",
+        ]
+    )
+    captured = capsys.readouterr()
+    payload = json.loads(captured.out)
 
-    with pytest.raises(SystemExit):
-        cli.normalize_port_intent(args)
+    assert exit_code == 1
+    assert payload["status"] == "failed"
+    assert payload["command"] == "port"
+    assert payload["diagnostics"][0]["code"] == "spec_invalid"
+    assert payload["diagnostics"][0]["module"] == "port"
+    assert "Traceback" not in captured.err
