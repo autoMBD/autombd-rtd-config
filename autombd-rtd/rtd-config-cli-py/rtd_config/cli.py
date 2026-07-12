@@ -145,6 +145,13 @@ def _load_spec_payload(args: argparse.Namespace, module: str, action: str = "set
             module=module,
             details={"spec": str(spec_path)},
         ) from exc
+    except UnicodeError as exc:
+        raise CliFailure(
+            code="spec_invalid",
+            message=f"Spec is not valid UTF-8: {spec_path}",
+            module=module,
+            details={"spec": str(spec_path), "reason": str(exc)},
+        ) from exc
     except OSError as exc:
         raise CliFailure(
             code="spec_read_failed",
@@ -1073,8 +1080,17 @@ def _dispatch(args: argparse.Namespace, parser: argparse.ArgumentParser) -> int:
             "version": __version__,
         })
 
-    parser.print_help()
-    return 0
+    raise CliFailure(
+        code="invalid_arguments",
+        message="A complete command and action are required.",
+        module="cli",
+        details={
+            "command": getattr(args, "command", None),
+            "action": getattr(args, "action", None),
+            "usage": parser.format_usage().strip(),
+        },
+        exit_code=2,
+    )
 
 
 def _command_from_argv(argv: list[str]) -> str:
@@ -1126,12 +1142,6 @@ def _map_exception(exc: Exception) -> CliFailure:
             "The operation failed because of an operating-system I/O error.",
             module="cli",
             details={"reason": str(exc)},
-        )
-    if isinstance(exc, ValueError):
-        return CliFailure(
-            "invalid_request",
-            str(exc),
-            module="cli",
         )
     return CliFailure(
         "internal_error",

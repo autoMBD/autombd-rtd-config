@@ -139,6 +139,22 @@ def test_json_flag_is_honored_before_or_after_subcommand(argv):
     assert_json_failure(run_cli(*argv), "invalid_arguments", exit_code=2)
 
 
+@pytest.mark.parametrize("argv", [("--json",), ("uart", "--json")])
+def test_missing_command_level_is_a_json_argument_failure(argv):
+    payload = assert_json_failure(
+        run_cli(*argv), "invalid_arguments", exit_code=2
+    )
+    assert payload["command"] in {"unknown", "uart"}
+
+
+def test_missing_command_without_json_is_nonzero_and_human_readable():
+    result = run_cli()
+    assert result.returncode == 2
+    assert result.stdout == ""
+    assert "invalid_arguments" in result.stderr
+    assert "Traceback" not in result.stderr
+
+
 def test_default_mode_reports_expected_failure_without_traceback(tmp_path):
     result = run_cli("inspect", "--project", tmp_path / "absent")
     assert result.returncode == 1
@@ -188,6 +204,38 @@ def test_unknown_internal_error_is_hidden_by_default(monkeypatch, capsys, tmp_pa
     assert payload["diagnostics"][0]["code"] == "internal_error"
     assert "private implementation detail" not in captured.out
     assert "Traceback" not in captured.err
+
+
+def test_unknown_internal_value_error_is_hidden_by_default(
+    monkeypatch, capsys, tmp_path
+):
+    def explode(_args) -> int:
+        raise ValueError("private implementation detail")
+
+    monkeypatch.setattr(cli, "cmd_inspect", explode)
+    exit_code = cli.main(["inspect", "--project", str(tmp_path), "--json"])
+    captured = capsys.readouterr()
+    payload = json.loads(captured.out)
+    diagnostic = payload["diagnostics"][0]
+    assert exit_code == 1
+    assert diagnostic["code"] == "internal_error"
+    assert "private implementation detail" not in diagnostic["message"]
+    assert "private implementation detail" not in captured.out
+    assert "Traceback" not in captured.err
+
+
+def test_non_utf8_spec_is_a_stable_spec_failure(tmp_path):
+    project = tmp_path / "project"
+    project.mkdir()
+    spec = tmp_path / "intent.json"
+    spec.write_bytes(b"\xff\xfe\x00")
+
+    result = run_cli(
+        "platform", "set", "--project", project, "--spec", spec, "--json"
+    )
+    payload = assert_json_failure(result, "spec_invalid")
+    assert "Traceback" not in result.stderr
+    assert payload["diagnostics"][0]["module"] == "platform"
 
 
 def test_debug_traceback_stays_on_stderr(monkeypatch, capsys, tmp_path):
