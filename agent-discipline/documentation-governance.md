@@ -2,7 +2,7 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.1.3 |
+| Version | 0.1.4 |
 | Date | 2026-06-29 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Documentation-governance rules for the RTD CfgFile CLI project. Defines the two-category split, official tool name, changelog integrity, archive policy, and the authoritative cross-category documentation map. |
@@ -82,6 +82,7 @@ paths are relative to the repository root.
 | Document | Role | References |
 | --- | --- | --- |
 | `docs/specs/rtd-config-core-design.md` | Long-term architecture, CLI/JSON contract, goals, engineering constraints, minimal-system definition | domain-truth, test strategy, test cases, source materials |
+| `docs/specs/rtd-config-runtime-safety-and-contract-design.md` | Runtime trust-boundary design: project identity, assets, diagnostics, secure transactions, provider ownership, descriptor inventory, and release integrity | core design, domain truth, test strategy |
 | `docs/specs/rtd-config-domain-truth.md` | Per-module truth sourcing rule; vendor validation flow + gate; fixture role | source materials |
 | `docs/specs/figures/` | Editable architecture figures (drawio + spec) | — |
 | `docs/tests/rtd-config-test-strategy.md` | Test method: layers, gate, acceptance rule, hygiene | domain-truth, test cases |
@@ -134,6 +135,7 @@ flowchart TD
 
 | Date | Version | Description |
 | --- | --- | --- |
+| 2026-07-12 | 0.1.4 | Added the runtime-safety and public-contract design to the authoritative Category A documentation map. |
 | 2026-06-29 | 0.1.3 | Issue #35: renamed the read-only review archive to `agent-discipline/review-archive-NOT-USED-NEVER-TOUCH!!!/` to make its frozen status explicit; updated all active references (purity-sweep rule, archive policy, documentation map, mermaid diagram). Frozen changelog rows retain the historical path. |
 | 2026-06-16 | 0.1.2 | Replaced the script-centered agent environment document with the lightweight external-dependency-memory skill entry. |
 | 2026-06-15 | 0.1.1 | Added `agent-discipline/agent-environment.md` to the Category B documentation map for issue #11. |
