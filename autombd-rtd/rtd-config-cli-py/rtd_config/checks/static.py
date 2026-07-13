@@ -73,6 +73,7 @@ from rtd_config.backends.s32_mex.document import MexDocument
 from rtd_config.backends.s32_mex.locate import find_single_mex
 from rtd_config.backends.s32_mex.target import VerifiedProjectTarget
 from rtd_config.backends.s32_mex.static_check import is_xml_well_formed
+from rtd_config.resources.bundles import ResolvedAssetBundle
 from rtd_config.diagnostics import Diagnostic, Result
 
 
@@ -428,18 +429,14 @@ def _mcl_dma_enabled(doc: MexDocument) -> bool:
     return False
 
 
-def _adc_channel_enum() -> set[str]:
+def _adc_channel_enum(bundle: ResolvedAssetBundle) -> set[str]:
     """Return the device ADC channel-name enum from the committed adc.json asset.
 
     Runtime reads only the committed asset, never the raw .epd. Returns an empty
     set if the asset is unavailable so the check degrades to a no-op rather than
     raising.
     """
-    try:
-        from rtd_config.backends.s32_mex.apply import _load_adc_asset
-        return set(_load_adc_asset().get("channel_name_to_id", {}).keys())
-    except Exception:  # pragma: no cover - asset always present in this repo
-        return set()
+    return set(bundle.load_json("adc").get("channel_name_to_id", {}).keys())
 
 
 def _adc_unit_structs(doc: MexDocument, adc_cfg: ET.Element) -> list[ET.Element]:
@@ -463,7 +460,7 @@ def _adc_hw_config_by_id(doc: MexDocument, adc_cfg: ET.Element) -> dict[str, ET.
     return out
 
 
-def _check_adc(doc: MexDocument, diagnostics: list[Diagnostic]) -> None:
+def _check_adc(doc: MexDocument, diagnostics: list[Diagnostic], bundle: ResolvedAssetBundle) -> None:
     """ADC coherence validation (RTD-MEX-ADC-001).
 
     Encodes the Adc.xdm INVALID rules that ConfigTools would otherwise report as
@@ -503,7 +500,7 @@ def _check_adc(doc: MexDocument, diagnostics: list[Diagnostic]) -> None:
     if adc_cfg is None:
         return
 
-    channel_enum = _adc_channel_enum()
+    channel_enum = _adc_channel_enum(bundle)
     hw_configs = _adc_hw_config_by_id(doc, adc_cfg)
 
     # Adc-global watchdog API switch.
@@ -928,6 +925,7 @@ def run_static_checks(
     modified_elements: Iterable[ET.Element] | None = None,
     requested_callback: str | None = None,
     verified_target: VerifiedProjectTarget | None = None,
+    bundle: ResolvedAssetBundle,
 ) -> Result:
     """Run all static checks against a .mex document.
 
@@ -967,7 +965,7 @@ def run_static_checks(
             _check_flexio_refs(doc, diagnostics)
             _check_duplicate_lpuart_hw(doc, diagnostics)
             _check_uart_channel_ids(doc, diagnostics)
-            _check_adc(doc, diagnostics)
+            _check_adc(doc, diagnostics, bundle)
             _check_quick_selection_conflict(doc, modified_elements or [], diagnostics)
             _check_callback(requested_callback, diagnostics)
         has_blocker = any(d.severity == "blocker" for d in diagnostics)

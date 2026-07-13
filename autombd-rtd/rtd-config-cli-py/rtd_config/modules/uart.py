@@ -52,6 +52,7 @@ from rtd_config.modules.mcu import McuProvider
 from rtd_config.modules.port import PortProvider
 from rtd_config.modules.platform import PlatformProvider
 from rtd_config.modules.mcl import MclProvider
+from rtd_config.resources.bundles import ResolvedAssetBundle
 
 
 def is_flexio(hw: str) -> bool:
@@ -73,6 +74,9 @@ class UartProvider:
     """
 
     name = "uart"
+
+    def __init__(self, bundle: ResolvedAssetBundle):
+        self.bundle = bundle
 
     def plan(self, intent: Intent) -> Plan:
         action = intent.action
@@ -97,23 +101,23 @@ class UartProvider:
         ]
 
         # Mcu clock reference is always required for a working Uart channel.
-        changes.append(McuProvider().clock_dependency(hw))
+        changes.append(McuProvider(self.bundle).clock_dependency(hw))
 
         # Port pin routing dependency, when the consumer requested pins.
         if payload.get("pins"):
-            changes.append(PortProvider().pin_dependency(payload["pins"]))
+            changes.append(PortProvider(self.bundle).pin_dependency(payload["pins"]))
 
         if mode == "interrupt":
             # Platform IRQ dependency in interrupt mode: LPUART peripheral IRQ.
-            changes.append(PlatformProvider().irq_dependency(hw))
+            changes.append(PlatformProvider(self.bundle).irq_dependency(hw))
         elif mode == "dma":
             # DMA mode: Platform owns DMATCD ISRs, Mcl owns DMA logic channels.
-            changes.append(PlatformProvider().dma_isr_dependency(hw))
-            changes.append(MclProvider().dma_dependency(hw))
+            changes.append(PlatformProvider(self.bundle).dma_isr_dependency(hw))
+            changes.append(MclProvider(self.bundle).dma_dependency(hw))
 
         # Mcl FlexIO logic-channel dependency on the FlexIO path only.
         if is_flexio(hw):
-            changes.append(MclProvider().flexio_dependency(hw))
+            changes.append(MclProvider(self.bundle).flexio_dependency(hw))
 
         return Plan(changes)
 

@@ -873,6 +873,18 @@ def snapshot_project_relative(
         ) from exc
 
 
+def snapshot_safe_relative(root: Path, relative: str, *, max_bytes: int) -> FileSnapshot | None:
+    """Capture a bounded root-relative regular file without following path links."""
+    absolute_root = Path(root).absolute()
+    platform = default_target_platform()
+    with _protected_root(platform, absolute_root) as lease:
+        placeholder = FileSnapshot(
+            absolute_root, FileIdentity(None, None, None), 0, 0, 0, "", b""
+        )
+        target = VerifiedProjectTarget(absolute_root, placeholder, lease)
+        return snapshot_project_relative(target, relative, max_bytes=max_bytes)
+
+
 def _read_posix_relative(
     target: VerifiedProjectTarget,
     parts: tuple[str, ...],

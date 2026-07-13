@@ -48,6 +48,7 @@ from __future__ import annotations
 
 from rtd_config.intent import Intent
 from rtd_config.plan import Plan, PlannedChange
+from rtd_config.resources.bundles import ResolvedAssetBundle
 
 
 class PortProvider:
@@ -59,6 +60,9 @@ class PortProvider:
     """
 
     name = "port"
+
+    def __init__(self, bundle: ResolvedAssetBundle):
+        self.bundle = bundle
 
     def plan(self, intent: Intent) -> Plan:
         """Return owned PlannedChanges for pin routing.

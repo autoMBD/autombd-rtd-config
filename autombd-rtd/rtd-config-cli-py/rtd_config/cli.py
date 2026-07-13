@@ -73,7 +73,7 @@ from .modules.port import PortProvider
 from .modules.dio import DioProvider
 from .modules.adc import AdcProvider
 from .checks.static import run_static_checks
-from .backends.s32_mex.apply import apply_uart_set, apply_uart_add_flexio_channel, apply_platform_set, apply_basenxp_set, apply_mcl_set, apply_port_set, apply_dio_set, apply_mcu_set, apply_adc_set, _load_basenxp_asset
+from .backends.s32_mex.apply import apply_uart_set, apply_uart_add_flexio_channel, apply_platform_set, apply_basenxp_set, apply_mcl_set, apply_port_set, apply_dio_set, apply_mcu_set, apply_adc_set
 from .backends.s32_mex.validation import find_s32ds_root, probe_which_root, run_validation
 from .diagnostics import Diagnostic, render_failure
 from .errors import CliFailure
@@ -473,7 +473,7 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def normalize_uart_intent(args: argparse.Namespace) -> Intent:
+def normalize_uart_intent(args: argparse.Namespace, bundle) -> Intent:
     """Normalize `uart set` CLI arguments into the stable JSON intent contract.
 
     Shortcut commands and JSON intents converge on this same Intent so the
@@ -485,8 +485,6 @@ def normalize_uart_intent(args: argparse.Namespace) -> Intent:
       --word-length 7/8/9/10  -> word_length via word_length_cli_to_enum
       --priority N            -> priority (ISR priority, default 2)
     """
-    from rtd_config.backends.s32_mex.apply import _load_uart_asset
-
     spec_payload = _load_spec_payload(args, "uart")
     if spec_payload is not None:
         return Intent.from_dict({"module": "uart", "action": "set", "payload": spec_payload})
@@ -511,7 +509,7 @@ def normalize_uart_intent(args: argparse.Namespace) -> Intent:
         payload["callback"] = args.callback
 
     # Map frame parameters to their .mex enum values via the uart.json asset.
-    asset = _load_uart_asset()
+    asset = bundle.load_json("uart")
     enums = asset.get("enum_domains", {})
 
     parity = getattr(args, "parity", None)
@@ -591,7 +589,7 @@ def cmd_check(args: argparse.Namespace) -> int:
         target = project.verified_target
         result = run_static_checks(
             target.mex.path, doc=project.document,
-            verified_target=target,
+            verified_target=target, bundle=project.asset_bundle,
         )
         return emit(result.to_dict())
 
@@ -611,13 +609,15 @@ def _preflight_project(project: Project) -> Project:
     return project
 
 
-def _preflight_plan(args, intent: Intent, provider):
+def _preflight_plan(args, normalizer, provider_type):
     """Verify observed project identity before module-specific planning."""
     config = RuntimeConfig.from_dict({"project": args.project})
     project = Project.verified(config.project, config.backend)
     try:
         _preflight_project(project)
-        return provider.plan(intent), project
+        bundle = project.asset_bundle
+        intent = normalizer(args, bundle)
+        return intent, provider_type(bundle).plan(intent), project
     except BaseException:
         project.close()
         raise
@@ -655,7 +655,7 @@ def _cmd_validate_verified(args, config: RuntimeConfig, project: Project) -> int
 
     # Static check always runs first; vendor validation never substitutes for it.
     static_result = run_static_checks(
-        mex, doc=project.document, verified_target=target
+        mex, doc=project.document, verified_target=target, bundle=project.asset_bundle
     )
 
     root = find_s32ds_root(args.s32ds_root)
@@ -728,12 +728,11 @@ def _cmd_validate_verified(args, config: RuntimeConfig, project: Project) -> int
 
 
 def cmd_uart_set(args: argparse.Namespace) -> int:
-    intent = normalize_uart_intent(args)
-    plan, project = _preflight_plan(args, intent, UartProvider())
+    intent, plan, project = _preflight_plan(args, normalize_uart_intent, UartProvider)
     return _complete_planned_command(args, intent, plan, apply_uart_set, project)
 
 
-def normalize_uart_add_flexio_intent(args: argparse.Namespace) -> Intent:
+def normalize_uart_add_flexio_intent(args: argparse.Namespace, _bundle) -> Intent:
     """Normalize `uart add-flexio-channel` CLI arguments into the JSON intent contract."""
     payload: dict = {
         "baud": args.baud,
@@ -750,8 +749,7 @@ def normalize_uart_add_flexio_intent(args: argparse.Namespace) -> Intent:
 
 
 def cmd_uart_add_flexio_channel(args: argparse.Namespace) -> int:
-    intent = normalize_uart_add_flexio_intent(args)
-    plan, project = _preflight_plan(args, intent, UartProvider())
+    intent, plan, project = _preflight_plan(args, normalize_uart_add_flexio_intent, UartProvider)
     return _complete_planned_command(
         args, intent, plan, apply_uart_add_flexio_channel, project
     )
@@ -770,6 +768,7 @@ def _configure_module(
     if project is None:
         config = RuntimeConfig.from_dict({"project": args.project})
         project = Project.verified(config.project, config.backend)
+        _preflight_project(project)
     try:
         return _configure_verified_project(args, intent, plan, apply_fn, project)
     finally:
@@ -784,7 +783,7 @@ def _configure_verified_project(args, intent, plan, apply_fn, project: Project) 
 
     revalidate_snapshot(target)
     revalidate_project_metadata(target, project.metadata)
-    apply_result = apply_fn(doc, intent)
+    apply_result = apply_fn(doc, intent, bundle=project.asset_bundle)
     if apply_result.blocked:
         target.close()
         return emit({
@@ -809,6 +808,7 @@ def _configure_verified_project(args, intent, plan, apply_fn, project: Project) 
             verified_target=target,
             modified_elements=apply_result.modified_elements,
             requested_callback=intent.payload.get("callback"),
+            bundle=project.asset_bundle,
         )
 
         diagnostics = apply_result.diagnostics + static_result.diagnostics
@@ -881,7 +881,7 @@ def _write_configure_staging(doc: MexDocument, mex: Path) -> Path:
     return staging
 
 
-def normalize_platform_intent(args: argparse.Namespace) -> Intent:
+def normalize_platform_intent(args: argparse.Namespace, _bundle) -> Intent:
     """Normalize `platform set` CLI arguments into the JSON intent contract."""
     spec_payload = _load_spec_payload(args, "platform")
     if spec_payload is not None:
@@ -898,12 +898,11 @@ def normalize_platform_intent(args: argparse.Namespace) -> Intent:
 
 
 def cmd_platform_set(args: argparse.Namespace) -> int:
-    intent = normalize_platform_intent(args)
-    plan, project = _preflight_plan(args, intent, PlatformProvider())
+    intent, plan, project = _preflight_plan(args, normalize_platform_intent, PlatformProvider)
     return _complete_planned_command(args, intent, plan, apply_platform_set, project)
 
 
-def normalize_basenxp_intent(args: argparse.Namespace) -> Intent:
+def normalize_basenxp_intent(args: argparse.Namespace, bundle) -> Intent:
     """Normalize `basenxp set` CLI arguments into the JSON intent contract."""
     spec_payload = _load_spec_payload(args, "basenxp")
     if spec_payload is not None:
@@ -925,18 +924,17 @@ def normalize_basenxp_intent(args: argparse.Namespace) -> Intent:
             payload[attr] = value
     get_user_id = getattr(args, "get_user_id", None)
     if get_user_id is not None:
-        enum_map = _load_basenxp_asset()["cli_enum_map"]["get_user_id"]
+        enum_map = bundle.load_json("basenxp")["cli_enum_map"]["get_user_id"]
         payload["get_user_id"] = enum_map[get_user_id]
     return Intent.from_dict({"module": "basenxp", "action": "set", "payload": payload})
 
 
 def cmd_basenxp_set(args: argparse.Namespace) -> int:
-    intent = normalize_basenxp_intent(args)
-    plan, project = _preflight_plan(args, intent, BaseNxpProvider())
+    intent, plan, project = _preflight_plan(args, normalize_basenxp_intent, BaseNxpProvider)
     return _complete_planned_command(args, intent, plan, apply_basenxp_set, project)
 
 
-def normalize_mcl_intent(args: argparse.Namespace) -> Intent:
+def normalize_mcl_intent(args: argparse.Namespace, _bundle) -> Intent:
     """Normalize `mcl set` CLI arguments into the JSON intent contract."""
     spec_payload = _load_spec_payload(args, "mcl")
     if spec_payload is not None:
@@ -950,12 +948,11 @@ def normalize_mcl_intent(args: argparse.Namespace) -> Intent:
 
 
 def cmd_mcl_set(args: argparse.Namespace) -> int:
-    intent = normalize_mcl_intent(args)
-    plan, project = _preflight_plan(args, intent, MclProvider())
+    intent, plan, project = _preflight_plan(args, normalize_mcl_intent, MclProvider)
     return _complete_planned_command(args, intent, plan, apply_mcl_set, project)
 
 
-def normalize_port_intent(args: argparse.Namespace) -> Intent:
+def normalize_port_intent(args: argparse.Namespace, _bundle) -> Intent:
     """Normalize `port set` CLI arguments into the JSON intent contract."""
     spec_payload = _load_spec_payload(args, "port")
     if spec_payload is not None:
@@ -975,12 +972,11 @@ def normalize_port_intent(args: argparse.Namespace) -> Intent:
 
 
 def cmd_port_set(args: argparse.Namespace) -> int:
-    intent = normalize_port_intent(args)
-    plan, project = _preflight_plan(args, intent, PortProvider())
+    intent, plan, project = _preflight_plan(args, normalize_port_intent, PortProvider)
     return _complete_planned_command(args, intent, plan, apply_port_set, project)
 
 
-def normalize_dio_intent(args: argparse.Namespace) -> Intent:
+def normalize_dio_intent(args: argparse.Namespace, _bundle) -> Intent:
     """Normalize `dio set` CLI arguments into the JSON intent contract."""
     spec_payload = _load_spec_payload(args, "dio")
     if spec_payload is not None:
@@ -999,7 +995,7 @@ def normalize_dio_intent(args: argparse.Namespace) -> Intent:
     return Intent.from_dict({"module": "dio", "action": "set", "payload": payload})
 
 
-def normalize_mcu_intent(args: argparse.Namespace) -> Intent:
+def normalize_mcu_intent(args: argparse.Namespace, _bundle) -> Intent:
     """Normalize `mcu set` CLI arguments into the JSON intent contract."""
     spec_payload = _load_spec_payload(args, "mcu")
     if spec_payload is not None:
@@ -1022,18 +1018,16 @@ def normalize_mcu_intent(args: argparse.Namespace) -> Intent:
 
 
 def cmd_dio_set(args: argparse.Namespace) -> int:
-    intent = normalize_dio_intent(args)
-    plan, project = _preflight_plan(args, intent, DioProvider())
+    intent, plan, project = _preflight_plan(args, normalize_dio_intent, DioProvider)
     return _complete_planned_command(args, intent, plan, apply_dio_set, project)
 
 
 def cmd_mcu_set(args: argparse.Namespace) -> int:
-    intent = normalize_mcu_intent(args)
-    plan, project = _preflight_plan(args, intent, McuProvider())
+    intent, plan, project = _preflight_plan(args, normalize_mcu_intent, McuProvider)
     return _complete_planned_command(args, intent, plan, apply_mcu_set, project)
 
 
-def normalize_adc_intent(args: argparse.Namespace) -> Intent:
+def normalize_adc_intent(args: argparse.Namespace, _bundle) -> Intent:
     """Normalize `adc set` CLI arguments into the JSON intent contract.
 
     The ADC config delta is expressed as a single JSON object via ``--spec``;
@@ -1047,8 +1041,7 @@ def normalize_adc_intent(args: argparse.Namespace) -> Intent:
 
 
 def cmd_adc_set(args: argparse.Namespace) -> int:
-    intent = normalize_adc_intent(args)
-    plan, project = _preflight_plan(args, intent, AdcProvider())
+    intent, plan, project = _preflight_plan(args, normalize_adc_intent, AdcProvider)
     return _complete_planned_command(args, intent, plan, apply_adc_set, project)
 
 

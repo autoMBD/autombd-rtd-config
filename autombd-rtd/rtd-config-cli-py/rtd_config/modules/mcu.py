@@ -47,18 +47,11 @@
 
 from __future__ import annotations
 
-import json
 import re
-from pathlib import Path
 
 from rtd_config.intent import Intent
 from rtd_config.plan import Plan, PlannedChange
-
-# Asset root: this file lives at
-#   autombd-rtd/rtd-config-cli-py/rtd_config/modules/mcu.py
-# parents[3] is autombd-rtd/
-_MODULE_FILE = Path(__file__).resolve()
-_UART_ASSET_PATH = _MODULE_FILE.parents[3] / "assets" / "nxp" / "s32k3" / "uart" / "uart.json"
+from rtd_config.resources.bundles import ResolvedAssetBundle
 
 
 def _lpuart_clock_ref_name(hw: str) -> str:
@@ -70,7 +63,7 @@ def _lpuart_clock_ref_name(hw: str) -> str:
     return f"{text}_CLK"
 
 
-def _load_lpuart_clock_entry(hw: str) -> "dict | None":
+def _load_lpuart_clock_entry(hw: str, bundle: ResolvedAssetBundle) -> "dict | None":
     """Load uart.json and return the irq/handler/clock entry for ``hw``.
 
     Returns None for unknown instances or non-LPUART peripherals.
@@ -79,11 +72,7 @@ def _load_lpuart_clock_entry(hw: str) -> "dict | None":
     m = re.match(r"^LPUART(\d+)$", key)
     if m:
         key = f"LPUART_{m.group(1)}"
-    try:
-        data = json.loads(_UART_ASSET_PATH.read_text(encoding="utf-8"))
-        return data.get("instance_irq_clock_map", {}).get(key)
-    except (OSError, ValueError):
-        return None
+    return bundle.load_json("uart").get("instance_irq_clock_map", {}).get(key)
 
 
 class McuProvider:
@@ -104,6 +93,9 @@ class McuProvider:
     """
 
     name = "mcu"
+
+    def __init__(self, bundle: ResolvedAssetBundle):
+        self.bundle = bundle
 
     def plan(self, intent: Intent) -> Plan:
         """Return planned changes for the Mcu clock-tree recipe.
@@ -175,7 +167,7 @@ class McuProvider:
         will be written.  Falls back to a generic description for non-LPUART
         peripherals or unknown instances.
         """
-        entry = _load_lpuart_clock_entry(hw)
+        entry = _load_lpuart_clock_entry(hw, self.bundle)
         if entry is not None:
             ref_name = _lpuart_clock_ref_name(hw)
             clock_select = entry["clock_select"]

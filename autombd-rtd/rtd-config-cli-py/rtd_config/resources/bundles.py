@@ -47,6 +47,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import copy
 import json
 from pathlib import Path, PurePosixPath
 from types import MappingProxyType
@@ -58,9 +59,9 @@ from ..backends.s32_mex.target import (
     _inspect,
     _protected_root,
     default_target_platform,
+    snapshot_safe_relative,
 )
 from ..errors import CliFailure
-from .runtime import load_json
 
 
 _IDENTITY_FIELDS = (
@@ -92,26 +93,27 @@ class ResolvedAssetBundle:
     def load_json(self, name: str) -> dict[str, Any]:
         cached = self._cache.get(name)
         if cached is not None:
-            return cached
+            return copy.deepcopy(cached)
         relative = self.assets.get(name)
         if relative is None:
             raise _failure("asset_not_found", "The requested bundle asset is not declared.", asset=name)
-        path = self.root.joinpath(*PurePosixPath(relative).parts)
         try:
-            if not path.is_file():
+            snapshot = snapshot_safe_relative(
+                self.root, relative, max_bytes=32 * 1024 * 1024
+            )
+            if snapshot is None:
                 raise FileNotFoundError
-            cursor = self.root
-            for part in PurePosixPath(relative).parts:
-                cursor /= part
-                if cursor.is_symlink():
-                    raise _failure("asset_invalid", "Bundle asset paths must not contain symbolic links.", asset=name)
-            value = load_json(path)
+            value = json.loads(snapshot.content.decode("utf-8"))
         except FileNotFoundError as exc:
             raise _failure("asset_not_found", "A required bundle asset was not found.", asset=name) from exc
+        except CliFailure as exc:
+            raise _failure("asset_invalid", "A required bundle asset could not be read safely.", asset=name) from exc
         except (OSError, UnicodeError) as exc:
             raise _failure("asset_invalid", "A required bundle asset could not be read.", asset=name) from exc
         except (json.JSONDecodeError, TypeError) as exc:
             raise _failure("asset_invalid", "A required bundle asset is not valid JSON.", asset=name) from exc
+        if not isinstance(value, dict):
+            raise _failure("asset_invalid", "A required bundle asset must contain a JSON object.", asset=name)
         expected = {key: self.identity[key] for key in _ASSET_IDENTITY_FIELDS}
         expected.update(self.asset_identities[name])
         actual = value.get("_identity")
@@ -125,7 +127,7 @@ class ResolvedAssetBundle:
             if key in value and value[key] != expected.get(key):
                 raise _failure("asset_identity_mismatch", "Bundle asset legacy identity conflicts with its manifest.", asset=name, field=key)
         self._cache[name] = value
-        return value
+        return copy.deepcopy(value)
 
 
 class AssetBundleResolver:

@@ -61,22 +61,14 @@ removed (the highest-risk lesson from the legacy-skills experience).
 from __future__ import annotations
 
 import io
-import json
 import re
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
-from pathlib import Path
 
 from rtd_config.backends.s32_mex.document import MexDocument, xml_attr
 from rtd_config.diagnostics import Diagnostic
 from rtd_config.intent import Intent
-
-# Skill root: this file lives at
-#   autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py
-# parents[4] is autombd-rtd/
-_APPLY_FILE = Path(__file__).resolve()
-_SKILL_ROOT = _APPLY_FILE.parents[4]
-_ASSET_ROOT = _SKILL_ROOT / "assets"
+from rtd_config.resources.bundles import ResolvedAssetBundle
 
 
 # Uart "asynchronous method" enum. RTD 7.0.1 ConfigTools models this field with
@@ -94,25 +86,7 @@ _FLEXIO_METHOD = {
 }
 
 
-def _load_uart_asset() -> dict:
-    """Load the committed uart.json asset at runtime. Never reads raw .xdm."""
-    asset_path = _ASSET_ROOT / "nxp" / "s32k3" / "uart" / "uart.json"
-    return json.loads(asset_path.read_text(encoding="utf-8"))
-
-
-def _load_basenxp_asset() -> dict:
-    """Load the committed BaseNXP osif.json asset. Never reads raw .xdm."""
-    asset_path = _ASSET_ROOT / "nxp" / "s32k3" / "basenxp" / "osif.json"
-    return json.loads(asset_path.read_text(encoding="utf-8"))
-
-
-def _load_mcl_asset() -> dict:
-    """Load the committed Mcl mcl.json asset. Never reads raw .xdm."""
-    asset_path = _ASSET_ROOT / "nxp" / "s32k3" / "mcl" / "mcl.json"
-    return json.loads(asset_path.read_text(encoding="utf-8"))
-
-
-def _lookup_lpuart_irq_clock(hw: str) -> "dict | None":
+def _lookup_lpuart_irq_clock(hw: str, bundle: ResolvedAssetBundle) -> "dict | None":
     """Return the irq_name/isr_handler/clock_select entry for an LPUART instance.
 
     Grounded in uart.json instance_irq_clock_map (derived from S32K344_IRQ.h,
@@ -124,7 +98,7 @@ def _lookup_lpuart_irq_clock(hw: str) -> "dict | None":
     m = re.match(r"^LPUART(\d+)$", key)
     if m:
         key = f"LPUART_{m.group(1)}"
-    asset = _load_uart_asset()
+    asset = bundle.load_json("uart")
     return asset.get("instance_irq_clock_map", {}).get(key)
 
 
@@ -164,7 +138,7 @@ def _select_channel(doc: MexDocument, uart_cfg: ET.Element, want_flexio: bool, c
     return None
 
 
-def apply_uart_set(doc: MexDocument, intent: Intent) -> ApplyResult:
+def apply_uart_set(doc: MexDocument, intent: Intent, *, bundle: ResolvedAssetBundle) -> ApplyResult:
     """Apply the full Uart channel orchestration to the loaded document.
 
     Performs three owned edits in one call (RTD-MEX-UART-001):
@@ -309,7 +283,7 @@ def apply_uart_set(doc: MexDocument, intent: Intent) -> ApplyResult:
     clock_setting_name = ""
     ref_clock_name = ""
     if not want_flexio:
-        irq_clock = _lookup_lpuart_irq_clock(hw)
+        irq_clock = _lookup_lpuart_irq_clock(hw, bundle)
         if irq_clock is not None:
             # Discover the McuClockSettingConfig name BEFORE any raw-bytes splices.
             clock_setting_name = _find_clock_setting_config_name(doc)
@@ -331,11 +305,11 @@ def apply_uart_set(doc: MexDocument, intent: Intent) -> ApplyResult:
 
             elif mode == "dma":
                 # Part B (DMA): MCL ch1 add + Platform DMATCD ISR insertions (raw-bytes).
-                _apply_uart_set_dma_phase1(doc, result, priority)
+                _apply_uart_set_dma_phase1(doc, result, priority, bundle)
                 # Part C (DMA): Populate UartDmaTxChannelRef + UartDmaRxChannelRef (raw-bytes).
                 # Must happen in Phase 1 BEFORE attribute mutations -- replace_element_region
                 # reloads the tree and wipes any prior .set() mutations.
-                _populate_uart_dma_refs(doc)
+                _populate_uart_dma_refs(doc, bundle)
 
             if mcu_inserted and "mcu" not in result.changed_modules:
                 result.changed_modules.append("mcu")
@@ -393,7 +367,7 @@ def apply_uart_set(doc: MexDocument, intent: Intent) -> ApplyResult:
             # UartDmaEnable and MCL ch0 flags are attribute mutations.
             # Tx/Rx ref population was done in Phase 1 (_populate_uart_dma_refs).
             if mode == "dma":
-                _apply_uart_set_dma_attrs(doc, uart_cfg)
+                _apply_uart_set_dma_attrs(doc, uart_cfg, bundle)
 
     # UartClockRef update (LPUART path, after all raw splices so ref is stable)
     if not want_flexio and channel is not None and clock_setting_name and ref_clock_name:
@@ -651,7 +625,7 @@ def _ensure_dma_logic_channel(doc: MexDocument, channel_index: int) -> bool:
     return True
 
 
-def _activate_dma_logic_channel_0(doc: MexDocument) -> None:
+def _activate_dma_logic_channel_0(doc: MexDocument, bundle: ResolvedAssetBundle) -> None:
     """Activate dmaLogicChannel_Type_0 for DMA TX use.
 
     Sets the three activation flags on the EXISTING dmaLogicChannel_Type_0 struct.
@@ -660,7 +634,7 @@ def _activate_dma_logic_channel_0(doc: MexDocument) -> None:
 
     Grounded in fixture lines ~600, ~614, ~632 and uart.json mcl_dma_channel_template.
     """
-    asset = _load_uart_asset()
+    asset = bundle.load_json("uart")
     tmpl = asset.get("mcl_dma_channel_template", {})
     flag_global = tmpl.get("dmaLogicChannel_EnableGlobalConfig", "true")
     flag_req = tmpl.get("dmaGlobalRequest_enDmaRequest", "true")
@@ -768,6 +742,7 @@ def _apply_uart_set_dma_phase1(
     doc: MexDocument,
     result: ApplyResult,
     priority: int,
+    bundle: ResolvedAssetBundle,
 ) -> None:
     """Phase 1 (raw-bytes) DMA edits for apply_uart_set DMA mode (RTD-MEX-UART-003).
 
@@ -785,7 +760,7 @@ def _apply_uart_set_dma_phase1(
 
     Propagates changed_modules: adds "mcl" and "platform" to result.
     """
-    asset = _load_uart_asset()
+    asset = bundle.load_json("uart")
     dma_map = asset.get("dma_hw_channel_irq_map", {})
 
     # 1. Add MCL dmaLogicChannel_Type_1 (RX, ch index=1).
@@ -837,7 +812,7 @@ def _find_lpuart_ip_channel_detail(doc: MexDocument) -> "ET.Element | None":
     return None
 
 
-def _populate_uart_dma_refs(doc: MexDocument) -> None:
+def _populate_uart_dma_refs(doc: MexDocument, bundle: ResolvedAssetBundle) -> None:
     """Phase 1 raw-bytes: populate UartDmaTxChannelRef[0] and UartDmaRxChannelRef[0].
 
     Replaces the self-closed empty arrays with populated versions containing
@@ -847,7 +822,7 @@ def _populate_uart_dma_refs(doc: MexDocument) -> None:
 
     Ref paths loaded from uart.json dma_channel_ref_path_pattern (not hardcoded).
     """
-    asset = _load_uart_asset()
+    asset = bundle.load_json("uart")
     ref_pattern = asset.get(
         "dma_channel_ref_path_pattern",
         "/Mcl/Mcl/MclConfig/dmaLogicChannel_Type_{index}",
@@ -872,7 +847,7 @@ def _populate_uart_dma_refs(doc: MexDocument) -> None:
                 break
 
 
-def _activate_mcl_dma(doc: MexDocument) -> None:
+def _activate_mcl_dma(doc: MexDocument, bundle: ResolvedAssetBundle) -> None:
     """Set MclEnableDma=true and activate dmaLogicChannel_Type_0 flags.
 
     Pure attribute mutations (no raw-bytes splice). Called in Phase 2.
@@ -891,10 +866,10 @@ def _activate_mcl_dma(doc: MexDocument) -> None:
                 if dma_en is not None:
                     dma_en.set("value", "true")
                 break
-    _activate_dma_logic_channel_0(doc)
+    _activate_dma_logic_channel_0(doc, bundle)
 
 
-def _apply_uart_set_dma_attrs(doc: MexDocument, uart_cfg: "ET.Element | None") -> None:
+def _apply_uart_set_dma_attrs(doc: MexDocument, uart_cfg: "ET.Element | None", bundle: ResolvedAssetBundle) -> None:
     """Phase 2 attribute-only DMA mutations for apply_uart_set DMA mode.
 
     Two attribute mutations only (no replace_element_region):
@@ -915,7 +890,7 @@ def _apply_uart_set_dma_attrs(doc: MexDocument, uart_cfg: "ET.Element | None") -
                 break
 
     # 2. MclEnableDma=true + activate dmaLogicChannel_Type_0 flags
-    _activate_mcl_dma(doc)
+    _activate_mcl_dma(doc, bundle)
 
 
 def _find_clock_setting_config_name(doc: MexDocument) -> str:
@@ -1226,7 +1201,7 @@ def _available_isr_names(doc: MexDocument, platform_cfg: ET.Element) -> list[str
     return names
 
 
-def apply_platform_set(doc: MexDocument, intent: Intent) -> ApplyResult:
+def apply_platform_set(doc: MexDocument, intent: Intent, *, bundle: ResolvedAssetBundle) -> ApplyResult:
     """Apply an owned Platform interrupt edit (priority / enable) in place.
 
     Edits an EXISTING ``PlatformIsrConfig`` entry only; it never creates an
@@ -1570,7 +1545,7 @@ def _apply_basenxp_osif_general_payload(
     return modified, diagnostics
 
 
-def apply_basenxp_set(doc: MexDocument, intent: Intent) -> ApplyResult:
+def apply_basenxp_set(doc: MexDocument, intent: Intent, *, bundle: ResolvedAssetBundle) -> ApplyResult:
     """Apply owned BaseNXP/OsIf edits.
 
     Edits are grounded in the BaseNXP osif.json asset (derived from BaseNXP.xdm)
@@ -1589,7 +1564,7 @@ def apply_basenxp_set(doc: MexDocument, intent: Intent) -> ApplyResult:
     """
     result = ApplyResult()
     payload = intent.payload
-    asset = _load_basenxp_asset()
+    asset = bundle.load_json("basenxp")
     supported_general = _basenxp_supported_general_payload_keys(asset)
     requested_general = any(key in payload for key in supported_general)
     enable_system_timer = payload.get("enable_system_timer", False)
@@ -1749,15 +1724,15 @@ def _extract_pin_index(value: str) -> int | None:
     return None
 
 
-def _mcl_flexio_enum_values(field_name: str) -> list[str]:
-    fields = _load_mcl_asset().get("FlexioMclLogicChannel", {}).get("fields", {})
+def _mcl_flexio_enum_values(field_name: str, bundle: ResolvedAssetBundle) -> list[str]:
+    fields = bundle.load_json("mcl").get("FlexioMclLogicChannel", {}).get("fields", {})
     values = fields.get(field_name, {}).get("enum_values", [])
     return [str(value) for value in values]
 
 
-def _first_unused_mcl_flexio_enum(field_name: str, used_values: set[str]) -> str | None:
+def _first_unused_mcl_flexio_enum(field_name: str, used_values: set[str], bundle: ResolvedAssetBundle) -> str | None:
     """Return the first unused legal enum literal from the descriptor-derived asset."""
-    for value in _mcl_flexio_enum_values(field_name):
+    for value in _mcl_flexio_enum_values(field_name, bundle):
         if value not in used_values:
             return value
     return None
@@ -1825,7 +1800,7 @@ def _detect_struct_indent(doc: MexDocument, struct: ET.Element) -> int:
     return spaces
 
 
-def apply_mcl_set(doc: MexDocument, intent: Intent) -> ApplyResult:
+def apply_mcl_set(doc: MexDocument, intent: Intent, *, bundle: ResolvedAssetBundle) -> ApplyResult:
     """Apply an owned Mcl edit: append one FlexIO logic channel to FlexioMclLogicChannels.
 
     Intent payload must carry ``add_flexio_logic_channel`` (string: the new
@@ -1890,9 +1865,9 @@ def apply_mcl_set(doc: MexDocument, intent: Intent) -> ApplyResult:
         ch_setting = doc.find_child_setting(struct, "FlexioMclChannelId")
         if ch_setting is not None:
             used_channels.add(ch_setting.attrib.get("value", ""))
-    new_channel_id = _first_unused_mcl_flexio_enum("FlexioMclChannelId", used_channels)
+    new_channel_id = _first_unused_mcl_flexio_enum("FlexioMclChannelId", used_channels, bundle)
     if new_channel_id is None:
-        legal_values = _mcl_flexio_enum_values("FlexioMclChannelId")
+        legal_values = _mcl_flexio_enum_values("FlexioMclChannelId", bundle)
         result.diagnostics.append(Diagnostic(
             severity="blocker",
             code="mcl_flexio_channel_id_exhausted",
@@ -1913,9 +1888,9 @@ def apply_mcl_set(doc: MexDocument, intent: Intent) -> ApplyResult:
         pin_setting = doc.find_child_setting(struct, "FlexioMclPinId")
         if pin_setting is not None:
             used_pins.add(pin_setting.attrib.get("value", ""))
-    new_pin_id = _first_unused_mcl_flexio_enum("FlexioMclPinId", used_pins)
+    new_pin_id = _first_unused_mcl_flexio_enum("FlexioMclPinId", used_pins, bundle)
     if new_pin_id is None:
-        legal_values = _mcl_flexio_enum_values("FlexioMclPinId")
+        legal_values = _mcl_flexio_enum_values("FlexioMclPinId", bundle)
         result.diagnostics.append(Diagnostic(
             severity="blocker",
             code="mcl_flexio_pin_id_exhausted",
@@ -2028,33 +2003,9 @@ def apply_mcl_set(doc: MexDocument, intent: Intent) -> ApplyResult:
 # Port: LPUART TX/RX pin-routing insertion
 # ---------------------------------------------------------------------------
 
-# Package element text -> pins.json field mapping (grounded in portpin.json asset)
-_PACKAGE_PIN_FIELD: dict[str, str] = {
-    "S32K344_257BGA": "pin_mapbga257",
-    "S32K344_172HDQFP": "pin_hdqfp172",
-}
-_DEFAULT_PIN_FIELD = "pin_mapbga257"
-
-
-def _load_pins_data() -> list[dict]:
-    """Load committed pins.json asset. Never reads .xdm at runtime."""
-    pins_path = _ASSET_ROOT / "nxp" / "s32k3" / "port" / "pins.json"
-    data = json.loads(pins_path.read_text(encoding="utf-8"))
-    return data["signals"]
-
-
 def _normalize_peripheral_id(peripheral: str) -> str:
     """LPUART_0 -> LPUART0 (asset-internal form)."""
     return re.sub(r"_(\d+)$", r"\1", peripheral.strip().upper())
-
-
-def _detect_package_pin_field(doc: MexDocument) -> str:
-    """Read <common><package> from the .mex and return the pins.json field name."""
-    for el in doc.root.iter():
-        if el.tag.endswith("package") and el.text:
-            pkg = el.text.strip()
-            return _PACKAGE_PIN_FIELD.get(pkg, _DEFAULT_PIN_FIELD)
-    return _DEFAULT_PIN_FIELD
 
 
 def _legal_pins_for_signal(
@@ -2340,7 +2291,7 @@ def _insert_into_parent_before_close(
     return True
 
 
-def apply_port_set(doc: MexDocument, intent: Intent) -> ApplyResult:
+def apply_port_set(doc: MexDocument, intent: Intent, *, bundle: ResolvedAssetBundle) -> ApplyResult:
     """Apply Port pin-routing insertion for a peripheral's TX/RX pins.
 
     Validates that the requested pins are legal options for the peripheral
@@ -2377,7 +2328,7 @@ def apply_port_set(doc: MexDocument, intent: Intent) -> ApplyResult:
     peripheral_id = _normalize_peripheral_id(peripheral)  # e.g. LPUART0
 
     # Load committed pins.json asset (legality source)
-    signals_data = _load_pins_data()
+    signals_data = bundle.load_json("pins")["signals"]
 
     # Validate TX pin legality
     if tx_pin:
@@ -2427,7 +2378,7 @@ def apply_port_set(doc: MexDocument, intent: Intent) -> ApplyResult:
         return result
 
     # Determine package -> pin_num field
-    pin_field = _detect_package_pin_field(doc)
+    pin_field = bundle.pin_field
 
     line_ending = _detect_line_ending(doc._raw)
 
@@ -2908,7 +2859,7 @@ def _build_dio_port_struct_bytes(
     return le.join(lines).encode("utf-8")
 
 
-def apply_dio_set(doc: MexDocument, intent: Intent) -> ApplyResult:
+def apply_dio_set(doc: MexDocument, intent: Intent, *, bundle: ResolvedAssetBundle) -> ApplyResult:
     """Apply a Dio output channel insertion with cross-module Port GPIO pin routing.
 
     Owns the Dio channel edit; orchestrates the Port-owned GPIO pin edits.
@@ -2946,8 +2897,8 @@ def apply_dio_set(doc: MexDocument, intent: Intent) -> ApplyResult:
         return result  # nothing requested -- no-op
 
     # ---- Load assets ----
-    signals_data = _load_pins_data()
-    pin_field = _detect_package_pin_field(doc)
+    signals_data = bundle.load_json("pins")["signals"]
+    pin_field = bundle.pin_field
     line_ending = _detect_line_ending(doc._raw)
 
     # ---- Validate pin: must be a GPIO pin in pins.json ----
@@ -3533,7 +3484,7 @@ def _build_merged_ref_point_array_bytes(
     return le.join(lines).encode("utf-8")
 
 
-def apply_mcu_set(doc: MexDocument, intent: Intent) -> ApplyResult:
+def apply_mcu_set(doc: MexDocument, intent: Intent, *, bundle: ResolvedAssetBundle) -> ApplyResult:
     """Apply the Mcu clock-tree PLL/divider recipe and McuClockReferencePoint array.
 
     Implements RTD-MEX-MCU-001: 160/80/40 MHz clock tree for S32K344 using the
@@ -3950,7 +3901,7 @@ def _find_flexio_clock_ref_path(doc: MexDocument) -> str:
     return "/Mcu/Mcu/McuModuleConfiguration/McuClockSettingConfig_0/FLEXIO_CLK"
 
 
-def apply_uart_add_flexio_channel(doc: MexDocument, intent: Intent) -> ApplyResult:
+def apply_uart_add_flexio_channel(doc: MexDocument, intent: Intent, *, bundle: ResolvedAssetBundle) -> ApplyResult:
     """Create a FlexIO Tx+Rx UART channel pair (RTD-MEX-UART-002).
 
     Performs four orchestrated edits in one call:
@@ -4018,7 +3969,7 @@ def apply_uart_add_flexio_channel(doc: MexDocument, intent: Intent) -> ApplyResu
         return result
 
     # Load asset to validate baud and build MCL ref path (Fix 1 / LL-012).
-    uart_asset = _load_uart_asset()
+    uart_asset = bundle.load_json("uart")
 
     # Validate baud against FlexioDesireBaudrate enum domain (LOAD approach).
     valid_baud_enums: list[str] = uart_asset["enum_domains"]["FlexioDesireBaudrate"]
@@ -4169,7 +4120,7 @@ def _apply_mcl_add_channel_inner(
         "action": "set",
         "payload": {"add_flexio_logic_channel": channel_name},
     })
-    mcl_result = apply_mcl_set(doc, synthetic_intent)
+    mcl_result = apply_mcl_set(doc, synthetic_intent, bundle=bundle)
     for d in mcl_result.diagnostics:
         result.diagnostics.append(d)
     for m in mcl_result.changed_modules:
@@ -4277,12 +4228,6 @@ def _apply_uart_append_flexio_channel_inner(
 # ===========================================================================
 # Adc: Hardware-Unit configuration (groups, channels, watchdog) -- RTD-MEX-ADC
 # ===========================================================================
-
-def _load_adc_asset() -> dict:
-    """Load the committed adc.json asset at runtime. Never reads raw .xdm/.epd."""
-    asset_path = _ASSET_ROOT / "nxp" / "s32k3" / "adc" / "adc.json"
-    return json.loads(asset_path.read_text(encoding="utf-8"))
-
 
 # Sampling-derivation constants pinned to adc.json by
 # test_adc_apply.py::test_adc_json_matches_apply_code_literals (LL-012). The
@@ -5895,6 +5840,7 @@ def _adc_set_setting(
 
 def _apply_adc_shared_tail(
     doc: MexDocument, is_dma: bool, has_watchdog: bool, result: ApplyResult,
+    bundle: ResolvedAssetBundle,
     has_bctu: bool = False, has_fifo_dma: bool = False,
 ) -> None:
     """Cross-cutting attribute flips shared by the add and update paths.
@@ -5935,7 +5881,7 @@ def _apply_adc_shared_tail(
             # The global unit-DMA support switch is for AdcTransferType=ADC_DMA
             # units; a BCTU FIFO DMA does not use it (it uses CtuEnableDmaTransferMode).
             _adc_set_setting(doc, adc_cfg, "AdcEnableDmaTransferMode", "true", result)
-        _activate_mcl_dma(doc)
+        _activate_mcl_dma(doc, bundle)
         # Either DMA path wires Mcl: report it in changed_modules.
         if "mcl" not in result.changed_modules:
             result.changed_modules.append("mcl")
@@ -6144,7 +6090,7 @@ def _adc_unique_list_channels(bctu: "dict | None") -> "list[str]":
     return seen
 
 
-def _apply_adc_set_multi(doc: MexDocument, intent: Intent) -> ApplyResult:
+def _apply_adc_set_multi(doc: MexDocument, intent: Intent, bundle: ResolvedAssetBundle) -> ApplyResult:
     """Create several AdcHwUnits then wire one shared BCTU (RTD-MEX-ADC-004).
 
     Payload shape::
@@ -6179,7 +6125,7 @@ def _apply_adc_set_multi(doc: MexDocument, intent: Intent) -> ApplyResult:
     # rejection (adc_bctu_list_channel_not_in_device) the caller expects for a bad
     # 'list' token. Grounded in the committed adc.json channel enum (never invented).
     if is_list_bctu and bctu is not None:
-        asset = _load_adc_asset()
+        asset = bundle.load_json("adc")
         for tok in bctu.get("list") or []:
             token = str(tok).strip()
             if token and _resolve_adc_channel(token, asset) is None:
@@ -6235,7 +6181,7 @@ def _apply_adc_set_multi(doc: MexDocument, intent: Intent) -> ApplyResult:
         sub_intent = Intent.from_dict(
             {"module": "adc", "action": "set", "payload": unit_payload}
         )
-        sub_result = apply_adc_set(doc, sub_intent)
+        sub_result = apply_adc_set(doc, sub_intent, bundle=bundle)
         result.diagnostics.extend(sub_result.diagnostics)
         result.modified_elements.extend(sub_result.modified_elements)
         for m in sub_result.changed_modules:
@@ -6246,14 +6192,14 @@ def _apply_adc_set_multi(doc: MexDocument, intent: Intent) -> ApplyResult:
 
     # Wire the single shared BCTU subtree now that every unit exists.
     if bctu is not None:
-        asset = _load_adc_asset()
+        asset = bundle.load_json("adc")
         anchor_unit = str((units[0] or {}).get("unit", "")).strip() if units else ""
         if not _apply_adc_bctu(doc, bctu, anchor_unit, asset, result):
             return result
         has_fifo_dma = bool(bctu.get("fifo_dma", False))
         _apply_adc_shared_tail(
             doc, is_dma=False, has_watchdog=False, result=result,
-            has_bctu=True, has_fifo_dma=has_fifo_dma,
+            bundle=bundle, has_bctu=True, has_fifo_dma=has_fifo_dma,
         )
 
     # changed_modules contract: adc first.
@@ -6264,7 +6210,7 @@ def _apply_adc_set_multi(doc: MexDocument, intent: Intent) -> ApplyResult:
     return result
 
 
-def apply_adc_set(doc: MexDocument, intent: Intent) -> ApplyResult:
+def apply_adc_set(doc: MexDocument, intent: Intent, *, bundle: ResolvedAssetBundle) -> ApplyResult:
     """Configure an Adc Hardware Unit + its groups/channels/watchdog (RTD-MEX-ADC-001).
 
     Intent payload (the --spec object):
@@ -6298,14 +6244,14 @@ def apply_adc_set(doc: MexDocument, intent: Intent) -> ApplyResult:
     # sampling_time_us}, ...] plus one shared "bctu" block. Dispatch to the
     # orchestrator that creates each unit then wires the single (list) BCTU.
     if payload.get("units"):
-        return _apply_adc_set_multi(doc, intent)
+        return _apply_adc_set_multi(doc, intent, bundle)
 
     result = ApplyResult()
     unit_id = payload.get("unit")
     if not unit_id:
         return result
 
-    asset = _load_adc_asset()
+    asset = bundle.load_json("adc")
     transfer_token = payload.get("transfer", "interrupt")
     transfer_enum = _ADC_TRANSFER_ENUM.get(transfer_token, transfer_token)
     groups = payload.get("groups", []) or []
@@ -6458,7 +6404,7 @@ def apply_adc_set(doc: MexDocument, intent: Intent) -> ApplyResult:
             if not _apply_adc_bctu(doc, bctu, unit_id, asset, result):
                 return result
         _apply_adc_shared_tail(
-            doc, is_dma, bool(watchdog_by_channel), result, has_bctu=bctu is not None
+            doc, is_dma, bool(watchdog_by_channel), result, bundle, has_bctu=bctu is not None
         )
         return result
 
@@ -6641,6 +6587,6 @@ def apply_adc_set(doc: MexDocument, intent: Intent) -> ApplyResult:
             return result
 
     _apply_adc_shared_tail(
-        doc, is_dma, bool(watchdog_by_channel), result, has_bctu=bctu is not None
+        doc, is_dma, bool(watchdog_by_channel), result, bundle, has_bctu=bctu is not None
     )
     return result

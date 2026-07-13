@@ -46,22 +46,14 @@
 
 from __future__ import annotations
 
-import json
 import re
-from pathlib import Path
 
 from rtd_config.intent import Intent
 from rtd_config.plan import Plan, PlannedChange
-
-# Asset root: this file lives at
-#   autombd-rtd/rtd-config-cli-py/rtd_config/modules/platform.py
-# parents[3] is autombd-rtd/
-_MODULE_FILE = Path(__file__).resolve()
-_UART_ASSET_PATH = _MODULE_FILE.parents[3] / "assets" / "nxp" / "s32k3" / "uart" / "uart.json"
-_PLATFORM_ASSET_PATH = _MODULE_FILE.parents[3] / "assets" / "nxp" / "s32k3" / "platform" / "interrupts.json"
+from rtd_config.resources.bundles import ResolvedAssetBundle
 
 
-def _load_lpuart_irq_entry(hw: str) -> "dict | None":
+def _load_lpuart_irq_entry(hw: str, bundle: ResolvedAssetBundle) -> "dict | None":
     """Load uart.json and return the irq/handler/clock entry for ``hw``.
 
     Normalises LPUART3 -> LPUART_3 for keys without underscore. Returns None
@@ -71,11 +63,7 @@ def _load_lpuart_irq_entry(hw: str) -> "dict | None":
     m = re.match(r"^LPUART(\d+)$", key)
     if m:
         key = f"LPUART_{m.group(1)}"
-    try:
-        data = json.loads(_UART_ASSET_PATH.read_text(encoding="utf-8"))
-        return data.get("instance_irq_clock_map", {}).get(key)
-    except (OSError, ValueError):
-        return None
+    return bundle.load_json("uart").get("instance_irq_clock_map", {}).get(key)
 
 
 def _lpuart_key_from_isr_name(isr_name: str) -> str | None:
@@ -85,15 +73,8 @@ def _lpuart_key_from_isr_name(isr_name: str) -> str | None:
     return f"LPUART_{match.group(1)}"
 
 
-def _load_platform_asset() -> dict:
-    try:
-        return json.loads(_PLATFORM_ASSET_PATH.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return {}
-
-
-def _derive_platform_isr_name(peripheral: str) -> str | None:
-    patterns = _load_platform_asset().get("isr_name_patterns", {})
+def _derive_platform_isr_name(peripheral: str, bundle: ResolvedAssetBundle) -> str | None:
+    patterns = bundle.load_json("platform").get("isr_name_patterns", {})
     text = peripheral.strip().upper()
     match = re.fullmatch(r"LPUART_?(\d+)", text)
     if match is not None:
@@ -114,6 +95,9 @@ class PlatformProvider:
 
     name = "platform"
 
+    def __init__(self, bundle: ResolvedAssetBundle):
+        self.bundle = bundle
+
     def plan(self, intent: Intent) -> Plan:
         return Plan([self.platform_request_change(intent.payload)])
 
@@ -123,7 +107,7 @@ class PlatformProvider:
         priority = payload.get("priority")
         isr_name = payload.get("isr_name")
         if isr_name is None and target:
-            isr_name = _derive_platform_isr_name(target)
+            isr_name = _derive_platform_isr_name(target, self.bundle)
         elif isr_name and not target:
             target = _lpuart_key_from_isr_name(isr_name) or isr_name
 
@@ -167,7 +151,7 @@ class PlatformProvider:
         generic description when the hw is not an LPUART instance with a known
         entry (e.g. FLEXIO path or unknown instance).
         """
-        entry = _load_lpuart_irq_entry(hw)
+        entry = _load_lpuart_irq_entry(hw, self.bundle)
         if entry is not None:
             irq_name = entry["irq_name"]
             isr_handler = entry["isr_handler"]
@@ -211,7 +195,7 @@ class PlatformProvider:
         Grounded in: Platform.epd DMATCD IRQ table, Dma_Ip_Irq.c, Spi_Transfer example.
         """
         try:
-            data = json.loads(_UART_ASSET_PATH.read_text(encoding="utf-8"))
+            data = self.bundle.load_json("uart")
             dma_map = data.get("dma_hw_channel_irq_map", {})
             ch0 = dma_map.get("0") or dma_map.get(0)
             ch1 = dma_map.get("1") or dma_map.get(1)
@@ -225,7 +209,7 @@ class PlatformProvider:
                 )
             else:
                 description = f"Insert DMATCD PlatformIsrConfig entries for {hw} DMA mode"
-        except (OSError, ValueError, KeyError):
+        except KeyError:
             description = f"Insert DMATCD PlatformIsrConfig entries for {hw} DMA mode"
         return PlannedChange(
             module="platform",

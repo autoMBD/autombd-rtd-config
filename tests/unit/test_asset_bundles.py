@@ -80,7 +80,8 @@ def test_real_fixture_resolves_exact_profile(project, profile):
     assert bundle.profile_id == profile
     assert bundle.pin_field == "pin_mapbga257"
     assert bundle.load_json("pins")["_identity"]["package"] == "mapbga257"
-    assert bundle.load_json("pins") is bundle.load_json("pins")
+    assert bundle.load_json("pins") == bundle.load_json("pins")
+    assert bundle.load_json("pins") is not bundle.load_json("pins")
 
 
 @pytest.mark.parametrize(
