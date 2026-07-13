@@ -52,6 +52,8 @@ import gc
 import hashlib
 import json
 import os
+import subprocess
+import sys
 import threading
 from pathlib import Path
 from types import SimpleNamespace
@@ -672,20 +674,15 @@ def test_inspect_uses_verified_bytes_when_target_is_swapped(monkeypatch, capsys,
 def test_check_uses_verified_bytes_when_target_is_swapped(monkeypatch, capsys, tmp_path):
     root, mex = _project(tmp_path)
     _swap_project_after_verification(monkeypatch, root, mex)
-    original_checks = cli.run_static_checks
+    monkeypatch.setattr(
+        cli, "run_static_checks",
+        lambda *_args, **_kwargs: pytest.fail("checks ran after target ownership ended"),
+    )
 
-    def assert_snapshot_checks(path, doc=None, **kwargs):
-        assert path == mex.resolve()
-        assert doc is not None and doc._raw == XML_A
-        assert kwargs["verified_target"].mex.content == XML_A
-        return original_checks(path, doc=doc, **kwargs)
+    with pytest.raises(CliFailure) as caught:
+        cli.cmd_check(SimpleNamespace(project=root))
 
-    monkeypatch.setattr(cli, "run_static_checks", assert_snapshot_checks)
-
-    assert cli.cmd_check(SimpleNamespace(project=root)) == 0
-    payload = json.loads(capsys.readouterr().out)
-
-    assert payload["command"] == "check"
+    assert caught.value.code == "project_target_closed"
     assert mex.read_bytes() == XML_B
 
 
@@ -715,7 +712,7 @@ def test_validate_uses_snapshot_then_rejects_swapped_target_before_vendor(
     with pytest.raises(CliFailure) as caught:
         cli.cmd_validate(args)
 
-    assert caught.value.code == "project_target_changed"
+    assert caught.value.code == "project_target_closed"
     assert not vendor_called
 
 
@@ -932,6 +929,53 @@ def test_target_lease_close_waits_for_every_concurrent_reader():
     assert not closer.is_alive()
     assert released.is_set()
     assert lease.closed
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX openat mount guard")
+def test_project_relative_reader_resamples_descendant_mounts(tmp_path):
+    root, _ = _project(tmp_path)
+    settings = root / ".settings"
+    settings.mkdir()
+    (settings / "sample.prefs").write_bytes(b"x=1\n")
+    sampled = []
+
+    def detector(path):
+        sampled.append(path)
+        return sampled.count(path) > 1 and path == settings
+
+    platform = _PosixTargetPlatform(mount_detector=detector)
+    with verify_project_target(root, platform=platform) as target:
+        with pytest.raises(CliFailure) as caught:
+            target_module.read_project_relative(
+                target, ".settings/sample.prefs", max_bytes=32
+            )
+    assert caught.value.code == "unsafe_project_path"
+    assert sampled.count(settings) >= 2
+
+
+@pytest.mark.skipif(sys.platform != "linux", reason="Linux bind-mount test")
+def test_real_linux_internal_bind_mount_is_rejected(tmp_path):
+    root, _ = _project(tmp_path)
+    source = tmp_path / "source-settings"
+    source.mkdir()
+    (source / "sample.prefs").write_bytes(b"x=1\n")
+    mountpoint = root / ".settings"
+    mountpoint.mkdir()
+    mounted = subprocess.run(
+        ["mount", "--bind", str(source), str(mountpoint)],
+        capture_output=True, text=True, check=False,
+    )
+    if mounted.returncode != 0:
+        pytest.skip("bind mount unavailable in this Linux environment")
+    try:
+        with verify_project_target(root) as target:
+            with pytest.raises(CliFailure) as caught:
+                target_module.read_project_relative(
+                    target, ".settings/sample.prefs", max_bytes=32
+                )
+        assert caught.value.code == "unsafe_project_path"
+    finally:
+        subprocess.run(["umount", str(mountpoint)], check=False)
 
 
 @pytest.mark.parametrize("error,code", [(PermissionError(), "project_permission_denied"), (OSError(), "unsafe_project_path")])

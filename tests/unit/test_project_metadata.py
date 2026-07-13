@@ -207,10 +207,16 @@ def test_missing_observations_remain_unknown(tmp_path):
  <common/><tools/>
 </configuration>'''
     metadata = _parse(_temporary_project(tmp_path, raw))
-    assert metadata == ProjectMetadata(
+    assert (
+        metadata.vendor, metadata.backend, metadata.processor, metadata.family,
+        metadata.device, metadata.raw_package, metadata.package, metadata.mcu_data,
+        metadata.xml_namespace, metadata.schema_version, metadata.schema_location,
+        metadata.tools, metadata.modules, metadata.rtd_release, metadata.conflicts,
+    ) == (
         None, None, None, None, None, None, None, None,
         "urn:unrecognized", None, None, (), None, None, (),
     )
+    assert all(not item.observed for item in metadata.auxiliary_sources)
 
 
 @pytest.mark.parametrize(
@@ -378,6 +384,51 @@ def test_metadata_to_dict_returns_detached_nested_values():
             "xpath": "/configuration/@name",
         }],
     }]
+
+
+def test_metadata_records_all_fixed_auxiliary_source_evidence():
+    metadata = _parse(UART)
+    assert [item.relative for item in metadata.auxiliary_sources] == [
+        ".project", ".cproject",
+        ".settings/com.freescale.s32ds.cross.sdk.support.prefs",
+        ".settings/com.nxp.s32ds.cle.runtime.component.prefs",
+    ]
+    assert all(item.observed and item.snapshot is not None for item in metadata.auxiliary_sources)
+    payload = metadata.to_dict()
+    assert "auxiliary_sources" not in payload
+    assert "sha256" not in json.dumps(payload)
+
+
+def test_parse_revalidates_auxiliary_sources_as_one_generation(monkeypatch, tmp_path):
+    root = _temporary_project(tmp_path)
+    (root / ".project").write_text("<project/>", encoding="utf-8")
+    real_read = metadata_module.snapshot_project_relative
+    calls = 0
+
+    def mutate_after_initial_reads(target, relative, *, max_bytes):
+        nonlocal calls
+        result = real_read(target, relative, max_bytes=max_bytes)
+        calls += 1
+        if calls == 4:
+            (root / ".project").write_text("<changed/>", encoding="utf-8")
+        return result
+
+    monkeypatch.setattr(metadata_module, "snapshot_project_relative", mutate_after_initial_reads)
+    with pytest.raises(CliFailure) as caught:
+        _parse(root)
+    assert caught.value.code == "project_metadata_source_changed"
+
+
+def test_metadata_revalidation_rejects_same_bytes_new_identity(tmp_path):
+    with Project.verified(UART) as project:
+        metadata = project.metadata
+        source = project.root / ".project"
+        replacement = project.root / ".project.replacement"
+        replacement.write_bytes(source.read_bytes())
+        os.replace(replacement, source)
+        with pytest.raises(CliFailure) as caught:
+            metadata_module.revalidate_project_metadata(project.verified_target, metadata)
+    assert caught.value.code == "project_metadata_source_changed"
 
 
 @pytest.mark.parametrize(

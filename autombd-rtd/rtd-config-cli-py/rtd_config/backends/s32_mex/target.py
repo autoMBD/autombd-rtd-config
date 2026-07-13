@@ -819,6 +819,17 @@ def read_project_relative(
     max_bytes: int,
 ) -> bytes | None:
     """Read one bounded project-relative file through the live root lease."""
+    snapshot = snapshot_project_relative(target, relative, max_bytes=max_bytes)
+    return None if snapshot is None else snapshot.content
+
+
+def snapshot_project_relative(
+    target: VerifiedProjectTarget,
+    relative: str,
+    *,
+    max_bytes: int,
+) -> FileSnapshot | None:
+    """Capture one bounded project-relative file through the live root lease."""
     if not isinstance(target, VerifiedProjectTarget):
         raise TypeError("target must be a VerifiedProjectTarget")
     if max_bytes < 0:
@@ -866,7 +877,7 @@ def _read_posix_relative(
     target: VerifiedProjectTarget,
     parts: tuple[str, ...],
     max_bytes: int,
-) -> bytes:
+) -> FileSnapshot:
     root_fd = target.lease._resources.get("root_fd")
     platform = target.lease._resources.get("platform")
     if root_fd is None or not platform._no_follow or not platform._nonblock:
@@ -877,14 +888,37 @@ def _read_posix_relative(
         )
     opened: list[int] = []
     parent = root_fd
+    current = target.root
     try:
         directory_flags = os.O_RDONLY | os.O_DIRECTORY | platform._no_follow | platform._nonblock
         for part in parts[:-1]:
+            current /= part
+            if platform._mount_detector(current):
+                raise CliFailure(
+                    "unsafe_project_path", "Project metadata paths must not cross mounts.",
+                    module="backend", details={"path": str(current)},
+                )
             parent = os.open(part, directory_flags, dir_fd=parent)
             opened.append(parent)
+            if platform._mount_detector(current):
+                raise CliFailure(
+                    "unsafe_project_path", "Project metadata mount topology changed during open.",
+                    module="backend", details={"path": str(current)},
+                )
+        current /= parts[-1]
+        if platform._mount_detector(current):
+            raise CliFailure(
+                "unsafe_project_path", "Project metadata paths must not cross mounts.",
+                module="backend", details={"path": str(current)},
+            )
         flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | platform._no_follow | platform._nonblock
         descriptor = os.open(parts[-1], flags, dir_fd=parent)
         opened.append(descriptor)
+        if platform._mount_detector(current):
+            raise CliFailure(
+                "unsafe_project_path", "Project metadata mount topology changed during open.",
+                module="backend", details={"path": str(current)},
+            )
         before = os.fstat(descriptor)
         if not stat.S_ISREG(before.st_mode):
             raise OSError("metadata source is not a regular file")
@@ -908,7 +942,12 @@ def _read_posix_relative(
         after_evidence = (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns, after.st_ctime_ns)
         if before_evidence != after_evidence or len(content) != before.st_size:
             raise RuntimeError("metadata source changed")
-        return content
+        return FileSnapshot(
+            current,
+            FileIdentity(before.st_dev, before.st_ino, None),
+            before.st_size, before.st_mtime_ns, before.st_ctime_ns,
+            hashlib.sha256(content).hexdigest(), content,
+        )
     finally:
         for descriptor in reversed(opened):
             os.close(descriptor)
@@ -919,7 +958,7 @@ def _read_windows_relative(
     parts: tuple[str, ...],
     max_bytes: int,
     platform: _WindowsTargetPlatform,
-) -> bytes:
+) -> FileSnapshot:
     held = []
     current = target.root
     try:
@@ -970,7 +1009,17 @@ def _read_windows_relative(
         content = b"".join(chunks)
         if before != after or len(content) != standard_before.EndOfFile:
             raise RuntimeError("metadata source changed")
-        return content
+        return FileSnapshot(
+            current,
+            FileIdentity(
+                None, None,
+                WindowsFileId(id_before.VolumeSerialNumber, bytes(id_before.FileId.Identifier)),
+            ),
+            standard_before.EndOfFile,
+            basic_before.LastWriteTime * 100,
+            basic_before.ChangeTime * 100,
+            hashlib.sha256(content).hexdigest(), content,
+        )
     finally:
         for handle in reversed(held):
             _CloseHandle(handle)

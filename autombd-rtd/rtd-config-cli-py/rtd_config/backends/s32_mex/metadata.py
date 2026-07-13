@@ -48,13 +48,21 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+import hashlib
+from pathlib import Path
 import re
 from typing import Any
 import xml.etree.ElementTree as ET
 
 from ...errors import CliFailure
 from .document import MexDocument
-from .target import VerifiedProjectTarget, read_project_relative
+from .target import (
+    FileIdentity,
+    FileSnapshot,
+    VerifiedProjectTarget,
+    read_project_relative,
+    snapshot_project_relative,
+)
 
 
 _NXP_NAMESPACE_PREFIX = "http://mcuxpresso.nxp.com/XSD/mex_configuration_"
@@ -110,6 +118,13 @@ class MetadataConflict:
 
 
 @dataclass(frozen=True)
+class AuxiliarySourceEvidence:
+    relative: str
+    observed: bool
+    snapshot: FileSnapshot | None
+
+
+@dataclass(frozen=True)
 class ProjectMetadata:
     vendor: str | None
     backend: str | None
@@ -126,6 +141,7 @@ class ProjectMetadata:
     modules: tuple[ModuleMetadata, ...] | None
     rtd_release: str | None
     conflicts: tuple[MetadataConflict, ...]
+    auxiliary_sources: tuple[AuxiliarySourceEvidence, ...] = ()
 
     def require_consistent(self) -> "ProjectMetadata":
         if self.conflicts:
@@ -363,6 +379,82 @@ def _read_sources(reader: SourceReader) -> dict[str, str]:
     return result
 
 
+def _decode_snapshot(snapshot: FileSnapshot, relative: str) -> str:
+    try:
+        return snapshot.content.decode("utf-8-sig")
+    except UnicodeDecodeError as exc:
+        raise CliFailure(
+            "project_metadata_source_encoding_invalid",
+            "A project metadata source is not valid UTF-8.",
+            module="backend", details={"source": relative},
+        ) from exc
+
+
+def _capture_auxiliary_sources(
+    target: VerifiedProjectTarget,
+) -> tuple[dict[str, str], tuple[AuxiliarySourceEvidence, ...]]:
+    texts = {}
+    evidence = []
+    for relative in _AUXILIARY_SOURCES:
+        snapshot = snapshot_project_relative(
+            target, relative, max_bytes=_MAX_SOURCE_BYTES
+        )
+        evidence.append(AuxiliarySourceEvidence(relative, snapshot is not None, snapshot))
+        if snapshot is not None:
+            texts[relative] = _decode_snapshot(snapshot, relative)
+    return texts, tuple(evidence)
+
+
+def _synthetic_evidence(
+    raw_sources: dict[str, str],
+) -> tuple[AuxiliarySourceEvidence, ...]:
+    evidence = []
+    for relative in _AUXILIARY_SOURCES:
+        text = raw_sources.get(relative)
+        if text is None:
+            evidence.append(AuxiliarySourceEvidence(relative, False, None))
+            continue
+        content = text.encode("utf-8")
+        evidence.append(AuxiliarySourceEvidence(
+            relative, True,
+            FileSnapshot(
+                Path(relative), FileIdentity(None, None, None), len(content), 0, 0,
+                hashlib.sha256(content).hexdigest(), content,
+            ),
+        ))
+    return tuple(evidence)
+
+
+def revalidate_project_metadata(
+    target: VerifiedProjectTarget,
+    metadata: ProjectMetadata,
+) -> None:
+    _, current = _capture_auxiliary_sources(target)
+    if len(current) != len(metadata.auxiliary_sources):
+        raise _metadata_sources_changed()
+    for expected, actual in zip(metadata.auxiliary_sources, current):
+        if expected.relative != actual.relative or expected.observed != actual.observed:
+            raise _metadata_sources_changed()
+        if expected.snapshot is None:
+            if actual.snapshot is not None:
+                raise _metadata_sources_changed()
+            continue
+        if actual.snapshot is None or (
+            expected.snapshot.identity != actual.snapshot.identity
+            or expected.snapshot.size != actual.snapshot.size
+            or expected.snapshot.sha256 != actual.snapshot.sha256
+        ):
+            raise _metadata_sources_changed()
+
+
+def _metadata_sources_changed() -> CliFailure:
+    return CliFailure(
+        "project_metadata_source_changed",
+        "Project metadata sources changed after the observed snapshot; reload and retry.",
+        module="backend",
+    )
+
+
 def _parse_xml_source(text: str, source: str) -> ET.Element:
     try:
         return ET.fromstring(text)
@@ -438,7 +530,11 @@ def parse_project_metadata(
         and root.attrib.get("version") == official_match.group(1)
     )
 
-    sources = _read_sources(source_reader or _safe_source_reader(target))
+    if source_reader is None:
+        sources, auxiliary_sources = _capture_auxiliary_sources(target)
+    else:
+        sources = _read_sources(source_reader)
+        auxiliary_sources = _synthetic_evidence(sources)
     for source in (".project", ".cproject"):
         text = sources.get(source)
         if text is None:
@@ -472,10 +568,18 @@ def parse_project_metadata(
         resolved[field] = value
         if conflict:
             conflicts.append(conflict)
-    return ProjectMetadata(
+    metadata = ProjectMetadata(
         "NXP" if recognized else None, "s32-mex" if recognized else None,
         resolved["processor"], resolved["family"], resolved["device"],
         raw_package, package_aliases.get(raw_package) if raw_package else None, mcu_data,
         namespace, resolved["schema_version"], schema_location,
-        _parse_tools(root, namespace), _parse_modules(root, namespace), resolved["rtd_release"], tuple(conflicts),
+        _parse_tools(root, namespace), _parse_modules(root, namespace),
+        resolved["rtd_release"], tuple(conflicts), auxiliary_sources,
     )
+    if source_reader is None:
+        revalidate_project_metadata(target, metadata)
+    else:
+        later = _read_sources(source_reader)
+        if _synthetic_evidence(later) != auxiliary_sources:
+            raise _metadata_sources_changed()
+    return metadata

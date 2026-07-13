@@ -194,6 +194,36 @@ def test_configure_writer_blocker_leaves_original_mex_bytes_unchanged(
     assert not list(mex.parent.glob(f".{mex.name}.*.tmp"))
 
 
+def test_configure_revalidates_plan_metadata_before_apply(monkeypatch, tmp_path):
+    project_root = copy_uart_fixture(tmp_path)
+    prefs = project_root / ".settings/com.freescale.s32ds.cross.sdk.support.prefs"
+    apply_called = False
+
+    class Provider:
+        def plan(self, _intent):
+            prefs.write_text(
+                "com.freescale.s32ds.cross.sdk.support.attachedSDKs="
+                "PlatformSDK_S32K3_S32K344_M7_6.0.0_PATH|Debug_FLASH\n",
+                encoding="utf-8",
+            )
+            return SimpleNamespace(to_dict=lambda: {})
+
+    def unexpected_apply(*_args):
+        nonlocal apply_called
+        apply_called = True
+
+    monkeypatch.setattr(cli, "UartProvider", Provider)
+    monkeypatch.setattr(cli, "apply_uart_set", unexpected_apply)
+    monkeypatch.setattr(
+        cli, "normalize_uart_intent",
+        lambda _args: Intent.from_dict({"module": "uart", "action": "set", "payload": {}}),
+    )
+    with pytest.raises(Exception) as caught:
+        cli.cmd_uart_set(Namespace(project=project_root, configure=True, backup=False))
+    assert getattr(caught.value, "code", None) == "project_metadata_source_changed"
+    assert not apply_called
+
+
 @pytest.mark.parametrize(
     "command_name,normalizer_name,provider_name,apply_name",
     CONFIGURE_ENTRY_POINTS,

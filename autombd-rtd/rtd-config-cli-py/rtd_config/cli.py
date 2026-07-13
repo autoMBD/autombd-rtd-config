@@ -58,6 +58,7 @@ from pathlib import Path
 from . import __version__
 from .config import RuntimeConfig
 from .backends.s32_mex.document import MexDocument, MexWriteError
+from .backends.s32_mex.metadata import revalidate_project_metadata
 from .backends.s32_mex.target import revalidate_snapshot
 from .project import Project
 from .resources.pins import pin_options
@@ -584,6 +585,7 @@ def cmd_check(args: argparse.Namespace) -> int:
     config = RuntimeConfig.from_dict({"project": args.project})
     with Project.verified(config.project, config.backend) as project:
         project.metadata.require_consistent()
+        revalidate_project_metadata(project.verified_target, project.metadata)
         target = project.verified_target
         result = run_static_checks(
             target.mex.path, doc=project.document,
@@ -637,6 +639,7 @@ def cmd_validate(args: argparse.Namespace) -> int:
 
 def _cmd_validate_verified(args, config: RuntimeConfig, project: Project) -> int:
     project.metadata.require_consistent()
+    revalidate_project_metadata(project.verified_target, project.metadata)
     target = project.verified_target
     mex = target.mex.path
 
@@ -688,6 +691,7 @@ def _cmd_validate_verified(args, config: RuntimeConfig, project: Project) -> int
     workspace = Path(args.workspace) if args.workspace else None
     sdk_path = Path(args.sdk_path) if args.sdk_path else None
     revalidate_snapshot(target)
+    revalidate_project_metadata(target, project.metadata)
     outcome = run_validation(
         config.project,
         root,
@@ -769,6 +773,7 @@ def _configure_verified_project(args, intent, plan, apply_fn, project: Project) 
     doc = project.document
 
     revalidate_snapshot(target)
+    revalidate_project_metadata(target, project.metadata)
     apply_result = apply_fn(doc, intent)
     if apply_result.blocked:
         target.close()
