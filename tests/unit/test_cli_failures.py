@@ -56,6 +56,7 @@ import pytest
 
 from rtd_config import cli
 from rtd_config.errors import CliFailure
+from tests.fixtures import copy_uart_fixture
 
 
 def run_cli(*args: object) -> subprocess.CompletedProcess[str]:
@@ -260,20 +261,15 @@ def test_non_utf8_pin_asset_is_asset_invalid(monkeypatch, capsys, tmp_path):
 def test_non_utf8_uart_asset_is_safely_classified_at_public_boundary(
     monkeypatch, capsys, tmp_path
 ):
-    from rtd_config.backends.s32_mex import apply as apply_module
-
-    def invalid_asset():
-        raise UnicodeDecodeError(
-            "utf-8",
-            b"\xffSECRET_ABSOLUTE_PATH",
-            0,
-            1,
-            "SECRET_ABSOLUTE_PATH",
-        )
-
-    monkeypatch.setattr(apply_module, "_load_uart_asset", invalid_asset)
+    asset_root = tmp_path / "SECRET_ABSOLUTE_PATH"
+    shutil.copytree(Path(__file__).resolve().parents[2] / "autombd-rtd/assets", asset_root)
+    (asset_root / "nxp/s32k3/uart/uart.json").write_bytes(
+        b"\xffSECRET_ABSOLUTE_PATH"
+    )
+    monkeypatch.setattr(cli, "DEFAULT_ASSET_ROOT", asset_root)
+    project = copy_uart_fixture(tmp_path)
     exit_code = cli.main(
-        ["uart", "set", "--project", str(tmp_path), "--json"]
+        ["uart", "set", "--project", str(project), "--json"]
     )
     captured = capsys.readouterr()
     payload = json.loads(captured.out)

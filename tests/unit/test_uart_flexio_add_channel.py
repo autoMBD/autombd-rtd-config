@@ -877,7 +877,7 @@ class TestAntiHardcode:
             "module": "mcl", "action": "set",
             "payload": {"add_flexio_logic_channel": "PRE_EXISTING"},
         })
-        pre_result = apply_mcl_set(doc, pre_intent)
+        pre_result = apply_mcl_set(doc, pre_intent, bundle=_BUNDLE)
         assert not pre_result.blocked, [d.to_dict() for d in pre_result.diagnostics]
         # Now apply UART-002 -- it should compute ids starting from 3 (TX) and 4 (RX)
         result = apply_uart_add_flexio_channel(doc, _default_intent())

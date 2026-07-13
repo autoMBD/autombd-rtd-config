@@ -737,14 +737,13 @@ def test_adc_json_matches_apply_code_literals():
     loader path (not a doc-only asset).
     """
     from rtd_config.backends.s32_mex.apply import (
-        _load_adc_asset,
         _ADC_SAMPLING_CLOCK_HZ,
         _ADC_ALLOWED_PRESCALERS,
         _ADC_SD_MIN,
         _ADC_SD_MAX,
     )
 
-    asset = _load_adc_asset()
+    asset = _BUNDLE.load_json("adc")
     sd = asset["sampling_derivation"]
     assert _ADC_SAMPLING_CLOCK_HZ == sd["adc_source_clock_hz"]
     assert list(_ADC_ALLOWED_PRESCALERS) == sd["allowed_prescalers"]

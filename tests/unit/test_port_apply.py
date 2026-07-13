@@ -64,6 +64,7 @@ This case inserts:
 Legal-pin validation prevents writing illegal pins; blocker code=port_illegal_pin.
 """
 import difflib
+from dataclasses import replace
 from functools import partial
 import json
 import subprocess
@@ -866,37 +867,22 @@ def test_pin_signal_canonical_casing(tmp_path):
 # apply_port_set must emit a blocker 'port_pin_no_package_num' diagnostic
 # instead of silently writing pin_num="".
 # ---------------------------------------------------------------------------
-def test_blocker_on_missing_package_pin_num(tmp_path, monkeypatch):
+def test_blocker_on_missing_package_pin_num(tmp_path):
     """apply_port_set emits port_pin_no_package_num when pin_num field is empty.
 
     We monkeypatch _load_pins_data to return a synthetic signal record whose
     pin_mapbga257 field is None (simulating a pin that is legal for the signal
     but has no package pin number for the active package).
     """
-    from rtd_config.backends.s32_mex import apply as apply_mod
-
-    # Build a synthetic pin record: LPUART0 TX PTA27, but pin_mapbga257 is None
-    synthetic_signals = [
-        {
-            "peripheral": "LPUART0",
-            "signal": "TX",
-            "pin": "PTA27",
-            "pin_mapbga257": None,   # simulates missing package pin num
-            "pin_hdqfp172": "28",
-        },
-        {
-            "peripheral": "LPUART0",
-            "signal": "RX",
-            "pin": "PTA28",
-            "pin_mapbga257": None,
-            "pin_hdqfp172": "30",
-        },
-    ]
-    monkeypatch.setattr(apply_mod, "_load_pins_data", lambda: synthetic_signals)
+    pins = _BUNDLE.load_json("pins")
+    for signal in pins["signals"]:
+        if signal["pin"] in {"PTA27", "PTA28"} and signal["peripheral"] == "LPUART0":
+            signal["pin_mapbga257"] = None
+    injected = replace(_BUNDLE, _cache={"pins": pins})
 
     project = copy_uart_fixture(tmp_path)
     doc = MexDocument.load(project / "Uart_Example.mex")
-    result = apply_port_set(doc, _standard_intent())
+    result = apply_port_set.func(doc, _standard_intent(), bundle=injected)
 
     assert result.blocked, (
         "Expected blocker port_pin_no_package_num when pin_num field is None, "
