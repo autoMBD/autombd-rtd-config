@@ -224,13 +224,22 @@ def test_configure_revalidates_plan_metadata_before_apply(monkeypatch, tmp_path)
     assert not apply_called
 
 
+@pytest.mark.parametrize(
+    "changed_relative",
+    [
+        ".project",
+        ".cproject",
+        ".settings/com.freescale.s32ds.cross.sdk.support.prefs",
+        ".settings/com.nxp.s32ds.cle.runtime.component.prefs",
+    ],
+)
 def test_configure_revalidates_metadata_changed_by_apply_before_publish(
-    monkeypatch, tmp_path
+    monkeypatch, tmp_path, changed_relative
 ):
     project_root = copy_uart_fixture(tmp_path)
     mex = project_root / "Uart_Example.mex"
     original = mex.read_bytes()
-    prefs = project_root / ".settings/com.freescale.s32ds.cross.sdk.support.prefs"
+    metadata_source = project_root / changed_relative
     projects = []
     original_verified = cli.Project.verified
 
@@ -240,7 +249,7 @@ def test_configure_revalidates_metadata_changed_by_apply_before_publish(
         return project
 
     def mutate_aux(_doc, _intent):
-        prefs.write_text(prefs.read_text(encoding="utf-8") + "# changed\n", encoding="utf-8")
+        metadata_source.write_bytes(metadata_source.read_bytes() + b"\n")
         return ApplyResult(changed_modules=["uart"])
 
     monkeypatch.setattr(cli.Project, "verified", tracked_verified)
@@ -255,13 +264,22 @@ def test_configure_revalidates_metadata_changed_by_apply_before_publish(
     assert projects[0].verified_target.lease.closed
 
 
+@pytest.mark.parametrize(
+    "changed_relative",
+    [
+        ".project",
+        ".cproject",
+        ".settings/com.freescale.s32ds.cross.sdk.support.prefs",
+        ".settings/com.nxp.s32ds.cle.runtime.component.prefs",
+    ],
+)
 def test_configure_revalidates_metadata_changed_by_static_check_before_publish(
-    monkeypatch, tmp_path
+    monkeypatch, tmp_path, changed_relative
 ):
     project_root = copy_uart_fixture(tmp_path)
     mex = project_root / "Uart_Example.mex"
     original = mex.read_bytes()
-    prefs = project_root / ".settings/com.freescale.s32ds.cross.sdk.support.prefs"
+    metadata_source = project_root / changed_relative
     original_checks = cli.run_static_checks
     projects = []
     original_verified = cli.Project.verified
@@ -273,7 +291,7 @@ def test_configure_revalidates_metadata_changed_by_static_check_before_publish(
 
     def mutate_after_checks(*args, **kwargs):
         result = original_checks(*args, **kwargs)
-        prefs.write_text(prefs.read_text(encoding="utf-8") + "# changed\n", encoding="utf-8")
+        metadata_source.write_bytes(metadata_source.read_bytes() + b"\n")
         return result
 
     monkeypatch.setattr(cli.Project, "verified", tracked_verified)
