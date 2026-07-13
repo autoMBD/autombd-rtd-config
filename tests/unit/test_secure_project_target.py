@@ -60,6 +60,7 @@ from rtd_config.backends.s32_mex.target import (
     PathInspection,
     VerifiedProjectTarget,
     WindowsFileId,
+    _PosixTargetPlatform,
     default_target_platform,
     revalidate_snapshot,
     verify_project_target,
@@ -90,6 +91,10 @@ class InjectedPlatform:
         self.list_error: Exception | None = None
         self.inspect_error: Exception | None = None
         self.canonical_error: Exception | None = None
+        self.snapshot_hook = None
+
+    def protect_root(self, path: Path):
+        return self.native.protect_root(path)
 
     def list_directory(self, path: Path) -> tuple[Path, ...]:
         if self.list_error is not None:
@@ -107,6 +112,9 @@ class InjectedPlatform:
         return self.canonical.get(path, self.native.canonicalize(path))
 
     def snapshot_file(self, path: Path) -> FileSnapshot:
+        if self.snapshot_hook is not None:
+            hook, self.snapshot_hook = self.snapshot_hook, None
+            hook()
         if self.snapshot_error is not None:
             raise self.snapshot_error
         if self.snapshot_override is not None:
@@ -286,6 +294,37 @@ def test_snapshot_contains_identity_evidence_hash_and_exact_bytes(tmp_path):
     else:
         assert identity.device is not None
         assert identity.inode is not None
+
+
+def test_mex_set_change_during_snapshot_fails_closed(tmp_path):
+    root, _ = _project(tmp_path)
+    platform = InjectedPlatform()
+    platform.snapshot_hook = lambda: (root / "late.mex").write_bytes(XML_B)
+
+    with pytest.raises(CliFailure) as caught:
+        verify_project_target(root, platform=platform)
+
+    assert caught.value.code == "project_target_changed"
+
+
+def test_root_aware_revalidation_rejects_new_mex(tmp_path):
+    root, _ = _project(tmp_path)
+    target = verify_project_target(root)
+    (root / "late.mex").write_bytes(XML_B)
+
+    with pytest.raises(CliFailure) as caught:
+        revalidate_snapshot(target)
+
+    assert caught.value.code == "project_mex_ambiguous"
+
+
+def test_posix_without_no_follow_support_fails_closed(tmp_path):
+    root, _ = _project(tmp_path)
+
+    with pytest.raises(CliFailure) as caught:
+        verify_project_target(root, platform=_PosixTargetPlatform(no_follow_flag=0))
+
+    assert caught.value.code == "project_identity_unavailable"
 
 
 def test_document_parses_captured_bytes_and_revalidation_detects_replacement(tmp_path):

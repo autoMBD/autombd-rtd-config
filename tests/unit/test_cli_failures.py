@@ -185,10 +185,10 @@ def test_default_mode_reports_expected_failure_without_traceback(tmp_path):
 
 
 def test_permission_failure_uses_public_boundary(monkeypatch, capsys, tmp_path):
-    def deny(_project: Path) -> Path:
+    def deny(*_args, **_kwargs):
         raise PermissionError("access denied")
 
-    monkeypatch.setattr(cli, "find_single_mex", deny)
+    monkeypatch.setattr(cli.Project, "verified", deny)
     exit_code = cli.main(["inspect", "--project", str(tmp_path), "--json"])
     captured = capsys.readouterr()
     payload = json.loads(captured.out)

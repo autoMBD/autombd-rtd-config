@@ -46,6 +46,7 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass
 import hashlib
 import os
@@ -97,6 +98,7 @@ class PathInspection:
 
 
 class TargetPlatform(Protocol):
+    def protect_root(self, path: Path): ...
     def list_directory(self, path: Path) -> tuple[Path, ...]: ...
     def inspect(self, path: Path) -> PathInspection: ...
     def canonicalize(self, path: Path) -> Path: ...
@@ -104,12 +106,48 @@ class TargetPlatform(Protocol):
 
 
 class _PosixTargetPlatform:
+    def __init__(self, no_follow_flag: int | None = None) -> None:
+        self._no_follow = getattr(os, "O_NOFOLLOW", 0) if no_follow_flag is None else no_follow_flag
+        self._root_fd: int | None = None
+        self._root_path: Path | None = None
+
+    @contextmanager
+    def protect_root(self, path: Path):
+        if not self._no_follow:
+            raise CliFailure(
+                "project_identity_unavailable",
+                "This POSIX platform cannot open project paths without following links.",
+                module="backend",
+            )
+        absolute = path.absolute()
+        flags = os.O_RDONLY | os.O_DIRECTORY | self._no_follow
+        fd = os.open(absolute.anchor, flags)
+        try:
+            for name in absolute.parts[1:]:
+                child = os.open(name, flags, dir_fd=fd)
+                os.close(fd)
+                fd = child
+            self._root_fd = fd
+            self._root_path = absolute
+            yield
+        finally:
+            self._root_fd = None
+            self._root_path = None
+            os.close(fd)
+
     def list_directory(self, path: Path) -> tuple[Path, ...]:
+        if self._root_fd is not None and path == self._root_path:
+            return tuple(path / name for name in os.listdir(self._root_fd))
         return tuple(path.iterdir())
 
     def inspect(self, path: Path) -> PathInspection:
         try:
-            status = os.lstat(path)
+            if self._root_fd is not None and path.parent == self._root_path:
+                status = os.stat(path.name, dir_fd=self._root_fd, follow_symlinks=False)
+            elif self._root_fd is not None and path == self._root_path:
+                status = os.fstat(self._root_fd)
+            else:
+                status = os.lstat(path)
         except FileNotFoundError:
             return PathInspection(False, False, False, False, False, False)
         return PathInspection(
@@ -125,8 +163,17 @@ class _PosixTargetPlatform:
         return path.resolve(strict=True)
 
     def snapshot_file(self, path: Path) -> FileSnapshot:
-        flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0)
-        descriptor = os.open(path, flags)
+        if not self._no_follow:
+            raise CliFailure(
+                "project_identity_unavailable",
+                "This POSIX platform cannot open project files without following links.",
+                module="backend",
+            )
+        flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | self._no_follow
+        if self._root_fd is not None and path.parent == self._root_path:
+            descriptor = os.open(path.name, flags, dir_fd=self._root_fd)
+        else:
+            descriptor = os.open(path, flags)
         try:
             before = os.fstat(descriptor)
             if not stat.S_ISREG(before.st_mode):
@@ -221,16 +268,40 @@ if os.name == "nt":
 
 
 class _WindowsTargetPlatform:
+    def __init__(self) -> None:
+        self._protected_handles: list = []
+
+    @contextmanager
+    def protect_root(self, path: Path):
+        handles: list = []
+        try:
+            for component in _path_components(path):
+                handle = self._open(component, read=False, directory=True, share_delete=False)
+                handles.append(handle)
+                tag = self._query(handle, 9, _FILE_ATTRIBUTE_TAG_INFO)
+                if tag.FileAttributes & _FILE_ATTRIBUTE_REPARSE_POINT:
+                    raise CliFailure(
+                        "unsafe_project_path",
+                        "Project paths must not contain reparse points.",
+                        module="backend", details={"path": str(component)},
+                    )
+            self._protected_handles = handles
+            yield
+        finally:
+            self._protected_handles = []
+            for handle in reversed(handles):
+                _CloseHandle(handle)
+
     def list_directory(self, path: Path) -> tuple[Path, ...]:
         return tuple(path.iterdir())
 
-    def _open(self, path: Path, *, read: bool, directory: bool):
+    def _open(self, path: Path, *, read: bool, directory: bool, share_delete: bool = True):
         flags = _FILE_FLAG_OPEN_REPARSE_POINT
         if directory:
             flags |= _FILE_FLAG_BACKUP_SEMANTICS
         handle = _CreateFileW(
             str(path), _GENERIC_READ if read else 0,
-            _FILE_SHARE_READ | _FILE_SHARE_WRITE | _FILE_SHARE_DELETE,
+            _FILE_SHARE_READ | _FILE_SHARE_WRITE | (_FILE_SHARE_DELETE if share_delete else 0),
             None, _OPEN_EXISTING, flags, None,
         )
         if handle == _INVALID_HANDLE_VALUE:
@@ -421,80 +492,130 @@ def _capture_snapshot(path: Path, platform: TargetPlatform) -> FileSnapshot:
     return snapshot
 
 
+def _protected_root(platform: TargetPlatform, path: Path):
+    protector = getattr(platform, "protect_root", None)
+    return protector(path) if protector is not None else nullcontext()
+
+
+def _direct_mex_entries(root: Path, platform: TargetPlatform) -> tuple[Path, ...]:
+    try:
+        entries = platform.list_directory(root)
+    except PermissionError as exc:
+        raise CliFailure(
+            "project_permission_denied",
+            "Permission was denied while enumerating the project directory.",
+            module="backend", details={"project": str(root)},
+        ) from exc
+    return tuple(sorted(
+        (entry for entry in entries if entry.suffix.lower() == ".mex"), key=str
+    ))
+
+
 def verify_project_target(
     project: Path | str,
     platform: TargetPlatform | None = None,
 ) -> VerifiedProjectTarget:
     adapter = platform or default_target_platform()
     supplied_root = Path(project).absolute()
-    root_evidence = _inspect(supplied_root, adapter)
-    if not root_evidence.exists:
+    try:
+        protection = _protected_root(adapter, supplied_root)
+        with protection:
+            root_evidence = _inspect(supplied_root, adapter)
+            if not root_evidence.exists:
+                raise CliFailure(
+                    "project_not_found", f"Project directory does not exist: {project}",
+                    module="backend", details={"project": str(project)},
+                )
+            if not root_evidence.is_directory:
+                raise CliFailure(
+                    "project_not_directory", f"Project path is not a directory: {project}",
+                    module="backend", details={"project": str(project)},
+                )
+            _inspect_safe_chain(supplied_root, adapter)
+            canonical_root = _canonicalize(supplied_root, adapter)
+            matches = _direct_mex_entries(supplied_root, adapter)
+            if not matches:
+                raise CliFailure(
+                    "project_mex_not_found",
+                    f"No .mex file was found in project directory: {canonical_root}",
+                    module="backend", details={"project": str(canonical_root), "mex_count": 0},
+                )
+            if len(matches) != 1:
+                raise CliFailure(
+                    "project_mex_ambiguous",
+                    f"Expected one .mex file in {canonical_root}, found {len(matches)}.",
+                    module="backend",
+                    details={"project": str(canonical_root), "mex_count": len(matches),
+                             "matches": [str(path) for path in matches]},
+                )
+            supplied_mex = matches[0]
+            mex_evidence = _inspect(supplied_mex, adapter)
+            if mex_evidence.is_symlink or mex_evidence.is_reparse_point or mex_evidence.is_mount_point:
+                raise CliFailure(
+                    "unsafe_project_path",
+                    "The project .mex file must not be a link, mount point, or reparse point.",
+                    module="backend", details={"path": str(supplied_mex)},
+                )
+            if not mex_evidence.is_regular:
+                raise CliFailure(
+                    "project_mex_not_regular", "The project .mex path is not a regular file.",
+                    module="backend", details={"path": str(supplied_mex)},
+                )
+            canonical_mex = _canonicalize(supplied_mex, adapter)
+            try:
+                canonical_mex.relative_to(canonical_root)
+            except ValueError as exc:
+                raise CliFailure(
+                    "unsafe_project_path",
+                    "The project .mex file resolves outside the project root.",
+                    module="backend",
+                    details={"path": str(canonical_mex), "root": str(canonical_root)},
+                ) from exc
+            snapshot = _capture_snapshot(supplied_mex, adapter)
+            snapshot = FileSnapshot(canonical_mex, snapshot.identity, snapshot.size,
+                                    snapshot.mtime_ns, snapshot.ctime_ns,
+                                    snapshot.sha256, snapshot.content)
+            after_matches = _direct_mex_entries(supplied_root, adapter)
+            if tuple(path.name for path in after_matches) != (supplied_mex.name,):
+                raise CliFailure(
+                    "project_target_changed",
+                    "The project .mex set changed while the target was being verified.",
+                    module="backend", details={"project": str(canonical_root)},
+                )
+            after = _capture_snapshot(after_matches[0], adapter)
+            if after.identity != snapshot.identity or after.sha256 != snapshot.sha256:
+                raise CliFailure(
+                    "project_target_changed",
+                    "The project .mex file changed while the target was being verified.",
+                    module="backend", details={"path": str(canonical_mex)},
+                )
+            if _canonicalize(supplied_root, adapter) != canonical_root:
+                raise CliFailure(
+                    "project_target_changed",
+                    "The project path changed while the target was being verified.",
+                    module="backend", details={"project": str(canonical_root)},
+                )
+            return VerifiedProjectTarget(canonical_root, snapshot)
+    except FileNotFoundError as exc:
         raise CliFailure(
             "project_not_found", f"Project directory does not exist: {project}",
             module="backend", details={"project": str(project)},
-        )
-    if not root_evidence.is_directory:
-        raise CliFailure(
-            "project_not_directory", f"Project path is not a directory: {project}",
-            module="backend", details={"project": str(project)},
-        )
-    _inspect_safe_chain(supplied_root, adapter)
-    canonical_root = _canonicalize(supplied_root, adapter)
-    _inspect_safe_chain(canonical_root, adapter)
-    try:
-        entries = adapter.list_directory(canonical_root)
-    except PermissionError as exc:
-        raise CliFailure(
-            "project_permission_denied",
-            "Permission was denied while enumerating the project directory.",
-            module="backend", details={"project": str(canonical_root)},
         ) from exc
-    matches = tuple(sorted(
-        (entry for entry in entries if entry.suffix.lower() == ".mex"), key=str
-    ))
-    if not matches:
-        raise CliFailure(
-            "project_mex_not_found",
-            f"No .mex file was found in project directory: {canonical_root}",
-            module="backend", details={"project": str(canonical_root), "mex_count": 0},
-        )
-    if len(matches) != 1:
-        raise CliFailure(
-            "project_mex_ambiguous",
-            f"Expected one .mex file in {canonical_root}, found {len(matches)}.",
-            module="backend",
-            details={"project": str(canonical_root), "mex_count": len(matches),
-                     "matches": [str(path) for path in matches]},
-        )
-    supplied_mex = matches[0]
-    mex_evidence = _inspect(supplied_mex, adapter)
-    if mex_evidence.is_symlink or mex_evidence.is_reparse_point or mex_evidence.is_mount_point:
-        raise CliFailure(
-            "unsafe_project_path",
-            "The project .mex file must not be a link, mount point, or reparse point.",
-            module="backend", details={"path": str(supplied_mex)},
-        )
-    if not mex_evidence.is_regular:
-        raise CliFailure(
-            "project_mex_not_regular", "The project .mex path is not a regular file.",
-            module="backend", details={"path": str(supplied_mex)},
-        )
-    canonical_mex = _canonicalize(supplied_mex, adapter)
-    try:
-        canonical_mex.relative_to(canonical_root)
-    except ValueError as exc:
-        raise CliFailure(
-            "unsafe_project_path", "The project .mex file resolves outside the project root.",
-            module="backend", details={"path": str(canonical_mex), "root": str(canonical_root)},
-        ) from exc
-    _inspect_safe_chain(canonical_mex, adapter)
-    return VerifiedProjectTarget(canonical_root, _capture_snapshot(canonical_mex, adapter))
 
 
 def revalidate_snapshot(
-    snapshot: FileSnapshot,
+    snapshot: FileSnapshot | VerifiedProjectTarget,
     platform: TargetPlatform | None = None,
 ) -> FileSnapshot:
+    if isinstance(snapshot, VerifiedProjectTarget):
+        current_target = verify_project_target(snapshot.root, platform=platform)
+        if current_target.mex.identity != snapshot.mex.identity or current_target.mex.sha256 != snapshot.mex.sha256:
+            raise CliFailure(
+                "project_target_changed",
+                "The verified project target changed after it was loaded; reload and retry.",
+                module="backend", details={"path": str(snapshot.mex.path)},
+            )
+        return current_target.mex
     adapter = platform or default_target_platform()
     _inspect_safe_chain(snapshot.path, adapter)
     current = _capture_snapshot(snapshot.path, adapter)

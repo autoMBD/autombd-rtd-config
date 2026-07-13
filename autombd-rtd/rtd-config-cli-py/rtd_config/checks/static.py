@@ -71,6 +71,7 @@ from typing import Iterable
 
 from rtd_config.backends.s32_mex.document import MexDocument
 from rtd_config.backends.s32_mex.locate import find_single_mex
+from rtd_config.backends.s32_mex.target import VerifiedProjectTarget
 from rtd_config.backends.s32_mex.static_check import is_xml_well_formed
 from rtd_config.diagnostics import Diagnostic, Result
 
@@ -117,7 +118,16 @@ def flexio_logic_channel_refs(doc: MexDocument) -> set[str]:
     return refs
 
 
-def _check_xml_and_single_mex(mex_path: Path, checks: dict, diagnostics: list[Diagnostic]) -> None:
+def _check_xml_and_single_mex(
+    mex_path: Path,
+    checks: dict,
+    diagnostics: list[Diagnostic],
+    verified_target: VerifiedProjectTarget | None = None,
+) -> None:
+    if verified_target is not None:
+        checks["xml_well_formed"] = True
+        checks["single_mex"] = verified_target.mex.path == mex_path
+        return
     well_formed = is_xml_well_formed(mex_path)
     checks["xml_well_formed"] = well_formed
     if not well_formed:
@@ -914,6 +924,7 @@ def run_static_checks(
     *,
     modified_elements: Iterable[ET.Element] | None = None,
     requested_callback: str | None = None,
+    verified_target: VerifiedProjectTarget | None = None,
 ) -> Result:
     """Run all static checks against a .mex document.
 
@@ -924,7 +935,7 @@ def run_static_checks(
     diagnostics: list[Diagnostic] = []
     checks: dict = {}
 
-    _check_xml_and_single_mex(mex_path, checks, diagnostics)
+    _check_xml_and_single_mex(mex_path, checks, diagnostics, verified_target)
 
     if doc is None and checks.get("xml_well_formed"):
         doc = MexDocument.load(mex_path)

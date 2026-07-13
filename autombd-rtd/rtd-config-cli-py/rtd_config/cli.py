@@ -58,7 +58,8 @@ from pathlib import Path
 from . import __version__
 from .config import RuntimeConfig
 from .backends.s32_mex.document import MexDocument, MexWriteError
-from .backends.s32_mex.locate import find_single_mex
+from .backends.s32_mex.target import revalidate_snapshot
+from .project import Project
 from .resources.pins import pin_options
 from .intent import Intent
 from .modules.uart import UartProvider
@@ -557,8 +558,11 @@ def cmd_pin_options(args: argparse.Namespace) -> int:
 
 def cmd_inspect(args: argparse.Namespace) -> int:
     config = RuntimeConfig.from_dict({"project": args.project})
-    mex = find_single_mex(config.project)
-    doc = MexDocument.load(mex)
+    project = Project.verified(config.project, config.backend)
+    target = project.verified_target
+    assert target is not None
+    mex = target.mex.path
+    doc = MexDocument.from_snapshot(target.mex)
     modules = sorted(doc.enabled_instance_names())
     return emit({
         "status": "passed",
@@ -576,8 +580,14 @@ def cmd_inspect(args: argparse.Namespace) -> int:
 
 def cmd_check(args: argparse.Namespace) -> int:
     config = RuntimeConfig.from_dict({"project": args.project})
-    mex = find_single_mex(config.project)
-    result = run_static_checks(mex)
+    project = Project.verified(config.project, config.backend)
+    target = project.verified_target
+    assert target is not None
+    result = run_static_checks(
+        target.mex.path,
+        doc=MexDocument.from_snapshot(target.mex),
+        verified_target=target,
+    )
     return emit(result.to_dict())
 
 
@@ -591,10 +601,15 @@ def _intent_dict(intent: Intent) -> dict:
 
 def cmd_validate(args: argparse.Namespace) -> int:
     config = RuntimeConfig.from_dict({"project": args.project})
-    mex = find_single_mex(config.project)
+    project = Project.verified(config.project, config.backend)
+    target = project.verified_target
+    assert target is not None
+    mex = target.mex.path
 
     # Static check always runs first; vendor validation never substitutes for it.
-    static_result = run_static_checks(mex)
+    static_result = run_static_checks(
+        mex, doc=MexDocument.from_snapshot(target.mex), verified_target=target
+    )
 
     root = find_s32ds_root(args.s32ds_root)
     if root is None:
@@ -638,6 +653,7 @@ def cmd_validate(args: argparse.Namespace) -> int:
     # Flow B uses a throwaway -data workspace; only honour an explicit override.
     workspace = Path(args.workspace) if args.workspace else None
     sdk_path = Path(args.sdk_path) if args.sdk_path else None
+    revalidate_snapshot(target)
     outcome = run_validation(
         config.project,
         root,
@@ -717,8 +733,11 @@ def _configure_module(args: argparse.Namespace, intent: Intent, plan, apply_fn) 
     intent payload and the apply function.
     """
     config = RuntimeConfig.from_dict({"project": args.project})
-    mex = find_single_mex(config.project)
-    doc = MexDocument.load(mex)
+    project = Project.verified(config.project, config.backend)
+    target = project.verified_target
+    assert target is not None
+    mex = target.mex.path
+    doc = MexDocument.from_snapshot(target.mex)
 
     apply_result = apply_fn(doc, intent)
     if apply_result.blocked:
@@ -741,6 +760,7 @@ def _configure_module(args: argparse.Namespace, intent: Intent, plan, apply_fn) 
         static_result = run_static_checks(
             mex,
             doc=doc,
+            verified_target=target,
             modified_elements=apply_result.modified_elements,
             requested_callback=intent.payload.get("callback"),
         )
@@ -748,11 +768,12 @@ def _configure_module(args: argparse.Namespace, intent: Intent, plan, apply_fn) 
         diagnostics = apply_result.diagnostics + static_result.diagnostics
         status = "passed" if static_result.status == "passed" else "blocked"
         if status == "passed":
+            revalidate_snapshot(target)
             # Optional safety backup of the original .mex before committing.
             # Default behaviour creates no backup.
             if args.backup:
                 backup = mex.with_name(mex.name + ".bak")
-                backup.write_bytes(mex.read_bytes())
+                backup.write_bytes(target.mex.content)
             os.replace(staging, mex)
             staging = None
         return emit({
