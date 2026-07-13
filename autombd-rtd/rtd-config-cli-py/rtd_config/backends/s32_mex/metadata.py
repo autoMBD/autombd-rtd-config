@@ -388,7 +388,7 @@ def parse_project_metadata(
     official_match = re.fullmatch(
         re.escape(_NXP_NAMESPACE_PREFIX) + r"(\d+)", namespace or ""
     )
-    recognized = official_match is not None
+    recognized = False
     observations = _Observations()
     observations.add("processor", _common_text(root, namespace, "processor"), ".mex", "/configuration/common/processor")
     observations.add("device", root.attrib.get("name"), ".mex", "/configuration/@name")
@@ -405,6 +405,7 @@ def parse_project_metadata(
         observations.add("schema_identity", "official", ".mex", "/configuration/namespace-uri()")
         match = official_match
         observations.add("schema_version", match.group(1) if match else None, ".mex", "/configuration/namespace-uri()")
+    valid_pair = False
     if schema_location:
         tokens = schema_location.split()
         pairs = tuple(zip(tokens[::2], tokens[1::2])) if len(tokens) % 2 == 0 else ()
@@ -417,6 +418,12 @@ def parse_project_metadata(
                 location_match = re.search(r"mex_configuration_(\d+)(?:\.xsd)?$", token)
                 if location_match:
                     observations.add("schema_version", location_match.group(1), ".mex", "/configuration/@xsi:schemaLocation")
+    recognized = bool(
+        official_match
+        and root.tag == f"{{{namespace}}}configuration"
+        and valid_pair
+        and root.attrib.get("version") == official_match.group(1)
+    )
 
     sources = _read_sources(source_reader or _safe_source_reader(target))
     for source in (".project", ".cproject"):
