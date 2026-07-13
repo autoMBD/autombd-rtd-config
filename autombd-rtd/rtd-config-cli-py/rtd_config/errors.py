@@ -52,6 +52,20 @@ from typing import Any, Literal, Mapping
 FailureStatus = Literal["failed", "blocked"]
 
 
+def _freeze_detail(value: Any) -> Any:
+    """Return a recursively copied, immutable representation of a detail value."""
+
+    if isinstance(value, Mapping):
+        return MappingProxyType(
+            {key: _freeze_detail(item) for key, item in value.items()}
+        )
+    if isinstance(value, (list, tuple)):
+        return tuple(_freeze_detail(item) for item in value)
+    if isinstance(value, (set, frozenset)):
+        return frozenset(_freeze_detail(item) for item in value)
+    return value
+
+
 class CliFailure(Exception):
     """Expected failure with immutable public fields.
 
@@ -78,7 +92,7 @@ class CliFailure(Exception):
         self._message = message
         self._status = status
         self._module = module
-        self._details = MappingProxyType(dict(details or {}))
+        self._details = _freeze_detail(details or {})
         self._exit_code = exit_code
 
     @property

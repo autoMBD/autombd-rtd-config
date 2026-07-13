@@ -86,6 +86,23 @@ def test_cli_failure_public_fields_are_immutable():
         failure.details["key"] = "changed"
 
 
+def test_cli_failure_details_are_defensively_frozen_and_render_as_json():
+    nested = {"mapping": {"key": "original"}, "items": ["original"]}
+    failure = CliFailure("stable_code", "message", details=nested)
+
+    nested["mapping"]["key"] = "changed"
+    nested["items"].append("changed")
+
+    assert failure.details["mapping"]["key"] == "original"
+    assert list(failure.details["items"]) == ["original"]
+    payload = cli.render_failure(failure, "inspect")
+    assert payload["diagnostics"][0]["details"] == {
+        "mapping": {"key": "original"},
+        "items": ["original"],
+    }
+    json.dumps(payload)
+
+
 def test_cli_failure_allows_python_to_attach_traceback():
     with pytest.raises(CliFailure) as caught:
         raise CliFailure("stable_code", "message")
@@ -176,18 +193,59 @@ def test_permission_failure_uses_public_boundary(monkeypatch, capsys, tmp_path):
     assert "Traceback" not in captured.err
 
 
+@pytest.mark.parametrize(
+    "error",
+    [
+        PermissionError(13, "SECRET_ABSOLUTE_PATH", "C:/SECRET_ABSOLUTE_PATH"),
+        FileNotFoundError(2, "SECRET_ABSOLUTE_PATH", "C:/SECRET_ABSOLUTE_PATH"),
+        OSError(5, "SECRET_ABSOLUTE_PATH", "C:/SECRET_ABSOLUTE_PATH"),
+    ],
+)
+def test_generic_os_failures_do_not_disclose_internal_paths(
+    monkeypatch, capsys, tmp_path, error
+):
+    def explode(_args) -> int:
+        raise error
+
+    monkeypatch.setattr(cli, "cmd_inspect", explode)
+    exit_code = cli.main(["inspect", "--project", str(tmp_path), "--json"])
+    captured = capsys.readouterr()
+    payload = json.loads(captured.out)
+
+    assert exit_code == 1
+    assert "SECRET_ABSOLUTE_PATH" not in captured.out
+    assert payload["diagnostics"][0]["details"] == {"errno": error.errno}
+    assert "Traceback" not in captured.err
+
+
 def test_missing_and_corrupt_assets_are_mapped(monkeypatch, capsys, tmp_path):
-    monkeypatch.setattr(cli, "DEFAULT_ASSET_ROOT", tmp_path)
+    asset_root = tmp_path / "SECRET_ABSOLUTE_PATH"
+    monkeypatch.setattr(cli, "DEFAULT_ASSET_ROOT", asset_root)
     exit_code = cli.main(["pin-options", "--peripheral", "LPUART_0", "--json"])
-    payload = json.loads(capsys.readouterr().out)
+    captured = capsys.readouterr()
+    payload = json.loads(captured.out)
     assert exit_code == 1
     assert payload["diagnostics"][0]["code"] == "asset_not_found"
+    assert "SECRET_ABSOLUTE_PATH" not in captured.out
 
-    asset = tmp_path / "nxp" / "s32k3" / "port" / "pins.json"
+    asset = asset_root / "nxp" / "s32k3" / "port" / "pins.json"
     asset.parent.mkdir(parents=True)
     asset.write_text("{", encoding="utf-8")
     exit_code = cli.main(["pin-options", "--peripheral", "LPUART_0", "--json"])
     payload = json.loads(capsys.readouterr().out)
+    assert exit_code == 1
+    assert payload["diagnostics"][0]["code"] == "asset_invalid"
+
+
+def test_non_utf8_pin_asset_is_asset_invalid(monkeypatch, capsys, tmp_path):
+    asset = tmp_path / "nxp" / "s32k3" / "port" / "pins.json"
+    asset.parent.mkdir(parents=True)
+    asset.write_bytes(b"\xff\xfe\x00")
+    monkeypatch.setattr(cli, "DEFAULT_ASSET_ROOT", tmp_path)
+
+    exit_code = cli.main(["pin-options", "--peripheral", "LPUART_0", "--json"])
+    payload = json.loads(capsys.readouterr().out)
+
     assert exit_code == 1
     assert payload["diagnostics"][0]["code"] == "asset_invalid"
 
@@ -262,3 +320,24 @@ def test_keyboard_interrupt_is_not_swallowed(monkeypatch, tmp_path):
     monkeypatch.setattr(cli, "cmd_inspect", interrupt)
     with pytest.raises(KeyboardInterrupt):
         cli.main(["inspect", "--project", str(tmp_path), "--json"])
+
+
+def test_unknown_option_value_is_not_reflected_as_command(capsys):
+    secret = "INTERNAL_SECRET"
+    exit_code = cli.main(["--bogus", secret, "--json"])
+    captured = capsys.readouterr()
+    payload = json.loads(captured.out)
+
+    assert exit_code == 2
+    assert payload["command"] == "unknown"
+    assert secret not in payload["command"]
+
+
+def test_misplaced_version_flag_does_not_override_known_command(capsys, tmp_path):
+    exit_code = cli.main(
+        ["inspect", "--version", "--project", str(tmp_path), "--json"]
+    )
+    payload = json.loads(capsys.readouterr().out)
+
+    assert exit_code == 2
+    assert payload["command"] == "inspect"

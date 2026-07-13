@@ -81,6 +81,22 @@ from .errors import CliFailure
 # parents[2] is the skill root (autombd-rtd/) that owns assets/.
 SKILL_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_ASSET_ROOT = SKILL_ROOT / "assets"
+ROOT_COMMANDS = frozenset(
+    {
+        "pin-options",
+        "inspect",
+        "check",
+        "validate",
+        "uart",
+        "platform",
+        "basenxp",
+        "mcl",
+        "port",
+        "dio",
+        "mcu",
+        "adc",
+    }
+)
 
 
 def emit(payload: dict) -> int:
@@ -524,7 +540,6 @@ def cmd_pin_options(args: argparse.Namespace) -> int:
             "asset_not_found",
             "Required pin-mapping asset was not found.",
             module="port",
-            details={"asset": str(exc.filename) if exc.filename else None},
         ) from exc
     except json.JSONDecodeError as exc:
         raise CliFailure(
@@ -532,6 +547,12 @@ def cmd_pin_options(args: argparse.Namespace) -> int:
             "Pin-mapping asset is not valid JSON.",
             module="port",
             details={"line": exc.lineno, "column": exc.colno},
+        ) from exc
+    except UnicodeError as exc:
+        raise CliFailure(
+            "asset_invalid",
+            "Pin-mapping asset is not valid UTF-8.",
+            module="port",
         ) from exc
     return emit({
         "status": "passed",
@@ -1094,11 +1115,10 @@ def _dispatch(args: argparse.Namespace, parser: argparse.ArgumentParser) -> int:
 
 
 def _command_from_argv(argv: list[str]) -> str:
-    if "--version" in argv:
+    if argv == ["--version"]:
         return "version"
-    for token in argv:
-        if not token.startswith("-"):
-            return token
+    if argv and argv[0] in ROOT_COMMANDS:
+        return argv[0]
     return "unknown"
 
 
@@ -1110,7 +1130,7 @@ def _map_exception(exc: Exception) -> CliFailure:
             "permission_denied",
             "The operation was denied by the operating system.",
             module="cli",
-            details={"reason": str(exc)},
+            details={"errno": exc.errno} if exc.errno is not None else {},
         )
     if isinstance(exc, FileNotFoundError):
         filename = str(exc.filename) if exc.filename else None
@@ -1120,7 +1140,7 @@ def _map_exception(exc: Exception) -> CliFailure:
             if filename and "assets" in Path(filename).parts
             else "A required file or directory was not found.",
             module="cli",
-            details={"path": filename},
+            details={"errno": exc.errno} if exc.errno is not None else {},
         )
     if isinstance(exc, json.JSONDecodeError):
         return CliFailure(
@@ -1141,7 +1161,7 @@ def _map_exception(exc: Exception) -> CliFailure:
             "io_error",
             "The operation failed because of an operating-system I/O error.",
             module="cli",
-            details={"reason": str(exc)},
+            details={"errno": exc.errno} if exc.errno is not None else {},
         )
     return CliFailure(
         "internal_error",
