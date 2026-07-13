@@ -180,6 +180,21 @@ def test_missing_or_malformed_manifest_is_typed(tmp_path, content):
     assert caught.value.code in {"asset_manifest_not_found", "asset_manifest_invalid"}
 
 
+def test_manifest_symbolic_link_is_rejected_fail_closed(tmp_path):
+    root = copied_assets(tmp_path)
+    manifest = root / "bundles.json"
+    outside = tmp_path / "outside-bundles.json"
+    manifest.replace(outside)
+    try:
+        manifest.symlink_to(outside)
+    except OSError as exc:
+        pytest.skip(f"symbolic-link creation unavailable: {exc}")
+
+    with pytest.raises(CliFailure) as caught:
+        AssetBundleResolver(root)
+    assert caught.value.code == "asset_manifest_invalid"
+
+
 def test_resolution_failure_precedes_provider_apply_and_vendor(monkeypatch):
     calls = {"plan": 0, "apply": 0, "vendor": 0}
 
