@@ -48,6 +48,7 @@ from __future__ import annotations
 
 from contextlib import contextmanager, nullcontext
 from dataclasses import FrozenInstanceError, replace
+from functools import partial
 import gc
 import hashlib
 import json
@@ -81,6 +82,9 @@ from rtd_config.backends.s32_mex.target import (
 from rtd_config.errors import CliFailure
 from rtd_config.project import Project
 from rtd_config.checks.static import run_static_checks
+from tests.fixtures import resolved_uart_bundle
+
+run_static_checks = partial(run_static_checks, bundle=resolved_uart_bundle())
 
 
 XML_A = b"<mex><instance name='A'/></mex>"
@@ -1085,7 +1089,7 @@ def test_public_project_flows_close_lease_when_work_raises(
 ):
     root, _ = (
         _bundle_compatible_project(tmp_path)
-        if flow in {"check", "validate"}
+        if flow in {"check", "validate", "configure"}
         else _project(tmp_path)
     )
     projects = []

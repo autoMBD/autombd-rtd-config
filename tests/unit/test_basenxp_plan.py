@@ -60,8 +60,13 @@ Three assertions are pinned:
     is present.
 """
 
+from functools import partial
+
 from rtd_config.intent import Intent
 from rtd_config.modules.basenxp import BaseNxpProvider
+from tests.fixtures import resolved_uart_bundle
+
+BaseNxpProvider = partial(BaseNxpProvider, resolved_uart_bundle())
 
 
 def _timer_intent() -> Intent:

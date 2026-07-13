@@ -72,6 +72,7 @@ Ground truth (Adc.xdm + Adc_s32k344_mapbga257.epd, cached):
     + AdcThresholdRegister ref + AdcWdogNotification.
 """
 import difflib
+from functools import partial
 import json
 import pathlib
 
@@ -81,7 +82,11 @@ from rtd_config.backends.s32_mex.document import MexDocument
 from rtd_config.backends.s32_mex.apply import apply_adc_set
 from rtd_config.intent import Intent
 from rtd_config.modules.adc import AdcProvider
-from tests.fixtures import copy_adc_fixture
+from tests.fixtures import copy_adc_fixture, resolved_adc_bundle
+
+_BUNDLE = resolved_adc_bundle()
+apply_adc_set = partial(apply_adc_set, bundle=_BUNDLE)
+AdcProvider = partial(AdcProvider, _BUNDLE)
 
 
 MEX_NAME = "Autombd_Test_Adc_S32K344.mex"

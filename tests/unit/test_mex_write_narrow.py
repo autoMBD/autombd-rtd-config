@@ -53,6 +53,7 @@ rule requires that an owned edit touch only the lines it actually changes and
 leave every unrelated byte intact. These tests pin that contract.
 """
 import difflib
+from functools import partial
 import xml.etree.ElementTree as ET
 
 import pytest
@@ -60,7 +61,9 @@ import pytest
 from rtd_config.backends.s32_mex.document import MexDocument, MexWriteError
 from rtd_config.backends.s32_mex.apply import apply_uart_set
 from rtd_config.intent import Intent
-from tests.fixtures import copy_uart_fixture
+from tests.fixtures import copy_uart_fixture, resolved_uart_bundle
+
+apply_uart_set = partial(apply_uart_set, bundle=resolved_uart_bundle())
 
 
 def _lpuart_intent() -> Intent:

@@ -627,12 +627,15 @@ def test_module_plan_preflights_metadata_before_provider(monkeypatch, tmp_path):
     provider_called = False
 
     class Provider:
+        def __init__(self, _bundle):
+            pass
+
         def plan(self, _intent):
             nonlocal provider_called
             provider_called = True
             pytest.fail("provider planned before metadata preflight")
 
-    monkeypatch.setattr(cli, "normalize_uart_intent", lambda _args: SimpleNamespace(module="uart", action="set", payload={}))
+    monkeypatch.setattr(cli, "normalize_uart_intent", lambda _args, _bundle: SimpleNamespace(module="uart", action="set", payload={}))
     monkeypatch.setattr(cli, "UartProvider", Provider)
     with pytest.raises(CliFailure) as caught:
         cli.cmd_uart_set(SimpleNamespace(project=root, configure=False))
@@ -822,6 +825,9 @@ def test_every_module_plan_requires_complete_observed_identity(
     provider_called = False
 
     class Provider:
+        def __init__(self, _bundle):
+            pass
+
         def plan(self, _intent):
             nonlocal provider_called
             provider_called = True
@@ -829,7 +835,7 @@ def test_every_module_plan_requires_complete_observed_identity(
 
     monkeypatch.setattr(
         cli, normalizer_name,
-        lambda _args: SimpleNamespace(module="test", action="set", payload={}),
+        lambda _args, _bundle: SimpleNamespace(module="test", action="set", payload={}),
     )
     monkeypatch.setattr(cli, provider_name, Provider)
     with pytest.raises(CliFailure) as caught:

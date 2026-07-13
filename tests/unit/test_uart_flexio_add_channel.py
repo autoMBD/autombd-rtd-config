@@ -68,6 +68,7 @@ Ground truth (from brief, Uart.xdm, Mcl.xdm, fixture):
 from __future__ import annotations
 
 import json
+from functools import partial
 import subprocess
 import sys
 import xml.etree.ElementTree as ET
@@ -79,7 +80,13 @@ from rtd_config.backends.s32_mex.apply import apply_uart_add_flexio_channel
 from rtd_config.backends.s32_mex.document import MexDocument
 from rtd_config.intent import Intent
 from rtd_config.modules.uart import UartProvider
-from tests.fixtures import copy_uart_fixture
+from tests.fixtures import copy_uart_fixture, resolved_uart_bundle
+
+_BUNDLE = resolved_uart_bundle()
+apply_uart_add_flexio_channel = partial(
+    apply_uart_add_flexio_channel, bundle=_BUNDLE
+)
+UartProvider = partial(UartProvider, _BUNDLE)
 
 # ---------------------------------------------------------------------------
 # Asset path

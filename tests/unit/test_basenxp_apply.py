@@ -60,6 +60,7 @@ OsIfSystemTimerClockFreq as an empty array (ConfigTools ArraySetting type),
 and verifies byte-narrowness and idempotency.
 """
 import difflib
+from functools import partial
 import json
 from pathlib import Path
 import subprocess
@@ -69,7 +70,9 @@ import xml.etree.ElementTree as ET
 from rtd_config.backends.s32_mex.document import MexDocument
 from rtd_config.backends.s32_mex.apply import apply_basenxp_set
 from rtd_config.intent import Intent
-from tests.fixtures import copy_uart_fixture
+from tests.fixtures import copy_uart_fixture, resolved_uart_bundle
+
+apply_basenxp_set = partial(apply_basenxp_set, bundle=resolved_uart_bundle())
 
 
 def _intent(**payload) -> Intent:

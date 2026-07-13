@@ -44,10 +44,17 @@
 # Description: Unit tests for the module providers.
 # =================================================================================
 
+from functools import partial
+
 from rtd_config.intent import Intent
 from rtd_config.modules import platform as platform_module
 from rtd_config.modules.platform import PlatformProvider
 from rtd_config.modules.uart import UartProvider
+from tests.fixtures import resolved_uart_bundle
+
+_BUNDLE = resolved_uart_bundle()
+UartProvider = partial(UartProvider, _BUNDLE)
+PlatformProvider = partial(PlatformProvider, _BUNDLE)
 
 
 def test_uart_plan_declares_dependencies_without_owning_other_modules():

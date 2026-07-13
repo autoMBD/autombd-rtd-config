@@ -61,6 +61,7 @@ Mux0..Mux11 + source subset; 10 CGM Mux12-20 + CM7_CORE_CLK clocks are
 deferred (documented in clock.json deferred_clocks). No value is invented here.
 """
 import difflib
+from functools import partial
 import json
 import sys
 from pathlib import Path
@@ -71,7 +72,11 @@ from rtd_config.backends.s32_mex.document import MexDocument
 from rtd_config.backends.s32_mex.apply import apply_mcu_set, _ALL_SELECTABLE_CLOCKS, _MCU_SUPPORTED_RECIPES
 from rtd_config.intent import Intent
 from rtd_config.modules.mcu import McuProvider
-from tests.fixtures import copy_uart_fixture
+from tests.fixtures import copy_uart_fixture, resolved_uart_bundle
+
+_BUNDLE = resolved_uart_bundle()
+apply_mcu_set = partial(apply_mcu_set, bundle=_BUNDLE)
+McuProvider = partial(McuProvider, _BUNDLE)
 
 
 # ---------------------------------------------------------------------------

@@ -64,6 +64,7 @@ This case inserts:
 Legal-pin validation prevents writing illegal pins; blocker code=port_illegal_pin.
 """
 import difflib
+from functools import partial
 import json
 import subprocess
 import sys
@@ -73,7 +74,11 @@ from rtd_config.backends.s32_mex.document import MexDocument
 from rtd_config.backends.s32_mex.apply import apply_port_set
 from rtd_config.intent import Intent
 from rtd_config.modules.port import PortProvider
-from tests.fixtures import copy_uart_fixture
+from tests.fixtures import copy_uart_fixture, resolved_uart_bundle
+
+_BUNDLE = resolved_uart_bundle()
+apply_port_set = partial(apply_port_set, bundle=_BUNDLE)
+PortProvider = partial(PortProvider, _BUNDLE)
 
 
 def _intent(**payload) -> Intent:

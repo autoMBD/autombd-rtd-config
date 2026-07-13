@@ -58,6 +58,7 @@ Next-available ids are computed from the first unused legal XDM enum values,
 not hardcoded or invented outside the descriptor domain.
 """
 import difflib
+from functools import partial
 import json
 import subprocess
 import sys
@@ -72,7 +73,11 @@ from rtd_config.backends.s32_mex.apply import (
 )
 from rtd_config.intent import Intent
 from rtd_config.modules.mcl import MclProvider
-from tests.fixtures import copy_uart_fixture
+from tests.fixtures import copy_uart_fixture, resolved_uart_bundle
+
+_BUNDLE = resolved_uart_bundle()
+apply_mcl_set = partial(apply_mcl_set, bundle=_BUNDLE)
+MclProvider = partial(MclProvider, _BUNDLE)
 
 
 def _intent(**payload) -> Intent:

@@ -169,7 +169,8 @@ def test_configure_writer_blocker_leaves_original_mex_bytes_unchanged(
         assert str(path).endswith(".tmp")
         raise MexWriteError("narrow .mex render unavailable: element count changed")
 
-    def apply_ok(_doc, _intent):
+    def apply_ok(_doc, _intent, *, bundle):
+        assert bundle.id == "nxp-s32-mex-s32k344-mapbga257-rtd-7.0.1"
         return ApplyResult(changed_modules=["uart"])
 
     monkeypatch.setattr(
@@ -200,6 +201,9 @@ def test_configure_revalidates_plan_metadata_before_apply(monkeypatch, tmp_path)
     apply_called = False
 
     class Provider:
+        def __init__(self, _bundle):
+            pass
+
         def plan(self, _intent):
             prefs.write_text(
                 "com.freescale.s32ds.cross.sdk.support.attachedSDKs="
@@ -216,7 +220,7 @@ def test_configure_revalidates_plan_metadata_before_apply(monkeypatch, tmp_path)
     monkeypatch.setattr(cli, "apply_uart_set", unexpected_apply)
     monkeypatch.setattr(
         cli, "normalize_uart_intent",
-        lambda _args: Intent.from_dict({"module": "uart", "action": "set", "payload": {}}),
+        lambda _args, _bundle: Intent.from_dict({"module": "uart", "action": "set", "payload": {}}),
     )
     with pytest.raises(Exception) as caught:
         cli.cmd_uart_set(Namespace(project=project_root, configure=True, backup=False))
@@ -248,7 +252,7 @@ def test_configure_revalidates_metadata_changed_by_apply_before_publish(
         projects.append(project)
         return project
 
-    def mutate_aux(_doc, _intent):
+    def mutate_aux(_doc, _intent, *, bundle):
         metadata_source.write_bytes(metadata_source.read_bytes() + b"\n")
         return ApplyResult(changed_modules=["uart"])
 
@@ -301,7 +305,7 @@ def test_configure_revalidates_metadata_changed_by_static_check_before_publish(
             Namespace(project=project_root, backup=False),
             Intent.from_dict({"module": "uart", "action": "set", "payload": {}}),
             SimpleNamespace(to_dict=lambda: {}),
-            lambda *_args: ApplyResult(changed_modules=["uart"]),
+            lambda *_args, **_kwargs: ApplyResult(changed_modules=["uart"]),
         )
     assert caught.value.code == "project_metadata_source_changed"
     assert mex.read_bytes() == original
@@ -331,6 +335,9 @@ def test_every_configure_entry_point_plans_and_applies_one_verified_project(
         return project
 
     class Provider:
+        def __init__(self, _bundle):
+            pass
+
         def plan(self, _intent):
             return SimpleNamespace(to_dict=lambda: {})
 
@@ -347,7 +354,7 @@ def test_every_configure_entry_point_plans_and_applies_one_verified_project(
     monkeypatch.setattr(
         cli,
         normalizer_name,
-        lambda _args: Intent.from_dict(
+        lambda _args, _bundle: Intent.from_dict(
             {"module": "test", "action": "set", "payload": {}}
         ),
     )
@@ -390,6 +397,9 @@ def test_every_configure_entry_point_rejects_target_swap_before_apply(
         return project
 
     class Provider:
+        def __init__(self, _bundle):
+            pass
+
         def plan(self, _intent):
             return SimpleNamespace(to_dict=lambda: {})
 
@@ -401,7 +411,7 @@ def test_every_configure_entry_point_rejects_target_swap_before_apply(
     monkeypatch.setattr(
         cli,
         normalizer_name,
-        lambda _args: Intent.from_dict(
+        lambda _args, _bundle: Intent.from_dict(
             {"module": "test", "action": "set", "payload": {}}
         ),
     )

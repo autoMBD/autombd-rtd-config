@@ -101,6 +101,7 @@ NOT written by us:
 """
 
 import difflib
+from functools import partial
 import json
 import subprocess
 import sys
@@ -110,7 +111,11 @@ from rtd_config.backends.s32_mex.document import MexDocument
 from rtd_config.backends.s32_mex.apply import apply_mcu_set
 from rtd_config.intent import Intent
 from rtd_config.modules.mcu import McuProvider
-from tests.fixtures import copy_uart_fixture
+from tests.fixtures import copy_uart_fixture, resolved_uart_bundle
+
+_BUNDLE = resolved_uart_bundle()
+apply_mcu_set = partial(apply_mcu_set, bundle=_BUNDLE)
+McuProvider = partial(McuProvider, _BUNDLE)
 
 
 # All selectable clocks verified from the Mcu.xdm INVALID rules (lines 14008-14152)

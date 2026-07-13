@@ -64,6 +64,7 @@ BCTU enum (BCTU_EMIOS_<0..2>_<0..22>), and the structure rules from Adc.xdm. No
 value is invented here.
 """
 import difflib
+from functools import partial
 
 import pytest
 
@@ -71,7 +72,11 @@ from rtd_config.backends.s32_mex.document import MexDocument
 from rtd_config.backends.s32_mex.apply import apply_adc_set, _derive_adc_sampling_duration
 from rtd_config.checks.static import run_static_checks
 from rtd_config.intent import Intent
-from tests.fixtures import copy_adc_fixture
+from tests.fixtures import copy_adc_fixture, resolved_adc_bundle
+
+_BUNDLE = resolved_adc_bundle()
+apply_adc_set = partial(apply_adc_set, bundle=_BUNDLE)
+run_static_checks = partial(run_static_checks, bundle=_BUNDLE)
 
 
 MEX_NAME = "Autombd_Test_Adc_S32K344.mex"
