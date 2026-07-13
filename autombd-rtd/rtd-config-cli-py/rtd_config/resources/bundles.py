@@ -53,6 +53,12 @@ from types import MappingProxyType
 from typing import Any, Mapping
 
 from ..backends.s32_mex.metadata import ProjectMetadata
+from ..backends.s32_mex.target import (
+    _capture_snapshot,
+    _inspect,
+    _protected_root,
+    default_target_platform,
+)
 from ..errors import CliFailure
 from .runtime import load_json
 
@@ -124,12 +130,32 @@ class ResolvedAssetBundle:
 
 class AssetBundleResolver:
     def __init__(self, root: Path):
-        self.root = Path(root).resolve()
+        self.root = Path(root).absolute()
         path = self.root / "bundles.json"
         try:
-            manifest = json.loads(path.read_text(encoding="utf-8"))
+            platform = default_target_platform()
+            with _protected_root(platform, self.root):
+                evidence = _inspect(path, platform)
+                if not evidence.exists:
+                    raise FileNotFoundError
+                if (
+                    not evidence.is_regular
+                    or evidence.is_symlink
+                    or evidence.is_reparse_point
+                    or evidence.is_mount_point
+                ):
+                    raise _failure(
+                        "asset_manifest_invalid",
+                        "The asset bundle manifest must be a safe regular file.",
+                    )
+                content = _capture_snapshot(path, platform).content
+            manifest = json.loads(content.decode("utf-8"))
         except FileNotFoundError as exc:
             raise _failure("asset_manifest_not_found", "The asset bundle manifest was not found.") from exc
+        except CliFailure as exc:
+            if exc.code == "asset_manifest_invalid":
+                raise
+            raise _failure("asset_manifest_invalid", "The asset bundle manifest is invalid.") from exc
         except (OSError, UnicodeError, json.JSONDecodeError) as exc:
             raise _failure("asset_manifest_invalid", "The asset bundle manifest is invalid.") from exc
         if not isinstance(manifest, dict) or manifest.get("format_version") != 1 or not isinstance(manifest.get("bundles"), list):
