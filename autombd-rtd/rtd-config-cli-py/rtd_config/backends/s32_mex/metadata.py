@@ -48,16 +48,13 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-import os
-from pathlib import Path
 import re
-import stat
 from typing import Any
 import xml.etree.ElementTree as ET
 
 from ...errors import CliFailure
 from .document import MexDocument
-from .target import VerifiedProjectTarget
+from .target import VerifiedProjectTarget, read_project_relative
 
 
 _NXP_NAMESPACE_PREFIX = "http://mcuxpresso.nxp.com/XSD/mex_configuration_"
@@ -125,8 +122,8 @@ class ProjectMetadata:
     xml_namespace: str | None
     schema_version: str | None
     schema_location: str | None
-    tools: tuple[ToolMetadata, ...]
-    modules: tuple[ModuleMetadata, ...]
+    tools: tuple[ToolMetadata, ...] | None
+    modules: tuple[ModuleMetadata, ...] | None
     rtd_release: str | None
     conflicts: tuple[MetadataConflict, ...]
 
@@ -140,6 +137,30 @@ class ProjectMetadata:
             )
         return self
 
+    def require_identity(self) -> "ProjectMetadata":
+        self.require_consistent()
+        required = (
+            "vendor", "backend", "processor", "family", "device", "raw_package",
+            "package", "mcu_data", "xml_namespace", "schema_version",
+            "schema_location", "tools", "modules", "rtd_release",
+        )
+        missing = [name for name in required if getattr(self, name) is None]
+        if missing:
+            raise CliFailure(
+                "project_metadata_unknown",
+                "Required project identity is not explicitly observed.",
+                module="backend", details={"missing_fields": missing},
+            )
+        return self
+
+    @property
+    def tools_observed(self) -> bool:
+        return self.tools is not None
+
+    @property
+    def modules_observed(self) -> bool:
+        return self.modules is not None
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "vendor": self.vendor, "backend": self.backend,
@@ -147,8 +168,10 @@ class ProjectMetadata:
             "raw_package": self.raw_package, "package": self.package, "mcu_data": self.mcu_data,
             "xml_namespace": self.xml_namespace, "schema_version": self.schema_version,
             "schema_location": self.schema_location,
-            "tools": [item.__dict__ for item in self.tools],
-            "modules": [item.__dict__ for item in self.modules],
+            "tools": None if self.tools is None else [item.__dict__ for item in self.tools],
+            "tools_observed": self.tools_observed,
+            "modules": None if self.modules is None else [item.__dict__ for item in self.modules],
+            "modules_observed": self.modules_observed,
             "rtd_release": self.rtd_release,
             "conflicts": [item.to_dict() for item in self.conflicts],
         }
@@ -199,10 +222,15 @@ def _root_namespace(root: ET.Element) -> str | None:
     return match.group(1) if match else None
 
 
-def _text_child(root: ET.Element, name: str) -> str | None:
-    for item in root.iter():
-        if _local_name(item.tag) == name:
-            return item.text
+def _common_text(root: ET.Element, namespace: str | None, name: str) -> str | None:
+    if namespace is None:
+        return None
+    common = root.find(f"{{{namespace}}}common")
+    if common is None:
+        return None
+    child = common.find(f"{{{namespace}}}{name}")
+    if child is not None:
+        return child.text
     return None
 
 
@@ -211,10 +239,14 @@ def _version(settings: Mapping[str, str], prefix: str) -> str | None:
     return ".".join(values) if all(value is not None for value in values) else None
 
 
-def _parse_tools(root: ET.Element) -> tuple[ToolMetadata, ...]:
-    tools = next((item for item in root.iter() if _local_name(item.tag) == "tools"), None)
+def _tools_carrier(root: ET.Element, namespace: str | None) -> ET.Element | None:
+    return root.find(f"{{{namespace}}}tools") if namespace else None
+
+
+def _parse_tools(root: ET.Element, namespace: str | None) -> tuple[ToolMetadata, ...] | None:
+    tools = _tools_carrier(root, namespace)
     if tools is None:
-        return ()
+        return None
     result = []
     for item in tools:
         if item.attrib.get("enabled", "true").lower() != "true":
@@ -225,9 +257,17 @@ def _parse_tools(root: ET.Element) -> tuple[ToolMetadata, ...]:
     return tuple(result)
 
 
-def _parse_modules(root: ET.Element) -> tuple[ModuleMetadata, ...]:
+def _parse_modules(root: ET.Element, namespace: str | None) -> tuple[ModuleMetadata, ...] | None:
+    tools = _tools_carrier(root, namespace)
+    if tools is None:
+        return None
+    peripherals = next((item for item in tools if _local_name(item.tag) == "periphs"), None)
+    if peripherals is None:
+        return None
     modules = []
-    for item in root.iter():
+    if peripherals.attrib.get("enabled", "true").lower() != "true":
+        return ()
+    for item in peripherals.iter():
         if _local_name(item.tag) != "instance" or item.attrib.get("enabled", "true").lower() != "true":
             continue
         name = item.attrib.get("name")
@@ -250,52 +290,10 @@ def _parse_modules(root: ET.Element) -> tuple[ModuleMetadata, ...]:
 
 
 def _safe_source_reader(target: VerifiedProjectTarget) -> SourceReader:
-    root = target.root
-
     def read(relative: str) -> bytes | None:
         if relative not in _AUXILIARY_SOURCES:
             raise ValueError(f"unsupported metadata source: {relative}")
-        path = root.joinpath(*relative.split("/"))
-        current = root
-        try:
-            for part in relative.split("/"):
-                current = current / part
-                if not current.exists() and not current.is_symlink():
-                    return None
-                status = current.lstat()
-                attributes = getattr(status, "st_file_attributes", 0)
-                if current.is_symlink() or attributes & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400):
-                    raise CliFailure("unsafe_project_path", "Project metadata paths must not contain links or reparse points.", module="backend", details={"path": str(current)})
-            resolved = path.resolve(strict=True)
-            resolved.relative_to(root)
-            if not resolved.is_file():
-                raise CliFailure("unsafe_project_path", "A project metadata source is not a regular file.", module="backend", details={"path": str(path)})
-            size = resolved.stat().st_size
-            if size > _MAX_SOURCE_BYTES:
-                raise CliFailure("project_metadata_source_too_large", "A project metadata source exceeds the one MiB limit.", module="backend", details={"source": relative, "size": size})
-            flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0)
-            descriptor = os.open(resolved, flags)
-            try:
-                before = os.fstat(descriptor)
-                if not stat.S_ISREG(before.st_mode):
-                    raise CliFailure("unsafe_project_path", "A project metadata source is not a regular file.", module="backend", details={"path": str(path)})
-                content = os.read(descriptor, _MAX_SOURCE_BYTES + 1)
-                after = os.fstat(descriptor)
-            finally:
-                os.close(descriptor)
-            evidence_before = (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns, before.st_ctime_ns)
-            evidence_after = (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns, after.st_ctime_ns)
-            if evidence_before != evidence_after or len(content) != before.st_size:
-                raise CliFailure("project_metadata_source_changed", "A project metadata source changed while it was being read; reload and retry.", module="backend", details={"source": relative})
-            if len(content) > _MAX_SOURCE_BYTES:
-                raise CliFailure("project_metadata_source_too_large", "A project metadata source exceeds the one MiB limit.", module="backend", details={"source": relative})
-            return content
-        except CliFailure:
-            raise
-        except PermissionError as exc:
-            raise CliFailure("project_permission_denied", "Permission was denied while reading project metadata.", module="backend", details={"source": relative}) from exc
-        except (OSError, ValueError) as exc:
-            raise CliFailure("unsafe_project_path", "A project metadata source could not be read safely.", module="backend", details={"source": relative}) from exc
+        return read_project_relative(target, relative, max_bytes=_MAX_SOURCE_BYTES)
     return read
 
 
@@ -333,7 +331,16 @@ def _parse_xml_source(text: str, source: str) -> ET.Element:
 
 
 def _add_attachment_observations(observations: _Observations, text: str, source: str) -> None:
-    for match in re.finditer(r"PlatformSDK_(S32K\d+)_([A-Z0-9]+)_M\d+_(\d+\.\d+\.\d+)_PATH", text, re.IGNORECASE):
+    values = {}
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith(("#", "!")):
+            continue
+        key, separator, value = line.partition("=")
+        if separator:
+            values[key.strip()] = value.strip()
+    attached = values.get("com.freescale.s32ds.cross.sdk.support.attachedSDKs", "")
+    for match in re.finditer(r"PlatformSDK_(S32K\d+)_([A-Z0-9]+)_M\d+_(\d+\.\d+\.\d+)_PATH", attached, re.IGNORECASE):
         observations.add("family", match.group(1), source, "/attachedSDKs")
         observations.add("device", match.group(2), source, "/attachedSDKs")
         observations.add("rtd_release", match.group(3), source, "/attachedSDKs")
@@ -353,10 +360,10 @@ def parse_project_metadata(
     namespace = _root_namespace(root)
     recognized = namespace is not None and namespace.startswith(_NXP_NAMESPACE_PREFIX)
     observations = _Observations()
-    observations.add("processor", _text_child(root, "processor"), ".mex", "/configuration/common/processor")
+    observations.add("processor", _common_text(root, namespace, "processor"), ".mex", "/configuration/common/processor")
     observations.add("device", root.attrib.get("name"), ".mex", "/configuration/@name")
-    raw_package = _normalize("raw_package", _text_child(root, "package"))
-    mcu_data = _normalize("mcu_data", _text_child(root, "mcu_data"))
+    raw_package = _normalize("raw_package", _common_text(root, namespace, "package"))
+    mcu_data = _normalize("mcu_data", _common_text(root, namespace, "mcu_data"))
     if mcu_data:
         match = re.fullmatch(r"PlatformSDK_(S32K\d+)", mcu_data, re.IGNORECASE)
         if match:
@@ -364,13 +371,23 @@ def parse_project_metadata(
     schema_location = _normalize("schema_location", root.attrib.get(_XSI_SCHEMA_LOCATION))
     schema_version = root.attrib.get("version")
     observations.add("schema_version", schema_version, ".mex", "/configuration/@version")
-    if namespace:
-        match = re.search(r"mex_configuration_(\d+)$", namespace)
+    official_match = re.fullmatch(re.escape(_NXP_NAMESPACE_PREFIX) + r"(\d+)", namespace or "")
+    if official_match:
+        observations.add("schema_identity", "official", ".mex", "/configuration/namespace-uri()")
+        match = official_match
         observations.add("schema_version", match.group(1) if match else None, ".mex", "/configuration/namespace-uri()")
     if schema_location:
-        versions = set(re.findall(r"mex_configuration_(\d+)", schema_location))
-        for version in versions:
-            observations.add("schema_version", version, ".mex", "/configuration/@xsi:schemaLocation")
+        tokens = schema_location.split()
+        pairs = tuple(zip(tokens[::2], tokens[1::2])) if len(tokens) % 2 == 0 else ()
+        valid_pair = bool(official_match) and pairs == ((namespace, f"{namespace}.xsd"),)
+        observations.add("schema_identity", "official" if valid_pair else "invalid", ".mex", "/configuration/@xsi:schemaLocation")
+        if valid_pair:
+            observations.add("schema_version", official_match.group(1), ".mex", "/configuration/@xsi:schemaLocation")
+        else:
+            for token in tokens:
+                location_match = re.search(r"mex_configuration_(\d+)(?:\.xsd)?$", token)
+                if location_match:
+                    observations.add("schema_version", location_match.group(1), ".mex", "/configuration/@xsi:schemaLocation")
 
     sources = _read_sources(source_reader or _safe_source_reader(target))
     for source in (".project", ".cproject"):
@@ -391,9 +408,9 @@ def parse_project_metadata(
         key, separator, value = line.partition("=")
         if not separator:
             continue
-        if key.endswith("hardware.registry.device.id"):
+        if key == "com.nxp.s32ds.cle.runtime.hardware.registry.device.id":
             observations.add("device", value, runtime_source, f"/{key}[line={line_number}]")
-        elif key.endswith("hardware.registry.family.id"):
+        elif key == "com.nxp.s32ds.cle.runtime.hardware.registry.family.id":
             observations.add("family", value, runtime_source, f"/{key}[line={line_number}]")
 
     sdk_source = ".settings/com.freescale.s32ds.cross.sdk.support.prefs"
@@ -401,7 +418,7 @@ def parse_project_metadata(
 
     resolved: dict[str, str | None] = {}
     conflicts = []
-    for field in ("processor", "family", "device", "schema_version", "rtd_release"):
+    for field in ("processor", "family", "device", "schema_version", "schema_identity", "rtd_release"):
         value, conflict = observations.resolve(field)
         resolved[field] = value
         if conflict:
@@ -411,5 +428,5 @@ def parse_project_metadata(
         resolved["processor"], resolved["family"], resolved["device"],
         raw_package, package_aliases.get(raw_package) if raw_package else None, mcu_data,
         namespace, resolved["schema_version"], schema_location,
-        _parse_tools(root), _parse_modules(root), resolved["rtd_release"], tuple(conflicts),
+        _parse_tools(root, namespace), _parse_modules(root, namespace), resolved["rtd_release"], tuple(conflicts),
     )

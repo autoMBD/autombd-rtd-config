@@ -91,6 +91,7 @@ class TargetLease:
     _retained: bool = field(default=False, init=False, repr=False, compare=False)
     _closed: bool = field(default=False, init=False, repr=False, compare=False)
     _lock: threading.Lock = field(default_factory=threading.Lock, init=False, repr=False, compare=False)
+    _resources: dict = field(default_factory=dict, init=False, repr=False, compare=False)
 
     def retain(self) -> None:
         object.__setattr__(self, "_retained", True)
@@ -245,6 +246,8 @@ class _PosixTargetPlatform:
                         module="backend", details={"path": str(component)},
                     )
             self._root_fd = fd
+            lease._resources["root_fd"] = fd
+            lease._resources["platform"] = self
             self._root_path = absolute
             self._protected_fds = fds
             yield lease
@@ -421,6 +424,8 @@ class _WindowsTargetPlatform:
                         module="backend", details={"path": str(component)},
                     )
             self._protected_handles = handles
+            lease._resources["root_handle"] = handles[-1]
+            lease._resources["platform"] = self
             yield lease
         finally:
             self._protected_handles = []
@@ -775,6 +780,175 @@ def verify_project_target(
             "The protected project lease could not be acquired safely.",
             module="backend", details={"errno": exc.errno} if exc.errno is not None else {},
         ) from exc
+
+
+def read_project_relative(
+    target: VerifiedProjectTarget,
+    relative: str,
+    *,
+    max_bytes: int,
+) -> bytes | None:
+    """Read one bounded project-relative file through the live root lease."""
+    if not isinstance(target, VerifiedProjectTarget):
+        raise TypeError("target must be a VerifiedProjectTarget")
+    if target.lease.closed:
+        raise CliFailure(
+            "project_target_closed",
+            "The verified project lease is closed; reload the project before reading metadata.",
+            module="backend",
+        )
+    if max_bytes < 0:
+        raise ValueError("max_bytes must be non-negative")
+    parts = tuple(relative.split("/"))
+    if not parts or any(not part or part in {".", ".."} or "\\" in part for part in parts):
+        raise ValueError("relative project paths must contain only fixed child names")
+    platform = target.lease._resources.get("platform")
+    try:
+        if isinstance(platform, _PosixTargetPlatform):
+            return _read_posix_relative(target, parts, max_bytes)
+        if isinstance(platform, _WindowsTargetPlatform):
+            return _read_windows_relative(target, parts, max_bytes, platform)
+        raise CliFailure(
+            "project_identity_unavailable",
+            "The verified target does not retain a handle-capable project reader.",
+            module="backend",
+        )
+    except FileNotFoundError:
+        return None
+    except CliFailure:
+        raise
+    except PermissionError as exc:
+        raise CliFailure(
+            "project_permission_denied",
+            "Permission was denied while reading project metadata.",
+            module="backend", details={"source": relative},
+        ) from exc
+    except RuntimeError as exc:
+        raise CliFailure(
+            "project_metadata_source_changed",
+            "A project metadata source changed while it was read; reload and retry.",
+            module="backend", details={"source": relative},
+        ) from exc
+    except OSError as exc:
+        raise CliFailure(
+            "unsafe_project_path",
+            "A project metadata source could not be opened without following links.",
+            module="backend", details={"source": relative},
+        ) from exc
+
+
+def _read_posix_relative(
+    target: VerifiedProjectTarget,
+    parts: tuple[str, ...],
+    max_bytes: int,
+) -> bytes:
+    root_fd = target.lease._resources.get("root_fd")
+    platform = target.lease._resources.get("platform")
+    if root_fd is None or not platform._no_follow or not platform._nonblock:
+        raise CliFailure(
+            "project_identity_unavailable",
+            "Safe project-relative open flags are unavailable.",
+            module="backend",
+        )
+    opened: list[int] = []
+    parent = root_fd
+    try:
+        directory_flags = os.O_RDONLY | os.O_DIRECTORY | platform._no_follow | platform._nonblock
+        for part in parts[:-1]:
+            parent = os.open(part, directory_flags, dir_fd=parent)
+            opened.append(parent)
+        flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | platform._no_follow | platform._nonblock
+        descriptor = os.open(parts[-1], flags, dir_fd=parent)
+        opened.append(descriptor)
+        before = os.fstat(descriptor)
+        if not stat.S_ISREG(before.st_mode):
+            raise OSError("metadata source is not a regular file")
+        if before.st_size > max_bytes:
+            raise CliFailure(
+                "project_metadata_source_too_large",
+                "A project metadata source exceeds its size limit.",
+                module="backend", details={"size": before.st_size, "limit": max_bytes},
+            )
+        content = b""
+        while chunk := os.read(descriptor, min(64 * 1024, max_bytes + 1 - len(content))):
+            content += chunk
+            if len(content) > max_bytes:
+                raise CliFailure(
+                    "project_metadata_source_too_large",
+                    "A project metadata source exceeds its size limit.",
+                    module="backend", details={"limit": max_bytes},
+                )
+        after = os.fstat(descriptor)
+        before_evidence = (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns, before.st_ctime_ns)
+        after_evidence = (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns, after.st_ctime_ns)
+        if before_evidence != after_evidence or len(content) != before.st_size:
+            raise RuntimeError("metadata source changed")
+        return content
+    finally:
+        for descriptor in reversed(opened):
+            os.close(descriptor)
+
+
+def _read_windows_relative(
+    target: VerifiedProjectTarget,
+    parts: tuple[str, ...],
+    max_bytes: int,
+    platform: _WindowsTargetPlatform,
+) -> bytes:
+    held = []
+    current = target.root
+    try:
+        for part in parts[:-1]:
+            current /= part
+            handle = platform._open(current, read=True, directory=True, share_delete=False, share_write=False)
+            held.append(handle)
+            tag = platform._query(handle, 9, _FILE_ATTRIBUTE_TAG_INFO)
+            if tag.FileAttributes & _FILE_ATTRIBUTE_REPARSE_POINT:
+                raise OSError("metadata parent is a reparse point")
+        current /= parts[-1]
+        handle = platform._open(current, read=True, directory=False, share_delete=False, share_write=False)
+        held.append(handle)
+        tag = platform._query(handle, 9, _FILE_ATTRIBUTE_TAG_INFO)
+        if tag.FileAttributes & _FILE_ATTRIBUTE_REPARSE_POINT:
+            raise OSError("metadata source is a reparse point")
+        basic_before = platform._query(handle, 0, _FILE_BASIC_INFO)
+        standard_before = platform._query(handle, 1, _FILE_STANDARD_INFO)
+        id_before = platform._query(handle, 18, _FILE_ID_INFO)
+        if standard_before.Directory:
+            raise OSError("metadata source is not a regular file")
+        if standard_before.EndOfFile > max_bytes:
+            raise CliFailure(
+                "project_metadata_source_too_large",
+                "A project metadata source exceeds its size limit.",
+                module="backend", details={"size": standard_before.EndOfFile, "limit": max_bytes},
+            )
+        chunks = []
+        while True:
+            buffer = ctypes.create_string_buffer(min(64 * 1024, max_bytes + 1))
+            count = wintypes.DWORD()
+            if not _ReadFile(handle, buffer, len(buffer), ctypes.byref(count), None):
+                raise ctypes.WinError(ctypes.get_last_error())
+            if count.value == 0:
+                break
+            chunks.append(buffer.raw[:count.value])
+            if sum(map(len, chunks)) > max_bytes:
+                raise CliFailure(
+                    "project_metadata_source_too_large",
+                    "A project metadata source exceeds its size limit.",
+                    module="backend", details={"limit": max_bytes},
+                )
+        basic_after = platform._query(handle, 0, _FILE_BASIC_INFO)
+        standard_after = platform._query(handle, 1, _FILE_STANDARD_INFO)
+        id_after = platform._query(handle, 18, _FILE_ID_INFO)
+        before = (id_before.VolumeSerialNumber, bytes(id_before.FileId.Identifier), standard_before.EndOfFile, basic_before.LastWriteTime, basic_before.ChangeTime)
+        after = (id_after.VolumeSerialNumber, bytes(id_after.FileId.Identifier), standard_after.EndOfFile, basic_after.LastWriteTime, basic_after.ChangeTime)
+        content = b"".join(chunks)
+        if before != after or len(content) != standard_before.EndOfFile:
+            raise RuntimeError("metadata source changed")
+        return content
+    finally:
+        for handle in reversed(held):
+            _CloseHandle(handle)
 
 
 def revalidate_snapshot(

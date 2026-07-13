@@ -563,9 +563,19 @@ def cmd_inspect(args: argparse.Namespace) -> int:
         metadata = project.metadata.require_consistent()
         observed = metadata.to_dict()
         observed["module_metadata"] = observed["modules"]
-        observed["modules"] = [item.name for item in metadata.modules]
+        observed["modules"] = None if metadata.modules is None else [item.name for item in metadata.modules]
         return emit({
             "status": "passed", "command": "inspect", "mex_file": str(target.mex.path),
+            "validation_profile": "pending_asset_compatibility",
+            "compatibility": {
+                "status": "pending",
+                "diagnostics": [{
+                    "severity": "info",
+                    "code": "pending_asset_compatibility",
+                    "module": "backend",
+                    "message": "Exact asset compatibility is evaluated by the bundle gate.",
+                }],
+            },
             **observed,
         })
 
@@ -588,6 +598,14 @@ def _intent_dict(intent: Intent) -> dict:
         "action": intent.action,
         "payload": intent.payload,
     }
+
+
+def _preflight_plan(args, intent: Intent, provider):
+    """Verify observed project identity before module-specific planning."""
+    config = RuntimeConfig.from_dict({"project": args.project})
+    with Project.verified(config.project, config.backend) as project:
+        project.metadata.require_identity()
+        return provider.plan(intent)
 
 
 def cmd_validate(args: argparse.Namespace) -> int:
@@ -679,7 +697,7 @@ def _cmd_validate_verified(args, config: RuntimeConfig, project: Project) -> int
 
 def cmd_uart_set(args: argparse.Namespace) -> int:
     intent = normalize_uart_intent(args)
-    plan = UartProvider().plan(intent)
+    plan = _preflight_plan(args, intent, UartProvider())
 
     if not args.configure:
         return emit({
@@ -710,7 +728,7 @@ def normalize_uart_add_flexio_intent(args: argparse.Namespace) -> Intent:
 
 def cmd_uart_add_flexio_channel(args: argparse.Namespace) -> int:
     intent = normalize_uart_add_flexio_intent(args)
-    plan = UartProvider().plan(intent)
+    plan = _preflight_plan(args, intent, UartProvider())
 
     if not args.configure:
         return emit({
@@ -862,7 +880,7 @@ def normalize_platform_intent(args: argparse.Namespace) -> Intent:
 
 def cmd_platform_set(args: argparse.Namespace) -> int:
     intent = normalize_platform_intent(args)
-    plan = PlatformProvider().plan(intent)
+    plan = _preflight_plan(args, intent, PlatformProvider())
 
     if not args.configure:
         return emit({
@@ -904,7 +922,7 @@ def normalize_basenxp_intent(args: argparse.Namespace) -> Intent:
 
 def cmd_basenxp_set(args: argparse.Namespace) -> int:
     intent = normalize_basenxp_intent(args)
-    plan = BaseNxpProvider().plan(intent)
+    plan = _preflight_plan(args, intent, BaseNxpProvider())
 
     if not args.configure:
         return emit({
@@ -932,7 +950,7 @@ def normalize_mcl_intent(args: argparse.Namespace) -> Intent:
 
 def cmd_mcl_set(args: argparse.Namespace) -> int:
     intent = normalize_mcl_intent(args)
-    plan = MclProvider().plan(intent)
+    plan = _preflight_plan(args, intent, MclProvider())
 
     if not args.configure:
         return emit({
@@ -966,7 +984,7 @@ def normalize_port_intent(args: argparse.Namespace) -> Intent:
 
 def cmd_port_set(args: argparse.Namespace) -> int:
     intent = normalize_port_intent(args)
-    plan = PortProvider().plan(intent)
+    plan = _preflight_plan(args, intent, PortProvider())
 
     if not args.configure:
         return emit({
@@ -1022,7 +1040,7 @@ def normalize_mcu_intent(args: argparse.Namespace) -> Intent:
 
 def cmd_dio_set(args: argparse.Namespace) -> int:
     intent = normalize_dio_intent(args)
-    plan = DioProvider().plan(intent)
+    plan = _preflight_plan(args, intent, DioProvider())
 
     if not args.configure:
         return emit({
@@ -1037,7 +1055,7 @@ def cmd_dio_set(args: argparse.Namespace) -> int:
 
 def cmd_mcu_set(args: argparse.Namespace) -> int:
     intent = normalize_mcu_intent(args)
-    plan = McuProvider().plan(intent)
+    plan = _preflight_plan(args, intent, McuProvider())
 
     if not args.configure:
         return emit({
@@ -1065,7 +1083,7 @@ def normalize_adc_intent(args: argparse.Namespace) -> Intent:
 
 def cmd_adc_set(args: argparse.Namespace) -> int:
     intent = normalize_adc_intent(args)
-    plan = AdcProvider().plan(intent)
+    plan = _preflight_plan(args, intent, AdcProvider())
 
     if not args.configure:
         return emit({

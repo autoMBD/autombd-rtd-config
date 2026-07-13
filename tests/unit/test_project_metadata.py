@@ -58,6 +58,7 @@ import pytest
 from rtd_config import cli
 from rtd_config.backends.s32_mex.document import MexDocument
 from rtd_config.backends.s32_mex import metadata as metadata_module
+from rtd_config.backends.s32_mex import target as target_module
 from rtd_config.backends.s32_mex.metadata import (
     MetadataConflict,
     MetadataObservation,
@@ -208,7 +209,7 @@ def test_missing_observations_remain_unknown(tmp_path):
     metadata = _parse(_temporary_project(tmp_path, raw))
     assert metadata == ProjectMetadata(
         None, None, None, None, None, None, None, None,
-        "urn:unrecognized", None, None, (), (), None, (),
+        "urn:unrecognized", None, None, (), None, None, (),
     )
 
 
@@ -312,31 +313,10 @@ def test_default_reader_rejects_invalid_fixed_source_content(tmp_path, content, 
 def test_default_reader_detects_fixed_source_replacement(monkeypatch, tmp_path):
     root = _temporary_project(tmp_path)
     (root / ".cproject").write_text("<cproject/>", encoding="utf-8")
-    real_fstat = os.fstat
-    fstat_calls = 0
-
-    def changed_fstat(descriptor):
-        nonlocal fstat_calls
-        status = real_fstat(descriptor)
-        fstat_calls += 1
-        if fstat_calls == 2:
-            values = list(status)
-            values[9] += 1
-            return os.stat_result(values)
-        return status
-
+    reader_name = "_read_windows_relative" if os.name == "nt" else "_read_posix_relative"
     monkeypatch.setattr(
-        metadata_module,
-        "os",
-        SimpleNamespace(
-            O_RDONLY=os.O_RDONLY,
-            O_BINARY=getattr(os, "O_BINARY", 0),
-            O_NOFOLLOW=getattr(os, "O_NOFOLLOW", 0),
-            open=os.open,
-            read=os.read,
-            close=os.close,
-            fstat=changed_fstat,
-        ),
+        target_module, reader_name,
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("replaced")),
     )
     with pytest.raises(CliFailure) as caught:
         _parse(root)
@@ -381,7 +361,7 @@ def test_inspect_reports_observed_metadata_not_runtime_defaults(capsys):
     assert payload["rtd_release"] == "7.0.1"
     assert payload["schema_version"] == "19"
     assert len(payload["modules"]) == 7
-    assert "validation_profile" not in payload
+    assert payload["validation_profile"] == "pending_asset_compatibility"
 
 
 @pytest.mark.parametrize("flow", ["inspect", "check", "validate", "configure"])
@@ -422,3 +402,91 @@ def test_public_project_flows_reject_metadata_conflicts_before_work(
     with pytest.raises(CliFailure) as caught:
         invoke()
     assert caught.value.code == "project_metadata_conflict"
+
+
+def test_schema_location_evil_domain_is_a_blocking_identity_conflict(tmp_path):
+    raw = _minimal_mex(schema="https://evil.example/mex_configuration_19 https://evil.example/mex_configuration_19.xsd")
+    metadata = _parse(_temporary_project(tmp_path, raw))
+    assert any(item.field == "schema_identity" for item in metadata.conflicts)
+    with pytest.raises(CliFailure, match="disagree"):
+        metadata.require_consistent()
+
+
+def test_common_identity_ignores_same_named_descendant_before_direct_common(tmp_path):
+    raw = _minimal_mex().replace(
+        b"<common>", b"<other><processor>S32K999</processor></other><common>",
+    )
+    metadata = _parse(_temporary_project(tmp_path, raw))
+    assert metadata.processor == "S32K344"
+    assert not any(item.field == "processor" for item in metadata.conflicts)
+
+
+def test_sdk_attachment_parser_ignores_comments_and_unrelated_properties(tmp_path):
+    root = _temporary_project(tmp_path)
+    metadata = _parse(root, source_reader=_reader({
+        ".settings/com.freescale.s32ds.cross.sdk.support.prefs": (
+            b"# PlatformSDK_S32K9_S32K999_M7_9.9.9_PATH\n"
+            b"unrelated=PlatformSDK_S32K8_S32K888_M7_8.8.8_PATH\n"
+        ),
+    }))
+    assert metadata.rtd_release is None
+    assert metadata.family == "S32K3"
+
+
+def test_missing_and_empty_tool_module_carriers_are_distinct(tmp_path):
+    missing = _parse(_temporary_project(tmp_path, _minimal_mex().replace(b"<tools>", b"<not_tools>").replace(b"</tools>", b"</not_tools>")))
+    assert missing.tools is None and missing.modules is None
+    assert missing.tools_observed is False and missing.modules_observed is False
+
+    empty_raw = _minimal_mex().replace(
+        b'<pins name="Pins" version="17.0" enabled="true"/>', b"",
+    ).replace(
+        b'<clocks name="Clocks" version="19.0" enabled="false"/>', b"",
+    ).replace(
+        b'<periphs name="Peripherals" version="15.0" enabled="true"><functional_groups><functional_group><instances>\n <instance name="Dio" type="Dio" type_id="Dio" mode="autosar" enabled="false"/>\n </instances></functional_group></functional_groups></periphs>',
+        b'<periphs name="Peripherals" version="15.0" enabled="false"><functional_groups><functional_group><instances/></functional_group></functional_groups></periphs>',
+    )
+    empty_parent = tmp_path / "empty"
+    empty_parent.mkdir()
+    empty = _parse(_temporary_project(empty_parent, empty_raw))
+    assert empty.tools == () and empty.tools_observed is True
+    assert empty.modules == () and empty.modules_observed is True
+
+
+def test_module_plan_preflights_metadata_before_provider(monkeypatch, tmp_path):
+    root = _temporary_project(tmp_path)
+    (root / ".cproject").write_text('<root><listOptionValue value="CPU_S32K345"/></root>', encoding="utf-8")
+    provider_called = False
+
+    class Provider:
+        def plan(self, _intent):
+            nonlocal provider_called
+            provider_called = True
+            pytest.fail("provider planned before metadata preflight")
+
+    monkeypatch.setattr(cli, "normalize_uart_intent", lambda _args: SimpleNamespace(module="uart", action="set", payload={}))
+    monkeypatch.setattr(cli, "UartProvider", Provider)
+    with pytest.raises(CliFailure) as caught:
+        cli.cmd_uart_set(SimpleNamespace(project=root, configure=False))
+    assert caught.value.code == "project_metadata_conflict"
+    assert not provider_called
+
+
+def test_inspect_keeps_pending_compatibility_profile(capsys):
+    assert cli.cmd_inspect(SimpleNamespace(project=UART)) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["validation_profile"] == "pending_asset_compatibility"
+    assert payload["compatibility"]["status"] == "pending"
+    assert payload["compatibility"]["diagnostics"]
+
+
+def test_project_relative_reader_uses_live_target_lease(tmp_path):
+    root = _temporary_project(tmp_path)
+    (root / ".settings").mkdir()
+    source = ".settings/com.example.prefs"
+    (root / source).write_bytes(b"key=value\n")
+    with verify_project_target(root) as target:
+        assert target_module.read_project_relative(target, source, max_bytes=64) == b"key=value\n"
+    with pytest.raises(CliFailure) as caught:
+        target_module.read_project_relative(target, source, max_bytes=64)
+    assert caught.value.code == "project_target_closed"

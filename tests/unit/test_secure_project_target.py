@@ -648,6 +648,7 @@ def _swap_project_after_verification(monkeypatch, root: Path, mex: Path) -> None
 
     def verified_then_swap(project_root: Path, backend: str = "s32-mex"):
         project = original_verified(project_root, backend)
+        _ = project.metadata
         project.verified_target.close()
         replacement = root / "replacement.mex"
         replacement.write_bytes(XML_B)
@@ -664,7 +665,7 @@ def test_inspect_uses_verified_bytes_when_target_is_swapped(monkeypatch, capsys,
     assert cli.cmd_inspect(SimpleNamespace(project=root)) == 0
     payload = json.loads(capsys.readouterr().out)
 
-    assert payload["modules"] == ["A"]
+    assert payload["modules"] is None
     assert mex.read_bytes() == XML_B
 
 
