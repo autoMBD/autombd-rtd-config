@@ -48,6 +48,7 @@ from __future__ import annotations
 
 from dataclasses import FrozenInstanceError
 import json
+import os
 from pathlib import Path
 from types import SimpleNamespace
 import xml.etree.ElementTree as ET
@@ -56,6 +57,7 @@ import pytest
 
 from rtd_config import cli
 from rtd_config.backends.s32_mex.document import MexDocument
+from rtd_config.backends.s32_mex import metadata as metadata_module
 from rtd_config.backends.s32_mex.metadata import (
     MetadataConflict,
     MetadataObservation,
@@ -138,21 +140,46 @@ def test_uart_fixture_metadata_is_observed_exactly():
 
 
 def test_uart_module_identity_and_published_profiles_are_exact():
-    modules = {item.name: item for item in _parse(UART).modules}
-    assert modules["BaseNXP"] == ModuleMetadata("BaseNXP", "BaseNXP", "Base", "general", "0", "4.7.0", "3.0.0", "43")
-    assert modules["Uart"] == ModuleMetadata("Uart", "Uart", "Uart", "autosar", "255", "4.4.0", "2.0.0", "43")
-    assert modules["Dio"].software_version == "7.0.1"
-    assert modules["Mcl"].module_id is None and modules["Mcl"].software_version is None
-    assert modules["Mcu"].autosar_version is None and modules["Mcu"].vendor_id is None
+    assert _parse(UART).modules == (
+        ModuleMetadata("Mcl", "Mcl", "Mcl", "autosar", None, None, None, None),
+        ModuleMetadata("Uart", "Uart", "Uart", "autosar", "255", "4.4.0", "2.0.0", "43"),
+        ModuleMetadata("Port", "Port", "Port", "autosar", "124", "4.4.0", "2.0.0", "43"),
+        ModuleMetadata("BaseNXP", "BaseNXP", "Base", "general", "0", "4.7.0", "3.0.0", "43"),
+        ModuleMetadata("Platform", "Platform", "Platform", "autosar", "255", "4.7.0", "3.0.0", "43"),
+        ModuleMetadata("Mcu", "Mcu", "Mcu", "autosar", None, None, None, None),
+        ModuleMetadata("Dio", "Dio", "Dio", "autosar", "120", "4.9.0", "7.0.1", "43"),
+    )
 
 
 def test_adc_fixture_identity_and_profile_are_observed():
     metadata = _parse(ADC)
-    modules = {item.name: item for item in metadata.modules}
-    assert metadata.processor == metadata.device == "S32K344"
-    assert metadata.package == "mapbga257"
-    assert [item.name for item in metadata.modules] == ["BaseNXP", "Dio", "Port", "Mcu", "Adc", "Mcl", "Platform"]
-    assert modules["Adc"] == ModuleMetadata("Adc", "Adc", "Adc", "autosar", "123", "4.9.0", "7.0.1", "43")
+    assert (metadata.vendor, metadata.backend) == ("NXP", "s32-mex")
+    assert (metadata.processor, metadata.family, metadata.device) == (
+        "S32K344", "S32K3", "S32K344",
+    )
+    assert (metadata.raw_package, metadata.package, metadata.mcu_data) == (
+        "S32K344_257BGA", "mapbga257", "PlatformSDK_S32K3",
+    )
+    assert metadata.xml_namespace == "http://mcuxpresso.nxp.com/XSD/mex_configuration_19"
+    assert metadata.schema_version == "19"
+    assert metadata.schema_location == (
+        "http://mcuxpresso.nxp.com/XSD/mex_configuration_19 "
+        "http://mcuxpresso.nxp.com/XSD/mex_configuration_19.xsd"
+    )
+    assert metadata.tools == (
+        ToolMetadata("Pins", "17.0", True),
+        ToolMetadata("Clocks", "19.0", True),
+        ToolMetadata("Peripherals", "15.0", True),
+    )
+    assert metadata.modules == (
+        ModuleMetadata("BaseNXP", "BaseNXP", "Base", "general", "0", "4.4.0", "2.0.0", "43"),
+        ModuleMetadata("Dio", "Dio", "Dio", "autosar", "120", "4.7.0", "3.0.0", "43"),
+        ModuleMetadata("Port", "Port", "Port", "autosar", "124", "4.7.0", "3.0.0", "43"),
+        ModuleMetadata("Mcu", "Mcu", "Mcu", "autosar", None, None, None, None),
+        ModuleMetadata("Adc", "Adc", "Adc", "autosar", "123", "4.9.0", "7.0.1", "43"),
+        ModuleMetadata("Mcl", "Mcl", "Mcl", "autosar", None, None, None, None),
+        ModuleMetadata("Platform", "Platform", "Platform", "autosar", "255", "4.9.0", "7.0.1", "43"),
+    )
     assert metadata.rtd_release == "7.0.1"
 
 
@@ -173,6 +200,18 @@ def test_missing_prefs_stay_unknown_and_do_not_use_runtime_defaults(tmp_path):
     assert metadata.processor == "S32K344"
 
 
+def test_missing_observations_remain_unknown(tmp_path):
+    raw = b'''<?xml version="1.0"?>
+<configuration xmlns="urn:unrecognized" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+ <common/><tools/>
+</configuration>'''
+    metadata = _parse(_temporary_project(tmp_path, raw))
+    assert metadata == ProjectMetadata(
+        None, None, None, None, None, None, None, None,
+        "urn:unrecognized", None, None, (), (), None, (),
+    )
+
+
 @pytest.mark.parametrize(
     "field,raw,files",
     [
@@ -181,6 +220,7 @@ def test_missing_prefs_stay_unknown_and_do_not_use_runtime_defaults(tmp_path):
         ("family", _minimal_mex(mcu_data="PlatformSDK_S32K4"), {".settings/com.nxp.s32ds.cle.runtime.component.prefs": b"com.nxp.s32ds.cle.runtime.hardware.registry.family.id=S32K3\n"}),
         ("rtd_release", _minimal_mex(), {".settings/com.freescale.s32ds.cross.sdk.support.prefs": b"com.freescale.s32ds.cross.sdk.support.attachedSDKs=PlatformSDK_S32K3_S32K344_M7_7.0.1_PATH|X,PlatformSDK_S32K3_S32K344_M7_6.0.0_PATH|Y\n"}),
         ("schema_version", _minimal_mex(version="18"), {}),
+        ("schema_version", _minimal_mex(schema="urn:x mex_configuration_18.xsd"), {}),
     ],
 )
 def test_conflicting_observations_are_typed_blockers(tmp_path, field, raw, files):
@@ -243,6 +283,74 @@ def test_default_reader_rejects_auxiliary_path_escape_and_reparse(monkeypatch, t
     assert caught.value.code == "unsafe_project_path"
 
 
+def test_default_reader_does_not_follow_fixed_source_symlink(tmp_path):
+    root = _temporary_project(tmp_path)
+    outside = tmp_path / "outside.cproject"
+    outside.write_text("<cproject/>", encoding="utf-8")
+    (root / ".cproject").symlink_to(outside)
+    with pytest.raises(CliFailure) as caught:
+        _parse(root)
+    assert caught.value.code == "unsafe_project_path"
+
+
+@pytest.mark.parametrize(
+    "content,code",
+    [
+        (b"x" * (1024 * 1024 + 1), "project_metadata_source_too_large"),
+        (b"\xff", "project_metadata_source_encoding_invalid"),
+    ],
+    ids=["oversize", "encoding"],
+)
+def test_default_reader_rejects_invalid_fixed_source_content(tmp_path, content, code):
+    root = _temporary_project(tmp_path)
+    (root / ".cproject").write_bytes(content)
+    with pytest.raises(CliFailure) as caught:
+        _parse(root)
+    assert caught.value.code == code
+
+
+def test_default_reader_detects_fixed_source_replacement(monkeypatch, tmp_path):
+    root = _temporary_project(tmp_path)
+    (root / ".cproject").write_text("<cproject/>", encoding="utf-8")
+    real_fstat = os.fstat
+    fstat_calls = 0
+
+    def changed_fstat(descriptor):
+        nonlocal fstat_calls
+        status = real_fstat(descriptor)
+        fstat_calls += 1
+        if fstat_calls == 2:
+            values = list(status)
+            values[9] += 1
+            return os.stat_result(values)
+        return status
+
+    monkeypatch.setattr(
+        metadata_module,
+        "os",
+        SimpleNamespace(
+            O_RDONLY=os.O_RDONLY,
+            O_BINARY=getattr(os, "O_BINARY", 0),
+            O_NOFOLLOW=getattr(os, "O_NOFOLLOW", 0),
+            open=os.open,
+            read=os.read,
+            close=os.close,
+            fstat=changed_fstat,
+        ),
+    )
+    with pytest.raises(CliFailure) as caught:
+        _parse(root)
+    assert caught.value.code == "project_metadata_source_changed"
+
+
+def test_fixed_source_reader_rejects_unlisted_paths(tmp_path):
+    root = _temporary_project(tmp_path)
+    with verify_project_target(root) as target:
+        reader = metadata_module._safe_source_reader(target)
+        with pytest.raises(ValueError, match="unsupported metadata source"):
+            reader("arbitrary.txt")
+
+
 def test_metadata_value_objects_are_frozen():
     observation = MetadataObservation("device", "S32K344", ".mex", "/configuration/@name")
     conflict = MetadataConflict("device", (observation,))
@@ -274,3 +382,43 @@ def test_inspect_reports_observed_metadata_not_runtime_defaults(capsys):
     assert payload["schema_version"] == "19"
     assert len(payload["modules"]) == 7
     assert "validation_profile" not in payload
+
+
+@pytest.mark.parametrize("flow", ["inspect", "check", "validate", "configure"])
+def test_public_project_flows_reject_metadata_conflicts_before_work(
+    monkeypatch, tmp_path, flow
+):
+    root = _temporary_project(tmp_path)
+    (root / ".cproject").write_text(
+        '<root><listOptionValue value="CPU_S32K345"/></root>',
+        encoding="utf-8",
+    )
+    args = SimpleNamespace(project=root)
+
+    if flow == "inspect":
+        invoke = lambda: cli.cmd_inspect(args)
+    elif flow == "check":
+        monkeypatch.setattr(
+            cli, "run_static_checks",
+            lambda *_args, **_kwargs: pytest.fail("static checks ran after conflict"),
+        )
+        invoke = lambda: cli.cmd_check(args)
+    elif flow == "validate":
+        monkeypatch.setattr(
+            cli, "run_static_checks",
+            lambda *_args, **_kwargs: pytest.fail("static checks ran after conflict"),
+        )
+        args = SimpleNamespace(
+            project=root, s32ds_root=None, workspace=None, sdk_path=None,
+        )
+        invoke = lambda: cli.cmd_validate(args)
+    else:
+        apply_fn = lambda *_args: pytest.fail("apply ran after conflict")
+        args = SimpleNamespace(project=root, backup=False)
+        intent = SimpleNamespace(module="uart", action="set", payload={})
+        plan = SimpleNamespace(to_dict=lambda: {})
+        invoke = lambda: cli._configure_module(args, intent, plan, apply_fn)
+
+    with pytest.raises(CliFailure) as caught:
+        invoke()
+    assert caught.value.code == "project_metadata_conflict"

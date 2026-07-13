@@ -143,18 +143,17 @@ def test_configure_writer_blocker_leaves_original_mex_bytes_unchanged(
     mex = project / "Uart_Example.mex"
     original = mex.read_bytes()
 
-    class FailingDoc:
-        def write(self, path):
-            assert str(path).endswith(".tmp")
-            raise MexWriteError("narrow .mex render unavailable: element count changed")
+    def fail_write(_document, path):
+        assert str(path).endswith(".tmp")
+        raise MexWriteError("narrow .mex render unavailable: element count changed")
 
     def apply_ok(_doc, _intent):
         return ApplyResult(changed_modules=["uart"])
 
     monkeypatch.setattr(
         cli.MexDocument,
-        "from_snapshot",
-        staticmethod(lambda _snapshot: FailingDoc()),
+        "write",
+        fail_write,
     )
 
     rc = cli._configure_module(

@@ -110,11 +110,11 @@ def test_inspect_uart_fixture(tmp_path):
     payload = json.loads(result.stdout)
     assert result.returncode == 0
     assert payload["status"] == "passed"
-    assert payload["backend"] == "mex"
+    assert payload["backend"] == "s32-mex"
     # The inspect user prompt explicitly asks for chip package (封装); inspect
     # must surface the package dimension alongside device/RTD version.
-    assert payload["package"] == "default"
-    assert payload["device"] == "s32k344"
+    assert payload["package"] == "mapbga257"
+    assert payload["device"] == "S32K344"
     assert "Uart" in payload["modules"]
 
 
