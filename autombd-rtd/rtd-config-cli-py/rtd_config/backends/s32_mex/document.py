@@ -55,7 +55,7 @@ import xml.etree.ElementTree as ET
 from xml.parsers import expat
 
 if TYPE_CHECKING:
-    from .target import FileSnapshot, VerifiedProjectTarget
+    from .target import FileSnapshot
 
 
 # The .mex root declares a default namespace. By default ElementTree rewrites
@@ -96,7 +96,7 @@ class MexDocument:
     _raw: bytes = field(default=b"", repr=False, compare=False)
     _sources: list[_ElementSource] = field(default_factory=list, repr=False, compare=False)
     _aligned: bool = field(default=False, repr=False, compare=False)
-    _verified_target: "VerifiedProjectTarget | None" = field(
+    _source_snapshot: "FileSnapshot | None" = field(
         default=None, repr=False, compare=False
     )
 
@@ -117,7 +117,6 @@ class MexDocument:
             if target.mex.path != path.resolve():
                 raise ValueError(f"verified .mex target does not match requested path: {path}")
             doc = cls.from_snapshot(target.mex)
-            doc._verified_target = target
             return doc
         finally:
             target.close()
@@ -131,7 +130,9 @@ class MexDocument:
 
     @classmethod
     def from_snapshot(cls, snapshot: "FileSnapshot") -> "MexDocument":
-        return cls.from_bytes(snapshot.path, snapshot.content)
+        doc = cls.from_bytes(snapshot.path, snapshot.content)
+        doc._source_snapshot = snapshot
+        return doc
 
     @property
     def root(self) -> ET.Element:

@@ -940,11 +940,26 @@ def run_static_checks(
         owned_target = find_single_mex(mex_path.parent)
         verified_target = owned_target
         mex_path = owned_target.mex.path
-        if doc is None:
-            doc = MexDocument.from_snapshot(owned_target.mex)
     try:
         diagnostics: list[Diagnostic] = []
         checks: dict = {}
+        if doc is None and owned_target is not None:
+            try:
+                doc = MexDocument.from_snapshot(owned_target.mex)
+            except ET.ParseError as exc:
+                checks["xml_well_formed"] = False
+                checks["single_mex"] = True
+                diagnostics.append(Diagnostic(
+                    severity="blocker",
+                    code="xml_not_well_formed",
+                    module="backend",
+                    message=f"{mex_path.name} is not well-formed XML.",
+                    details={"reason": str(exc)},
+                ))
+                return Result(
+                    status="blocked", command="check",
+                    diagnostics=diagnostics, data={"checks": checks},
+                )
         _check_xml_and_single_mex(mex_path, checks, diagnostics, verified_target)
         if doc is None and checks.get("xml_well_formed"):
             doc = MexDocument.load(mex_path)

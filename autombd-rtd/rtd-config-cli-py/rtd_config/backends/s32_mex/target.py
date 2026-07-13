@@ -53,6 +53,8 @@ import os
 from pathlib import Path
 import stat
 import sys
+import re
+import threading
 from collections.abc import Callable
 from typing import Protocol
 
@@ -88,6 +90,7 @@ class TargetLease:
     _release: Callable[[], None] = field(repr=False, compare=False)
     _retained: bool = field(default=False, init=False, repr=False, compare=False)
     _closed: bool = field(default=False, init=False, repr=False, compare=False)
+    _lock: threading.Lock = field(default_factory=threading.Lock, init=False, repr=False, compare=False)
 
     def retain(self) -> None:
         object.__setattr__(self, "_retained", True)
@@ -101,12 +104,24 @@ class TargetLease:
         return self._closed
 
     def close(self) -> None:
-        if not self._closed:
-            self._release()
+        with self._lock:
+            if self._closed:
+                return
             object.__setattr__(self, "_closed", True)
+        self._release()
 
     def __del__(self) -> None:
-        self.close()
+        try:
+            self.close()
+        except Exception:
+            pass
+
+
+@dataclass(frozen=True)
+class PublishExpectation:
+    path: Path
+    identity: FileIdentity
+    sha256: str
 
 
 @dataclass(frozen=True)
@@ -147,13 +162,26 @@ class _PosixTargetPlatform:
     def __init__(
         self,
         no_follow_flag: int | None = None,
+        nonblock_flag: int | None = None,
         mount_detector: Callable[[Path], bool] | None = None,
     ) -> None:
         self._no_follow = getattr(os, "O_NOFOLLOW", 0) if no_follow_flag is None else no_follow_flag
+        self._nonblock = getattr(os, "O_NONBLOCK", 0) if nonblock_flag is None else nonblock_flag
         self._mount_detector = mount_detector or self._default_mount_detector()
-        self._root_fd: int | None = None
-        self._root_path: Path | None = None
-        self._protected_fds: list[int] | None = None
+        self._state = threading.local()
+
+    @property
+    def _root_fd(self): return getattr(self._state, "root_fd", None)
+    @_root_fd.setter
+    def _root_fd(self, value): self._state.root_fd = value
+    @property
+    def _root_path(self): return getattr(self._state, "root_path", None)
+    @_root_path.setter
+    def _root_path(self, value): self._state.root_path = value
+    @property
+    def _protected_fds(self): return getattr(self._state, "protected_fds", None)
+    @_protected_fds.setter
+    def _protected_fds(self, value): self._state.protected_fds = value
 
     @staticmethod
     def _default_mount_detector() -> Callable[[Path], bool]:
@@ -177,7 +205,7 @@ class _PosixTargetPlatform:
                     module="backend",
                 ) from exc
             mounts = {
-                Path(fields[4].replace("\\040", " ").replace("\\011", "\t").replace("\\134", "\\"))
+                Path(re.sub(r"\\([0-7]{3})", lambda m: chr(int(m.group(1), 8)), fields[4]))
                 for line in lines
                 if len(fields := line.split()) > 5
             }
@@ -261,7 +289,13 @@ class _PosixTargetPlatform:
                 "This POSIX platform cannot open project files without following links.",
                 module="backend",
             )
-        flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | self._no_follow
+        if not self._nonblock:
+            raise CliFailure(
+                "project_identity_unavailable",
+                "This POSIX platform cannot open project files without blocking.",
+                module="backend",
+            )
+        flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | self._no_follow | self._nonblock
         if self._root_fd is not None and path.parent == self._root_path:
             descriptor = os.open(path.name, flags, dir_fd=self._root_fd)
         else:
@@ -364,7 +398,12 @@ if os.name == "nt":
 
 class _WindowsTargetPlatform:
     def __init__(self) -> None:
-        self._protected_handles: list = []
+        self._state = threading.local()
+
+    @property
+    def _protected_handles(self): return getattr(self._state, "protected_handles", [])
+    @_protected_handles.setter
+    def _protected_handles(self, value): self._state.protected_handles = value
 
     @contextmanager
     def protect_root(self, path: Path):
@@ -719,10 +758,22 @@ def verify_project_target(
                 )
             lease.retain()
             return VerifiedProjectTarget(canonical_root, snapshot, lease)
+    except PermissionError as exc:
+        raise CliFailure(
+            "project_permission_denied",
+            "Permission was denied while acquiring the protected project lease.",
+            module="backend", details={},
+        ) from exc
     except FileNotFoundError as exc:
         raise CliFailure(
             "project_not_found", f"Project directory does not exist: {project}",
             module="backend", details={"project": str(project)},
+        ) from exc
+    except OSError as exc:
+        raise CliFailure(
+            "unsafe_project_path",
+            "The protected project lease could not be acquired safely.",
+            module="backend", details={"errno": exc.errno} if exc.errno is not None else {},
         ) from exc
 
 
@@ -743,3 +794,14 @@ def revalidate_snapshot(
         return current_target.mex
     finally:
         current_target.close()
+
+
+def release_for_publish(
+    target: VerifiedProjectTarget,
+    platform: TargetPlatform | None = None,
+) -> PublishExpectation:
+    """Revalidate and release a target, returning Task 4 publish evidence."""
+    revalidate_snapshot(target, platform=platform)
+    expectation = PublishExpectation(target.mex.path, target.mex.identity, target.mex.sha256)
+    target.close()
+    return expectation

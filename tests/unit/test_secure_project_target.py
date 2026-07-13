@@ -46,12 +46,13 @@
 
 from __future__ import annotations
 
-from contextlib import nullcontext
+from contextlib import contextmanager, nullcontext
 from dataclasses import FrozenInstanceError, replace
 import gc
 import hashlib
 import json
 import os
+import threading
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -68,12 +69,14 @@ from rtd_config.backends.s32_mex.target import (
     VerifiedProjectTarget,
     WindowsFileId,
     _PosixTargetPlatform,
+    release_for_publish,
     default_target_platform,
     revalidate_snapshot,
     verify_project_target,
 )
 from rtd_config.errors import CliFailure
 from rtd_config.project import Project
+from rtd_config.checks.static import run_static_checks
 
 
 XML_A = b"<mex><instance name='A'/></mex>"
@@ -388,6 +391,24 @@ def test_posix_without_no_follow_support_fails_closed(tmp_path):
     assert caught.value.code == "project_identity_unavailable"
 
 
+def test_posix_without_nonblock_support_fails_closed(tmp_path):
+    _, mex = _project(tmp_path)
+    platform = _PosixTargetPlatform(
+        no_follow_flag=1, nonblock_flag=0, mount_detector=lambda _path: False
+    )
+    with pytest.raises(CliFailure) as caught:
+        platform.snapshot_file(mex)
+    assert caught.value.code == "project_identity_unavailable"
+
+
+def test_static_malformed_snapshot_is_structured_and_releases_lease(tmp_path):
+    root, mex = _project(tmp_path, b"<mex>")
+    result = run_static_checks(mex)
+    assert result.status == "blocked"
+    assert any(item.code == "xml_not_well_formed" for item in result.diagnostics)
+    root.rename(tmp_path / "released-malformed")
+
+
 def test_injected_bind_mount_detector_fails_closed(tmp_path):
     root, _ = _project(tmp_path)
     platform = _PosixTargetPlatform(
@@ -494,6 +515,7 @@ def test_linux_mountinfo_detector_decodes_escaped_mount_paths(monkeypatch):
         "36 25 0:32 / /workspace\\040bind rw,relatime - ext4 /dev/root rw\n"
         "37 25 0:33 / /workspace\\011tab rw,relatime - ext4 /dev/root rw\n"
         "38 25 0:34 / /workspace\\134slash rw,relatime - ext4 /dev/root rw\n"
+        "39 25 0:35 / /workspace\\012newline rw,relatime - ext4 /dev/root rw\n"
     )
     monkeypatch.setattr(target_module.sys, "platform", "linux")
     monkeypatch.setattr(
@@ -507,6 +529,7 @@ def test_linux_mountinfo_detector_decodes_escaped_mount_paths(monkeypatch):
     assert detector(Path("/workspace bind"))
     assert detector(Path("/workspace\ttab"))
     assert detector(Path("/workspace\\slash"))
+    assert detector(Path("/workspace\nnewline"))
     assert not detector(Path("/workspace/ordinary"))
 
 
@@ -734,6 +757,52 @@ def test_project_context_closes_lease_on_success_and_exception(tmp_path, raise_i
     except RuntimeError:
         assert raise_inside
     assert project.verified_target.lease.closed
+
+
+def test_target_lease_close_is_thread_safe_and_release_failure_is_not_retried():
+    barrier = threading.Barrier(2)
+    releases = []
+
+    def release():
+        releases.append(1)
+        raise RuntimeError("release failed")
+
+    lease = TargetLease(release)
+    errors = []
+    def close():
+        barrier.wait()
+        try:
+            lease.close()
+        except RuntimeError:
+            errors.append(1)
+    threads = [threading.Thread(target=close) for _ in range(2)]
+    for thread in threads: thread.start()
+    for thread in threads: thread.join()
+    lease.close()
+    assert releases == [1]
+    assert errors == [1]
+
+
+@pytest.mark.parametrize("error,code", [(PermissionError(), "project_permission_denied"), (OSError(), "unsafe_project_path")])
+def test_protect_root_enter_errors_are_typed(tmp_path, error, code):
+    root, _ = _project(tmp_path)
+    platform = InjectedPlatform()
+    @contextmanager
+    def fail(_path):
+        raise error
+        yield
+    platform.protect_root = fail
+    with pytest.raises(CliFailure) as caught:
+        verify_project_target(root, platform=platform)
+    assert caught.value.code == code
+
+
+def test_release_for_publish_revalidates_then_closes(tmp_path):
+    root, _ = _project(tmp_path)
+    target = verify_project_target(root)
+    expectation = release_for_publish(target)
+    assert expectation.sha256 == target.mex.sha256
+    assert target.lease.closed
 
 
 @pytest.mark.parametrize("flow", ["inspect", "check", "validate", "configure"])
