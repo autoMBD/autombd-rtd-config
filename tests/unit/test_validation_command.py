@@ -371,7 +371,27 @@ def test_validation_uses_controlled_copy_and_leaves_project_byte_identical(tmp_p
             assert not load.is_relative_to(project)
             assert Path(env["TEMP"]).is_relative_to(control)
             assert Path(env["TMP"]).is_relative_to(control)
-            assert {item.name for item in load.parent.iterdir()} == {load.name}
+            staged = {
+                item.relative_to(load.parent).as_posix(): item
+                for item in load.parent.rglob("*")
+                if item.is_file()
+            }
+            required = {
+                load.name,
+                ".project",
+                ".cproject",
+                *(
+                    item.relative_to(project).as_posix()
+                    for item in (project / ".settings").rglob("*")
+                    if item.is_file()
+                ),
+            }
+            assert required <= set(staged), (
+                "controlled validation stage lacks the S32DS project metadata "
+                f"required by the real -Load command: {sorted(required - set(staged))}"
+            )
+            for relative in required:
+                assert staged[relative].read_bytes() == (project / relative).read_bytes()
             load.write_bytes(b"vendor-mutated-stage")
             export.mkdir(parents=True, exist_ok=True)
             (export / "generated.c").write_bytes(b"generated")
