@@ -90,7 +90,9 @@ class TargetLease:
     _release: Callable[[], None] = field(repr=False, compare=False)
     _retained: bool = field(default=False, init=False, repr=False, compare=False)
     _closed: bool = field(default=False, init=False, repr=False, compare=False)
-    _lock: threading.Lock = field(default_factory=threading.Lock, init=False, repr=False, compare=False)
+    _closing: bool = field(default=False, init=False, repr=False, compare=False)
+    _active_readers: int = field(default=0, init=False, repr=False, compare=False)
+    _condition: threading.Condition = field(default_factory=threading.Condition, init=False, repr=False, compare=False)
     _resources: dict = field(default_factory=dict, init=False, repr=False, compare=False)
 
     def retain(self) -> None:
@@ -104,12 +106,40 @@ class TargetLease:
     def closed(self) -> bool:
         return self._closed
 
+    @contextmanager
+    def borrow(self):
+        with self._condition:
+            if self._closing or self._closed:
+                raise CliFailure(
+                    "project_target_closed",
+                    "The verified project lease is closing or closed.",
+                    module="backend",
+                )
+            object.__setattr__(self, "_active_readers", self._active_readers + 1)
+        try:
+            yield
+        finally:
+            with self._condition:
+                object.__setattr__(self, "_active_readers", self._active_readers - 1)
+                self._condition.notify_all()
+
     def close(self) -> None:
-        with self._lock:
+        with self._condition:
             if self._closed:
                 return
-            object.__setattr__(self, "_closed", True)
-        self._release()
+            if self._closing:
+                while not self._closed:
+                    self._condition.wait()
+                return
+            object.__setattr__(self, "_closing", True)
+            while self._active_readers:
+                self._condition.wait()
+        try:
+            self._release()
+        finally:
+            with self._condition:
+                object.__setattr__(self, "_closed", True)
+                self._condition.notify_all()
 
     def __del__(self) -> None:
         try:
@@ -791,12 +821,6 @@ def read_project_relative(
     """Read one bounded project-relative file through the live root lease."""
     if not isinstance(target, VerifiedProjectTarget):
         raise TypeError("target must be a VerifiedProjectTarget")
-    if target.lease.closed:
-        raise CliFailure(
-            "project_target_closed",
-            "The verified project lease is closed; reload the project before reading metadata.",
-            module="backend",
-        )
     if max_bytes < 0:
         raise ValueError("max_bytes must be non-negative")
     parts = tuple(relative.split("/"))
@@ -804,15 +828,16 @@ def read_project_relative(
         raise ValueError("relative project paths must contain only fixed child names")
     platform = target.lease._resources.get("platform")
     try:
-        if isinstance(platform, _PosixTargetPlatform):
-            return _read_posix_relative(target, parts, max_bytes)
-        if isinstance(platform, _WindowsTargetPlatform):
-            return _read_windows_relative(target, parts, max_bytes, platform)
-        raise CliFailure(
-            "project_identity_unavailable",
-            "The verified target does not retain a handle-capable project reader.",
-            module="backend",
-        )
+        with target.lease.borrow():
+            if isinstance(platform, _PosixTargetPlatform):
+                return _read_posix_relative(target, parts, max_bytes)
+            if isinstance(platform, _WindowsTargetPlatform):
+                return _read_windows_relative(target, parts, max_bytes, platform)
+            raise CliFailure(
+                "project_identity_unavailable",
+                "The verified target does not retain a handle-capable project reader.",
+                module="backend",
+            )
     except FileNotFoundError:
         return None
     except CliFailure:

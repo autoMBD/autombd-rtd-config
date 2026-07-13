@@ -170,3 +170,32 @@ def test_configure_writer_blocker_leaves_original_mex_bytes_unchanged(
     assert payload["diagnostics"][0]["module"] == "backend"
     assert mex.read_bytes() == original
     assert not list(mex.parent.glob(f".{mex.name}.*.tmp"))
+
+
+def test_configure_plan_and_apply_share_one_verified_project(monkeypatch, tmp_path):
+    project_root = copy_uart_fixture(tmp_path)
+    projects = []
+    original_verified = cli.Project.verified
+
+    def tracked_verified(root, backend="s32-mex"):
+        project = original_verified(root, backend)
+        projects.append(project)
+        return project
+
+    class Provider:
+        def plan(self, _intent):
+            return SimpleNamespace(to_dict=lambda: {})
+
+    def configure_same_project(_args, _intent, _plan, _apply, project):
+        assert project is projects[0]
+        assert not project.verified_target.lease.closed
+        return 0
+
+    monkeypatch.setattr(cli.Project, "verified", tracked_verified)
+    monkeypatch.setattr(cli, "UartProvider", Provider)
+    monkeypatch.setattr(cli, "normalize_uart_intent", lambda _args: Intent.from_dict({"module": "uart", "action": "set", "payload": {}}))
+    monkeypatch.setattr(cli, "_configure_verified_project", configure_same_project)
+
+    assert cli.cmd_uart_set(Namespace(project=project_root, configure=True, backup=False)) == 0
+    assert len(projects) == 1
+    assert projects[0].verified_target.lease.closed

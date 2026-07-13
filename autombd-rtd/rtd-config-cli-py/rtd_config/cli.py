@@ -603,9 +603,27 @@ def _intent_dict(intent: Intent) -> dict:
 def _preflight_plan(args, intent: Intent, provider):
     """Verify observed project identity before module-specific planning."""
     config = RuntimeConfig.from_dict({"project": args.project})
-    with Project.verified(config.project, config.backend) as project:
+    project = Project.verified(config.project, config.backend)
+    try:
         project.metadata.require_identity()
-        return provider.plan(intent)
+        return provider.plan(intent), project
+    except BaseException:
+        project.close()
+        raise
+
+
+def _complete_planned_command(args, intent, plan, apply_fn, project: Project) -> int:
+    if not args.configure:
+        try:
+            return emit({
+                "status": "passed",
+                "command": "plan",
+                "normalized_intent": _intent_dict(intent),
+                "plan": plan.to_dict(),
+            })
+        finally:
+            project.close()
+    return _configure_module(args, intent, plan, apply_fn, project=project)
 
 
 def cmd_validate(args: argparse.Namespace) -> int:
@@ -697,17 +715,8 @@ def _cmd_validate_verified(args, config: RuntimeConfig, project: Project) -> int
 
 def cmd_uart_set(args: argparse.Namespace) -> int:
     intent = normalize_uart_intent(args)
-    plan = _preflight_plan(args, intent, UartProvider())
-
-    if not args.configure:
-        return emit({
-            "status": "passed",
-            "command": "plan",
-            "normalized_intent": _intent_dict(intent),
-            "plan": plan.to_dict(),
-        })
-
-    return _configure_module(args, intent, plan, apply_uart_set)
+    plan, project = _preflight_plan(args, intent, UartProvider())
+    return _complete_planned_command(args, intent, plan, apply_uart_set, project)
 
 
 def normalize_uart_add_flexio_intent(args: argparse.Namespace) -> Intent:
@@ -728,28 +737,25 @@ def normalize_uart_add_flexio_intent(args: argparse.Namespace) -> Intent:
 
 def cmd_uart_add_flexio_channel(args: argparse.Namespace) -> int:
     intent = normalize_uart_add_flexio_intent(args)
-    plan = _preflight_plan(args, intent, UartProvider())
-
-    if not args.configure:
-        return emit({
-            "status": "passed",
-            "command": "plan",
-            "normalized_intent": _intent_dict(intent),
-            "plan": plan.to_dict(),
-        })
-
-    return _configure_module(args, intent, plan, apply_uart_add_flexio_channel)
+    plan, project = _preflight_plan(args, intent, UartProvider())
+    return _complete_planned_command(
+        args, intent, plan, apply_uart_add_flexio_channel, project
+    )
 
 
-def _configure_module(args: argparse.Namespace, intent: Intent, plan, apply_fn) -> int:
+def _configure_module(
+    args: argparse.Namespace, intent: Intent, plan, apply_fn,
+    project: Project | None = None,
+) -> int:
     """Shared configure pipeline: apply an owned edit, preflight, then commit.
 
     ``apply_fn(doc, intent) -> ApplyResult`` is the module's localized backend
     edit. The pipeline is module-agnostic; per-module specifics live in the
     intent payload and the apply function.
     """
-    config = RuntimeConfig.from_dict({"project": args.project})
-    project = Project.verified(config.project, config.backend)
+    if project is None:
+        config = RuntimeConfig.from_dict({"project": args.project})
+        project = Project.verified(config.project, config.backend)
     try:
         return _configure_verified_project(args, intent, plan, apply_fn, project)
     finally:
@@ -757,11 +763,12 @@ def _configure_module(args: argparse.Namespace, intent: Intent, plan, apply_fn) 
 
 
 def _configure_verified_project(args, intent, plan, apply_fn, project: Project) -> int:
-    project.metadata.require_consistent()
+    project.metadata.require_identity()
     target = project.verified_target
     mex = target.mex.path
     doc = project.document
 
+    revalidate_snapshot(target)
     apply_result = apply_fn(doc, intent)
     if apply_result.blocked:
         target.close()
@@ -880,17 +887,8 @@ def normalize_platform_intent(args: argparse.Namespace) -> Intent:
 
 def cmd_platform_set(args: argparse.Namespace) -> int:
     intent = normalize_platform_intent(args)
-    plan = _preflight_plan(args, intent, PlatformProvider())
-
-    if not args.configure:
-        return emit({
-            "status": "passed",
-            "command": "plan",
-            "normalized_intent": _intent_dict(intent),
-            "plan": plan.to_dict(),
-        })
-
-    return _configure_module(args, intent, plan, apply_platform_set)
+    plan, project = _preflight_plan(args, intent, PlatformProvider())
+    return _complete_planned_command(args, intent, plan, apply_platform_set, project)
 
 
 def normalize_basenxp_intent(args: argparse.Namespace) -> Intent:
@@ -922,17 +920,8 @@ def normalize_basenxp_intent(args: argparse.Namespace) -> Intent:
 
 def cmd_basenxp_set(args: argparse.Namespace) -> int:
     intent = normalize_basenxp_intent(args)
-    plan = _preflight_plan(args, intent, BaseNxpProvider())
-
-    if not args.configure:
-        return emit({
-            "status": "passed",
-            "command": "plan",
-            "normalized_intent": _intent_dict(intent),
-            "plan": plan.to_dict(),
-        })
-
-    return _configure_module(args, intent, plan, apply_basenxp_set)
+    plan, project = _preflight_plan(args, intent, BaseNxpProvider())
+    return _complete_planned_command(args, intent, plan, apply_basenxp_set, project)
 
 
 def normalize_mcl_intent(args: argparse.Namespace) -> Intent:
@@ -950,17 +939,8 @@ def normalize_mcl_intent(args: argparse.Namespace) -> Intent:
 
 def cmd_mcl_set(args: argparse.Namespace) -> int:
     intent = normalize_mcl_intent(args)
-    plan = _preflight_plan(args, intent, MclProvider())
-
-    if not args.configure:
-        return emit({
-            "status": "passed",
-            "command": "plan",
-            "normalized_intent": _intent_dict(intent),
-            "plan": plan.to_dict(),
-        })
-
-    return _configure_module(args, intent, plan, apply_mcl_set)
+    plan, project = _preflight_plan(args, intent, MclProvider())
+    return _complete_planned_command(args, intent, plan, apply_mcl_set, project)
 
 
 def normalize_port_intent(args: argparse.Namespace) -> Intent:
@@ -984,17 +964,8 @@ def normalize_port_intent(args: argparse.Namespace) -> Intent:
 
 def cmd_port_set(args: argparse.Namespace) -> int:
     intent = normalize_port_intent(args)
-    plan = _preflight_plan(args, intent, PortProvider())
-
-    if not args.configure:
-        return emit({
-            "status": "passed",
-            "command": "plan",
-            "normalized_intent": _intent_dict(intent),
-            "plan": plan.to_dict(),
-        })
-
-    return _configure_module(args, intent, plan, apply_port_set)
+    plan, project = _preflight_plan(args, intent, PortProvider())
+    return _complete_planned_command(args, intent, plan, apply_port_set, project)
 
 
 def normalize_dio_intent(args: argparse.Namespace) -> Intent:
@@ -1040,32 +1011,14 @@ def normalize_mcu_intent(args: argparse.Namespace) -> Intent:
 
 def cmd_dio_set(args: argparse.Namespace) -> int:
     intent = normalize_dio_intent(args)
-    plan = _preflight_plan(args, intent, DioProvider())
-
-    if not args.configure:
-        return emit({
-            "status": "passed",
-            "command": "plan",
-            "normalized_intent": _intent_dict(intent),
-            "plan": plan.to_dict(),
-        })
-
-    return _configure_module(args, intent, plan, apply_dio_set)
+    plan, project = _preflight_plan(args, intent, DioProvider())
+    return _complete_planned_command(args, intent, plan, apply_dio_set, project)
 
 
 def cmd_mcu_set(args: argparse.Namespace) -> int:
     intent = normalize_mcu_intent(args)
-    plan = _preflight_plan(args, intent, McuProvider())
-
-    if not args.configure:
-        return emit({
-            "status": "passed",
-            "command": "plan",
-            "normalized_intent": _intent_dict(intent),
-            "plan": plan.to_dict(),
-        })
-
-    return _configure_module(args, intent, plan, apply_mcu_set)
+    plan, project = _preflight_plan(args, intent, McuProvider())
+    return _complete_planned_command(args, intent, plan, apply_mcu_set, project)
 
 
 def normalize_adc_intent(args: argparse.Namespace) -> Intent:
@@ -1083,17 +1036,8 @@ def normalize_adc_intent(args: argparse.Namespace) -> Intent:
 
 def cmd_adc_set(args: argparse.Namespace) -> int:
     intent = normalize_adc_intent(args)
-    plan = _preflight_plan(args, intent, AdcProvider())
-
-    if not args.configure:
-        return emit({
-            "status": "passed",
-            "command": "plan",
-            "normalized_intent": _intent_dict(intent),
-            "plan": plan.to_dict(),
-        })
-
-    return _configure_module(args, intent, plan, apply_adc_set)
+    plan, project = _preflight_plan(args, intent, AdcProvider())
+    return _complete_planned_command(args, intent, plan, apply_adc_set, project)
 
 
 def _dispatch(args: argparse.Namespace, parser: argparse.ArgumentParser) -> int:

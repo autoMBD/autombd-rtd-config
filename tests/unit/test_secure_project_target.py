@@ -741,7 +741,7 @@ def test_configure_uses_snapshot_then_rejects_swapped_target_before_publish(
     with pytest.raises(CliFailure) as caught:
         cli._configure_module(args, intent, plan, apply_snapshot)
 
-    assert caught.value.code == "project_target_changed"
+    assert caught.value.code == "project_metadata_unknown"
     assert mex.read_bytes() == XML_B
 
 
@@ -871,6 +871,37 @@ def test_target_lease_close_is_thread_safe_and_release_failure_is_not_retried():
     assert errors == [1]
 
 
+def test_target_lease_close_waits_for_active_reader_and_releases_once():
+    borrowed = threading.Event()
+    allow_reader_exit = threading.Event()
+    released = threading.Event()
+    releases = []
+    lease = TargetLease(lambda: (releases.append(1), released.set()))
+
+    def reader():
+        with lease.borrow():
+            borrowed.set()
+            assert allow_reader_exit.wait(timeout=5)
+
+    reader_thread = threading.Thread(target=reader)
+    reader_thread.start()
+    assert borrowed.wait(timeout=5)
+    closers = [threading.Thread(target=lease.close) for _ in range(2)]
+    for closer in closers:
+        closer.start()
+    assert not released.wait(timeout=0.1)
+    with pytest.raises(CliFailure) as caught:
+        with lease.borrow():
+            pass
+    assert caught.value.code == "project_target_closed"
+    allow_reader_exit.set()
+    reader_thread.join(timeout=5)
+    for closer in closers:
+        closer.join(timeout=5)
+    assert releases == [1]
+    assert lease.closed
+
+
 @pytest.mark.parametrize("error,code", [(PermissionError(), "project_permission_denied"), (OSError(), "unsafe_project_path")])
 def test_protect_root_enter_errors_are_typed(tmp_path, error, code):
     root, _ = _project(tmp_path)
@@ -956,11 +987,14 @@ def test_public_project_flows_close_lease_when_work_raises(
         plan = SimpleNamespace(to_dict=lambda: {})
         configure_args = SimpleNamespace(project=root, backup=False)
 
-        def fail_apply(_doc, _intent):
-            raise failure
+        monkeypatch.setattr(
+            cli,
+            "_configure_verified_project",
+            lambda *_args, **_kwargs: (_ for _ in ()).throw(failure),
+        )
 
         invoke = lambda: cli._configure_module(
-            configure_args, intent, plan, fail_apply
+            configure_args, intent, plan, lambda *_args: None
         )
 
     with pytest.raises(RuntimeError, match=f"{flow} work failed"):

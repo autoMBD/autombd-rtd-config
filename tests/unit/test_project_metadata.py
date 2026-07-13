@@ -344,6 +344,19 @@ def test_metadata_value_objects_are_frozen():
         metadata.device = "S32K344"  # type: ignore[misc]
 
 
+def test_metadata_to_dict_returns_detached_nested_values():
+    metadata = _parse(UART)
+    first = metadata.to_dict()
+    first["tools"][0]["name"] = "mutated"
+    first["modules"][0]["name"] = "mutated"
+    first["conflicts"].append({"field": "mutated"})
+
+    second = metadata.to_dict()
+    assert metadata.tools[0].name == second["tools"][0]["name"] == "Pins"
+    assert metadata.modules[0].name == second["modules"][0]["name"] == "Mcl"
+    assert second["conflicts"] == []
+
+
 def test_project_caches_document_and_metadata():
     with Project.verified(UART) as project:
         assert project.document is project.document
