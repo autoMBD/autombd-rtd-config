@@ -46,6 +46,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 import os
 from pathlib import Path
 import stat
@@ -61,6 +62,7 @@ from rtd_config.backends.s32_mex.target import (
     PublishExpectation,
     atomic_publish_candidate,
     default_target_platform,
+    discard_owned_path,
 )
 from rtd_config.backends.s32_mex.transaction import ConfigureTransaction
 import rtd_config.backends.s32_mex.transaction as transaction_module
@@ -437,6 +439,26 @@ def test_cleanup_failure_is_typed_without_publishing(monkeypatch, tmp_path):
         real_unlink(staging)
 
 
+def test_finally_preserves_staging_replaced_by_external_bytes(tmp_path):
+    project = _prepared_project(tmp_path)
+    mex = project.mex_file
+    external = b"<external-staging/>"
+    observed = {}
+
+    def replace_then_block(path, **_kwargs):
+        path.write_bytes(external)
+        observed["path"] = path
+        return SimpleNamespace(status="blocked", diagnostics=[])
+
+    with pytest.raises(CliFailure) as caught:
+        ConfigureTransaction(
+            project, static_runner=replace_then_block
+        ).execute(_intent(), _edit)
+    assert caught.value.code == "configure_cleanup_ownership_changed"
+    assert observed["path"].read_bytes() == external
+    assert mex.read_bytes() == project.verified_target.mex.content
+
+
 class _CapturePlatform:
     def __init__(self, target: Path, staging: Path) -> None:
         self.target = target
@@ -596,6 +618,49 @@ def test_atomic_adapter_is_mandatory(tmp_path):
     assert caught.value.code == "configure_atomic_publish_unavailable"
 
 
+def test_injected_posix_mode_mismatch_restores_original_fail_closed(tmp_path):
+    target = tmp_path / "project.mex"
+    staging = tmp_path / ".project.mex.candidate.tmp"
+
+    class ModePlatform(_CapturePlatform):
+        def snapshot_file(self, path):
+            snapshot = super().snapshot_file(path)
+            mode = 0o640 if snapshot.content == b"original" else 0o600
+            return replace(snapshot, mode=mode)
+
+    platform = ModePlatform(target, staging)
+    expectation = _capture_expectation(platform)
+    with pytest.raises(CliFailure) as caught:
+        atomic_publish_candidate(
+            expectation, staging,
+            __import__("hashlib").sha256(b"candidate").hexdigest(),
+            platform=platform,
+        )
+    assert caught.value.code == "configure_publish_metadata_changed"
+    assert platform.files[target][1] == b"original"
+
+
+def test_injected_cleanup_quarantine_deletes_only_snapshot_proven_candidate(tmp_path):
+    target = tmp_path / "project.mex"
+    staging = tmp_path / ".project.mex.candidate.tmp"
+    platform = _CapturePlatform(target, staging)
+    expected = platform.snapshot_file(staging)
+    discard_owned_path(staging, expected, platform)
+    assert staging not in platform.files
+
+
+def test_injected_cleanup_quarantine_restores_unowned_replacement(tmp_path):
+    target = tmp_path / "project.mex"
+    staging = tmp_path / ".project.mex.candidate.tmp"
+    platform = _CapturePlatform(target, staging)
+    expected = platform.snapshot_file(staging)
+    platform.files[staging] = (FileIdentity(1, 9, None), b"external")
+    with pytest.raises(CliFailure) as caught:
+        discard_owned_path(staging, expected, platform)
+    assert caught.value.code == "configure_cleanup_ownership_changed"
+    assert platform.files[staging][1] == b"external"
+
+
 @pytest.mark.skipif(os.name != "nt", reason="Windows ReplaceFileW capture test")
 def test_real_windows_adapter_restores_destination_swapped_at_syscall(tmp_path):
     target = tmp_path / "project.mex"
@@ -649,6 +714,24 @@ def test_atomic_publish_internal_aux_mutation_cannot_return_pass(tmp_path):
     assert caught.value.code == "project_metadata_source_changed"
 
 
+def test_flush_auxiliary_mutation_cannot_return_pass(monkeypatch, tmp_path):
+    project = _prepared_project(tmp_path)
+    mex = project.mex_file
+    original = mex.read_bytes()
+    source = project.root / ".project"
+
+    def mutate_aux(_directory):
+        source.write_bytes(source.read_bytes() + b"\n")
+
+    monkeypatch.setattr(ConfigureTransaction, "_flush_directory", staticmethod(mutate_aux))
+    with pytest.raises(CliFailure) as caught:
+        ConfigureTransaction(project, static_runner=_passed_static).execute(
+            _intent(), _edit
+        )
+    assert caught.value.code == "project_metadata_source_changed"
+    assert mex.read_bytes() == original
+
+
 def test_flush_target_swap_cannot_return_pass(monkeypatch, tmp_path):
     project = _prepared_project(tmp_path)
     mex = project.mex_file
@@ -665,6 +748,36 @@ def test_flush_target_swap_cannot_return_pass(monkeypatch, tmp_path):
             _intent(), _edit
         )
     assert mex.read_bytes() == attacker
+
+
+@pytest.mark.parametrize("preexisting", [False, True])
+def test_final_cas_external_target_preserves_attacker_and_restores_backup_pair(
+    monkeypatch, tmp_path, preexisting
+):
+    project = _prepared_project(tmp_path)
+    mex = project.mex_file
+    backup = mex.with_name(mex.name + ".bak")
+    prior = b"prior-backup"
+    attacker = b"<final-cas-attacker/>"
+    if preexisting:
+        backup.write_bytes(prior)
+
+    def mutate_target(_directory):
+        replacement = mex.with_name("final-cas-attacker.mex")
+        replacement.write_bytes(attacker)
+        os.replace(replacement, mex)
+
+    monkeypatch.setattr(ConfigureTransaction, "_flush_directory", staticmethod(mutate_target))
+    with pytest.raises(CliFailure) as caught:
+        ConfigureTransaction(
+            project, backup=True, static_runner=_passed_static
+        ).execute(_intent(), _edit)
+    assert caught.value.code == "configure_publish_restore_failed"
+    assert mex.read_bytes() == attacker
+    if preexisting:
+        assert backup.read_bytes() == prior
+    else:
+        assert not backup.exists()
 
 
 @pytest.mark.parametrize("preexisting", [False, True])
@@ -694,6 +807,87 @@ def test_flush_failure_rolls_back_backup_and_target(monkeypatch, tmp_path, preex
         assert not backup.exists()
 
 
+@pytest.mark.parametrize("preexisting", [False, True])
+def test_target_publish_failure_rolls_back_backup_pair(tmp_path, preexisting):
+    project = _prepared_project(tmp_path)
+    mex = project.mex_file
+    original = mex.read_bytes()
+    backup = mex.with_name(mex.name + ".bak")
+    prior = b"prior-backup"
+    if preexisting:
+        backup.write_bytes(prior)
+
+    def fail_target_publish(*_args, **_kwargs):
+        raise CliFailure(
+            "configure_publish_failed", "injected target failure", module="backend"
+        )
+
+    with pytest.raises(CliFailure) as caught:
+        ConfigureTransaction(
+            project, backup=True, static_runner=_passed_static,
+            atomic_publish_fn=fail_target_publish,
+        ).execute(_intent(), _edit)
+    assert caught.value.code == "configure_publish_failed"
+    assert mex.read_bytes() == original
+    if preexisting:
+        assert backup.read_bytes() == prior
+    else:
+        assert not backup.exists()
+
+
+def test_absent_backup_syscall_race_preserves_external_backup(
+    monkeypatch, tmp_path
+):
+    project = _prepared_project(tmp_path)
+    mex = project.mex_file
+    original = mex.read_bytes()
+    backup = mex.with_name(mex.name + ".bak")
+    attacker = b"external-backup"
+    install = transaction_module.atomic_install_absent
+
+    def race(path, staging, candidate_sha256, *, platform):
+        path.write_bytes(attacker)
+        return install(path, staging, candidate_sha256, platform=platform)
+
+    monkeypatch.setattr(transaction_module, "atomic_install_absent", race)
+    with pytest.raises(CliFailure) as caught:
+        ConfigureTransaction(
+            project, backup=True, static_runner=_passed_static
+        ).execute(_intent(), _edit)
+    assert caught.value.code == "configure_backup_changed"
+    assert mex.read_bytes() == original
+    assert backup.read_bytes() == attacker
+
+
+def test_preexisting_backup_syscall_race_preserves_external_backup(
+    monkeypatch, tmp_path
+):
+    project = _prepared_project(tmp_path)
+    mex = project.mex_file
+    original = mex.read_bytes()
+    backup = mex.with_name(mex.name + ".bak")
+    backup.write_bytes(b"prior")
+    attacker = b"external-backup"
+    publish = transaction_module.atomic_publish_candidate
+
+    def race(expectation, staging, candidate_sha256, *, platform):
+        replacement = backup.with_name("external-backup.tmp")
+        replacement.write_bytes(attacker)
+        os.replace(replacement, backup)
+        return publish(
+            expectation, staging, candidate_sha256, platform=platform
+        )
+
+    monkeypatch.setattr(transaction_module, "atomic_publish_candidate", race)
+    with pytest.raises(CliFailure) as caught:
+        ConfigureTransaction(
+            project, backup=True, static_runner=_passed_static
+        ).execute(_intent(), _edit)
+    assert caught.value.code == "project_target_changed"
+    assert mex.read_bytes() == original
+    assert backup.read_bytes() == attacker
+
+
 def test_published_mode_matches_original(tmp_path):
     project = _prepared_project(tmp_path)
     mex = project.mex_file
@@ -702,6 +896,27 @@ def test_published_mode_matches_original(tmp_path):
         _intent(), _edit
     )
     assert stat.S_IMODE(mex.stat().st_mode) == before_mode
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows readonly metadata test")
+def test_real_windows_readonly_target_fails_closed_without_metadata_loss(tmp_path):
+    root = copy_uart_fixture(tmp_path)
+    mex = root / "Uart_Example.mex"
+    original = mex.read_bytes()
+    os.chmod(mex, stat.S_IREAD)
+    try:
+        project = Project.verified(root)
+        cli._preflight_project(project)
+        with pytest.raises(CliFailure) as caught:
+            ConfigureTransaction(project, static_runner=_passed_static).execute(
+                _intent(), _edit
+            )
+        assert caught.value.code == "configure_publish_failed"
+        assert mex.read_bytes() == original
+        assert not (mex.stat().st_mode & stat.S_IWRITE)
+        assert not list(mex.parent.glob(f".{mex.name}.*.tmp"))
+    finally:
+        os.chmod(mex, stat.S_IREAD | stat.S_IWRITE)
 
 
 def test_real_static_context_uses_candidate_and_verified_project_facts(tmp_path):
