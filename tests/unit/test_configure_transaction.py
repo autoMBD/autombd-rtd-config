@@ -67,6 +67,7 @@ from rtd_config.backends.s32_mex.target import (
     discard_owned_path,
 )
 from rtd_config.backends.s32_mex.transaction import ConfigureTransaction
+import rtd_config.backends.s32_mex.target as target_module
 import rtd_config.backends.s32_mex.transaction as transaction_module
 from rtd_config.errors import CliFailure
 from rtd_config.intent import Intent
@@ -194,6 +195,8 @@ def test_noop_does_not_stage_backup_or_replace(tmp_path):
         assert result.status == "passed"
         assert result.changed_modules == []
         assert result.published_bytes == original
+        assert result.published is False
+        assert result.cleanup_warnings == []
         assert not mex.with_name(mex.name + ".bak").exists()
         assert not list(mex.parent.glob(f".{mex.name}.*.tmp"))
     finally:
@@ -991,8 +994,9 @@ def test_real_static_context_uses_candidate_and_verified_project_facts(tmp_path)
     assert checks["project_target"] is True
 
 
+@pytest.mark.parametrize("failed_snapshot", [1, 2])
 def test_exchange_classification_failure_is_adopted_and_primary_code_survives(
-    monkeypatch, tmp_path
+    monkeypatch, tmp_path, failed_snapshot
 ):
     project = _prepared_project(tmp_path)
     mex = project.mex_file
@@ -1000,7 +1004,7 @@ def test_exchange_classification_failure_is_adopted_and_primary_code_survives(
     platform = project.verified_target.lease._resources["platform"]
     snapshot = platform.snapshot_file
     exchange = platform.exchange_capture
-    state = {"exchanged": False, "failed": False}
+    state = {"exchanged": False, "count": 0}
 
     def mark_exchange(*args):
         result = exchange(*args)
@@ -1008,9 +1012,10 @@ def test_exchange_classification_failure_is_adopted_and_primary_code_survives(
         return result
 
     def fail_first_classification(path):
-        if state["exchanged"] and not state["failed"]:
-            state["failed"] = True
-            raise OSError("injected classification failure")
+        if state["exchanged"]:
+            state["count"] += 1
+            if state["count"] == failed_snapshot:
+                raise OSError("injected classification failure")
         return snapshot(path)
 
     monkeypatch.setattr(platform, "exchange_capture", mark_exchange)
@@ -1022,6 +1027,48 @@ def test_exchange_classification_failure_is_adopted_and_primary_code_survives(
     assert caught.value.code == "configure_publish_uncertain"
     assert mex.read_bytes() == original
     assert len(caught.value.details["preserved"]) >= 2
+
+
+@pytest.mark.skipif(os.name != "nt", reason="real Windows transaction path")
+def test_real_windows_transaction_adopts_restore_failure_without_masking_primary(
+    monkeypatch, tmp_path
+):
+    project = _prepared_project(tmp_path)
+    mex = project.mex_file
+    original = mex.read_bytes()
+    held = mex.with_name("held-original.mex")
+    attacker = mex.with_name("syscall-attacker.mex")
+    attacker_bytes = b"<syscall-attacker/>"
+    platform = project.verified_target.lease._resources["platform"]
+    exchange = platform.exchange_capture
+    restore = platform.restore_capture
+    calls = {"restore": 0}
+
+    def inject_at_exchange(replacement, destination, capture):
+        os.replace(destination, held)
+        attacker.write_bytes(attacker_bytes)
+        os.replace(attacker, destination)
+        return exchange(replacement, destination, capture)
+
+    def fail_first_restore(target, capture, rescue):
+        calls["restore"] += 1
+        if calls["restore"] == 1:
+            raise OSError("injected first restore failure")
+        return restore(target, capture, rescue)
+
+    monkeypatch.setattr(platform, "exchange_capture", inject_at_exchange)
+    monkeypatch.setattr(platform, "restore_capture", fail_first_restore)
+    with pytest.raises(CliFailure) as caught:
+        ConfigureTransaction(project, static_runner=_passed_static).execute(
+            _intent(), _edit
+        )
+
+    assert caught.value.code == "configure_publish_restore_failed"
+    assert mex.read_bytes() == attacker_bytes
+    assert held.read_bytes() == original
+    preserved = caught.value.details["preserved"]
+    assert mex.name in preserved
+    assert all(Path(item).name == item for item in preserved)
 
 
 def test_absent_backup_snapshot_failure_is_adopted_and_restored_absent(
@@ -1056,6 +1103,82 @@ def test_absent_backup_snapshot_failure_is_adopted_and_restored_absent(
     assert not backup.exists()
 
 
+def test_absent_backup_hash_mismatch_is_preserved_and_fully_classified(
+    monkeypatch, tmp_path
+):
+    project = _prepared_project(tmp_path)
+    mex = project.mex_file
+    original = mex.read_bytes()
+    backup = mex.with_name(mex.name + ".bak")
+    platform = project.verified_target.lease._resources["platform"]
+    install = platform.install_absent
+    tampered = b"external-backup-after-noreplace"
+
+    def tamper_after_install(replacement, destination):
+        install(replacement, destination)
+        if destination == backup:
+            destination.write_bytes(tampered)
+
+    monkeypatch.setattr(platform, "install_absent", tamper_after_install)
+    with pytest.raises(CliFailure) as caught:
+        ConfigureTransaction(
+            project, backup=True, static_runner=_passed_static
+        ).execute(_intent(), _edit)
+
+    assert caught.value.code == "configure_staging_changed"
+    assert mex.read_bytes() == original
+    assert backup.read_bytes() == tampered
+    preserved = caught.value.details["preserved"]
+    assert backup.name in preserved
+    assert all(Path(item).name == item for item in preserved)
+
+
+@pytest.mark.skipif(os.name != "nt", reason="real Windows backup path swap")
+@pytest.mark.parametrize("operation", ["swap", "reparse"])
+def test_absent_backup_post_install_path_attack_is_preserved_without_residual(
+    monkeypatch, tmp_path, operation
+):
+    project = _prepared_project(tmp_path)
+    mex = project.mex_file
+    original = mex.read_bytes()
+    backup = mex.with_name(mex.name + ".bak")
+    external = mex.with_name("external-backup-source.tmp")
+    external_bytes = b"external-backup-path"
+    external.write_bytes(external_bytes)
+    platform = project.verified_target.lease._resources["platform"]
+    install = platform.install_absent
+
+    def attack_after_install(replacement, destination):
+        install(replacement, destination)
+        if destination != backup:
+            return
+        if operation == "swap":
+            os.replace(external, destination)
+        else:
+            destination.unlink()
+            os.symlink(external, destination)
+
+    monkeypatch.setattr(platform, "install_absent", attack_after_install)
+    with pytest.raises(CliFailure) as caught:
+        ConfigureTransaction(
+            project, backup=True, static_runner=_passed_static
+        ).execute(_intent(), _edit)
+
+    assert caught.value.code in {
+        "configure_backup_uncertain", "configure_staging_changed",
+    }
+    assert mex.read_bytes() == original
+    if operation == "swap":
+        assert backup.read_bytes() == external_bytes
+        assert not external.exists()
+    else:
+        assert backup.is_symlink()
+        assert external.read_bytes() == external_bytes
+    preserved = caught.value.details["preserved"]
+    assert backup.name in preserved
+    assert all(Path(item).name == item for item in preserved)
+
+
 def test_second_finalize_failure_returns_published_with_cleanup_warning(
     monkeypatch, tmp_path
 ):
@@ -1083,6 +1206,128 @@ def test_second_finalize_failure_returns_published_with_cleanup_warning(
     assert mex.read_bytes() == result.published_bytes != original
     assert mex.with_name(mex.name + ".bak").read_bytes() == original
     assert result.cleanup_warnings[0]["code"] == "configure_cleanup_failed"
+
+
+def test_target_finalize_failure_is_postcommit_warning_without_fake_rollback(
+    monkeypatch, tmp_path
+):
+    project = _prepared_project(tmp_path)
+    mex = project.mex_file
+    original = mex.read_bytes()
+    finalize = transaction_module.finalize_atomic_publish
+    calls = {"count": 0}
+
+    def fail_first(result, *, platform):
+        calls["count"] += 1
+        if calls["count"] == 1:
+            raise CliFailure(
+                "configure_cleanup_failed", "injected target finalize failure",
+                module="backend", details={"preserved": ["target-evidence.tmp"]},
+            )
+        return finalize(result, platform=platform)
+
+    monkeypatch.setattr(transaction_module, "finalize_atomic_publish", fail_first)
+    result = ConfigureTransaction(
+        project, backup=True, static_runner=_passed_static
+    ).execute(_intent(), _edit)
+
+    assert result.status == "passed"
+    assert result.published is True
+    assert mex.read_bytes() == result.published_bytes != original
+    assert mex.with_name(mex.name + ".bak").read_bytes() == original
+    assert result.cleanup_warnings[0]["code"] == "configure_cleanup_failed"
+    assert result.cleanup_warnings[0]["message"] == (
+        "injected target finalize failure"
+    )
+    assert list(result.cleanup_warnings[0]["details"]["preserved"]) == [
+        "target-evidence.tmp"
+    ]
+
+
+def test_committed_delete_failure_reports_auditable_warning_and_keeps_bytes(
+    monkeypatch, tmp_path
+):
+    project = _prepared_project(tmp_path)
+    mex = project.mex_file
+    original = mex.read_bytes()
+    platform = project.verified_target.lease._resources["platform"]
+
+    def fail_delete(_path, _expected):
+        raise OSError("injected delete-by-handle failure")
+
+    monkeypatch.setattr(platform, "secure_delete_owned", fail_delete)
+    result = ConfigureTransaction(
+        project, backup=True, static_runner=_passed_static
+    ).execute(_intent(), _edit)
+
+    assert result.status == "passed"
+    assert result.published is True
+    assert mex.read_bytes() == result.published_bytes != original
+    assert mex.with_name(mex.name + ".bak").read_bytes() == original
+    assert len(result.cleanup_warnings) == 1
+    assert {item["code"] for item in result.cleanup_warnings} == {
+        "configure_cleanup_failed"
+    }
+    preserved = [
+        name
+        for warning in result.cleanup_warnings
+        for name in warning["details"]["preserved"]
+    ]
+    assert preserved
+    assert all(Path(item).name == item for item in preserved)
+
+
+def test_posix_shaped_adapter_without_conditional_delete_keeps_quarantine_warning(
+    monkeypatch, tmp_path,
+):
+    project = _prepared_project(tmp_path)
+    mex = project.mex_file
+    original = mex.read_bytes()
+    platform = project.verified_target.lease._resources["platform"]
+    monkeypatch.setattr(platform, "secure_delete_owned", None)
+    monkeypatch.setattr(platform, "unlink_path", None, raising=False)
+    result = ConfigureTransaction(project, static_runner=_passed_static).execute(
+        _intent(), _edit
+    )
+
+    assert result.status == "passed"
+    assert result.published is True
+    assert mex.read_bytes() == result.published_bytes != original
+    assert result.cleanup_warnings
+    warning = result.cleanup_warnings[0]
+    assert warning["code"] == "configure_cleanup_residual"
+    residual = mex.parent / warning["details"]["preserved"][0]
+    assert residual.exists()
+    assert residual.read_bytes() == original
+
+
+@pytest.mark.skipif(os.name != "nt", reason="real Windows delete-by-handle path")
+def test_real_windows_delete_by_handle_blocks_unlink_window_swap(
+    monkeypatch, tmp_path
+):
+    path = tmp_path / "cleanup.tmp"
+    attacker = tmp_path / "cleanup-attacker.tmp"
+    path.write_bytes(b"owned")
+    attacker.write_bytes(b"external")
+    platform = default_target_platform()
+    expected = platform.snapshot_file(path)
+    set_disposition = target_module._SetFileInformationByHandle
+    blocked = {"value": False}
+
+    def try_swap_while_handle_is_locked(handle, info_class, info, size):
+        try:
+            os.replace(attacker, path)
+        except OSError:
+            blocked["value"] = True
+        return set_disposition(handle, info_class, info, size)
+
+    monkeypatch.setattr(
+        target_module, "_SetFileInformationByHandle", try_swap_while_handle_is_locked
+    )
+    platform.secure_delete_owned(path, expected)
+    assert blocked["value"] is True
+    assert not path.exists()
+    assert attacker.read_bytes() == b"external"
 
 
 def test_backup_displaced_drift_fails_before_commit_and_keeps_primary_code(
@@ -1136,8 +1381,9 @@ def test_target_displaced_drift_fails_before_commit_and_preserves_drift(
     assert caught.value.details["preserved"]
 
 
-def test_production_has_no_bare_os_replace():
+def test_production_has_no_bare_replace_or_unlink():
     root = Path(transaction_module.__file__).parent
     production = (root / "transaction.py").read_text(encoding="utf-8")
     production += (root / "target.py").read_text(encoding="utf-8")
     assert "os.replace" not in production
+    assert ".unlink(" not in production

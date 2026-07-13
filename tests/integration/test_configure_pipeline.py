@@ -56,6 +56,7 @@ import pytest
 from rtd_config import cli
 from rtd_config.backends.s32_mex.apply import ApplyResult
 from rtd_config.backends.s32_mex.document import MexDocument, MexWriteError
+import rtd_config.backends.s32_mex.transaction as transaction_module
 from rtd_config.errors import CliFailure
 from rtd_config.intent import Intent
 from tests.fixtures import copy_uart_fixture
@@ -108,7 +109,52 @@ def test_configure_lpuart_interrupt_changes_mex_and_checks(tmp_path):
     assert result.returncode == 0
     assert payload["status"] == "passed"
     assert "uart" in payload["changed_modules"]
+    assert payload["published"] is True
+    assert payload["cleanup_warnings"] == []
     assert payload["runtime_verification"]["static_check"]["status"] == "passed"
+    assert "Traceback" not in result.stderr
+
+
+def test_cli_json_published_cleanup_warning_is_stable_and_path_safe(
+    monkeypatch, tmp_path, capsys
+):
+    project = copy_uart_fixture(tmp_path)
+    mex = project / "Uart_Example.mex"
+    original = mex.read_bytes()
+    residual = project / ".absolute-residual-evidence.tmp"
+
+    def return_residual(_publication, *, platform):
+        return residual
+
+    def apply_ok(doc, _intent, *, bundle):
+        assert bundle is not None
+        doc.root.attrib["uuid"] = "00000000-0000-0000-0000-000000000067"
+        return ApplyResult(changed_modules=["uart"])
+
+    monkeypatch.setattr(
+        transaction_module, "finalize_atomic_publish", return_residual
+    )
+    rc = cli._configure_module(
+        Namespace(project=project, backup=False),
+        Intent.from_dict({"module": "uart", "action": "set", "payload": {}}),
+        SimpleNamespace(to_dict=lambda: {"summary": "atomic cleanup warning"}),
+        apply_ok,
+    )
+    captured = capsys.readouterr()
+    payload = json.loads(captured.out)
+
+    assert rc == 0
+    assert payload["status"] == "passed"
+    assert payload["published"] is True
+    assert payload["cleanup_warnings"] == [{
+        "code": "configure_cleanup_residual",
+        "message": "Verified rollback evidence was retained for audit cleanup.",
+        "details": {"preserved": [residual.name]},
+    }]
+    assert captured.err == ""
+    assert "Traceback" not in captured.out
+    assert str(project) not in json.dumps(payload)
+    assert mex.read_bytes() != original
 
 
 def test_configure_writes_real_edit_and_file_reloads(tmp_path):
