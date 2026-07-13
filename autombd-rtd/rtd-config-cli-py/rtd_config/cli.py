@@ -59,7 +59,7 @@ from . import __version__
 from .config import RuntimeConfig
 from .backends.s32_mex.document import MexDocument, MexWriteError
 from .backends.s32_mex.metadata import revalidate_project_metadata
-from .backends.s32_mex.target import revalidate_snapshot
+from .backends.s32_mex.target import release_for_publish, revalidate_snapshot
 from .project import Project
 from .resources.pins import pin_options
 from .intent import Intent
@@ -804,16 +804,13 @@ def _configure_verified_project(args, intent, plan, apply_fn, project: Project) 
         diagnostics = apply_result.diagnostics + static_result.diagnostics
         status = "passed" if static_result.status == "passed" else "blocked"
         if status == "passed":
-            revalidate_snapshot(target)
+            revalidate_project_metadata(target, project.metadata)
+            release_for_publish(target)
             # Optional safety backup of the original .mex before committing.
             # Default behaviour creates no backup.
             if args.backup:
                 backup = mex.with_name(mex.name + ".bak")
                 backup.write_bytes(target.mex.content)
-            # Windows deliberately denies replacement while the verified file
-            # lease is live. Task 4 owns closing the remaining CAS-to-replace
-            # window; release immediately before the existing atomic publish.
-            target.close()
             os.replace(staging, mex)
             staging = None
         return emit({

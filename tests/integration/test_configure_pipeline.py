@@ -224,6 +224,72 @@ def test_configure_revalidates_plan_metadata_before_apply(monkeypatch, tmp_path)
     assert not apply_called
 
 
+def test_configure_revalidates_metadata_changed_by_apply_before_publish(
+    monkeypatch, tmp_path
+):
+    project_root = copy_uart_fixture(tmp_path)
+    mex = project_root / "Uart_Example.mex"
+    original = mex.read_bytes()
+    prefs = project_root / ".settings/com.freescale.s32ds.cross.sdk.support.prefs"
+    projects = []
+    original_verified = cli.Project.verified
+
+    def tracked_verified(root, backend="s32-mex"):
+        project = original_verified(root, backend)
+        projects.append(project)
+        return project
+
+    def mutate_aux(_doc, _intent):
+        prefs.write_text(prefs.read_text(encoding="utf-8") + "# changed\n", encoding="utf-8")
+        return ApplyResult(changed_modules=["uart"])
+
+    monkeypatch.setattr(cli.Project, "verified", tracked_verified)
+    with pytest.raises(CliFailure) as caught:
+        cli._configure_module(
+            Namespace(project=project_root, backup=False),
+            Intent.from_dict({"module": "uart", "action": "set", "payload": {}}),
+            SimpleNamespace(to_dict=lambda: {}), mutate_aux,
+        )
+    assert caught.value.code == "project_metadata_source_changed"
+    assert mex.read_bytes() == original
+    assert projects[0].verified_target.lease.closed
+
+
+def test_configure_revalidates_metadata_changed_by_static_check_before_publish(
+    monkeypatch, tmp_path
+):
+    project_root = copy_uart_fixture(tmp_path)
+    mex = project_root / "Uart_Example.mex"
+    original = mex.read_bytes()
+    prefs = project_root / ".settings/com.freescale.s32ds.cross.sdk.support.prefs"
+    original_checks = cli.run_static_checks
+    projects = []
+    original_verified = cli.Project.verified
+
+    def tracked_verified(root, backend="s32-mex"):
+        project = original_verified(root, backend)
+        projects.append(project)
+        return project
+
+    def mutate_after_checks(*args, **kwargs):
+        result = original_checks(*args, **kwargs)
+        prefs.write_text(prefs.read_text(encoding="utf-8") + "# changed\n", encoding="utf-8")
+        return result
+
+    monkeypatch.setattr(cli.Project, "verified", tracked_verified)
+    monkeypatch.setattr(cli, "run_static_checks", mutate_after_checks)
+    with pytest.raises(CliFailure) as caught:
+        cli._configure_module(
+            Namespace(project=project_root, backup=False),
+            Intent.from_dict({"module": "uart", "action": "set", "payload": {}}),
+            SimpleNamespace(to_dict=lambda: {}),
+            lambda *_args: ApplyResult(changed_modules=["uart"]),
+        )
+    assert caught.value.code == "project_metadata_source_changed"
+    assert mex.read_bytes() == original
+    assert projects[0].verified_target.lease.closed
+
+
 @pytest.mark.parametrize(
     "command_name,normalizer_name,provider_name,apply_name",
     CONFIGURE_ENTRY_POINTS,
