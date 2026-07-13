@@ -254,6 +254,34 @@ def test_non_utf8_pin_asset_is_asset_invalid(monkeypatch, capsys, tmp_path):
     assert payload["diagnostics"][0]["code"] == "asset_invalid"
 
 
+def test_non_utf8_uart_asset_is_safely_classified_at_public_boundary(
+    monkeypatch, capsys, tmp_path
+):
+    from rtd_config.backends.s32_mex import apply as apply_module
+
+    def invalid_asset():
+        raise UnicodeDecodeError(
+            "utf-8",
+            b"\xffSECRET_ABSOLUTE_PATH",
+            0,
+            1,
+            "SECRET_ABSOLUTE_PATH",
+        )
+
+    monkeypatch.setattr(apply_module, "_load_uart_asset", invalid_asset)
+    exit_code = cli.main(
+        ["uart", "set", "--project", str(tmp_path), "--json"]
+    )
+    captured = capsys.readouterr()
+    payload = json.loads(captured.out)
+
+    assert exit_code == 1
+    assert payload["diagnostics"][0]["code"] == "asset_invalid"
+    assert "SECRET_ABSOLUTE_PATH" not in captured.out
+    assert "SECRET_ABSOLUTE_PATH" not in captured.err
+    assert "Traceback" not in captured.err
+
+
 def test_unknown_internal_error_is_hidden_by_default(monkeypatch, capsys, tmp_path):
     def explode(_args) -> int:
         raise RuntimeError("private implementation detail")

@@ -548,12 +548,6 @@ def cmd_pin_options(args: argparse.Namespace) -> int:
             module="port",
             details={"line": exc.lineno, "column": exc.colno},
         ) from exc
-    except UnicodeError as exc:
-        raise CliFailure(
-            "asset_invalid",
-            "Pin-mapping asset is not valid UTF-8.",
-            module="port",
-        ) from exc
     return emit({
         "status": "passed",
         "command": "pin-options",
@@ -1148,6 +1142,12 @@ def _map_exception(exc: Exception) -> CliFailure:
             "A required runtime asset is not valid JSON.",
             module="cli",
             details={"line": exc.lineno, "column": exc.colno},
+        )
+    if isinstance(exc, UnicodeError):
+        return CliFailure(
+            "asset_invalid",
+            "A required runtime asset is not valid UTF-8.",
+            module="cli",
         )
     if isinstance(exc, ET.ParseError):
         return CliFailure(
