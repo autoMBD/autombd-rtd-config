@@ -95,6 +95,10 @@ def test_cli_failure_details_are_defensively_frozen_and_render_as_json():
 
     assert failure.details["mapping"]["key"] == "original"
     assert list(failure.details["items"]) == ["original"]
+    with pytest.raises(TypeError):
+        failure.details["mapping"]["key"] = "changed"
+    with pytest.raises(AttributeError):
+        failure.details["items"].append("changed")
     payload = cli.render_failure(failure, "inspect")
     assert payload["diagnostics"][0]["details"] == {
         "mapping": {"key": "original"},
@@ -325,6 +329,17 @@ def test_keyboard_interrupt_is_not_swallowed(monkeypatch, tmp_path):
 def test_unknown_option_value_is_not_reflected_as_command(capsys):
     secret = "INTERNAL_SECRET"
     exit_code = cli.main(["--bogus", secret, "--json"])
+    captured = capsys.readouterr()
+    payload = json.loads(captured.out)
+
+    assert exit_code == 2
+    assert payload["command"] == "unknown"
+    assert secret not in payload["command"]
+
+
+def test_unknown_command_token_is_not_reflected_as_command(capsys):
+    secret = "INTERNAL_SECRET"
+    exit_code = cli.main([secret, "--json"])
     captured = capsys.readouterr()
     payload = json.loads(captured.out)
 
