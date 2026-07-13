@@ -546,6 +546,20 @@ def test_namespace_prefix_spoof_is_not_an_observed_nxp_identity(tmp_path):
     assert caught.value.code in {"project_metadata_conflict", "project_metadata_unknown"}
 
 
+def test_official_namespace_on_foreign_root_is_not_an_observed_nxp_identity(tmp_path):
+    raw = _minimal_mex().replace(
+        b"<configuration xmlns=",
+        b"<not_configuration xmlns=",
+        1,
+    ).replace(b"</configuration>", b"</not_configuration>", 1)
+    metadata = _parse(_temporary_project(tmp_path, raw))
+    assert metadata.vendor is None
+    assert metadata.backend is None
+    with pytest.raises(CliFailure) as caught:
+        metadata.require_identity()
+    assert caught.value.code in {"project_metadata_conflict", "project_metadata_unknown"}
+
+
 def test_identity_fields_require_direct_children_of_direct_common(tmp_path):
     raw = _minimal_mex().replace(
         b"<common><processor>S32K344</processor><package>S32K344_257BGA</package><mcu_data>PlatformSDK_S32K3</mcu_data></common>",
