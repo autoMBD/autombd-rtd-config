@@ -1,4 +1,5 @@
 {
+  "_identity": {"vendor":"NXP","family":"S32K3","device":"S32K344","package":"mapbga257","rtd_release":"7.0.1","module":"Mcl","role":"module_schema"},
   "_source": "Mcl.xdm (RTD 7.0.1, FlexioCommon / FlexioMclLogicChannels) + per-package EPD enum validation (RTD/Mcl_TS_T40D34M70I1R0/autosar/Mcl_s32k344_lqfp100.epd / Mcl_s32k344_hdqfp172.epd / Mcl_s32k344_mapbga257.epd)",
   "rtd_version": "7.0.1",
   "module": "Mcl",

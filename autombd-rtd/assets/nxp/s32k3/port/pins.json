@@ -1,7 +1,8 @@
 {
-  "family": "s32k3",
-  "device": "s32k344",
-  "package": "default",
+  "_identity": {"vendor":"NXP","family":"S32K3","device":"S32K344","package":"mapbga257","rtd_release":"7.0.1","module":"Port","role":"pin_map"},
+  "family": "S32K3",
+  "device": "S32K344",
+  "packages": {"mapbga257": "pin_mapbga257"},
   "signals": [
     {
       "peripheral": "SIUL",

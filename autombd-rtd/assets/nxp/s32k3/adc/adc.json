@@ -1,7 +1,8 @@
 {
+  "_identity": {"vendor":"NXP","family":"S32K3","device":"S32K344","package":"mapbga257","rtd_release":"7.0.1","module":"Adc","role":"module_schema"},
   "_source": "S32K3 RTD 7.0.1 Adc.xdm (C:/NXP/S32DS.3.6.7/S32DS/software/PlatformSDK_S32K3/RTD/Adc_TS_T40D34M70I1R0/config/Adc.xdm) + device+package channel enum Adc_s32k344_mapbga257.epd (same package RTD/Adc_TS_T40D34M70I1R0/autosar/). Fixture: tests/fixtures/nxp/ds/s32k3/Autombd_Test_Adc_S32K344 (ADC0 baseline, ADC source clock 160 MHz). Cache ids: source.s32k3_rtd_xdm.adc, source.s32k3_rtd_epd.adc. Runtime reads ONLY this committed asset -- never raw .xdm/.epd. Code literals in apply.py are pinned to these values by tests/unit/test_adc_apply.py::test_adc_json_matches_apply_code_literals (LL-012).",
   "rtd_version": "7.0.1",
-  "device": "s32k344",
+  "device": "S32K344",
   "package": "mapbga257",
 
   "_coverage": {

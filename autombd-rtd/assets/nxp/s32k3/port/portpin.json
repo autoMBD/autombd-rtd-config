@@ -1,4 +1,5 @@
 {
+  "_identity": {"vendor":"NXP","family":"S32K3","device":"S32K344","package":"mapbga257","rtd_release":"7.0.1","module":"Port","role":"module_schema"},
   "_source": "Port.xdm (RTD 7.0.1, PortConfigSet/PortContainer/PortPin) + Uart_Example_S32K344 fixture + pins.json (pin_mapbga257 package pin numbers)",
   "_note": "pins.json is the legality source for peripheral+signal->pin mapping. This asset defines the PortPin struct template and <pin> header format for the Port config section.",
 

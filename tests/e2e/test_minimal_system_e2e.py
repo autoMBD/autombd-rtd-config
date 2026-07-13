@@ -151,8 +151,9 @@ def test_flexio_interrupt(tmp_path):
 def test_pin_options(tmp_path):
     result = _cli(
         "pin-options",
-        "--device", "s32k344",
-        "--package", "default",
+        "--vendor", "NXP", "--backend", "s32-mex", "--family", "S32K3",
+        "--device", "S32K344", "--package", "mapbga257",
+        "--rtd-release", "7.0.1", "--schema", "19",
         "--peripheral", "LPUART_0",
         "--json",
     )

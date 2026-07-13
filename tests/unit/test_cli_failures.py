@@ -47,6 +47,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -224,30 +225,32 @@ def test_generic_os_failures_do_not_disclose_internal_paths(
 
 def test_missing_and_corrupt_assets_are_mapped(monkeypatch, capsys, tmp_path):
     asset_root = tmp_path / "SECRET_ABSOLUTE_PATH"
+    shutil.copytree(Path(__file__).resolve().parents[2] / "autombd-rtd/assets", asset_root)
     monkeypatch.setattr(cli, "DEFAULT_ASSET_ROOT", asset_root)
-    exit_code = cli.main(["pin-options", "--peripheral", "LPUART_0", "--json"])
+    asset = asset_root / "nxp" / "s32k3" / "port" / "pins.json"
+    asset.unlink()
+    argv = ["pin-options", "--bundle-id", "nxp-s32-mex-s32k344-mapbga257-rtd-7.0.1", "--peripheral", "LPUART_0", "--json"]
+    exit_code = cli.main(argv)
     captured = capsys.readouterr()
     payload = json.loads(captured.out)
     assert exit_code == 1
     assert payload["diagnostics"][0]["code"] == "asset_not_found"
     assert "SECRET_ABSOLUTE_PATH" not in captured.out
 
-    asset = asset_root / "nxp" / "s32k3" / "port" / "pins.json"
-    asset.parent.mkdir(parents=True)
     asset.write_text("{", encoding="utf-8")
-    exit_code = cli.main(["pin-options", "--peripheral", "LPUART_0", "--json"])
+    exit_code = cli.main(argv)
     payload = json.loads(capsys.readouterr().out)
     assert exit_code == 1
     assert payload["diagnostics"][0]["code"] == "asset_invalid"
 
 
 def test_non_utf8_pin_asset_is_asset_invalid(monkeypatch, capsys, tmp_path):
-    asset = tmp_path / "nxp" / "s32k3" / "port" / "pins.json"
-    asset.parent.mkdir(parents=True)
+    shutil.copytree(Path(__file__).resolve().parents[2] / "autombd-rtd/assets", tmp_path / "assets")
+    asset = tmp_path / "assets" / "nxp" / "s32k3" / "port" / "pins.json"
     asset.write_bytes(b"\xff\xfe\x00")
-    monkeypatch.setattr(cli, "DEFAULT_ASSET_ROOT", tmp_path)
+    monkeypatch.setattr(cli, "DEFAULT_ASSET_ROOT", tmp_path / "assets")
 
-    exit_code = cli.main(["pin-options", "--peripheral", "LPUART_0", "--json"])
+    exit_code = cli.main(["pin-options", "--bundle-id", "nxp-s32-mex-s32k344-mapbga257-rtd-7.0.1", "--peripheral", "LPUART_0", "--json"])
     payload = json.loads(capsys.readouterr().out)
 
     assert exit_code == 1

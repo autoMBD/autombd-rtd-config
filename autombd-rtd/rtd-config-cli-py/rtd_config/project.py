@@ -52,6 +52,7 @@ from pathlib import Path
 from .backends.s32_mex.document import MexDocument
 from .backends.s32_mex.metadata import ProjectMetadata, parse_project_metadata
 from .backends.s32_mex.target import VerifiedProjectTarget, verify_project_target
+from .resources.bundles import ResolvedAssetBundle
 
 
 @dataclass(frozen=True)
@@ -76,6 +77,13 @@ class Project:
             metadata = parse_project_metadata(self.verified_target, self.document)
             self._cache["metadata"] = metadata
         return metadata
+
+    @property
+    def asset_bundle(self) -> ResolvedAssetBundle:
+        bundle = self._cache.get("asset_bundle")
+        if bundle is None:
+            raise RuntimeError("Project asset bundle has not passed preflight.")
+        return bundle
 
     @property
     def mex_file(self) -> Path:

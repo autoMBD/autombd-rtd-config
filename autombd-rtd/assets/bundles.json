@@ -1,0 +1,68 @@
+{
+  "format_version": 1,
+  "bundles": [
+    {
+      "id": "nxp-s32-mex-s32k344-mapbga257-rtd-7.0.1",
+      "identity": {
+        "vendor": "NXP", "backend": "s32-mex", "processor": "S32K344",
+        "family": "S32K3", "device": "S32K344",
+        "raw_package": "S32K344_257BGA", "package": "mapbga257",
+        "rtd_release": "7.0.1", "schema_version": "19"
+      },
+      "tools": [
+        {"name": "Pins", "version": "17.0", "enabled": true},
+        {"name": "Clocks", "version": "19.0", "enabled": true},
+        {"name": "Peripherals", "version": "15.0", "enabled": true}
+      ],
+      "module_profiles": [
+        {
+          "id": "uart",
+          "modules": [
+            {"name":"Mcl","type":"Mcl","type_id":"Mcl","mode":"autosar","published":"must_be_unknown"},
+            {"name":"Uart","type":"Uart","type_id":"Uart","mode":"autosar","module_id":"255","autosar_version":"4.4.0","software_version":"2.0.0","vendor_id":"43"},
+            {"name":"Port","type":"Port","type_id":"Port","mode":"autosar","module_id":"124","autosar_version":"4.4.0","software_version":"2.0.0","vendor_id":"43"},
+            {"name":"BaseNXP","type":"BaseNXP","type_id":"Base","mode":"general","module_id":"0","autosar_version":"4.7.0","software_version":"3.0.0","vendor_id":"43"},
+            {"name":"Platform","type":"Platform","type_id":"Platform","mode":"autosar","module_id":"255","autosar_version":"4.7.0","software_version":"3.0.0","vendor_id":"43"},
+            {"name":"Mcu","type":"Mcu","type_id":"Mcu","mode":"autosar","published":"must_be_unknown"},
+            {"name":"Dio","type":"Dio","type_id":"Dio","mode":"autosar","module_id":"120","autosar_version":"4.9.0","software_version":"7.0.1","vendor_id":"43"}
+          ]
+        },
+        {
+          "id": "adc",
+          "modules": [
+            {"name":"BaseNXP","type":"BaseNXP","type_id":"Base","mode":"general","module_id":"0","autosar_version":"4.4.0","software_version":"2.0.0","vendor_id":"43"},
+            {"name":"Dio","type":"Dio","type_id":"Dio","mode":"autosar","module_id":"120","autosar_version":"4.7.0","software_version":"3.0.0","vendor_id":"43"},
+            {"name":"Port","type":"Port","type_id":"Port","mode":"autosar","module_id":"124","autosar_version":"4.7.0","software_version":"3.0.0","vendor_id":"43"},
+            {"name":"Mcu","type":"Mcu","type_id":"Mcu","mode":"autosar","published":"must_be_unknown"},
+            {"name":"Adc","type":"Adc","type_id":"Adc","mode":"autosar","module_id":"123","autosar_version":"4.9.0","software_version":"7.0.1","vendor_id":"43"},
+            {"name":"Mcl","type":"Mcl","type_id":"Mcl","mode":"autosar","published":"must_be_unknown"},
+            {"name":"Platform","type":"Platform","type_id":"Platform","mode":"autosar","module_id":"255","autosar_version":"4.9.0","software_version":"7.0.1","vendor_id":"43"}
+          ]
+        }
+      ],
+      "assets": {
+        "adc": "nxp/s32k3/adc/adc.json",
+        "basenxp": "nxp/s32k3/basenxp/osif.json",
+        "dio": "nxp/s32k3/dio/dio.json",
+        "mcl": "nxp/s32k3/mcl/mcl.json",
+        "mcu": "nxp/s32k3/mcu/clock.json",
+        "platform": "nxp/s32k3/platform/interrupts.json",
+        "pins": "nxp/s32k3/port/pins.json",
+        "port": "nxp/s32k3/port/portpin.json",
+        "uart": "nxp/s32k3/uart/uart.json"
+      },
+      "asset_identities": {
+        "adc":{"module":"Adc","role":"module_schema"},
+        "basenxp":{"module":"BaseNXP","role":"module_schema"},
+        "dio":{"module":"Dio","role":"module_schema"},
+        "mcl":{"module":"Mcl","role":"module_schema"},
+        "mcu":{"module":"Mcu","role":"clock_schema"},
+        "platform":{"module":"Platform","role":"interrupt_schema"},
+        "pins":{"module":"Port","role":"pin_map"},
+        "port":{"module":"Port","role":"module_schema"},
+        "uart":{"module":"Uart","role":"module_schema"}
+      },
+      "pin_field": "pin_mapbga257"
+    }
+  ]
+}

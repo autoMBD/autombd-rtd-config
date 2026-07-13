@@ -1,4 +1,5 @@
 {
+  "_identity": {"vendor":"NXP","family":"S32K3","device":"S32K344","package":"mapbga257","rtd_release":"7.0.1","module":"BaseNXP","role":"module_schema"},
   "_source": "S32K3 RTD 7.0.1 BaseNXP.xdm (BaseNXP_TS_T40D34M70I1R0/config/BaseNXP.xdm). Descriptor cache id: source.s32k3_rtd_xdm.basenxp. Runtime reads ONLY this committed asset -- never raw .xdm.",
   "rtd_version": "7.0.1",
   "module": "BaseNXP",

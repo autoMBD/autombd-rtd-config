@@ -62,6 +62,7 @@ from .backends.s32_mex.metadata import revalidate_project_metadata
 from .backends.s32_mex.target import release_for_publish, revalidate_snapshot
 from .project import Project
 from .resources.pins import pin_options
+from .resources.bundles import AssetBundleResolver
 from .intent import Intent
 from .modules.uart import UartProvider
 from .modules.platform import PlatformProvider
@@ -221,8 +222,14 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command")
 
     pin_options_parser = subparsers.add_parser("pin-options")
-    pin_options_parser.add_argument("--device", default="s32k344")
-    pin_options_parser.add_argument("--package", default="default")
+    pin_options_parser.add_argument("--bundle-id")
+    pin_options_parser.add_argument("--vendor")
+    pin_options_parser.add_argument("--backend")
+    pin_options_parser.add_argument("--family")
+    pin_options_parser.add_argument("--device")
+    pin_options_parser.add_argument("--package")
+    pin_options_parser.add_argument("--rtd-release")
+    pin_options_parser.add_argument("--schema")
     pin_options_parser.add_argument("--peripheral", required=True)
     pin_options_parser.add_argument("--json", action="store_true")
 
@@ -530,26 +537,20 @@ def normalize_uart_intent(args: argparse.Namespace) -> Intent:
 
 
 def cmd_pin_options(args: argparse.Namespace) -> int:
-    try:
-        options = pin_options(
-            data_root=DEFAULT_ASSET_ROOT,
-            device=args.device,
-            package=args.package,
-            peripheral=args.peripheral,
+    selector = {
+        "vendor": args.vendor, "backend": args.backend, "family": args.family,
+        "device": args.device, "package": args.package,
+        "rtd_release": args.rtd_release, "schema_version": args.schema,
+    }
+    if args.bundle_id is None and any(value is None for value in selector.values()):
+        raise CliFailure(
+            "invalid_arguments", "Projectless pin-options requires a complete asset selector or --bundle-id.",
+            module="cli", exit_code=2,
         )
-    except FileNotFoundError as exc:
-        raise CliFailure(
-            "asset_not_found",
-            "Required pin-mapping asset was not found.",
-            module="port",
-        ) from exc
-    except json.JSONDecodeError as exc:
-        raise CliFailure(
-            "asset_invalid",
-            "Pin-mapping asset is not valid JSON.",
-            module="port",
-            details={"line": exc.lineno, "column": exc.colno},
-        ) from exc
+    bundle = AssetBundleResolver(DEFAULT_ASSET_ROOT).resolve_selector(
+        bundle_id=args.bundle_id, **selector
+    )
+    options = pin_options(bundle=bundle, peripheral=args.peripheral)
     return emit({
         "status": "passed",
         "command": "pin-options",
@@ -561,20 +562,21 @@ def cmd_inspect(args: argparse.Namespace) -> int:
     config = RuntimeConfig.from_dict({"project": args.project})
     with Project.verified(config.project, config.backend) as project:
         target = project.verified_target
-        metadata = project.metadata.require_consistent()
+        _preflight_project(project)
+        metadata = project.metadata
         observed = metadata.to_dict()
         observed["module_metadata"] = observed["modules"]
         observed["modules"] = None if metadata.modules is None else [item.name for item in metadata.modules]
         return emit({
             "status": "passed", "command": "inspect", "mex_file": str(target.mex.path),
-            "validation_profile": "pending_asset_compatibility",
+            "validation_profile": project.asset_bundle.profile_id,
             "compatibility": {
-                "status": "pending",
+                "status": "passed",
                 "diagnostics": [{
                     "severity": "info",
-                    "code": "pending_asset_compatibility",
+                    "code": "asset_bundle_resolved",
                     "module": "backend",
-                    "message": "Exact asset compatibility is evaluated by the bundle gate.",
+                    "message": "Exact project asset compatibility is verified.",
                 }],
             },
             **observed,
@@ -584,7 +586,7 @@ def cmd_inspect(args: argparse.Namespace) -> int:
 def cmd_check(args: argparse.Namespace) -> int:
     config = RuntimeConfig.from_dict({"project": args.project})
     with Project.verified(config.project, config.backend) as project:
-        project.metadata.require_consistent()
+        _preflight_project(project)
         revalidate_project_metadata(project.verified_target, project.metadata)
         target = project.verified_target
         result = run_static_checks(
@@ -602,12 +604,19 @@ def _intent_dict(intent: Intent) -> dict:
     }
 
 
+def _preflight_project(project: Project) -> Project:
+    """Resolve and cache exact project assets before provider or vendor work."""
+    metadata = project.metadata.require_identity()
+    project._cache["asset_bundle"] = AssetBundleResolver(DEFAULT_ASSET_ROOT).resolve(metadata)
+    return project
+
+
 def _preflight_plan(args, intent: Intent, provider):
     """Verify observed project identity before module-specific planning."""
     config = RuntimeConfig.from_dict({"project": args.project})
     project = Project.verified(config.project, config.backend)
     try:
-        project.metadata.require_identity()
+        _preflight_project(project)
         return provider.plan(intent), project
     except BaseException:
         project.close()
@@ -632,6 +641,7 @@ def cmd_validate(args: argparse.Namespace) -> int:
     config = RuntimeConfig.from_dict({"project": args.project})
     project = Project.verified(config.project, config.backend)
     try:
+        _preflight_project(project)
         return _cmd_validate_verified(args, config, project)
     finally:
         project.close()

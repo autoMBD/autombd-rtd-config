@@ -47,8 +47,8 @@
 from __future__ import annotations
 
 import re
-from pathlib import Path
-from .runtime import load_json
+
+from .bundles import ResolvedAssetBundle
 
 
 def _normalize_peripheral(peripheral: str) -> str:
@@ -81,11 +81,8 @@ def _present_peripheral(asset_peripheral: str, requested_peripheral: str) -> str
 
 
 def pin_options(
-    data_root: Path,
-    device: str,
-    package: str,
+    bundle: ResolvedAssetBundle,
     peripheral: str,
-    family: str = "s32k3",
 ) -> list[dict]:
     """Return pin-option records for a peripheral from the committed runtime asset.
 
@@ -96,14 +93,20 @@ def pin_options(
     The returned records present `peripheral` in the caller-supplied form so
     the CLI JSON output is consistent with the user's request.
     """
-    path = data_root / "nxp" / family / "port" / "pins.json"
-    data = load_json(path)
+    data = bundle.load_json("pins")
     asset_peripheral = _normalize_peripheral(peripheral)
     result = []
     for item in data["signals"]:
         if item["peripheral"] == asset_peripheral:
-            # Return a copy with peripheral in the user-facing form
-            presented = dict(item)
+            package_pin = item.get(bundle.pin_field)
+            if package_pin in (None, ""):
+                continue
+            # Expose only the selected package value, never sibling package fields.
+            presented = {
+                key: value for key, value in item.items()
+                if not key.startswith("pin_") and value not in (None, "")
+            }
+            presented["package_pin"] = package_pin
             presented["peripheral"] = _present_peripheral(
                 item["peripheral"], peripheral
             )

@@ -1,7 +1,8 @@
 {
-  "family": "s32k3",
-  "device": "s32k344",
-  "rtd_version": "7_0_1",
+  "_identity": {"vendor":"NXP","family":"S32K3","device":"S32K344","package":"mapbga257","rtd_release":"7.0.1","module":"Platform","role":"interrupt_schema"},
+  "family": "S32K3",
+  "device": "S32K344",
+  "rtd_version": "7.0.1",
   "source": "RTD/Platform_TS_T40D34M70I1R0/config/Platform.xdm",
   "_coverage": {
     "_note": "Forward, Spec-first coverage inventory for the Platform.xdm interrupt-controller surface used by the current Platform provider. The CLI edits existing PlatformIsrConfig entries for interrupt enablement/priority/handler preservation; it does not create new interrupt entries or configure partitioning surfaces.",

@@ -529,7 +529,7 @@ def test_inspect_reports_observed_metadata_not_runtime_defaults(capsys):
     assert payload["rtd_release"] == "7.0.1"
     assert payload["schema_version"] == "19"
     assert len(payload["modules"]) == 7
-    assert payload["validation_profile"] == "pending_asset_compatibility"
+    assert payload["validation_profile"] == "uart"
 
 
 @pytest.mark.parametrize("flow", ["inspect", "check", "validate", "configure"])
@@ -640,11 +640,11 @@ def test_module_plan_preflights_metadata_before_provider(monkeypatch, tmp_path):
     assert not provider_called
 
 
-def test_inspect_keeps_pending_compatibility_profile(capsys):
+def test_inspect_reports_resolved_compatibility_profile(capsys):
     assert cli.cmd_inspect(SimpleNamespace(project=UART)) == 0
     payload = json.loads(capsys.readouterr().out)
-    assert payload["validation_profile"] == "pending_asset_compatibility"
-    assert payload["compatibility"]["status"] == "pending"
+    assert payload["validation_profile"] == "uart"
+    assert payload["compatibility"]["status"] == "passed"
     assert payload["compatibility"]["diagnostics"]
 
 
@@ -840,17 +840,17 @@ def test_every_module_plan_requires_complete_observed_identity(
 
 
 @pytest.mark.parametrize("root", [UART, ADC], ids=["uart", "adc"])
-def test_inspect_pending_compatibility_contract_on_real_fixtures(capsys, root):
+def test_inspect_resolved_compatibility_contract_on_real_fixtures(capsys, root):
     assert cli.cmd_inspect(SimpleNamespace(project=root)) == 0
     payload = json.loads(capsys.readouterr().out)
-    assert payload["validation_profile"] == "pending_asset_compatibility"
+    assert payload["validation_profile"] in {"uart", "adc"}
     assert payload["compatibility"] == {
-        "status": "pending",
+        "status": "passed",
         "diagnostics": [{
             "severity": "info",
-            "code": "pending_asset_compatibility",
+            "code": "asset_bundle_resolved",
             "module": "backend",
-            "message": "Exact asset compatibility is evaluated by the bundle gate.",
+            "message": "Exact project asset compatibility is verified.",
         }],
     }
 
