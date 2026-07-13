@@ -490,3 +490,199 @@ def test_project_relative_reader_uses_live_target_lease(tmp_path):
     with pytest.raises(CliFailure) as caught:
         target_module.read_project_relative(target, source, max_bytes=64)
     assert caught.value.code == "project_target_closed"
+
+
+@pytest.mark.parametrize("root", [UART, ADC], ids=["uart", "adc"])
+def test_real_fixture_identity_is_complete_and_self_consistent(root):
+    """Both committed vendor fixtures satisfy the strict planning preflight."""
+    metadata = _parse(root)
+    assert metadata.require_identity() is metadata
+    assert metadata.conflicts == ()
+    assert metadata.tools_observed is True
+    assert metadata.modules_observed is True
+
+
+@pytest.mark.parametrize(
+    "schema",
+    [
+        "http://mcuxpresso.nxp.com/XSD/mex_configuration_19",
+        (
+            "http://mcuxpresso.nxp.com/XSD/mex_configuration_19 "
+            "http://mcuxpresso.nxp.com/XSD/mex_configuration_19.xsd extra"
+        ),
+        (
+            "http://mcuxpresso.nxp.com/XSD/mex_configuration_19 "
+            "http://mcuxpresso.nxp.com/XSD/mex_configuration_19.xsd "
+            "https://evil.example/mex_configuration_19 "
+            "https://evil.example/mex_configuration_19.xsd"
+        ),
+    ],
+    ids=["odd-token-count", "trailing-token", "additional-pair"],
+)
+def test_schema_location_requires_one_exact_official_pair(tmp_path, schema):
+    metadata = _parse(_temporary_project(tmp_path, _minimal_mex(schema=schema)))
+    assert {item.field for item in metadata.conflicts} >= {"schema_identity"}
+    with pytest.raises(CliFailure) as caught:
+        metadata.require_consistent()
+    assert caught.value.code == "project_metadata_conflict"
+
+
+def test_namespace_prefix_spoof_is_not_an_observed_nxp_identity(tmp_path):
+    namespace = "http://mcuxpresso.nxp.com/XSD/mex_configuration_19.evil"
+    root = _temporary_project(
+        tmp_path,
+        _minimal_mex(namespace=namespace, schema=f"{namespace} {namespace}.xsd"),
+    )
+    metadata = _parse(root, source_reader=_reader({
+        ".settings/com.freescale.s32ds.cross.sdk.support.prefs": (
+            b"com.freescale.s32ds.cross.sdk.support.attachedSDKs="
+            b"PlatformSDK_S32K3_S32K344_M7_7.0.1_PATH|X\n"
+        ),
+    }))
+    assert metadata.vendor is None
+    assert metadata.backend is None
+    with pytest.raises(CliFailure) as caught:
+        metadata.require_identity()
+    assert caught.value.code in {"project_metadata_conflict", "project_metadata_unknown"}
+
+
+def test_identity_fields_require_direct_children_of_direct_common(tmp_path):
+    raw = _minimal_mex().replace(
+        b"<common><processor>S32K344</processor><package>S32K344_257BGA</package><mcu_data>PlatformSDK_S32K3</mcu_data></common>",
+        (
+            b'<common><wrapper><processor>S32K345</processor>'
+            b'<package>S32K345_CUSTOM</package><mcu_data>PlatformSDK_S32K4</mcu_data>'
+            b'</wrapper><processor>S32K344</processor><package>S32K344_257BGA</package>'
+            b'<mcu_data>PlatformSDK_S32K3</mcu_data></common>'
+        ),
+    )
+    metadata = _parse(_temporary_project(tmp_path, raw))
+    assert (metadata.processor, metadata.raw_package, metadata.mcu_data) == (
+        "S32K344", "S32K344_257BGA", "PlatformSDK_S32K3",
+    )
+    assert metadata.conflicts == ()
+
+
+def test_foreign_namespace_carriers_do_not_publish_tools_or_modules(tmp_path):
+    raw = _minimal_mex().replace(
+        b'<tools>',
+        b'<tools xmlns:evil="https://evil.example/schema">',
+    ).replace(
+        b'<periphs name="Peripherals"',
+        b'<evil:periphs name="Peripherals"',
+    ).replace(b'</periphs>', b'</evil:periphs>')
+    metadata = _parse(_temporary_project(tmp_path, raw))
+    assert metadata.modules is None
+    assert all(item.name != "Peripherals" for item in metadata.tools or ())
+
+
+def test_sdk_attachment_accepts_only_trimmed_exact_property_key(tmp_path):
+    root = _temporary_project(tmp_path)
+    metadata = _parse(root, source_reader=_reader({
+        ".settings/com.freescale.s32ds.cross.sdk.support.prefs": (
+            b"  com.freescale.s32ds.cross.sdk.support.attachedSDKs  =  "
+            b"PlatformSDK_S32K3_S32K344_M7_7.0.1_PATH|X  \n"
+            b"com.example.com.freescale.s32ds.cross.sdk.support.attachedSDKs="
+            b"PlatformSDK_S32K9_S32K999_M7_9.9.9_PATH|Y\n"
+        ),
+    }))
+    assert (metadata.family, metadata.device, metadata.rtd_release) == (
+        "S32K3", "S32K344", "7.0.1",
+    )
+    assert metadata.conflicts == ()
+
+
+@pytest.mark.parametrize(
+    "tools_fragment,expected_tools,expected_modules",
+    [
+        (b"", None, None),
+        (b"<tools/>", (), None),
+        (b'<tools><pins name="Pins" enabled="false"/></tools>', (), None),
+        (
+            b'<tools><periphs name="Peripherals" enabled="false"/></tools>',
+            (), (),
+        ),
+    ],
+    ids=["missing-tools", "empty-tools", "disabled-tool", "disabled-peripherals"],
+)
+def test_tool_and_module_observation_boundaries(
+    tmp_path, tools_fragment, expected_tools, expected_modules
+):
+    raw = _minimal_mex()
+    start = raw.index(b"<tools>")
+    end = raw.index(b"</tools>") + len(b"</tools>")
+    metadata = _parse(_temporary_project(tmp_path, raw[:start] + tools_fragment + raw[end:]))
+    assert metadata.tools == expected_tools
+    assert metadata.modules == expected_modules
+    payload = metadata.to_dict()
+    assert payload["tools_observed"] is (expected_tools is not None)
+    assert payload["modules_observed"] is (expected_modules is not None)
+
+
+@pytest.mark.parametrize(
+    "command_name,normalizer_name,provider_name",
+    [
+        ("cmd_uart_set", "normalize_uart_intent", "UartProvider"),
+        ("cmd_uart_add_flexio_channel", "normalize_uart_add_flexio_intent", "UartProvider"),
+        ("cmd_platform_set", "normalize_platform_intent", "PlatformProvider"),
+        ("cmd_basenxp_set", "normalize_basenxp_intent", "BaseNxpProvider"),
+        ("cmd_mcl_set", "normalize_mcl_intent", "MclProvider"),
+        ("cmd_port_set", "normalize_port_intent", "PortProvider"),
+        ("cmd_dio_set", "normalize_dio_intent", "DioProvider"),
+        ("cmd_mcu_set", "normalize_mcu_intent", "McuProvider"),
+        ("cmd_adc_set", "normalize_adc_intent", "AdcProvider"),
+    ],
+)
+def test_every_module_plan_requires_complete_observed_identity(
+    monkeypatch, tmp_path, command_name, normalizer_name, provider_name
+):
+    root = _temporary_project(tmp_path)
+    provider_called = False
+
+    class Provider:
+        def plan(self, _intent):
+            nonlocal provider_called
+            provider_called = True
+            pytest.fail("provider planned before complete metadata identity")
+
+    monkeypatch.setattr(
+        cli, normalizer_name,
+        lambda _args: SimpleNamespace(module="test", action="set", payload={}),
+    )
+    monkeypatch.setattr(cli, provider_name, Provider)
+    with pytest.raises(CliFailure) as caught:
+        getattr(cli, command_name)(SimpleNamespace(project=root, configure=False))
+    assert caught.value.code == "project_metadata_unknown"
+    assert "rtd_release" in caught.value.details["missing_fields"]
+    assert provider_called is False
+
+
+@pytest.mark.parametrize("root", [UART, ADC], ids=["uart", "adc"])
+def test_inspect_pending_compatibility_contract_on_real_fixtures(capsys, root):
+    assert cli.cmd_inspect(SimpleNamespace(project=root)) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["validation_profile"] == "pending_asset_compatibility"
+    assert payload["compatibility"] == {
+        "status": "pending",
+        "diagnostics": [{
+            "severity": "info",
+            "code": "pending_asset_compatibility",
+            "module": "backend",
+            "message": "Exact asset compatibility is evaluated by the bundle gate.",
+        }],
+    }
+
+
+def test_project_relative_reader_boundary_contract(tmp_path):
+    root = _temporary_project(tmp_path)
+    (root / "empty.txt").write_bytes(b"")
+    (root / "one.txt").write_bytes(b"x")
+    with verify_project_target(root) as target:
+        assert target_module.read_project_relative(target, "missing.txt", max_bytes=1) is None
+        assert target_module.read_project_relative(target, "empty.txt", max_bytes=0) == b""
+        with pytest.raises(CliFailure) as caught:
+            target_module.read_project_relative(target, "one.txt", max_bytes=0)
+        assert caught.value.code == "project_metadata_source_too_large"
+        for relative in ("", ".", "..", "a//b", "a/../b", r"a\b"):
+            with pytest.raises(ValueError):
+                target_module.read_project_relative(target, relative, max_bytes=1)
