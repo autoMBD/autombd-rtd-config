@@ -902,6 +902,38 @@ def test_target_lease_close_waits_for_active_reader_and_releases_once():
     assert lease.closed
 
 
+def test_target_lease_close_waits_for_every_concurrent_reader():
+    entered = [threading.Event(), threading.Event()]
+    exits = [threading.Event(), threading.Event()]
+    released = threading.Event()
+    lease = TargetLease(released.set)
+
+    def reader(index):
+        with lease.borrow():
+            entered[index].set()
+            assert exits[index].wait(timeout=5)
+
+    readers = [threading.Thread(target=reader, args=(index,)) for index in range(2)]
+    for reader_thread in readers:
+        reader_thread.start()
+    assert all(event.wait(timeout=5) for event in entered)
+
+    closer = threading.Thread(target=lease.close)
+    closer.start()
+    exits[0].set()
+    readers[0].join(timeout=5)
+    assert not readers[0].is_alive()
+    assert not released.wait(timeout=0.1)
+
+    exits[1].set()
+    readers[1].join(timeout=5)
+    closer.join(timeout=5)
+    assert not readers[1].is_alive()
+    assert not closer.is_alive()
+    assert released.is_set()
+    assert lease.closed
+
+
 @pytest.mark.parametrize("error,code", [(PermissionError(), "project_permission_denied"), (OSError(), "unsafe_project_path")])
 def test_protect_root_enter_errors_are_typed(tmp_path, error, code):
     root, _ = _project(tmp_path)

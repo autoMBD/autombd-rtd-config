@@ -46,7 +46,7 @@
 
 from __future__ import annotations
 
-from dataclasses import FrozenInstanceError
+from dataclasses import FrozenInstanceError, replace
 import json
 import os
 from pathlib import Path
@@ -345,16 +345,80 @@ def test_metadata_value_objects_are_frozen():
 
 
 def test_metadata_to_dict_returns_detached_nested_values():
-    metadata = _parse(UART)
+    observation = MetadataObservation("device", "S32K344", ".mex", "/configuration/@name")
+    metadata = ProjectMetadata(
+        "NXP", "s32-mex", "S32K344", "S32K3", "S32K344",
+        "S32K344_257BGA", "mapbga257", "PlatformSDK_S32K3",
+        "http://mcuxpresso.nxp.com/XSD/mex_configuration_19", "19",
+        (
+            "http://mcuxpresso.nxp.com/XSD/mex_configuration_19 "
+            "http://mcuxpresso.nxp.com/XSD/mex_configuration_19.xsd"
+        ),
+        (ToolMetadata("Pins", "17.0", True),),
+        (ModuleMetadata("Mcl", "Mcl", "Mcl", "autosar", "101", "4.7.0", "7.0.1", "43"),),
+        "7.0.1",
+        (MetadataConflict("device", (observation,)),),
+    )
     first = metadata.to_dict()
     first["tools"][0]["name"] = "mutated"
     first["modules"][0]["name"] = "mutated"
-    first["conflicts"].append({"field": "mutated"})
+    first["conflicts"][0]["field"] = "mutated"
+    first["conflicts"][0]["observations"][0]["value"] = "mutated"
+    first["conflicts"].append({"field": "appended"})
 
     second = metadata.to_dict()
     assert metadata.tools[0].name == second["tools"][0]["name"] == "Pins"
     assert metadata.modules[0].name == second["modules"][0]["name"] == "Mcl"
-    assert second["conflicts"] == []
+    assert second["conflicts"] == [{
+        "field": "device",
+        "observations": [{
+            "field": "device",
+            "value": "S32K344",
+            "source": ".mex",
+            "xpath": "/configuration/@name",
+        }],
+    }]
+
+
+@pytest.mark.parametrize(
+    "field,expected_missing",
+    [
+        ("vendor", {"vendor"}),
+        ("backend", {"backend"}),
+        ("processor", {"processor"}),
+        ("family", {"family"}),
+        ("device", {"device"}),
+        ("raw_package", {"raw_package"}),
+        ("package", {"package"}),
+        ("mcu_data", {"mcu_data"}),
+        ("xml_namespace", {"xml_namespace", "schema_identity"}),
+        ("schema_version", {"schema_version", "schema_identity"}),
+        ("schema_location", {"schema_location", "schema_identity"}),
+        ("tools", {"tools"}),
+        ("modules", {"modules"}),
+        ("rtd_release", {"rtd_release"}),
+    ],
+)
+def test_require_identity_reports_every_missing_metadata_boundary(
+    field, expected_missing
+):
+    metadata = _parse(UART)
+
+    with pytest.raises(CliFailure) as caught:
+        replace(metadata, **{field: None}).require_identity()
+
+    assert caught.value.code == "project_metadata_unknown"
+    assert set(caught.value.details["missing_fields"]) == expected_missing
+
+
+def test_require_identity_reports_invalid_schema_identity_without_missing_sources():
+    metadata = _parse(UART)
+
+    with pytest.raises(CliFailure) as caught:
+        replace(metadata, schema_location="https://example.invalid/schema.xsd").require_identity()
+
+    assert caught.value.code == "project_metadata_unknown"
+    assert tuple(caught.value.details["missing_fields"]) == ("schema_identity",)
 
 
 def test_project_caches_document_and_metadata():

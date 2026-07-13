@@ -45,16 +45,38 @@
 # =================================================================================
 
 import json
+import os
 import subprocess
 import sys
 from argparse import Namespace
 from types import SimpleNamespace
 
+import pytest
+
 from rtd_config import cli
 from rtd_config.backends.s32_mex.apply import ApplyResult
 from rtd_config.backends.s32_mex.document import MexDocument, MexWriteError
+from rtd_config.errors import CliFailure
 from rtd_config.intent import Intent
 from tests.fixtures import copy_uart_fixture
+
+
+CONFIGURE_ENTRY_POINTS = (
+    ("cmd_uart_set", "normalize_uart_intent", "UartProvider", "apply_uart_set"),
+    (
+        "cmd_uart_add_flexio_channel",
+        "normalize_uart_add_flexio_intent",
+        "UartProvider",
+        "apply_uart_add_flexio_channel",
+    ),
+    ("cmd_platform_set", "normalize_platform_intent", "PlatformProvider", "apply_platform_set"),
+    ("cmd_basenxp_set", "normalize_basenxp_intent", "BaseNxpProvider", "apply_basenxp_set"),
+    ("cmd_mcl_set", "normalize_mcl_intent", "MclProvider", "apply_mcl_set"),
+    ("cmd_port_set", "normalize_port_intent", "PortProvider", "apply_port_set"),
+    ("cmd_dio_set", "normalize_dio_intent", "DioProvider", "apply_dio_set"),
+    ("cmd_mcu_set", "normalize_mcu_intent", "McuProvider", "apply_mcu_set"),
+    ("cmd_adc_set", "normalize_adc_intent", "AdcProvider", "apply_adc_set"),
+)
 
 
 def _run_configure(project, *extra):
@@ -172,7 +194,19 @@ def test_configure_writer_blocker_leaves_original_mex_bytes_unchanged(
     assert not list(mex.parent.glob(f".{mex.name}.*.tmp"))
 
 
-def test_configure_plan_and_apply_share_one_verified_project(monkeypatch, tmp_path):
+@pytest.mark.parametrize(
+    "command_name,normalizer_name,provider_name,apply_name",
+    CONFIGURE_ENTRY_POINTS,
+    ids=[item[0].removeprefix("cmd_") for item in CONFIGURE_ENTRY_POINTS],
+)
+def test_every_configure_entry_point_plans_and_applies_one_verified_project(
+    monkeypatch,
+    tmp_path,
+    command_name,
+    normalizer_name,
+    provider_name,
+    apply_name,
+):
     project_root = copy_uart_fixture(tmp_path)
     projects = []
     original_verified = cli.Project.verified
@@ -186,16 +220,84 @@ def test_configure_plan_and_apply_share_one_verified_project(monkeypatch, tmp_pa
         def plan(self, _intent):
             return SimpleNamespace(to_dict=lambda: {})
 
-    def configure_same_project(_args, _intent, _plan, _apply, project):
+    expected_apply = object()
+
+    def configure_same_project(_args, _intent, _plan, apply_fn, project):
         assert project is projects[0]
+        assert apply_fn is expected_apply
         assert not project.verified_target.lease.closed
         return 0
 
     monkeypatch.setattr(cli.Project, "verified", tracked_verified)
-    monkeypatch.setattr(cli, "UartProvider", Provider)
-    monkeypatch.setattr(cli, "normalize_uart_intent", lambda _args: Intent.from_dict({"module": "uart", "action": "set", "payload": {}}))
+    monkeypatch.setattr(cli, provider_name, Provider)
+    monkeypatch.setattr(
+        cli,
+        normalizer_name,
+        lambda _args: Intent.from_dict(
+            {"module": "test", "action": "set", "payload": {}}
+        ),
+    )
+    monkeypatch.setattr(cli, apply_name, expected_apply)
     monkeypatch.setattr(cli, "_configure_verified_project", configure_same_project)
 
-    assert cli.cmd_uart_set(Namespace(project=project_root, configure=True, backup=False)) == 0
+    assert getattr(cli, command_name)(
+        Namespace(project=project_root, configure=True, backup=False)
+    ) == 0
+    assert len(projects) == 1
+    assert projects[0].verified_target.lease.closed
+
+
+@pytest.mark.parametrize(
+    "command_name,normalizer_name,provider_name,apply_name",
+    CONFIGURE_ENTRY_POINTS,
+    ids=[item[0].removeprefix("cmd_") for item in CONFIGURE_ENTRY_POINTS],
+)
+def test_every_configure_entry_point_rejects_target_swap_before_apply(
+    monkeypatch,
+    tmp_path,
+    command_name,
+    normalizer_name,
+    provider_name,
+    apply_name,
+):
+    project_root = copy_uart_fixture(tmp_path)
+    mex = project_root / "Uart_Example.mex"
+    projects = []
+    original_verified = cli.Project.verified
+
+    def verified_then_swap(root, backend="s32-mex"):
+        project = original_verified(root, backend)
+        projects.append(project)
+        _ = project.metadata
+        project.close()
+        replacement = mex.with_name("replacement.mex")
+        replacement.write_bytes(mex.read_bytes() + b"\n")
+        os.replace(replacement, mex)
+        return project
+
+    class Provider:
+        def plan(self, _intent):
+            return SimpleNamespace(to_dict=lambda: {})
+
+    def unexpected_apply(*_args, **_kwargs):
+        pytest.fail("apply ran after the verified .mex target was swapped")
+
+    monkeypatch.setattr(cli.Project, "verified", verified_then_swap)
+    monkeypatch.setattr(cli, provider_name, Provider)
+    monkeypatch.setattr(
+        cli,
+        normalizer_name,
+        lambda _args: Intent.from_dict(
+            {"module": "test", "action": "set", "payload": {}}
+        ),
+    )
+    monkeypatch.setattr(cli, apply_name, unexpected_apply)
+
+    with pytest.raises(CliFailure) as caught:
+        getattr(cli, command_name)(
+            Namespace(project=project_root, configure=True, backup=False)
+        )
+
+    assert caught.value.code == "project_target_changed"
     assert len(projects) == 1
     assert projects[0].verified_target.lease.closed
