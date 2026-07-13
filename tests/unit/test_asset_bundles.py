@@ -196,6 +196,28 @@ def test_manifest_symbolic_link_is_rejected_fail_closed(tmp_path):
     assert caught.value.code == "asset_manifest_invalid"
 
 
+@pytest.mark.parametrize("linked_part", ["leaf", "ancestor"])
+def test_asset_symbolic_link_chain_is_rejected_fail_closed(tmp_path, linked_part):
+    root = copied_assets(tmp_path)
+    pins = root / "nxp/s32k3/port/pins.json"
+    try:
+        if linked_part == "leaf":
+            outside = tmp_path / "outside-pins.json"
+            pins.replace(outside)
+            pins.symlink_to(outside)
+        else:
+            port = pins.parent
+            outside = tmp_path / "outside-port"
+            port.replace(outside)
+            port.symlink_to(outside, target_is_directory=True)
+    except OSError as exc:
+        pytest.skip(f"symbolic-link creation unavailable: {exc}")
+
+    with pytest.raises(CliFailure) as caught:
+        AssetBundleResolver(root).resolve(metadata(UART))
+    assert caught.value.code == "asset_invalid"
+
+
 def test_resolution_failure_precedes_provider_apply_and_vendor(monkeypatch):
     calls = {"plan": 0, "apply": 0, "vendor": 0}
 

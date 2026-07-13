@@ -327,6 +327,7 @@ def test_every_configure_entry_point_plans_and_applies_one_verified_project(
 ):
     project_root = copy_uart_fixture(tmp_path)
     projects = []
+    injected = {}
     original_verified = cli.Project.verified
 
     def tracked_verified(root, backend="s32-mex"):
@@ -335,8 +336,8 @@ def test_every_configure_entry_point_plans_and_applies_one_verified_project(
         return project
 
     class Provider:
-        def __init__(self, _bundle):
-            pass
+        def __init__(self, bundle):
+            injected["provider"] = bundle
 
         def plan(self, _intent):
             return SimpleNamespace(to_dict=lambda: {})
@@ -345,19 +346,21 @@ def test_every_configure_entry_point_plans_and_applies_one_verified_project(
 
     def configure_same_project(_args, _intent, _plan, apply_fn, project):
         assert project is projects[0]
+        assert injected["provider"] is project.asset_bundle
+        assert injected["normalizer"] is project.asset_bundle
         assert apply_fn is expected_apply
         assert not project.verified_target.lease.closed
         return 0
 
     monkeypatch.setattr(cli.Project, "verified", tracked_verified)
     monkeypatch.setattr(cli, provider_name, Provider)
-    monkeypatch.setattr(
-        cli,
-        normalizer_name,
-        lambda _args, _bundle: Intent.from_dict(
+    def normalize(_args, bundle):
+        injected["normalizer"] = bundle
+        return Intent.from_dict(
             {"module": "test", "action": "set", "payload": {}}
-        ),
-    )
+        )
+
+    monkeypatch.setattr(cli, normalizer_name, normalize)
     monkeypatch.setattr(cli, apply_name, expected_apply)
     monkeypatch.setattr(cli, "_configure_verified_project", configure_same_project)
 

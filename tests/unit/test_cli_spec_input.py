@@ -51,6 +51,11 @@ import json
 import pytest
 
 from rtd_config import cli
+from tests.fixtures import (
+    copy_uart_fixture,
+    resolved_adc_bundle,
+    resolved_uart_bundle,
+)
 
 
 def _write_spec(tmp_path, module: str, payload: dict) -> str:
@@ -66,7 +71,12 @@ def _normalize_from_args(argv: list[str]):
     parser = cli.build_parser()
     args = parser.parse_args(argv)
     normalizer = getattr(cli, f"normalize_{args.command}_intent")
-    return normalizer(args)
+    bundle = (
+        resolved_adc_bundle()
+        if args.command == "adc"
+        else resolved_uart_bundle()
+    )
+    return normalizer(args, bundle)
 
 
 @pytest.mark.parametrize(
@@ -223,8 +233,7 @@ def test_adc_set_accepts_legacy_raw_payload_spec(tmp_path):
 def test_spec_envelope_wrong_module_uses_public_json_failure_boundary(
     tmp_path, capsys
 ):
-    project = tmp_path / "project"
-    project.mkdir()
+    project = copy_uart_fixture(tmp_path)
     spec = _write_spec(tmp_path, "dio", {"add_channel": "LED_CTRL"})
 
     exit_code = cli.main(

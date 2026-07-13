@@ -139,6 +139,7 @@ def test_expected_failures_have_stable_json_contract(tmp_path, case, code):
     elif case == "malformed_xml":
         (project / "bad.mex").write_text("<mex>", encoding="utf-8")
     elif case in {"missing_spec", "corrupt_spec"}:
+        project = copy_uart_fixture(tmp_path)
         spec = tmp_path / "intent.json"
         if case == "corrupt_spec":
             spec.write_text("{", encoding="utf-8")
@@ -314,8 +315,7 @@ def test_unknown_internal_value_error_is_hidden_by_default(
 
 
 def test_non_utf8_spec_is_a_stable_spec_failure(tmp_path):
-    project = tmp_path / "project"
-    project.mkdir()
+    project = copy_uart_fixture(tmp_path)
     spec = tmp_path / "intent.json"
     spec.write_bytes(b"\xff\xfe\x00")
 
