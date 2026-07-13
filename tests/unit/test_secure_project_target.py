@@ -46,6 +46,7 @@
 
 from __future__ import annotations
 
+from contextlib import nullcontext
 from dataclasses import FrozenInstanceError, replace
 import gc
 import hashlib
@@ -63,6 +64,7 @@ from rtd_config.backends.s32_mex.target import (
     FileIdentity,
     FileSnapshot,
     PathInspection,
+    TargetLease,
     VerifiedProjectTarget,
     WindowsFileId,
     _PosixTargetPlatform,
@@ -410,6 +412,22 @@ def test_missing_protect_root_fails_closed(tmp_path):
     assert caught.value.code == "project_identity_unavailable"
 
 
+@pytest.mark.parametrize("lease_state", ["missing", "closed"])
+def test_invalid_protect_root_lease_fails_closed(tmp_path, lease_state):
+    root, _ = _project(tmp_path)
+    platform = InjectedPlatform()
+    lease = None
+    if lease_state == "closed":
+        lease = TargetLease(lambda: None)
+        lease.close()
+    platform.protect_root = lambda _path: nullcontext(lease)
+
+    with pytest.raises(CliFailure) as caught:
+        verify_project_target(root, platform=platform)
+
+    assert caught.value.code == "project_identity_unavailable"
+
+
 def test_mount_change_after_fd_chain_open_fails_closed(monkeypatch, tmp_path):
     root, _ = _project(tmp_path)
     calls = 0
@@ -701,6 +719,62 @@ def test_project_context_closes_lease_on_success_and_exception(tmp_path, raise_i
     except RuntimeError:
         assert raise_inside
     assert project.verified_target.lease.closed
+
+
+@pytest.mark.parametrize("flow", ["inspect", "check", "validate", "configure"])
+def test_public_project_flows_close_lease_when_work_raises(
+    monkeypatch, tmp_path, flow
+):
+    root, _ = _project(tmp_path)
+    projects = []
+    original_verified = cli.Project.verified
+
+    def tracked_verified(project_root: Path, backend: str = "s32-mex"):
+        project = original_verified(project_root, backend)
+        projects.append(project)
+        return project
+
+    monkeypatch.setattr(cli.Project, "verified", tracked_verified)
+    failure = RuntimeError(f"{flow} work failed")
+    args = SimpleNamespace(project=root)
+
+    if flow == "inspect":
+        monkeypatch.setattr(
+            cli.MexDocument,
+            "from_snapshot",
+            staticmethod(lambda _snapshot: (_ for _ in ()).throw(failure)),
+        )
+        invoke = lambda: cli.cmd_inspect(args)
+    elif flow in {"check", "validate"}:
+        monkeypatch.setattr(
+            cli,
+            "run_static_checks",
+            lambda *_args, **_kwargs: (_ for _ in ()).throw(failure),
+        )
+        if flow == "check":
+            invoke = lambda: cli.cmd_check(args)
+        else:
+            validate_args = SimpleNamespace(
+                project=root, s32ds_root=None, workspace=None, sdk_path=None
+            )
+            invoke = lambda: cli.cmd_validate(validate_args)
+    else:
+        intent = SimpleNamespace(module="test", action="set", payload={})
+        plan = SimpleNamespace(to_dict=lambda: {})
+        configure_args = SimpleNamespace(project=root, backup=False)
+
+        def fail_apply(_doc, _intent):
+            raise failure
+
+        invoke = lambda: cli._configure_module(
+            configure_args, intent, plan, fail_apply
+        )
+
+    with pytest.raises(RuntimeError, match=f"{flow} work failed"):
+        invoke()
+
+    assert len(projects) == 1
+    assert projects[0].verified_target.lease.closed
 
 
 def test_secure_target_value_objects_are_frozen(tmp_path):
