@@ -510,6 +510,21 @@ def test_linux_mountinfo_detector_decodes_escaped_mount_paths(monkeypatch):
     assert not detector(Path("/workspace/ordinary"))
 
 
+def test_linux_default_mount_detector_resamples_mountinfo(monkeypatch, tmp_path):
+    monkeypatch.setattr(target_module.sys, "platform", "linux")
+    mount = tmp_path / "bind"
+    snapshots = iter(("", f"36 25 0:32 / {mount} rw - ext4 /dev/root rw\n"))
+    monkeypatch.setattr(
+        target_module.Path,
+        "read_text",
+        lambda _self, *, encoding: next(snapshots),
+    )
+    detector = _PosixTargetPlatform._default_mount_detector()
+
+    assert not detector(mount)
+    assert detector(mount)
+
+
 def test_non_linux_posix_mount_detection_fails_closed(monkeypatch, tmp_path):
     monkeypatch.setattr(target_module.sys, "platform", "darwin")
     detector = _PosixTargetPlatform._default_mount_detector()

@@ -165,22 +165,24 @@ class _PosixTargetPlatform:
                     module="backend",
                 )
             return unsupported
-        try:
-            lines = Path("/proc/self/mountinfo").read_text(encoding="utf-8").splitlines()
-        except OSError:
-            def unavailable(_path: Path) -> bool:
+        def detect(path: Path) -> bool:
+            try:
+                lines = Path("/proc/self/mountinfo").read_text(
+                    encoding="utf-8"
+                ).splitlines()
+            except OSError as exc:
                 raise CliFailure(
                     "project_identity_unavailable",
                     "Linux mount information is unavailable; project safety cannot be proven.",
                     module="backend",
-                )
-            return unavailable
-        mounts = {
-            Path(fields[4].replace("\\040", " ").replace("\\011", "\t").replace("\\134", "\\"))
-            for line in lines
-            if len(fields := line.split()) > 5
-        }
-        return lambda path: path in mounts
+                ) from exc
+            mounts = {
+                Path(fields[4].replace("\\040", " ").replace("\\011", "\t").replace("\\134", "\\"))
+                for line in lines
+                if len(fields := line.split()) > 5
+            }
+            return path in mounts
+        return detect
 
     @contextmanager
     def protect_root(self, path: Path):

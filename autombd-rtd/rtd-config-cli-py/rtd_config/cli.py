@@ -730,8 +730,14 @@ def _configure_module(args: argparse.Namespace, intent: Intent, plan, apply_fn) 
     """
     config = RuntimeConfig.from_dict({"project": args.project})
     project = Project.verified(config.project, config.backend)
+    try:
+        return _configure_verified_project(args, intent, plan, apply_fn, project)
+    finally:
+        project.close()
+
+
+def _configure_verified_project(args, intent, plan, apply_fn, project: Project) -> int:
     target = project.verified_target
-    assert target is not None
     mex = target.mex.path
     doc = MexDocument.from_snapshot(target.mex)
 
