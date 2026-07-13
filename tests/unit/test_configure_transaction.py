@@ -63,6 +63,7 @@ from rtd_config.backends.s32_mex.target import (
     default_target_platform,
 )
 from rtd_config.backends.s32_mex.transaction import ConfigureTransaction
+import rtd_config.backends.s32_mex.transaction as transaction_module
 from rtd_config.errors import CliFailure
 from rtd_config.intent import Intent
 from rtd_config.project import Project
@@ -212,6 +213,29 @@ def test_replace_failure_is_typed_and_staging_is_cleaned(tmp_path):
     assert not list(mex.parent.glob(f".{mex.name}.*.tmp"))
 
 
+def test_precreated_staging_symlink_is_never_followed_or_overwritten(
+    monkeypatch, tmp_path
+):
+    project = _prepared_project(tmp_path)
+    mex = project.mex_file
+    outside = tmp_path / "outside-staging"
+    outside.write_bytes(b"attacker")
+    staging = mex.parent / f".{mex.name}.candidate.sentinel.tmp"
+    try:
+        staging.symlink_to(outside)
+    except OSError as exc:
+        project.close()
+        pytest.skip(f"staging symlink creation unavailable: {exc}")
+    monkeypatch.setattr(transaction_module.secrets, "token_hex", lambda _size: "sentinel")
+
+    with pytest.raises(CliFailure) as caught:
+        ConfigureTransaction(project, static_runner=_passed_static).execute(
+            _intent(), _edit
+        )
+    assert caught.value.code == "configure_staging_failed"
+    assert outside.read_bytes() == b"attacker"
+
+
 def test_vendor_pass_cannot_publish_after_auxiliary_metadata_drift(tmp_path):
     project = _prepared_project(tmp_path)
     mex = project.mex_file
@@ -230,6 +254,100 @@ def test_vendor_pass_cannot_publish_after_auxiliary_metadata_drift(tmp_path):
         ).execute(_intent(), _edit)
     assert caught.value.code == "project_metadata_source_changed"
     assert mex.read_bytes() == original
+
+
+@pytest.mark.parametrize("relative", [
+    ".project",
+    ".cproject",
+    ".settings/com.freescale.s32ds.cross.sdk.support.prefs",
+    ".settings/com.nxp.s32ds.cle.runtime.component.prefs",
+])
+@pytest.mark.parametrize("operation", ["modify", "swap", "delete", "recreate"])
+def test_auxiliary_change_after_release_is_rejected_before_publish(
+    tmp_path, relative, operation
+):
+    project = _prepared_project(tmp_path)
+    mex = project.mex_file
+    original = mex.read_bytes()
+    source = project.root / relative
+    original_source = source.read_bytes()
+
+    def release_then_mutate(target):
+        expectation = cli.release_for_publish(target)
+        if operation == "modify":
+            source.write_bytes(original_source + b"\n")
+        elif operation == "swap":
+            replacement = source.with_name(source.name + ".replacement")
+            replacement.write_bytes(original_source + b"\n")
+            os.replace(replacement, source)
+        elif operation == "delete":
+            source.unlink()
+        else:
+            source.unlink()
+            source.write_bytes(original_source)
+        return expectation
+
+    with pytest.raises(CliFailure) as caught:
+        ConfigureTransaction(
+            project, static_runner=_passed_static,
+            release_for_publish_fn=release_then_mutate,
+        ).execute(_intent(), _edit)
+    assert caught.value.code == "project_metadata_source_changed"
+    assert mex.read_bytes() == original
+
+
+def test_candidate_changed_after_validation_is_restored_without_publish(tmp_path):
+    project = _prepared_project(tmp_path)
+    mex = project.mex_file
+    original = mex.read_bytes()
+
+    def mutate_validated_candidate(path, **_kwargs):
+        path.write_bytes(b"<attacker-candidate/>")
+        return _passed_static()
+
+    with pytest.raises(CliFailure) as caught:
+        ConfigureTransaction(
+            project, static_runner=mutate_validated_candidate
+        ).execute(_intent(), _edit)
+    assert caught.value.code == "configure_staging_changed"
+    assert mex.read_bytes() == original
+    assert not list(mex.parent.glob(f".{mex.name}.*.tmp"))
+
+
+def test_vendor_observes_exact_validated_candidate_bytes(tmp_path):
+    project = _prepared_project(tmp_path)
+    observed = {}
+
+    def vendor(*, staging, document, project, bundle):
+        observed["bytes"] = staging.read_bytes()
+        assert document._raw == observed["bytes"]
+        assert bundle is project.asset_bundle
+        return _passed_static()
+
+    result = ConfigureTransaction(
+        project, static_runner=_passed_static, vendor_runner=vendor
+    ).execute(_intent(), _edit)
+    assert observed["bytes"] == result.published_bytes
+
+
+def test_transaction_closes_target_lease_exactly_once(monkeypatch, tmp_path):
+    project = _prepared_project(tmp_path)
+    calls = 0
+    target = project.verified_target
+    target_type = type(target)
+    original_close = target_type.close
+
+    def counted_close(self):
+        nonlocal calls
+        if self is target:
+            calls += 1
+        original_close(self)
+
+    monkeypatch.setattr(target_type, "close", counted_close)
+    ConfigureTransaction(project, static_runner=_passed_static).execute(
+        _intent(), _edit
+    )
+    assert calls == 1
 
 
 def test_linked_backup_target_is_rejected_before_target_publish(
@@ -259,6 +377,28 @@ def test_linked_backup_target_is_rejected_before_target_publish(
     assert caught.value.code == "unsafe_backup_target"
     assert mex.read_bytes() == original
     assert backup.read_bytes() == b"attacker"
+
+
+def test_real_symlink_backup_target_is_rejected_and_target_preserved(tmp_path):
+    project = _prepared_project(tmp_path)
+    mex = project.mex_file
+    original = mex.read_bytes()
+    backup = mex.with_name(mex.name + ".bak")
+    outside = tmp_path / "outside-backup"
+    outside.write_bytes(b"attacker")
+    try:
+        backup.symlink_to(outside)
+    except OSError as exc:
+        project.close()
+        pytest.skip(f"backup symlink creation unavailable: {exc}")
+
+    with pytest.raises(CliFailure) as caught:
+        ConfigureTransaction(
+            project, backup=True, static_runner=_passed_static
+        ).execute(_intent(), _edit)
+    assert caught.value.code == "unsafe_backup_target"
+    assert mex.read_bytes() == original
+    assert outside.read_bytes() == b"attacker"
 
 
 def test_keyboard_interrupt_closes_lease_and_cleans_staging(tmp_path):

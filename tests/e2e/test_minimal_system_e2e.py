@@ -143,7 +143,7 @@ def test_flexio_interrupt(tmp_path):
     payload = json.loads(result.stdout)
     assert result.returncode == 0
     assert payload["status"] == "passed"
-    assert "uart" in payload["changed_modules"]
+    assert payload["changed_modules"] == []
     assert payload["runtime_verification"]["static_check"]["status"] == "passed"
     _maybe_validate(project)
 
@@ -186,7 +186,7 @@ def test_e2e_flexio_stack(tmp_path):
     configure_payload = json.loads(configure.stdout)
     assert configure.returncode == 0
     assert configure_payload["status"] == "passed"
-    assert "uart" in configure_payload["changed_modules"]
+    assert configure_payload["changed_modules"] == []
 
     check = _cli("check", "--project", str(project), "--json")
     check_payload = json.loads(check.stdout)
