@@ -439,6 +439,23 @@ def test_static_malformed_snapshot_is_structured_and_releases_lease(tmp_path):
     root.rename(tmp_path / "released-malformed")
 
 
+def test_static_malformed_supplied_snapshot_never_reopens_path(monkeypatch, tmp_path):
+    root, mex = _project(tmp_path, b"<mex>")
+    target = verify_project_target(root)
+    monkeypatch.setattr(
+        MexDocument,
+        "load",
+        classmethod(lambda _cls, _path: pytest.fail("path reload is forbidden")),
+    )
+    try:
+        result = run_static_checks(mex, verified_target=target, doc=None)
+        assert result.status == "blocked"
+        assert any(item.code == "xml_not_well_formed" for item in result.diagnostics)
+    finally:
+        target.close()
+    assert target.lease.closed
+
+
 def test_injected_bind_mount_detector_fails_closed(tmp_path):
     root, _ = _project(tmp_path)
     platform = _PosixTargetPlatform(

@@ -943,9 +943,9 @@ def run_static_checks(
     try:
         diagnostics: list[Diagnostic] = []
         checks: dict = {}
-        if doc is None and owned_target is not None:
+        if doc is None and verified_target is not None:
             try:
-                doc = MexDocument.from_snapshot(owned_target.mex)
+                doc = MexDocument.from_snapshot(verified_target.mex)
             except ET.ParseError as exc:
                 checks["xml_well_formed"] = False
                 checks["single_mex"] = True
@@ -961,8 +961,6 @@ def run_static_checks(
                     diagnostics=diagnostics, data={"checks": checks},
                 )
         _check_xml_and_single_mex(mex_path, checks, diagnostics, verified_target)
-        if doc is None and checks.get("xml_well_formed"):
-            doc = MexDocument.load(mex_path)
         if doc is not None and checks.get("xml_well_formed", True):
             _check_enabled_modules(doc, checks, diagnostics)
             _check_dma(doc, diagnostics)
