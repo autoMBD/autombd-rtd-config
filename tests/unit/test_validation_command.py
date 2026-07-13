@@ -45,13 +45,16 @@
 # =================================================================================
 
 import hashlib
+import json
 import os
 from pathlib import Path
 import sys
 import time
+from types import SimpleNamespace
 
 import pytest
 
+from rtd_config import cli
 from rtd_config.backends.s32_mex.validation import (
     ValidationOutcome,
     _DEFAULT_S32DS_PARENTS,
@@ -69,6 +72,7 @@ from rtd_config.backends.s32_mex.process_tree import (
 )
 from rtd_config.errors import CliFailure
 from tests.fixtures import copy_uart_fixture
+import rtd_config.backends.s32_mex.validation_workspace as workspace_module
 
 
 def _validate_cmd():
@@ -236,6 +240,14 @@ def test_validation_outcome_pass_gate():
     assert ValidationOutcome(
         exit_code=0, severe_problems=["boom"], generated_files=122, **base
     ).passed is False
+    # exit 0, no severe, but no code generated -> not a pass.
+    assert ValidationOutcome(
+        exit_code=0, severe_problems=[], generated_files=0, **base
+    ).passed is False
+    # non-zero exit -> not a pass.
+    assert ValidationOutcome(
+        exit_code=2, severe_problems=[], generated_files=122, **base
+    ).passed is False
 
 
 def test_process_tree_runner_bounds_invalid_output_without_deadlock(tmp_path):
@@ -365,14 +377,94 @@ def test_validation_rejects_linked_source_without_launch(tmp_path):
         )
     assert caught.value.code == "validation_source_unsafe"
     assert outside.read_bytes() == b"outside"
-    # exit 0, no severe, but no code generated -> not a pass.
-    assert ValidationOutcome(
-        exit_code=0, severe_problems=[], generated_files=0, **base
-    ).passed is False
-    # non-zero exit -> not a pass.
-    assert ValidationOutcome(
-        exit_code=2, severe_problems=[], generated_files=122, **base
-    ).passed is False
+
+
+def test_validate_static_blocker_short_circuits_before_vendor_or_workspace(
+    monkeypatch, capsys, tmp_path
+):
+    project = copy_uart_fixture(tmp_path)
+    control = tmp_path / "must-not-exist"
+    blocked = SimpleNamespace(
+        status="blocked", diagnostics=[],
+        to_dict=lambda: {"status": "blocked", "diagnostics": []},
+    )
+    monkeypatch.setattr(cli, "run_static_checks", lambda *_args, **_kwargs: blocked)
+    monkeypatch.setattr(
+        cli, "find_s32ds_root",
+        lambda *_args, **_kwargs: pytest.fail("S32DS resolution ran after static blocker"),
+    )
+    monkeypatch.setattr(
+        cli, "run_validation",
+        lambda *_args, **_kwargs: pytest.fail("vendor ran after static blocker"),
+    )
+    result = cli.cmd_validate(SimpleNamespace(
+        project=project, s32ds_root="unused", workspace=control, sdk_path=None,
+    ))
+    payload = json.loads(capsys.readouterr().out)
+    assert result == 1
+    assert payload["status"] == "blocked"
+    assert payload["runtime_verification"]["static_check"]["status"] == "blocked"
+    assert "validation" not in payload
+    assert not control.exists()
+
+
+def test_vendor_mutation_of_original_project_is_detected_and_workspace_cleaned(
+    tmp_path
+):
+    project = copy_uart_fixture(tmp_path)
+    control = tmp_path / "controlled-validation"
+    source = project / ".project"
+
+    class MutatingRunner:
+        def run(self, argv, *, cwd, env, timeout_s):
+            source.write_bytes(source.read_bytes() + b"mutated")
+            export = Path(argv[argv.index("-ExportSrc") + 1])
+            (export / "generated.c").write_bytes(b"generated")
+            return SimpleNamespace(
+                exit_code=0, stdout="", stderr="", code="process_exit",
+                timed_out=False, stdout_truncated=False, stderr_truncated=False,
+            )
+
+    with pytest.raises(CliFailure) as caught:
+        run_validation(
+            project, Path("C:/NXP/S32DS.3.6.7"),
+            workspace=control, runner=MutatingRunner(),
+        )
+    assert caught.value.code == "validation_source_changed"
+    assert tuple(caught.value.details["entries"]) == (".project",)
+    assert not control.exists()
+
+
+def test_cleanup_failure_is_explicit_and_preserves_only_workspace_basename(
+    monkeypatch, tmp_path
+):
+    project = copy_uart_fixture(tmp_path)
+    control = tmp_path / "controlled-validation"
+    real_rmtree = workspace_module.shutil.rmtree
+
+    class PassingRunner:
+        def run(self, argv, *, cwd, env, timeout_s):
+            export = Path(argv[argv.index("-ExportSrc") + 1])
+            (export / "generated.c").write_bytes(b"generated")
+            return SimpleNamespace(
+                exit_code=0, stdout="", stderr="", code="process_exit",
+                timed_out=False, stdout_truncated=False, stderr_truncated=False,
+            )
+
+    monkeypatch.setattr(
+        workspace_module.shutil, "rmtree",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("injected cleanup")),
+    )
+    outcome = run_validation(
+        project, Path("C:/NXP/S32DS.3.6.7"),
+        workspace=control, runner=PassingRunner(),
+    )
+    assert outcome.passed is False
+    assert outcome.cleanup_warnings[0]["code"] == "validation_cleanup_failed"
+    preserved = outcome.cleanup_warnings[0]["details"]["preserved"]
+    assert len(preserved) == 1 and not Path(preserved[0]).is_absolute()
+    monkeypatch.setattr(workspace_module.shutil, "rmtree", real_rmtree)
+    real_rmtree(control)
 
 
 # ---------------------------------------------------------------------------
