@@ -151,8 +151,11 @@ def test_configure_writer_blocker_leaves_original_mex_bytes_unchanged(
     def apply_ok(_doc, _intent):
         return ApplyResult(changed_modules=["uart"])
 
-    monkeypatch.setattr(cli, "find_single_mex", lambda _project: mex)
-    monkeypatch.setattr(cli.MexDocument, "load", staticmethod(lambda _mex: FailingDoc()))
+    monkeypatch.setattr(
+        cli.MexDocument,
+        "from_snapshot",
+        staticmethod(lambda _snapshot: FailingDoc()),
+    )
 
     rc = cli._configure_module(
         Namespace(project=project, backup=False),

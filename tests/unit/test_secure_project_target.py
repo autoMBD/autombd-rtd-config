@@ -48,11 +48,14 @@ from __future__ import annotations
 
 from dataclasses import FrozenInstanceError, replace
 import hashlib
+import json
 import os
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
+from rtd_config import cli
 from rtd_config.backends.s32_mex.document import MexDocument
 from rtd_config.backends.s32_mex.target import (
     FileIdentity,
@@ -91,6 +94,7 @@ class InjectedPlatform:
         self.list_error: Exception | None = None
         self.inspect_error: Exception | None = None
         self.canonical_error: Exception | None = None
+        self.canonical_hook = None
         self.snapshot_hook = None
 
     def protect_root(self, path: Path):
@@ -109,6 +113,10 @@ class InjectedPlatform:
     def canonicalize(self, path: Path) -> Path:
         if self.canonical_error is not None:
             raise self.canonical_error
+        if self.canonical_hook is not None:
+            replacement = self.canonical_hook(path)
+            if replacement is not None:
+                return replacement
         return self.canonical.get(path, self.native.canonicalize(path))
 
     def snapshot_file(self, path: Path) -> FileSnapshot:
@@ -307,6 +315,27 @@ def test_mex_set_change_during_snapshot_fails_closed(tmp_path):
     assert caught.value.code == "project_target_changed"
 
 
+def test_ancestor_path_swap_during_verification_fails_closed(tmp_path):
+    root, _ = _project(tmp_path)
+    replacement_root, _ = _project(tmp_path / "replacement")
+    platform = InjectedPlatform()
+    root_calls = 0
+
+    def swap_canonical_root(path: Path) -> Path | None:
+        nonlocal root_calls
+        if path != root.absolute():
+            return None
+        root_calls += 1
+        return root.resolve() if root_calls == 1 else replacement_root.resolve()
+
+    platform.canonical_hook = swap_canonical_root
+
+    with pytest.raises(CliFailure) as caught:
+        verify_project_target(root, platform=platform)
+
+    assert caught.value.code == "project_target_changed"
+
+
 def test_root_aware_revalidation_rejects_new_mex(tmp_path):
     root, _ = _project(tmp_path)
     target = verify_project_target(root)
@@ -318,6 +347,34 @@ def test_root_aware_revalidation_rejects_new_mex(tmp_path):
     assert caught.value.code == "project_mex_ambiguous"
 
 
+def test_root_aware_revalidation_rechecks_root_path_safety(tmp_path):
+    root, _ = _project(tmp_path)
+    platform = InjectedPlatform()
+    target = verify_project_target(root, platform=platform)
+    platform.inspections[root] = replace(
+        platform.inspect(root), is_reparse_point=True
+    )
+
+    with pytest.raises(CliFailure) as caught:
+        revalidate_snapshot(target, platform=platform)
+
+    assert caught.value.code == "unsafe_project_path"
+
+
+def test_root_aware_revalidation_rechecks_mex_containment(tmp_path):
+    root, mex = _project(tmp_path)
+    outside = tmp_path / "outside.mex"
+    outside.write_bytes(XML_A)
+    platform = InjectedPlatform()
+    target = verify_project_target(root, platform=platform)
+    platform.canonical[mex] = outside.resolve()
+
+    with pytest.raises(CliFailure) as caught:
+        revalidate_snapshot(target, platform=platform)
+
+    assert caught.value.code == "unsafe_project_path"
+
+
 def test_posix_without_no_follow_support_fails_closed(tmp_path):
     root, _ = _project(tmp_path)
 
@@ -325,6 +382,106 @@ def test_posix_without_no_follow_support_fails_closed(tmp_path):
         verify_project_target(root, platform=_PosixTargetPlatform(no_follow_flag=0))
 
     assert caught.value.code == "project_identity_unavailable"
+
+
+def _swap_project_after_verification(monkeypatch, root: Path, mex: Path) -> None:
+    original_verified = cli.Project.verified
+
+    def verified_then_swap(project_root: Path, backend: str = "s32-mex"):
+        project = original_verified(project_root, backend)
+        replacement = root / "replacement.mex"
+        replacement.write_bytes(XML_B)
+        os.replace(replacement, mex)
+        return project
+
+    monkeypatch.setattr(cli.Project, "verified", verified_then_swap)
+
+
+def test_inspect_uses_verified_bytes_when_target_is_swapped(monkeypatch, capsys, tmp_path):
+    root, mex = _project(tmp_path)
+    _swap_project_after_verification(monkeypatch, root, mex)
+
+    assert cli.cmd_inspect(SimpleNamespace(project=root)) == 0
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["modules"] == ["A"]
+    assert mex.read_bytes() == XML_B
+
+
+def test_check_uses_verified_bytes_when_target_is_swapped(monkeypatch, capsys, tmp_path):
+    root, mex = _project(tmp_path)
+    _swap_project_after_verification(monkeypatch, root, mex)
+    original_checks = cli.run_static_checks
+
+    def assert_snapshot_checks(path, doc=None, **kwargs):
+        assert path == mex.resolve()
+        assert doc is not None and doc._raw == XML_A
+        assert kwargs["verified_target"].mex.content == XML_A
+        return original_checks(path, doc=doc, **kwargs)
+
+    monkeypatch.setattr(cli, "run_static_checks", assert_snapshot_checks)
+
+    assert cli.cmd_check(SimpleNamespace(project=root)) == 0
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["command"] == "check"
+    assert mex.read_bytes() == XML_B
+
+
+def test_validate_uses_snapshot_then_rejects_swapped_target_before_vendor(
+    monkeypatch, tmp_path
+):
+    root, mex = _project(tmp_path)
+    _swap_project_after_verification(monkeypatch, root, mex)
+    original_checks = cli.run_static_checks
+    vendor_called = False
+
+    def assert_snapshot_checks(path, doc=None, **kwargs):
+        assert doc is not None and doc._raw == XML_A
+        return original_checks(path, doc=doc, **kwargs)
+
+    def unexpected_vendor(*_args, **_kwargs):
+        nonlocal vendor_called
+        vendor_called = True
+
+    monkeypatch.setattr(cli, "run_static_checks", assert_snapshot_checks)
+    monkeypatch.setattr(cli, "find_s32ds_root", lambda _root: tmp_path)
+    monkeypatch.setattr(cli, "run_validation", unexpected_vendor)
+    args = SimpleNamespace(
+        project=root, s32ds_root=tmp_path, workspace=None, sdk_path=None
+    )
+
+    with pytest.raises(CliFailure) as caught:
+        cli.cmd_validate(args)
+
+    assert caught.value.code == "project_target_changed"
+    assert not vendor_called
+
+
+def test_configure_uses_snapshot_then_rejects_swapped_target_before_publish(
+    monkeypatch, tmp_path
+):
+    root, mex = _project(tmp_path)
+    _swap_project_after_verification(monkeypatch, root, mex)
+
+    def apply_snapshot(doc, _intent):
+        assert doc._raw == XML_A
+        return SimpleNamespace(
+            blocked=False,
+            modified_elements=[],
+            diagnostics=[],
+            changed_modules=[],
+        )
+
+    args = SimpleNamespace(project=root, backup=False)
+    intent = SimpleNamespace(module="test", action="set", payload={})
+    plan = SimpleNamespace(to_dict=lambda: {})
+
+    with pytest.raises(CliFailure) as caught:
+        cli._configure_module(args, intent, plan, apply_snapshot)
+
+    assert caught.value.code == "project_target_changed"
+    assert mex.read_bytes() == XML_B
 
 
 def test_document_parses_captured_bytes_and_revalidation_detects_replacement(tmp_path):
@@ -434,3 +591,16 @@ def test_real_windows_junction_is_rejected_and_safely_cleaned(tmp_path):
     finally:
         # rmdir removes the junction itself and never traverses its target.
         os.rmdir(junction)
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows handle protection test")
+def test_real_windows_root_handle_blocks_path_swap(tmp_path):
+    root, _ = _project(tmp_path)
+    replacement = tmp_path / "replacement"
+
+    with default_target_platform().protect_root(root):
+        with pytest.raises(PermissionError):
+            root.rename(replacement)
+
+    assert root.is_dir()
+    assert not replacement.exists()
