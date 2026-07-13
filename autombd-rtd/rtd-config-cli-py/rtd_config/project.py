@@ -90,7 +90,8 @@ class Project:
         return self.verified_target.mex.path
 
     def close(self) -> None:
-        self.verified_target.close()
+        if not self.verified_target.lease.closed:
+            self.verified_target.close()
 
     def __enter__(self) -> "Project":
         return self

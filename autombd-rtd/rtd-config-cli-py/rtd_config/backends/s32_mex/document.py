@@ -378,11 +378,15 @@ class MexDocument:
 
     def write(self, path: Path | None = None) -> None:
         target = Path(path) if path is not None else self.path
+        target.write_bytes(self.render())
+
+    def render(self) -> bytes:
+        """Render the pending narrow edit without opening a filesystem path."""
         if not self._aligned:
             raise MexWriteError(
                 "narrow .mex render unavailable: source byte mapping is not aligned"
             )
-        target.write_bytes(self._render_minimal())
+        return self._render_minimal()
 
     def _render_minimal(self) -> bytes:
         """Rebuild the file bytes, rewriting only start tags that changed.

@@ -62,6 +62,7 @@ from .target import (
     VerifiedProjectTarget,
     read_project_relative,
     snapshot_project_relative,
+    snapshot_safe_relative,
 )
 
 
@@ -430,6 +431,29 @@ def revalidate_project_metadata(
     metadata: ProjectMetadata,
 ) -> None:
     _, current = _capture_auxiliary_sources(target)
+    _compare_auxiliary_sources(metadata, current)
+
+
+def revalidate_project_metadata_after_release(
+    root: Path,
+    metadata: ProjectMetadata,
+) -> None:
+    """Recheck every fixed auxiliary source after the publish-release seam."""
+    current = []
+    for expected in metadata.auxiliary_sources:
+        snapshot = snapshot_safe_relative(
+            root, expected.relative, max_bytes=_MAX_SOURCE_BYTES
+        )
+        current.append(AuxiliarySourceEvidence(
+            expected.relative, snapshot is not None, snapshot
+        ))
+    _compare_auxiliary_sources(metadata, tuple(current))
+
+
+def _compare_auxiliary_sources(
+    metadata: ProjectMetadata,
+    current: tuple[AuxiliarySourceEvidence, ...],
+) -> None:
     if len(current) != len(metadata.auxiliary_sources):
         raise _metadata_sources_changed()
     for expected, actual in zip(metadata.auxiliary_sources, current):

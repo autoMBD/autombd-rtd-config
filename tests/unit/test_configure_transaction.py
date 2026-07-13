@@ -48,12 +48,20 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+import stat
 from types import SimpleNamespace
 
 import pytest
 
 from rtd_config import cli
 from rtd_config.backends.s32_mex.apply import ApplyResult
+from rtd_config.backends.s32_mex.target import (
+    FileIdentity,
+    FileSnapshot,
+    PublishExpectation,
+    atomic_publish_candidate,
+    default_target_platform,
+)
 from rtd_config.backends.s32_mex.transaction import ConfigureTransaction
 from rtd_config.errors import CliFailure
 from rtd_config.intent import Intent
@@ -73,7 +81,7 @@ def _intent() -> Intent:
 
 def _edit(doc, _intent, *, bundle) -> ApplyResult:
     assert bundle is not None
-    doc.root.attrib["transaction-test"] = "changed"
+    doc.root.attrib["uuid"] = "00000000-0000-0000-0000-000000000067"
     return ApplyResult(changed_modules=["uart"])
 
 
@@ -92,7 +100,7 @@ def test_static_checks_actual_same_directory_candidate_before_publish(tmp_path):
         assert path.parent == mex.parent
         assert path != mex
         assert doc._raw == path.read_bytes()
-        assert b'transaction-test="changed"' in doc._raw
+        assert b'uuid="00000000-0000-0000-0000-000000000067"' in doc._raw
         assert mex.read_bytes() == original
         assert verified_target is project.verified_target
         assert bundle is project.asset_bundle
@@ -168,14 +176,14 @@ def test_noop_does_not_stage_backup_or_replace(tmp_path):
         return ApplyResult(changed_modules=["uart"])
 
     def forbidden(*_args, **_kwargs):
-        pytest.fail("no-op attempted validation or publication")
+        pytest.fail("no-op attempted publication")
 
     try:
         result = ConfigureTransaction(
             project,
             backup=True,
-            static_runner=forbidden,
-            replace_fn=forbidden,
+            static_runner=_passed_static,
+            atomic_publish_fn=forbidden,
             release_for_publish_fn=forbidden,
         ).execute(_intent(), no_change)
         assert result.status == "passed"
@@ -192,13 +200,227 @@ def test_replace_failure_is_typed_and_staging_is_cleaned(tmp_path):
     mex = project.mex_file
     original = mex.read_bytes()
 
-    def fail_replace(_source, _target):
+    def fail_replace(*_args, **_kwargs):
         raise OSError("injected replace failure")
 
     with pytest.raises(CliFailure) as caught:
         ConfigureTransaction(
-            project, static_runner=_passed_static, replace_fn=fail_replace
+            project, static_runner=_passed_static, atomic_publish_fn=fail_replace
         ).execute(_intent(), _edit)
     assert caught.value.code == "configure_publish_failed"
     assert mex.read_bytes() == original
     assert not list(mex.parent.glob(f".{mex.name}.*.tmp"))
+
+
+def test_vendor_pass_cannot_publish_after_auxiliary_metadata_drift(tmp_path):
+    project = _prepared_project(tmp_path)
+    mex = project.mex_file
+    original = mex.read_bytes()
+    source = project.root / ".project"
+
+    def mutate_auxiliary(**_kwargs):
+        source.write_bytes(source.read_bytes() + b"\n")
+        return _passed_static()
+
+    with pytest.raises(CliFailure) as caught:
+        ConfigureTransaction(
+            project,
+            static_runner=_passed_static,
+            vendor_runner=mutate_auxiliary,
+        ).execute(_intent(), _edit)
+    assert caught.value.code == "project_metadata_source_changed"
+    assert mex.read_bytes() == original
+
+
+def test_linked_backup_target_is_rejected_before_target_publish(
+    monkeypatch, tmp_path
+):
+    project = _prepared_project(tmp_path)
+    mex = project.mex_file
+    original = mex.read_bytes()
+    backup = mex.with_name(mex.name + ".bak")
+    backup.write_bytes(b"attacker")
+    real_lstat = os.lstat
+
+    def linked_lstat(path):
+        status = real_lstat(path)
+        if Path(path) == backup:
+            return SimpleNamespace(
+                st_mode=stat.S_IFLNK,
+                st_file_attributes=getattr(status, "st_file_attributes", 0),
+            )
+        return status
+
+    monkeypatch.setattr(os, "lstat", linked_lstat)
+    with pytest.raises(CliFailure) as caught:
+        ConfigureTransaction(
+            project, backup=True, static_runner=_passed_static
+        ).execute(_intent(), _edit)
+    assert caught.value.code == "unsafe_backup_target"
+    assert mex.read_bytes() == original
+    assert backup.read_bytes() == b"attacker"
+
+
+def test_keyboard_interrupt_closes_lease_and_cleans_staging(tmp_path):
+    project = _prepared_project(tmp_path)
+    mex = project.mex_file
+
+    def interrupt(*_args, **_kwargs):
+        raise KeyboardInterrupt
+
+    with pytest.raises(KeyboardInterrupt):
+        ConfigureTransaction(project, static_runner=interrupt).execute(_intent(), _edit)
+    assert project.verified_target.lease.closed
+    assert not list(mex.parent.glob(f".{mex.name}.*.tmp"))
+
+
+def test_cleanup_failure_is_typed_without_publishing(monkeypatch, tmp_path):
+    project = _prepared_project(tmp_path)
+    mex = project.mex_file
+    original = mex.read_bytes()
+    real_unlink = Path.unlink
+
+    def fail_staging_cleanup(path, *args, **kwargs):
+        if path.name.startswith(f".{mex.name}.candidate."):
+            raise OSError("injected cleanup failure")
+        return real_unlink(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "unlink", fail_staging_cleanup)
+    blocked = SimpleNamespace(status="blocked", diagnostics=[])
+    with pytest.raises(CliFailure) as caught:
+        ConfigureTransaction(
+            project, static_runner=lambda *_args, **_kwargs: blocked
+        ).execute(_intent(), _edit)
+    assert caught.value.code == "configure_cleanup_failed"
+    assert mex.read_bytes() == original
+    for staging in mex.parent.glob(f".{mex.name}.*.tmp"):
+        real_unlink(staging)
+
+
+class _CapturePlatform:
+    def __init__(self, target: Path, staging: Path) -> None:
+        self.target = target
+        self.staging = staging
+        self.files = {
+            target: (FileIdentity(1, 1, None), b"original"),
+            staging: (FileIdentity(1, 2, None), b"candidate"),
+        }
+        self.inject_at_exchange = False
+        self.restore_fails = False
+
+    def snapshot_file(self, path: Path) -> FileSnapshot:
+        identity, content = self.files[path]
+        import hashlib
+
+        return FileSnapshot(
+            path, identity, len(content), 1, 1,
+            hashlib.sha256(content).hexdigest(), content,
+        )
+
+    def exchange_capture(self, replacement: Path, target: Path, capture: Path) -> Path:
+        if self.inject_at_exchange:
+            self.inject_at_exchange = False
+            self.files[target] = (FileIdentity(1, 3, None), b"attacker")
+        displaced = self.files.pop(target)
+        self.files[target] = self.files.pop(replacement)
+        self.files[capture] = displaced
+        return capture
+
+    def restore_capture(self, target: Path, capture: Path, rescue: Path) -> Path:
+        if self.restore_fails:
+            raise OSError("injected restore failure")
+        self.files[rescue] = self.files.pop(target)
+        self.files[target] = self.files.pop(capture)
+        return rescue
+
+
+def _capture_expectation(platform: _CapturePlatform) -> PublishExpectation:
+    original = platform.snapshot_file(platform.target)
+    return PublishExpectation(original.path, original.identity, original.sha256)
+
+
+def test_atomic_adapter_captures_syscall_window_swap_and_restores_attacker(tmp_path):
+    target = tmp_path / "project.mex"
+    staging = tmp_path / ".project.mex.candidate.tmp"
+    platform = _CapturePlatform(target, staging)
+    expectation = _capture_expectation(platform)
+    platform.inject_at_exchange = True
+
+    with pytest.raises(CliFailure) as caught:
+        atomic_publish_candidate(
+            expectation,
+            staging,
+            __import__("hashlib").sha256(b"candidate").hexdigest(),
+            platform=platform,
+        )
+    assert caught.value.code == "project_target_changed"
+    assert platform.files[target][1] == b"attacker"
+    assert b"original" not in [content for _, content in platform.files.values()]
+
+
+def test_atomic_adapter_restore_failure_is_typed_and_preserves_displaced_attacker(tmp_path):
+    target = tmp_path / "project.mex"
+    staging = tmp_path / ".project.mex.candidate.tmp"
+    platform = _CapturePlatform(target, staging)
+    expectation = _capture_expectation(platform)
+    platform.inject_at_exchange = True
+    platform.restore_fails = True
+
+    with pytest.raises(CliFailure) as caught:
+        atomic_publish_candidate(
+            expectation,
+            staging,
+            __import__("hashlib").sha256(b"candidate").hexdigest(),
+            platform=platform,
+        )
+    assert caught.value.code == "configure_publish_restore_failed"
+    assert b"attacker" in [content for _, content in platform.files.values()]
+
+
+def test_atomic_adapter_is_mandatory(tmp_path):
+    target = tmp_path / "project.mex"
+    staging = tmp_path / ".project.mex.candidate.tmp"
+    platform = _CapturePlatform(target, staging)
+    expectation = _capture_expectation(platform)
+    unsupported = SimpleNamespace(snapshot_file=platform.snapshot_file)
+    with pytest.raises(CliFailure) as caught:
+        atomic_publish_candidate(
+            expectation,
+            staging,
+            __import__("hashlib").sha256(b"candidate").hexdigest(),
+            platform=unsupported,
+        )
+    assert caught.value.code == "configure_atomic_publish_unavailable"
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows ReplaceFileW capture test")
+def test_real_windows_adapter_restores_destination_swapped_at_syscall(tmp_path):
+    target = tmp_path / "project.mex"
+    staging = tmp_path / ".project.mex.candidate.tmp"
+    attacker = tmp_path / "attacker.mex"
+    target.write_bytes(b"original")
+    staging.write_bytes(b"candidate")
+    attacker.write_bytes(b"attacker")
+    inner = default_target_platform()
+    original = inner.snapshot_file(target)
+    expectation = PublishExpectation(target, original.identity, original.sha256)
+
+    class InjectAtSyscall:
+        snapshot_file = staticmethod(inner.snapshot_file)
+        restore_capture = staticmethod(inner.restore_capture)
+
+        @staticmethod
+        def exchange_capture(replacement, destination, capture):
+            os.replace(attacker, destination)
+            return inner.exchange_capture(replacement, destination, capture)
+
+    with pytest.raises(CliFailure) as caught:
+        atomic_publish_candidate(
+            expectation,
+            staging,
+            __import__("hashlib").sha256(b"candidate").hexdigest(),
+            platform=InjectAtSyscall(),
+        )
+    assert caught.value.code == "project_target_changed"
+    assert target.read_bytes() == b"attacker"
+    assert not list(tmp_path.glob(".project.mex.*.tmp"))

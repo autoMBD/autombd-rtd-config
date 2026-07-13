@@ -48,9 +48,7 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
-import tempfile
 import traceback
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -60,6 +58,7 @@ from .config import RuntimeConfig
 from .backends.s32_mex.document import MexDocument, MexWriteError
 from .backends.s32_mex.metadata import revalidate_project_metadata
 from .backends.s32_mex.target import release_for_publish, revalidate_snapshot
+from .backends.s32_mex.transaction import ConfigureTransaction
 from .project import Project
 from .resources.pins import pin_options
 from .resources.bundles import AssetBundleResolver
@@ -776,109 +775,51 @@ def _configure_module(
 
 
 def _configure_verified_project(args, intent, plan, apply_fn, project: Project) -> int:
-    project.metadata.require_identity()
-    target = project.verified_target
-    mex = target.mex.path
-    doc = project.document
-
-    revalidate_snapshot(target)
-    revalidate_project_metadata(target, project.metadata)
-    apply_result = apply_fn(doc, intent, bundle=project.asset_bundle)
-    if apply_result.blocked:
-        target.close()
-        return emit({
-            "status": "blocked",
-            "command": "configure",
-            "normalized_intent": _intent_dict(intent),
-            "plan": plan.to_dict(),
-            "changed_modules": apply_result.changed_modules,
-            "diagnostics": [d.to_dict() for d in apply_result.diagnostics],
-        })
-
-    staging: Path | None = None
     try:
-        staging = _write_configure_staging(doc, mex)
-
-        # Runtime verification runs before the original project file is
-        # replaced. The in-memory document carries the pending edit, while the
-        # path keeps project-level checks anchored to the real single-.mex file.
-        static_result = run_static_checks(
-            mex,
-            doc=doc,
-            verified_target=target,
-            modified_elements=apply_result.modified_elements,
-            requested_callback=intent.payload.get("callback"),
-            bundle=project.asset_bundle,
-        )
-
-        diagnostics = apply_result.diagnostics + static_result.diagnostics
-        status = "passed" if static_result.status == "passed" else "blocked"
-        if status == "passed":
-            revalidate_project_metadata(target, project.metadata)
-            release_for_publish(target)
-            # Optional safety backup of the original .mex before committing.
-            # Default behaviour creates no backup.
-            if args.backup:
-                backup = mex.with_name(mex.name + ".bak")
-                backup.write_bytes(target.mex.content)
-            os.replace(staging, mex)
-            staging = None
-        return emit({
-            "status": status,
+        transaction_result = ConfigureTransaction(
+            project,
+            plan=plan,
+            backup=args.backup,
+            static_runner=run_static_checks,
+        ).execute(intent, apply_fn)
+        apply_result = transaction_result.apply_result
+        static_result = transaction_result.static_result
+        diagnostics = list(apply_result.diagnostics)
+        if static_result is not None:
+            diagnostics.extend(static_result.diagnostics)
+        payload = {
+            "status": transaction_result.status,
             "command": "configure",
             "normalized_intent": _intent_dict(intent),
             "plan": plan.to_dict(),
-            "changed_modules": apply_result.changed_modules,
+            "changed_modules": transaction_result.changed_modules,
             "diagnostics": [d.to_dict() for d in diagnostics],
-            "runtime_verification": {
+        }
+        if static_result is not None:
+            payload["runtime_verification"] = {
                 "static_check": static_result.to_dict(),
-            },
-        })
+            }
+        return emit(payload)
     except MexWriteError as exc:
-        diagnostics = apply_result.diagnostics + [
-            Diagnostic(
-                severity="blocker",
-                code="narrow_mex_write_unavailable",
-                module="backend",
-                message=(
-                    "The pending .mex edit could not be written with the "
-                    "byte-faithful narrow writer. The original file was left "
-                    "unchanged."
-                ),
-                details={
-                    "mex_file": str(mex),
-                    "reason": str(exc),
-                },
-            )
-        ]
+        diagnostic = Diagnostic(
+            severity="blocker",
+            code="narrow_mex_write_unavailable",
+            module="backend",
+            message=(
+                "The pending .mex edit could not be written with the "
+                "byte-faithful narrow writer. The original file was left "
+                "unchanged."
+            ),
+            details={"reason": str(exc)},
+        )
         return emit({
             "status": "blocked",
             "command": "configure",
             "normalized_intent": _intent_dict(intent),
             "plan": plan.to_dict(),
-            "changed_modules": apply_result.changed_modules,
-            "diagnostics": [d.to_dict() for d in diagnostics],
+            "changed_modules": [],
+            "diagnostics": [diagnostic.to_dict()],
         })
-    finally:
-        target.close()
-        if staging is not None:
-            staging.unlink(missing_ok=True)
-
-
-def _write_configure_staging(doc: MexDocument, mex: Path) -> Path:
-    with tempfile.NamedTemporaryFile(
-        prefix=f".{mex.name}.",
-        suffix=".tmp",
-        dir=mex.parent,
-        delete=False,
-    ) as handle:
-        staging = Path(handle.name)
-    try:
-        doc.write(staging)
-    except BaseException:
-        staging.unlink(missing_ok=True)
-        raise
-    return staging
 
 
 def normalize_platform_intent(args: argparse.Namespace, _bundle) -> Intent:

@@ -54,6 +54,7 @@ from pathlib import Path
 import stat
 import sys
 import re
+import secrets
 import threading
 from collections.abc import Callable
 from typing import Protocol
@@ -153,6 +154,13 @@ class PublishExpectation:
     path: Path
     identity: FileIdentity
     sha256: str
+
+
+@dataclass(frozen=True)
+class AtomicPublishResult:
+    published: FileSnapshot
+    displaced: FileSnapshot
+    displaced_path: Path
 
 
 @dataclass(frozen=True)
@@ -367,6 +375,31 @@ class _PosixTargetPlatform:
             else:
                 os.close(descriptor)
 
+    @staticmethod
+    def exchange_capture(replacement: Path, target: Path, _capture: Path) -> Path:
+        """Atomically exchange two names, leaving the displaced target at replacement."""
+        import ctypes
+
+        library = ctypes.CDLL(None, use_errno=True)
+        renameat2 = getattr(library, "renameat2", None)
+        if renameat2 is None:
+            raise NotImplementedError("renameat2 is unavailable")
+        renameat2.argtypes = [
+            ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p,
+            ctypes.c_uint,
+        ]
+        renameat2.restype = ctypes.c_int
+        if renameat2(
+            -100, os.fsencode(replacement), -100, os.fsencode(target), 0x2
+        ) != 0:
+            error = ctypes.get_errno()
+            raise OSError(error, os.strerror(error))
+        return replacement
+
+    @classmethod
+    def restore_capture(cls, target: Path, capture: Path, _rescue: Path) -> Path:
+        return cls.exchange_capture(capture, target, _rescue)
+
 
 if os.name == "nt":
     import ctypes
@@ -427,6 +460,12 @@ if os.name == "nt":
     _CloseHandle = _kernel32.CloseHandle
     _CloseHandle.argtypes = [wintypes.HANDLE]
     _CloseHandle.restype = wintypes.BOOL
+    _ReplaceFileW = _kernel32.ReplaceFileW
+    _ReplaceFileW.argtypes = [
+        wintypes.LPCWSTR, wintypes.LPCWSTR, wintypes.LPCWSTR,
+        wintypes.DWORD, wintypes.LPVOID, wintypes.LPVOID,
+    ]
+    _ReplaceFileW.restype = wintypes.BOOL
 
 
 class _WindowsTargetPlatform:
@@ -575,6 +614,18 @@ class _WindowsTargetPlatform:
                 self._protected_handles.append(handle)
             else:
                 _CloseHandle(handle)
+
+    @staticmethod
+    def exchange_capture(replacement: Path, target: Path, capture: Path) -> Path:
+        if not _ReplaceFileW(str(target), str(replacement), str(capture), 0, None, None):
+            raise ctypes.WinError(ctypes.get_last_error())
+        return capture
+
+    @staticmethod
+    def restore_capture(target: Path, capture: Path, rescue: Path) -> Path:
+        if not _ReplaceFileW(str(target), str(capture), str(rescue), 0, None, None):
+            raise ctypes.WinError(ctypes.get_last_error())
+        return rescue
 
 
 def default_target_platform() -> TargetPlatform:
@@ -1065,3 +1116,185 @@ def release_for_publish(
     expectation = PublishExpectation(target.mex.path, target.mex.identity, target.mex.sha256)
     target.close()
     return expectation
+
+
+def revalidate_publish_expectation(
+    expectation: PublishExpectation,
+    platform: TargetPlatform | None = None,
+) -> FileSnapshot:
+    """Recheck the exact selected target after releasing its live lease."""
+    adapter = platform or default_target_platform()
+    try:
+        current = _capture_snapshot(expectation.path, adapter)
+    except CliFailure as exc:
+        raise CliFailure(
+            "project_target_changed",
+            "The verified project target changed before publication; reload and retry.",
+            module="backend",
+        ) from exc
+    if current.identity != expectation.identity or current.sha256 != expectation.sha256:
+        raise CliFailure(
+            "project_target_changed",
+            "The verified project target changed before publication; reload and retry.",
+            module="backend",
+        )
+    return current
+
+
+def atomic_publish_candidate(
+    expectation: PublishExpectation,
+    staging: Path,
+    candidate_sha256: str,
+    platform: TargetPlatform | None = None,
+) -> AtomicPublishResult:
+    """Publish by atomically capturing and verifying the displaced target.
+
+    The syscall itself captures whichever destination existed at its linearized
+    instant.  A check-then-swap attacker is therefore detected from the
+    displaced file, restored atomically, and never permanently overwritten.
+    Platforms without capture/exchange semantics fail closed.
+    """
+    adapter = platform or default_target_platform()
+    exchange = getattr(adapter, "exchange_capture", None)
+    restore = getattr(adapter, "restore_capture", None)
+    if not callable(exchange) or not callable(restore):
+        raise CliFailure(
+            "configure_atomic_publish_unavailable",
+            "This platform cannot atomically capture a displaced .mex target.",
+            module="backend",
+        )
+
+    revalidate_publish_expectation(expectation, platform=adapter)
+    capture = _unused_publish_name(expectation.path, "displaced")
+    try:
+        displaced_path = exchange(staging, expectation.path, capture)
+    except NotImplementedError as exc:
+        raise CliFailure(
+            "configure_atomic_publish_unavailable",
+            "This platform lacks the required atomic exchange primitive.",
+            module="backend",
+        ) from exc
+    except OSError as exc:
+        raise CliFailure(
+            "configure_publish_failed",
+            "The verified .mex candidate could not be published atomically.",
+            module="backend",
+        ) from exc
+
+    try:
+        displaced = adapter.snapshot_file(displaced_path)
+    except (OSError, ValueError, RuntimeError) as exc:
+        _restore_displaced_target(adapter, restore, expectation.path, displaced_path, None)
+        raise CliFailure(
+            "configure_publish_uncertain",
+            "The displaced .mex target could not be verified; the original name was restored.",
+            module="backend",
+        ) from exc
+
+    if displaced.identity != expectation.identity or displaced.sha256 != expectation.sha256:
+        _restore_displaced_target(
+            adapter, restore, expectation.path, displaced_path, displaced
+        )
+        raise CliFailure(
+            "project_target_changed",
+            "The verified project target changed at publication; it was preserved and restored.",
+            module="backend",
+        )
+
+    try:
+        published = adapter.snapshot_file(expectation.path)
+    except (OSError, ValueError, RuntimeError) as exc:
+        _restore_displaced_target(
+            adapter, restore, expectation.path, displaced_path, displaced
+        )
+        raise CliFailure(
+            "configure_publish_verification_failed",
+            "The published .mex candidate could not be verified; the original was restored.",
+            module="backend",
+        ) from exc
+    if published.sha256 != candidate_sha256:
+        _restore_displaced_target(
+            adapter, restore, expectation.path, displaced_path, displaced
+        )
+        raise CliFailure(
+            "configure_staging_changed",
+            "The staged candidate changed at publication; the original was restored.",
+            module="backend",
+        )
+    return AtomicPublishResult(published, displaced, displaced_path)
+
+
+def rollback_atomic_publish(
+    result: AtomicPublishResult,
+    target: Path,
+    platform: TargetPlatform | None = None,
+) -> None:
+    """Restore a captured original only while the published candidate is intact."""
+    adapter = platform or default_target_platform()
+    restore = getattr(adapter, "restore_capture", None)
+    if not callable(restore):
+        raise CliFailure(
+            "configure_publish_restore_failed",
+            "The atomic publication cannot be rolled back on this platform.",
+            module="backend",
+        )
+    try:
+        current = adapter.snapshot_file(target)
+    except (OSError, ValueError, RuntimeError) as exc:
+        raise CliFailure(
+            "configure_publish_restore_failed",
+            "The published target changed before rollback and was not overwritten.",
+            module="backend",
+        ) from exc
+    if (
+        current.identity != result.published.identity
+        or current.sha256 != result.published.sha256
+    ):
+        raise CliFailure(
+            "configure_publish_restore_failed",
+            "The published target changed before rollback and was not overwritten.",
+            module="backend",
+        )
+    _restore_displaced_target(
+        adapter, restore, target, result.displaced_path, result.displaced
+    )
+
+
+def _restore_displaced_target(
+    adapter: TargetPlatform,
+    restore: Callable[[Path, Path, Path], Path],
+    target: Path,
+    displaced_path: Path,
+    expected_displaced: FileSnapshot | None,
+) -> None:
+    rescue = _unused_publish_name(target, "rejected")
+    try:
+        rejected_path = restore(target, displaced_path, rescue)
+        restored = adapter.snapshot_file(target)
+        if expected_displaced is not None and (
+            restored.identity != expected_displaced.identity
+            or restored.sha256 != expected_displaced.sha256
+        ):
+            raise OSError("restored target does not match displaced identity")
+        Path(rejected_path).unlink(missing_ok=True)
+    except (OSError, ValueError, RuntimeError) as exc:
+        raise CliFailure(
+            "configure_publish_restore_failed",
+            "An unexpected destination was captured but could not be restored safely.",
+            module="backend",
+        ) from exc
+
+
+def _unused_publish_name(target: Path, purpose: str) -> Path:
+    for _ in range(32):
+        candidate = target.parent / (
+            f".{target.name}.{purpose}.{secrets.token_hex(12)}.tmp"
+        )
+        if not os.path.lexists(candidate):
+            return candidate
+    raise CliFailure(
+        "configure_staging_failed",
+        "A unique atomic-publication capture name could not be allocated.",
+        module="backend",
+        details={"purpose": purpose},
+    )
