@@ -46,7 +46,7 @@
 
 from __future__ import annotations
 
-from contextlib import contextmanager, nullcontext
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 import hashlib
 import os
@@ -117,10 +117,6 @@ class VerifiedProjectTarget:
 
     def close(self) -> None:
         self.lease.close()
-
-    def __fspath__(self) -> str:
-        """Internal path compatibility; callers still retain this lease."""
-        return os.fspath(self.mex.path)
 
     def __enter__(self) -> "VerifiedProjectTarget":
         return self
@@ -211,6 +207,13 @@ class _PosixTargetPlatform:
                 child = os.open(name, flags, dir_fd=fd)
                 fds.append(child)
                 fd = child
+            for component in _path_components(absolute):
+                if self._mount_detector(component):
+                    raise CliFailure(
+                        "unsafe_project_path",
+                        "The project mount topology changed while its fd chain was opened.",
+                        module="backend", details={"path": str(component)},
+                    )
             self._root_fd = fd
             self._root_path = absolute
             self._protected_fds = fds
@@ -599,7 +602,13 @@ def _capture_snapshot(path: Path, platform: TargetPlatform) -> FileSnapshot:
 
 def _protected_root(platform: TargetPlatform, path: Path):
     protector = getattr(platform, "protect_root", None)
-    return protector(path) if protector is not None else nullcontext()
+    if not callable(protector):
+        raise CliFailure(
+            "project_identity_unavailable",
+            "The target platform cannot provide a protected project-root lease.",
+            module="backend", details={"path": str(path)},
+        )
+    return protector(path)
 
 
 def _direct_mex_entries(root: Path, platform: TargetPlatform) -> tuple[Path, ...]:
@@ -625,6 +634,12 @@ def verify_project_target(
     try:
         protection = _protected_root(adapter, supplied_root)
         with protection as lease:
+            if not isinstance(lease, TargetLease) or lease.closed:
+                raise CliFailure(
+                    "project_identity_unavailable",
+                    "The target platform returned an invalid project-root lease.",
+                    module="backend", details={"path": str(supplied_root)},
+                )
             root_evidence = _inspect(supplied_root, adapter)
             if not root_evidence.exists:
                 raise CliFailure(
@@ -700,9 +715,8 @@ def verify_project_target(
                     "The project path changed while the target was being verified.",
                     module="backend", details={"project": str(canonical_root)},
                 )
-            owned_lease = lease or TargetLease(lambda: None)
-            owned_lease.retain()
-            return VerifiedProjectTarget(canonical_root, snapshot, owned_lease)
+            lease.retain()
+            return VerifiedProjectTarget(canonical_root, snapshot, lease)
     except FileNotFoundError as exc:
         raise CliFailure(
             "project_not_found", f"Project directory does not exist: {project}",

@@ -399,6 +399,46 @@ def test_injected_bind_mount_detector_fails_closed(tmp_path):
     assert caught.value.code == "unsafe_project_path"
 
 
+def test_missing_protect_root_fails_closed(tmp_path):
+    root, _ = _project(tmp_path)
+    platform = InjectedPlatform()
+    platform.protect_root = None
+
+    with pytest.raises(CliFailure) as caught:
+        verify_project_target(root, platform=platform)
+
+    assert caught.value.code == "project_identity_unavailable"
+
+
+def test_mount_change_after_fd_chain_open_fails_closed(monkeypatch, tmp_path):
+    root, _ = _project(tmp_path)
+    calls = 0
+
+    def changing_detector(_path: Path) -> bool:
+        nonlocal calls
+        calls += 1
+        return calls > len(target_module._path_components(root.absolute()))
+
+    platform = _PosixTargetPlatform(no_follow_flag=1, mount_detector=changing_detector)
+    monkeypatch.setattr(target_module.os, "O_DIRECTORY", 0x10000, raising=False)
+    monkeypatch.setattr(target_module.os, "open", lambda *_args, **_kwargs: calls + 100)
+    monkeypatch.setattr(target_module.os, "close", lambda _fd: None)
+    with pytest.raises(CliFailure) as caught:
+        with platform.protect_root(root):
+            pass
+    assert caught.value.code == "unsafe_project_path"
+
+
+def test_verified_target_has_no_implicit_path_conversion(tmp_path):
+    root, _ = _project(tmp_path)
+    target = verify_project_target(root)
+    try:
+        with pytest.raises(TypeError):
+            os.fspath(target)
+    finally:
+        target.close()
+
+
 def test_posix_lease_holds_component_and_snapshot_fds_until_close(
     monkeypatch, tmp_path
 ):
@@ -647,6 +687,20 @@ def test_project_verified_preserves_locator_compatibility_and_snapshot(tmp_path)
 def test_project_requires_a_verified_target(tmp_path):
     with pytest.raises(TypeError):
         Project(root=tmp_path, backend="s32-mex")  # type: ignore[call-arg]
+
+
+@pytest.mark.parametrize("raise_inside", [False, True])
+def test_project_context_closes_lease_on_success_and_exception(tmp_path, raise_inside):
+    root, _ = _project(tmp_path)
+    project = Project.verified(root)
+    try:
+        with project:
+            assert not project.verified_target.lease.closed
+            if raise_inside:
+                raise RuntimeError("boom")
+    except RuntimeError:
+        assert raise_inside
+    assert project.verified_target.lease.closed
 
 
 def test_secure_target_value_objects_are_frozen(tmp_path):

@@ -1016,7 +1016,9 @@ class TestCliAddFlexioChannel:
             check=True,
         )
         from rtd_config.backends.s32_mex.locate import find_single_mex
-        mex = find_single_mex(project)
+        target = find_single_mex(project)
+        mex = target.mex.path
+        target.close()
         doc = MexDocument.load(mex)
         assert _mcl_channel_by_name(doc, "UART2_TX") is not None
         assert _mcl_channel_by_name(doc, "UART2_RX") is not None
@@ -1042,7 +1044,9 @@ class TestCliAddFlexioChannel:
             check=True,
         )
         from rtd_config.backends.s32_mex.locate import find_single_mex
-        mex = find_single_mex(project)
+        target = find_single_mex(project)
+        mex = target.mex.path
+        target.close()
         doc = MexDocument.load(mex)
         assert _uart_channel_by_name(doc, "UART2_TX") is not None
         assert _uart_channel_by_name(doc, "UART2_RX") is not None

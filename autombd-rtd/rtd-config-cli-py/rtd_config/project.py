@@ -62,6 +62,15 @@ class Project:
     def mex_file(self) -> Path:
         return self.verified_target.mex.path
 
+    def close(self) -> None:
+        self.verified_target.close()
+
+    def __enter__(self) -> "Project":
+        return self
+
+    def __exit__(self, *_exc_info) -> None:
+        self.close()
+
     @classmethod
     def verified(cls, root: Path, backend: str = "s32-mex") -> "Project":
         target = verify_project_target(root)

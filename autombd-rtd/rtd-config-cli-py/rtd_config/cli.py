@@ -558,37 +558,27 @@ def cmd_pin_options(args: argparse.Namespace) -> int:
 
 def cmd_inspect(args: argparse.Namespace) -> int:
     config = RuntimeConfig.from_dict({"project": args.project})
-    project = Project.verified(config.project, config.backend)
-    target = project.verified_target
-    assert target is not None
-    mex = target.mex.path
-    doc = MexDocument.from_snapshot(target.mex)
-    modules = sorted(doc.enabled_instance_names())
-    return emit({
-        "status": "passed",
-        "command": "inspect",
-        "backend": config.backend,
-        "family": config.family,
-        "device": config.device,
-        "package": config.package,
-        "rtd_version": config.rtd_version,
-        "mex_file": str(mex),
-        "modules": modules,
-        "validation_profile": f"{config.family}/{config.rtd_version}",
-    })
+    with Project.verified(config.project, config.backend) as project:
+        target = project.verified_target
+        doc = MexDocument.from_snapshot(target.mex)
+        modules = sorted(doc.enabled_instance_names())
+        return emit({
+            "status": "passed", "command": "inspect", "backend": config.backend,
+            "family": config.family, "device": config.device, "package": config.package,
+            "rtd_version": config.rtd_version, "mex_file": str(target.mex.path),
+            "modules": modules, "validation_profile": f"{config.family}/{config.rtd_version}",
+        })
 
 
 def cmd_check(args: argparse.Namespace) -> int:
     config = RuntimeConfig.from_dict({"project": args.project})
-    project = Project.verified(config.project, config.backend)
-    target = project.verified_target
-    assert target is not None
-    result = run_static_checks(
-        target.mex.path,
-        doc=MexDocument.from_snapshot(target.mex),
-        verified_target=target,
-    )
-    return emit(result.to_dict())
+    with Project.verified(config.project, config.backend) as project:
+        target = project.verified_target
+        result = run_static_checks(
+            target.mex.path, doc=MexDocument.from_snapshot(target.mex),
+            verified_target=target,
+        )
+        return emit(result.to_dict())
 
 
 def _intent_dict(intent: Intent) -> dict:
@@ -602,8 +592,14 @@ def _intent_dict(intent: Intent) -> dict:
 def cmd_validate(args: argparse.Namespace) -> int:
     config = RuntimeConfig.from_dict({"project": args.project})
     project = Project.verified(config.project, config.backend)
+    try:
+        return _cmd_validate_verified(args, config, project)
+    finally:
+        project.close()
+
+
+def _cmd_validate_verified(args, config: RuntimeConfig, project: Project) -> int:
     target = project.verified_target
-    assert target is not None
     mex = target.mex.path
 
     # Static check always runs first; vendor validation never substitutes for it.
