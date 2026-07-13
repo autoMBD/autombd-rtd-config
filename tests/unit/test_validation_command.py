@@ -45,11 +45,13 @@
 # =================================================================================
 
 import hashlib
+import _thread
 import json
 import os
 from pathlib import Path
 import sys
 import time
+import threading
 from types import SimpleNamespace
 
 import pytest
@@ -240,10 +242,10 @@ def test_validation_outcome_pass_gate():
     assert ValidationOutcome(
         exit_code=0, severe_problems=["boom"], generated_files=122, **base
     ).passed is False
-    # exit 0, no severe, but no code generated -> not a pass.
+    # The vendor gate is exactly exit 0 + no qualifying resource problem.
     assert ValidationOutcome(
         exit_code=0, severe_problems=[], generated_files=0, **base
-    ).passed is False
+    ).passed is True
     # non-zero exit -> not a pass.
     assert ValidationOutcome(
         exit_code=2, severe_problems=[], generated_files=122, **base
@@ -306,6 +308,41 @@ def test_process_tree_argv_is_never_interpreted_by_a_shell(tmp_path):
     assert not marker.exists()
 
 
+def test_process_tree_keyboard_interrupt_kills_descendants_and_reaps(tmp_path):
+    marker = tmp_path / "interrupt-escaped.txt"
+    child = (
+        "import pathlib,time,sys; time.sleep(1); "
+        "pathlib.Path(sys.argv[1]).write_text('escaped')"
+    )
+    parent = (
+        "import subprocess,sys,time; "
+        "subprocess.Popen([sys.executable,'-c',sys.argv[1],sys.argv[2]]); "
+        "time.sleep(30)"
+    )
+    timer = threading.Timer(0.2, _thread.interrupt_main)
+    timer.start()
+    try:
+        with pytest.raises(KeyboardInterrupt):
+            ProcessTreeRunner().run(
+                [sys.executable, "-c", parent, child, str(marker)],
+                cwd=tmp_path, env={}, timeout_s=30,
+            )
+    finally:
+        timer.cancel()
+    time.sleep(1.2)
+    assert not marker.exists()
+
+
+def test_process_tree_spawn_failure_is_sanitized(tmp_path):
+    result = ProcessTreeRunner().run(
+        [str(tmp_path / "missing-validator.exe")],
+        cwd=tmp_path, env={}, timeout_s=1,
+    )
+    assert result.code == "process_spawn_failed"
+    assert result.exit_code == 127
+    assert str(tmp_path) not in result.stderr
+
+
 def _project_manifest(root: Path) -> dict[str, tuple[int, str]]:
     return {
         path.relative_to(root).as_posix(): (
@@ -332,6 +369,9 @@ def test_validation_uses_controlled_copy_and_leaves_project_byte_identical(tmp_p
             assert load.is_relative_to(control)
             assert cwd.is_relative_to(control)
             assert not load.is_relative_to(project)
+            assert Path(env["TEMP"]).is_relative_to(control)
+            assert Path(env["TMP"]).is_relative_to(control)
+            assert {item.name for item in load.parent.iterdir()} == {load.name}
             load.write_bytes(b"vendor-mutated-stage")
             export.mkdir(parents=True, exist_ok=True)
             (export / "generated.c").write_bytes(b"generated")
@@ -377,6 +417,54 @@ def test_validation_rejects_linked_source_without_launch(tmp_path):
         )
     assert caught.value.code == "validation_source_unsafe"
     assert outside.read_bytes() == b"outside"
+
+
+def test_validation_rejects_linked_workspace_root_without_launch(tmp_path):
+    project = copy_uart_fixture(tmp_path)
+    outside = tmp_path / "outside-workspace"
+    outside.mkdir()
+    linked = tmp_path / "linked-workspace"
+    try:
+        linked.symlink_to(outside, target_is_directory=True)
+    except OSError as exc:
+        pytest.skip(f"directory symlink unavailable: {exc}")
+
+    class ForbiddenRunner:
+        def run(self, *_args, **_kwargs):
+            pytest.fail("vendor launched for linked workspace")
+
+    with pytest.raises(CliFailure) as caught:
+        run_validation(
+            project, Path("C:/NXP/S32DS.3.6.7"),
+            workspace=linked, runner=ForbiddenRunner(),
+        )
+    assert caught.value.code in {"validation_source_unsafe", "validation_workspace_unsafe"}
+    assert not tuple(outside.iterdir())
+
+
+def test_validation_rejects_system_temp_workspace_before_launch(monkeypatch, tmp_path):
+    project = copy_uart_fixture(tmp_path)
+    system_temp = tmp_path / "system-temp"
+    system_temp.mkdir()
+    monkeypatch.setenv("TEMP", str(system_temp))
+    monkeypatch.setenv("TMP", str(system_temp))
+
+    class ForbiddenRunner:
+        def run(self, *_args, **_kwargs):
+            pytest.fail("vendor launched in system temp")
+
+    with pytest.raises(CliFailure) as caught:
+        run_validation(
+            project, Path("C:/NXP/S32DS.3.6.7"),
+            workspace=system_temp / "validation", runner=ForbiddenRunner(),
+        )
+    assert caught.value.code == "validation_workspace_unsafe"
+    assert not (system_temp / "validation").exists()
+
+
+def test_nonqualifying_severe_text_does_not_fail_vendor_gate():
+    text = "SEVERE: ordinary launcher warning\n[TOOL] harmless status"
+    assert find_severe_tool_problems(text) == []
 
 
 def test_validate_static_blocker_short_circuits_before_vendor_or_workspace(
@@ -465,6 +553,24 @@ def test_cleanup_failure_is_explicit_and_preserves_only_workspace_basename(
     assert len(preserved) == 1 and not Path(preserved[0]).is_absolute()
     monkeypatch.setattr(workspace_module.shutil, "rmtree", real_rmtree)
     real_rmtree(control)
+
+
+def test_validation_keyboard_interrupt_cleans_workspace_and_preserves_project(tmp_path):
+    project = copy_uart_fixture(tmp_path)
+    control = tmp_path / "controlled-validation"
+    before = _project_manifest(project)
+
+    class InterruptingRunner:
+        def run(self, *_args, **_kwargs):
+            raise KeyboardInterrupt
+
+    with pytest.raises(KeyboardInterrupt):
+        run_validation(
+            project, Path("C:/NXP/S32DS.3.6.7"),
+            workspace=control, runner=InterruptingRunner(),
+        )
+    assert _project_manifest(project) == before
+    assert not control.exists()
 
 
 # ---------------------------------------------------------------------------

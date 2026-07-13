@@ -67,6 +67,7 @@ from rtd_config.backends.s32_mex.target import (
     discard_owned_path,
 )
 from rtd_config.backends.s32_mex.transaction import ConfigureTransaction
+from rtd_config.backends.s32_mex.validation import run_validation
 import rtd_config.backends.s32_mex.target as target_module
 import rtd_config.backends.s32_mex.transaction as transaction_module
 from rtd_config.errors import CliFailure
@@ -335,6 +336,42 @@ def test_vendor_observes_exact_validated_candidate_bytes(tmp_path):
         project, static_runner=_passed_static, vendor_runner=vendor
     ).execute(_intent(), _edit)
     assert observed["bytes"] == result.published_bytes
+
+
+def test_vendor_validation_uses_controlled_candidate_copy_before_publish(tmp_path):
+    project = _prepared_project(tmp_path)
+    mex = project.mex_file
+    original = mex.read_bytes()
+    control = tmp_path / "controlled-validation"
+    observed = {}
+
+    class FakeRunner:
+        def run(self, argv, *, cwd, env, timeout_s):
+            load = Path(argv[argv.index("-Load") + 1])
+            export = Path(argv[argv.index("-ExportSrc") + 1])
+            observed["validated"] = load.read_bytes()
+            assert load != mex and load.is_relative_to(control)
+            load.write_bytes(b"vendor-mutated-copy")
+            (export / "generated.c").write_bytes(b"generated")
+            return SimpleNamespace(
+                exit_code=0, stdout="", stderr="", code="process_exit",
+                timed_out=False, stdout_truncated=False, stderr_truncated=False,
+            )
+
+    def vendor(*, staging, document, project, bundle):
+        outcome = run_validation(
+            project.root, Path("C:/NXP/S32DS.3.6.7"),
+            workspace=control, mex_file=staging, runner=FakeRunner(),
+        )
+        return SimpleNamespace(status="passed" if outcome.passed else "blocked")
+
+    result = ConfigureTransaction(
+        project, static_runner=_passed_static, vendor_runner=vendor
+    ).execute(_intent(), _edit)
+    assert result.status == "passed"
+    assert observed["validated"] == result.published_bytes
+    assert mex.read_bytes() != original
+    assert not control.exists()
 
 
 def test_transaction_closes_target_lease_exactly_once(monkeypatch, tmp_path):
