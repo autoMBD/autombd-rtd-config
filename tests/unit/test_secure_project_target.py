@@ -52,6 +52,7 @@ import gc
 import hashlib
 import json
 import os
+import shutil
 import subprocess
 import sys
 import threading
@@ -84,6 +85,11 @@ from rtd_config.checks.static import run_static_checks
 
 XML_A = b"<mex><instance name='A'/></mex>"
 XML_B = b"<mex><instance name='B'/></mex>"
+UART_FIXTURE = (
+    Path(__file__).resolve().parents[1]
+    / "fixtures/nxp/ds/s32k3/Uart_Example_S32K344"
+)
+COMPATIBLE_XML = (UART_FIXTURE / "Uart_Example.mex").read_bytes()
 
 
 def _project(tmp_path: Path, raw: bytes = XML_A) -> tuple[Path, Path]:
@@ -92,6 +98,12 @@ def _project(tmp_path: Path, raw: bytes = XML_A) -> tuple[Path, Path]:
     mex = root / "sample.mex"
     mex.write_bytes(raw)
     return root, mex
+
+
+def _bundle_compatible_project(tmp_path: Path) -> tuple[Path, Path]:
+    root = tmp_path / "project"
+    shutil.copytree(UART_FIXTURE, root)
+    return root, root / "Uart_Example.mex"
 
 
 class InjectedPlatform:
@@ -661,18 +673,18 @@ def _swap_project_after_verification(monkeypatch, root: Path, mex: Path) -> None
 
 
 def test_inspect_uses_verified_bytes_when_target_is_swapped(monkeypatch, capsys, tmp_path):
-    root, mex = _project(tmp_path)
+    root, mex = _bundle_compatible_project(tmp_path)
     _swap_project_after_verification(monkeypatch, root, mex)
 
     assert cli.cmd_inspect(SimpleNamespace(project=root)) == 0
     payload = json.loads(capsys.readouterr().out)
 
-    assert payload["modules"] is None
+    assert "Uart" in payload["modules"]
     assert mex.read_bytes() == XML_B
 
 
 def test_check_uses_verified_bytes_when_target_is_swapped(monkeypatch, capsys, tmp_path):
-    root, mex = _project(tmp_path)
+    root, mex = _bundle_compatible_project(tmp_path)
     _swap_project_after_verification(monkeypatch, root, mex)
     monkeypatch.setattr(
         cli, "run_static_checks",
@@ -689,13 +701,13 @@ def test_check_uses_verified_bytes_when_target_is_swapped(monkeypatch, capsys, t
 def test_validate_uses_snapshot_then_rejects_swapped_target_before_vendor(
     monkeypatch, tmp_path
 ):
-    root, mex = _project(tmp_path)
+    root, mex = _bundle_compatible_project(tmp_path)
     _swap_project_after_verification(monkeypatch, root, mex)
     original_checks = cli.run_static_checks
     vendor_called = False
 
     def assert_snapshot_checks(path, doc=None, **kwargs):
-        assert doc is not None and doc._raw == XML_A
+        assert doc is not None and doc._raw == COMPATIBLE_XML
         return original_checks(path, doc=doc, **kwargs)
 
     def unexpected_vendor(*_args, **_kwargs):
@@ -1071,7 +1083,11 @@ def test_release_for_publish_rejects_a_changed_target_before_release(tmp_path):
 def test_public_project_flows_close_lease_when_work_raises(
     monkeypatch, tmp_path, flow
 ):
-    root, _ = _project(tmp_path)
+    root, _ = (
+        _bundle_compatible_project(tmp_path)
+        if flow in {"check", "validate"}
+        else _project(tmp_path)
+    )
     projects = []
     original_verified = cli.Project.verified
 
