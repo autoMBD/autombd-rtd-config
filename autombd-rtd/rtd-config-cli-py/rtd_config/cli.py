@@ -656,6 +656,12 @@ def _cmd_validate_verified(args, config: RuntimeConfig, project: Project) -> int
     static_result = run_static_checks(
         mex, doc=project.document, verified_target=target, bundle=project.asset_bundle
     )
+    if static_result.status != "passed":
+        return emit({
+            "status": "blocked",
+            "command": "validate",
+            "runtime_verification": {"static_check": static_result.to_dict()},
+        })
 
     root = find_s32ds_root(args.s32ds_root)
     if root is None:
@@ -687,9 +693,12 @@ def _cmd_validate_verified(args, config: RuntimeConfig, project: Project) -> int
                     ),
                     "details": {
                         "probed_which_root": (
-                            str(_which_root) if _which_root is not None else None
+                            _which_root.name if _which_root is not None else None
                         ),
-                        "breadcrumb": _which_breadcrumb or None,
+                        "breadcrumb": (
+                            "An incomplete S32DS installation was detected."
+                            if _which_breadcrumb else None
+                        ),
                     },
                 }
             ],
@@ -722,6 +731,11 @@ def _cmd_validate_verified(args, config: RuntimeConfig, project: Project) -> int
             "severe_problems": outcome.severe_problems,
             "command": outcome.command,
             "log_path": outcome.log_path,
+            "process_code": outcome.process_code,
+            "timed_out": outcome.timed_out,
+            "stdout_truncated": outcome.stdout_truncated,
+            "stderr_truncated": outcome.stderr_truncated,
+            "cleanup_warnings": outcome.cleanup_warnings,
         },
     })
 

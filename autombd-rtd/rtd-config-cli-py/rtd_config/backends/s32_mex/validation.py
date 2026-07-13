@@ -66,8 +66,9 @@ a deliberately invalid OsIf edit -> the SEVERE ``[TOOL]`` resource error below):
   flow required a CDT ``-import`` registration step which routinely exceeded the
   timeout and produced a spurious exit 2.
 
-Pass condition: ConfigTools exits ``0``, generates at least one source file, AND
-reports no SEVERE tool or resource-constraint problem.  Exit ``0`` alone is NOT
+Pass condition: ConfigTools exits ``0`` AND reports no qualifying SEVERE tool
+or resource-constraint problem.  Generated-file count is retained as audit
+evidence but is not an additional validity criterion. Exit ``0`` alone is NOT
 sufficient -- ConfigTools returns ``0`` even when it logs a SEVERE configuration
 error (verified: an invalid OsIf edit returned exit 0 while logging
 ``[TOOL] The resource "BaseNXP" ... has the following error: The number of OsIf
@@ -99,12 +100,17 @@ from __future__ import annotations
 
 import os
 import shutil
-import subprocess
-import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from rtd_config.backends.s32_mex.locate import find_single_mex
+from rtd_config.backends.s32_mex.process_tree import ProcessTreeRunner
+from rtd_config.backends.s32_mex.validation_workspace import (
+    ControlledValidationWorkspace,
+    snapshot_project_tree,
+    verify_project_tree,
+)
+from rtd_config.errors import CliFailure
 
 
 # S32 ConfigTools standalone application id (registered in S32DS 3.6.x). The
@@ -383,53 +389,83 @@ class ValidationOutcome:
     stderr: str = ""
     severe_problems: list[str] = field(default_factory=list)
     generated_files: int = 0
+    process_code: str = "process_exit"
+    timed_out: bool = False
+    stdout_truncated: bool = False
+    stderr_truncated: bool = False
+    cleanup_warnings: list[dict] = field(default_factory=list)
 
     @property
     def passed(self) -> bool:
-        """Pass = exit 0 AND code generated AND no SEVERE resource problem.
+        """Pass = exit 0 AND no qualifying SEVERE resource problem.
 
         Exit 0 alone is insufficient: ConfigTools returns 0 even when it logs a
         SEVERE resource problem — either ``[TOOL] ... has the following error``
         OR a ``From Problems view: Tool problem issue: ...`` Clocks/Peripherals/
         Pins constraint violation (see ``find_severe_tool_problems``) — so the
-        severe list must be empty. A pass must also have produced at least one
-        generated source file (the ``-ExportSrc`` evidence that codegen ran).
+        severe list must be empty. Generated-file count remains audit evidence,
+        but it is not an additional vendor validity criterion.
         """
         return (
             self.exit_code == 0
-            and self.generated_files > 0
+            and self.process_code == "process_exit"
             and not self.severe_problems
+            and not self.cleanup_warnings
         )
 
 
-def validation_log_path(project: Path) -> Path:
-    """Return the path where validation logs are kept (under build/)."""
-    return project / "build" / "configtools_validation.log"
+def validation_log_path(_project: Path) -> Path:
+    """Return the sanitized logical name of the controlled validation log."""
+    return Path("validation.log")
 
 
-def _run(command: list[str], timeout_s: int) -> tuple[int, str, str]:
-    """Run a headless launcher command, never raising for expected failures."""
-    creationflags = 0
-    if os.name == "nt":
-        creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+def _sanitized_command(command: list[str]) -> list[str]:
+    result = [Path(command[0]).name]
+    path_value = False
+    for item in command[1:]:
+        if path_value:
+            result.append(Path(item).name)
+            path_value = False
+            continue
+        result.append(item)
+        path_value = item in {"--launcher.ini", "-data", "-Load", "-sdkPath", "-ExportSrc"}
+    return result
+
+
+def _write_controlled_log(path: Path, text: str) -> None:
+    flags = (
+        os.O_WRONLY | os.O_CREAT | os.O_EXCL
+        | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0)
+    )
+    descriptor = -1
     try:
-        proc = subprocess.run(
-            command,
-            text=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=False,
-            timeout=timeout_s,
-            creationflags=creationflags,
-        )
-        return proc.returncode, proc.stdout or "", proc.stderr or ""
-    except subprocess.TimeoutExpired:
-        return 124, "", (
-            f"S32DS headless step exceeded the {timeout_s}s timeout; "
-            "treat as not validated (not a pass)."
-        )
-    except (FileNotFoundError, OSError) as exc:
-        return 127, "", f"Could not launch the S32DS executable: {exc}"
+        descriptor = os.open(path, flags, 0o600)
+        data = text.encode("utf-8", errors="replace")
+        view = memoryview(data)
+        while view:
+            written = os.write(descriptor, view)
+            if written <= 0:
+                raise OSError("short validation log write")
+            view = view[written:]
+        os.fsync(descriptor)
+    except OSError as exc:
+        raise CliFailure(
+            "validation_log_failed",
+            "The controlled validation log could not be written.",
+            module="backend", details={"entry": path.name},
+        ) from exc
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+
+
+def _redact_validation_text(text: str, replacements: list[tuple[Path, str]]) -> str:
+    result = text
+    for path, label in replacements:
+        raw = str(path)
+        result = result.replace(raw, label)
+        result = result.replace(raw.replace("\\", "/"), label)
+    return result
 
 
 def run_validation(
@@ -441,62 +477,135 @@ def run_validation(
     headless_tool: str = DEFAULT_HEADLESS_TOOL,
     mex_file: Path | None = None,
     timeout_s: int = 180,
+    runner: ProcessTreeRunner | None = None,
 ) -> ValidationOutcome:
     """Headlessly validate a project's .mex with the standalone Flow B.
 
-    A throwaway copy of the project is validated so the caller's files are never
-    touched, and generated code is exported to a temporary folder. No workspace
-    registration is performed; the Eclipse ``-data`` workspace and the
-    ``-ExportSrc`` target are temporary directories removed afterwards. The pass
-    decision is the returned outcome's ``passed`` property (exit 0 AND code
-    generated AND no SEVERE ``[TOOL]`` resource problem).
+    Only the selected .mex is copied into a controlled sibling workspace; the
+    vendor never receives an original-project path. The complete source tree is
+    snapshotted before and after execution, and the controlled data, export, log,
+    and temp roots are removed or reported as audit residuals. The pass decision
+    is exit 0 with no qualifying SEVERE resource problem and no cleanup warning.
     """
     project = Path(project)
     s32ds_root = Path(s32ds_root)
     sdk_path = sdk_path or default_sdk_path(s32ds_root)
 
-    # Log under the caller's real project even though validation runs on a copy.
-    log_path = validation_log_path(project)
-    log_path.parent.mkdir(parents=True, exist_ok=True)
-
-    stage = Path(tempfile.mkdtemp(prefix="rtd-validate-"))
+    project = project.absolute()
+    if mex_file is None:
+        located = find_single_mex(project)
+        try:
+            source_mex = located.mex.path
+        finally:
+            located.close()
+    else:
+        source_mex = Path(mex_file).absolute()
     try:
-        target = stage / project.name
-        shutil.copytree(project, target)
-        located_target = find_single_mex(target) if mex_file is None else None
-        target_mex = located_target.mex.path if located_target is not None else target / Path(mex_file).name
-        if located_target is not None:
-            located_target.close()
-        export_dir = stage / "_export"
-        export_dir.mkdir()
-        data_ws = Path(workspace) if workspace is not None else stage / "_ws"
-        data_ws.mkdir(parents=True, exist_ok=True)
+        source_mex.relative_to(project)
+    except ValueError as exc:
+        raise CliFailure(
+            "validation_source_unsafe",
+            "The validator input must remain inside the verified project.",
+            module="backend", details={"entry": source_mex.name},
+        ) from exc
 
+    before = snapshot_project_tree(project)
+    controlled_root = (
+        Path(workspace).absolute()
+        if workspace is not None
+        else project.parent / ".rtd-config-validation"
+    )
+    try:
+        controlled_root.relative_to(project)
+    except ValueError:
+        pass
+    else:
+        raise CliFailure(
+            "validation_workspace_unsafe",
+            "The controlled validation workspace must be outside the project.",
+            module="backend", details={"entry": controlled_root.name},
+        )
+    controlled = ControlledValidationWorkspace(controlled_root, source_mex)
+    primary: BaseException | None = None
+    outcome: ValidationOutcome | None = None
+    try:
+        controlled.open()
+        assert controlled.mex_file is not None
+        assert controlled.data_dir is not None
+        assert controlled.export_dir is not None
+        assert controlled.root is not None
+        assert controlled.log_file is not None
         val_cmd = build_validation_command(
-            s32ds_root, target_mex,
-            workspace=data_ws, export_dir=export_dir,
+            s32ds_root, controlled.mex_file,
+            workspace=controlled.data_dir, export_dir=controlled.export_dir,
             sdk_path=sdk_path, headless_tool=headless_tool,
         )
-        exit_code, stdout, stderr = _run(val_cmd, timeout_s)
+        process = (runner or ProcessTreeRunner()).run(
+            val_cmd,
+            cwd=controlled.root,
+            env=controlled.environment(),
+            timeout_s=timeout_s,
+        )
+        replacements = [
+            (controlled.root, "<validation-workspace>"),
+            (project, "<project>"),
+            (s32ds_root, "<s32ds>"),
+            (sdk_path, "<sdk>"),
+        ]
+        stdout = _redact_validation_text(process.stdout, replacements)
+        stderr = _redact_validation_text(process.stderr, replacements)
         severe = find_severe_tool_problems(stdout + "\n" + stderr)
-        generated_files = sum(1 for p in export_dir.rglob("*") if p.is_file())
-
-        log_path.write_text(
-            f"$ {' '.join(val_cmd)}\n[validate exit {exit_code}]\n"
+        generated_files = len(snapshot_project_tree(controlled.export_dir))
+        sanitized = _sanitized_command(val_cmd)
+        _write_controlled_log(
+            controlled.log_file,
+            f"$ {' '.join(sanitized)}\n[validate exit {process.exit_code}]\n"
             f"[generated_files {generated_files}]\n"
             f"[stdout]\n{stdout}\n[stderr]\n{stderr}\n"
             "[severe_tool_problems]\n" + "\n".join(severe) + "\n",
-            encoding="utf-8",
         )
-    finally:
-        shutil.rmtree(stage, ignore_errors=True)
+        outcome = ValidationOutcome(
+            exit_code=process.exit_code,
+            command=sanitized,
+            log_path="validation.log",
+            stdout=stdout,
+            stderr=stderr,
+            severe_problems=severe,
+            generated_files=generated_files,
+            process_code=process.code,
+            timed_out=process.timed_out,
+            stdout_truncated=process.stdout_truncated,
+            stderr_truncated=process.stderr_truncated,
+        )
+    except BaseException as exc:
+        primary = exc
 
-    return ValidationOutcome(
-        exit_code=exit_code,
-        command=val_cmd,
-        log_path=str(log_path),
-        stdout=stdout,
-        stderr=stderr,
-        severe_problems=severe,
-        generated_files=generated_files,
-    )
+    try:
+        verify_project_tree(project, before)
+    except CliFailure as exc:
+        if primary is None:
+            primary = exc
+        elif isinstance(primary, CliFailure):
+            details = dict(primary.details)
+            details["source_verification"] = {
+                "code": exc.code, "details": dict(exc.details),
+            }
+            primary = CliFailure(
+                primary.code, primary.message, status=primary.status,
+                module=primary.module, details=details,
+                exit_code=primary.exit_code,
+            )
+    cleanup_warnings = controlled.close()
+    if primary is not None:
+        if cleanup_warnings and isinstance(primary, CliFailure):
+            details = dict(primary.details)
+            details["cleanup_warnings"] = cleanup_warnings
+            primary = CliFailure(
+                primary.code, primary.message, status=primary.status,
+                module=primary.module, details=details,
+                exit_code=primary.exit_code,
+            )
+        raise primary
+    assert outcome is not None
+    outcome.cleanup_warnings.extend(cleanup_warnings)
+    return outcome
