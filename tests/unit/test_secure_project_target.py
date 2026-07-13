@@ -57,6 +57,7 @@ from types import SimpleNamespace
 import pytest
 
 from rtd_config import cli
+from rtd_config.backends.s32_mex import target as target_module
 from rtd_config.backends.s32_mex.document import MexDocument
 from rtd_config.backends.s32_mex.target import (
     FileIdentity,
@@ -398,6 +399,69 @@ def test_injected_bind_mount_detector_fails_closed(tmp_path):
     assert caught.value.code == "unsafe_project_path"
 
 
+def test_posix_lease_holds_component_and_snapshot_fds_until_close(
+    monkeypatch, tmp_path
+):
+    root, _ = _project(tmp_path)
+    platform = _PosixTargetPlatform(
+        no_follow_flag=1,
+        mount_detector=lambda _path: False,
+    )
+    opened: list[int] = []
+    closed: list[int] = []
+
+    def fake_open(_path, _flags, *, dir_fd=None):
+        descriptor = 100 + len(opened)
+        opened.append(descriptor)
+        return descriptor
+
+    monkeypatch.setattr(target_module.os, "O_DIRECTORY", 0x10000, raising=False)
+    monkeypatch.setattr(target_module.os, "open", fake_open)
+    monkeypatch.setattr(target_module.os, "close", closed.append)
+
+    with platform.protect_root(root) as lease:
+        lease.retain()
+        assert platform._protected_fds is not None
+        snapshot_descriptor = 999
+        platform._protected_fds.append(snapshot_descriptor)
+
+    assert opened
+    assert closed == []
+    lease.close()
+    assert closed == [snapshot_descriptor, *reversed(opened)]
+
+
+def test_linux_mountinfo_detector_decodes_escaped_mount_paths(monkeypatch):
+    mountinfo = (
+        "36 25 0:32 / /workspace\\040bind rw,relatime - ext4 /dev/root rw\n"
+        "37 25 0:33 / /workspace\\011tab rw,relatime - ext4 /dev/root rw\n"
+        "38 25 0:34 / /workspace\\134slash rw,relatime - ext4 /dev/root rw\n"
+    )
+    monkeypatch.setattr(target_module.sys, "platform", "linux")
+    monkeypatch.setattr(
+        target_module.Path,
+        "read_text",
+        lambda _self, *, encoding: mountinfo,
+    )
+
+    detector = _PosixTargetPlatform._default_mount_detector()
+
+    assert detector(Path("/workspace bind"))
+    assert detector(Path("/workspace\ttab"))
+    assert detector(Path("/workspace\\slash"))
+    assert not detector(Path("/workspace/ordinary"))
+
+
+def test_non_linux_posix_mount_detection_fails_closed(monkeypatch, tmp_path):
+    monkeypatch.setattr(target_module.sys, "platform", "darwin")
+    detector = _PosixTargetPlatform._default_mount_detector()
+
+    with pytest.raises(CliFailure) as caught:
+        detector(tmp_path)
+
+    assert caught.value.code == "project_identity_unavailable"
+
+
 def _swap_project_after_verification(monkeypatch, root: Path, mex: Path) -> None:
     original_verified = cli.Project.verified
 
@@ -571,11 +635,18 @@ def test_project_verified_preserves_locator_compatibility_and_snapshot(tmp_path)
     root, mex = _project(tmp_path)
 
     project = Project.verified(root)
+    try:
+        assert project.root == root.resolve()
+        assert project.mex_file == mex.resolve()
+        assert isinstance(project.verified_target, VerifiedProjectTarget)
+        assert project.verified_target.mex.content == XML_A
+    finally:
+        project.verified_target.close()
 
-    assert project.root == root.resolve()
-    assert project.mex_file == mex.resolve()
-    assert project.verified_target is not None
-    assert project.verified_target.mex.content == XML_A
+
+def test_project_requires_a_verified_target(tmp_path):
+    with pytest.raises(TypeError):
+        Project(root=tmp_path, backend="s32-mex")  # type: ignore[call-arg]
 
 
 def test_secure_target_value_objects_are_frozen(tmp_path):
@@ -634,13 +705,18 @@ def test_real_windows_root_handle_blocks_path_swap(tmp_path):
 
 @pytest.mark.skipif(os.name != "nt", reason="Windows lease lifecycle test")
 def test_windows_target_close_releases_path_locks(tmp_path):
-    root, _ = _project(tmp_path)
+    root, mex = _project(tmp_path)
     target = verify_project_target(root)
-    target.close()
+    replacement = root / "replacement.mex"
+    replacement.write_bytes(XML_B)
 
-    replacement = tmp_path / "replacement"
-    root.rename(replacement)
-    assert replacement.is_dir()
+    with pytest.raises(PermissionError):
+        os.replace(replacement, mex)
+
+    target.close()
+    os.replace(replacement, mex)
+
+    assert mex.read_bytes() == XML_B
 
 
 @pytest.mark.skipif(os.name != "nt", reason="Windows lease lifecycle test")
