@@ -46,9 +46,11 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
+from .backends.s32_mex.document import MexDocument
+from .backends.s32_mex.metadata import ProjectMetadata, parse_project_metadata
 from .backends.s32_mex.target import VerifiedProjectTarget, verify_project_target
 
 
@@ -57,6 +59,23 @@ class Project:
     root: Path
     backend: str
     verified_target: VerifiedProjectTarget
+    _cache: dict = field(default_factory=dict, repr=False, compare=False)
+
+    @property
+    def document(self) -> MexDocument:
+        document = self._cache.get("document")
+        if document is None:
+            document = MexDocument.from_snapshot(self.verified_target.mex)
+            self._cache["document"] = document
+        return document
+
+    @property
+    def metadata(self) -> ProjectMetadata:
+        metadata = self._cache.get("metadata")
+        if metadata is None:
+            metadata = parse_project_metadata(self.verified_target, self.document)
+            self._cache["metadata"] = metadata
+        return metadata
 
     @property
     def mex_file(self) -> Path:
