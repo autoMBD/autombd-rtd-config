@@ -46,12 +46,13 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import hashlib
 import os
 from pathlib import Path
 import secrets
 import stat
+import sys
 from typing import TYPE_CHECKING, Callable
 
 from ...errors import CliFailure
@@ -63,12 +64,15 @@ from .metadata import (
 )
 from .target import (
     AtomicPublishResult,
+    AtomicPublishFailure,
+    AtomicPublishState,
     FileSnapshot,
     PublishExpectation,
     atomic_install_absent,
     atomic_publish_candidate,
     discard_owned_path,
     finalize_atomic_publish,
+    prepare_atomic_finalize,
     release_for_publish,
     revalidate_publish_expectation,
     revalidate_snapshot,
@@ -89,6 +93,8 @@ class ConfigureTransactionResult:
     published_bytes: bytes
     changed_modules: list[str]
     no_op: bool = False
+    published: bool = False
+    cleanup_warnings: list[dict] = field(default_factory=list)
 
 
 class ConfigureTransaction:
@@ -130,6 +136,8 @@ class ConfigureTransaction:
         cleanup: list[FileSnapshot] = []
         target_publication: AtomicPublishResult | None = None
         backup_publication: AtomicPublishResult | None = None
+        committed = False
+        cleanup_warnings: list[dict] = []
         try:
             self.metadata.require_identity()
             revalidate_snapshot(self.target, platform=self.platform)
@@ -139,7 +147,10 @@ class ConfigureTransaction:
                 self.project.document, intent, bundle=self.bundle
             )
             if apply_result.blocked:
-                return self._result("blocked", apply_result, None, None, self.original.content)
+                return self._result(
+                    "blocked", apply_result, None, None, self.original.content,
+                    cleanup_warnings=cleanup_warnings,
+                )
 
             candidate = self.project.document.render()
             no_op = candidate == self.original.content
@@ -158,7 +169,8 @@ class ConfigureTransaction:
             )
             if getattr(static_result, "status", None) != "passed":
                 return self._result(
-                    "blocked", apply_result, static_result, None, self.original.content
+                    "blocked", apply_result, static_result, None, self.original.content,
+                    cleanup_warnings=cleanup_warnings,
                 )
 
             vendor_result = None
@@ -173,6 +185,7 @@ class ConfigureTransaction:
                     return self._result(
                         "blocked", apply_result, static_result, vendor_result,
                         self.original.content,
+                        cleanup_warnings=cleanup_warnings,
                     )
 
             revalidate_snapshot(self.target, platform=self.platform)
@@ -181,6 +194,7 @@ class ConfigureTransaction:
                 return self._result(
                     "passed", apply_result, static_result, vendor_result,
                     self.original.content, changed_modules=[], no_op=True,
+                    cleanup_warnings=cleanup_warnings,
                 )
 
             backup_path = self.original.path.with_name(self.original.path.name + ".bak")
@@ -199,46 +213,53 @@ class ConfigureTransaction:
             expectation = self.release_for_publish_fn(self.target)
             revalidate_publish_expectation(expectation, platform=self.platform)
             revalidate_project_metadata_after_release(self.project.root, self.metadata)
-            if self.backup:
-                self._revalidate_backup(backup_path, backup_before)
-                assert backup_staging is not None
-                backup_sha = hashlib.sha256(self.original.content).hexdigest()
-                if backup_before is None:
-                    backup_publication = atomic_install_absent(
-                        backup_path, backup_staging, backup_sha,
-                        platform=self.platform,
-                    )
-                else:
-                    backup_publication = atomic_publish_candidate(
-                        PublishExpectation(
-                            backup_path, backup_before.identity, backup_before.sha256
-                        ),
-                        backup_staging,
-                        backup_sha,
-                        platform=self.platform,
-                    )
-
             try:
+                if self.backup:
+                    self._revalidate_backup(backup_path, backup_before)
+                    assert backup_staging is not None
+                    backup_sha = hashlib.sha256(self.original.content).hexdigest()
+                    if backup_before is None:
+                        backup_publication = atomic_install_absent(
+                            backup_path, backup_staging, backup_sha,
+                            platform=self.platform,
+                        )
+                    else:
+                        backup_publication = atomic_publish_candidate(
+                            PublishExpectation(
+                                backup_path, backup_before.identity, backup_before.sha256
+                            ),
+                            backup_staging,
+                            backup_sha,
+                            platform=self.platform,
+                        )
                 target_publication = self.atomic_publish_fn(
                     expectation,
                     staging,
                     hashlib.sha256(candidate).hexdigest(),
                     platform=self.platform,
                 )
-            except CliFailure:
-                self._rollback_publications(
+            except CliFailure as primary:
+                if isinstance(primary, AtomicPublishFailure):
+                    adopted = self._adopt_atomic_failure(primary, cleanup)
+                    if adopted is not None:
+                        if primary.state.destination == backup_path:
+                            backup_publication = adopted
+                        else:
+                            target_publication = adopted
+                failures = self._rollback_publications(
                     target_publication, backup_publication, backup_path
                 )
-                raise
+                raise self._merge_failures(primary, failures)
             except Exception as exc:
-                self._rollback_publications(
+                failures = self._rollback_publications(
                     target_publication, backup_publication, backup_path
                 )
-                raise CliFailure(
+                primary = CliFailure(
                     "configure_publish_failed",
                     "The atomic publication adapter failed unexpectedly.",
                     module="backend",
-                ) from exc
+                )
+                raise self._merge_failures(primary, failures) from exc
             try:
                 self._flush_directory(self.original.path.parent)
                 final = self.platform.snapshot_file(self.original.path)
@@ -251,22 +272,78 @@ class ConfigureTransaction:
                 revalidate_project_metadata_after_release(
                     self.project.root, self.metadata
                 )
-            except BaseException:
-                self._rollback_publications(
+                prepare_atomic_finalize(target_publication, platform=self.platform)
+                if backup_publication is not None:
+                    prepare_atomic_finalize(
+                        backup_publication, platform=self.platform
+                    )
+            except BaseException as primary:
+                failures = self._rollback_publications(
                     target_publication, backup_publication, backup_path
                 )
+                if isinstance(primary, CliFailure):
+                    raise self._merge_failures(primary, failures)
+                if failures and hasattr(primary, "add_note"):
+                    primary.add_note(self._failure_note(failures))
                 raise
-            finalize_atomic_publish(target_publication, platform=self.platform)
-            if backup_publication is not None:
-                finalize_atomic_publish(backup_publication, platform=self.platform)
+
+            # Everything which can invalidate rollback evidence has completed.
+            # From here onward the candidate is the committed project state.
+            committed = True
+            for publication in (target_publication, backup_publication):
+                if publication is None:
+                    continue
+                try:
+                    residual = finalize_atomic_publish(
+                        publication, platform=self.platform
+                    )
+                    if residual is not None:
+                        cleanup_warnings.append(
+                            self._cleanup_residual_warning(residual)
+                        )
+                except CliFailure as exc:
+                    cleanup_warnings.append(self._warning(exc))
             return self._result(
                 "passed", apply_result, static_result, vendor_result,
                 final.content,
+                published=True,
+                cleanup_warnings=cleanup_warnings,
             )
         finally:
+            primary = sys.exc_info()[1]
+            cleanup_failures: list[CliFailure] = []
             if not self.target.lease.closed:
-                self.target.close()
-            self._cleanup(cleanup)
+                try:
+                    self.target.close()
+                except Exception as exc:
+                    cleanup_failure = CliFailure(
+                        "configure_cleanup_failed",
+                        "Transaction resources could not be released cleanly.",
+                        module="backend",
+                    )
+                    cleanup_failure.__cause__ = exc
+                    cleanup_failures.append(cleanup_failure)
+            try:
+                residuals = self._cleanup(cleanup)
+                for residual in residuals:
+                    cleanup_warnings.append(
+                        self._cleanup_residual_warning(residual)
+                    )
+            except CliFailure as failure:
+                cleanup_failures.append(failure)
+            if cleanup_failures:
+                cleanup_failure = self._merge_failures(
+                    cleanup_failures[0], cleanup_failures[1:]
+                )
+                if committed:
+                    cleanup_warnings.append(self._warning(cleanup_failure))
+                elif isinstance(primary, CliFailure):
+                    raise self._merge_failures(primary, [cleanup_failure]) from primary
+                elif primary is not None:
+                    if hasattr(primary, "add_note"):
+                        primary.add_note(self._failure_note([cleanup_failure]))
+                else:
+                    raise cleanup_failure
 
     def _result(
         self,
@@ -278,6 +355,8 @@ class ConfigureTransaction:
         *,
         changed_modules: list[str] | None = None,
         no_op: bool = False,
+        published: bool = False,
+        cleanup_warnings: list[dict] | None = None,
     ) -> ConfigureTransactionResult:
         return ConfigureTransactionResult(
             status=status,
@@ -291,6 +370,10 @@ class ConfigureTransaction:
                 else list(changed_modules or [])
             ),
             no_op=no_op,
+            published=published,
+            cleanup_warnings=(
+                cleanup_warnings if cleanup_warnings is not None else []
+            ),
         )
 
     def _stage_bytes(
@@ -324,17 +407,13 @@ class ConfigureTransaction:
                         os.close(descriptor)
                     except OSError:
                         pass
-                try:
-                    path.unlink(missing_ok=True)
-                except OSError:
-                    pass
                 if isinstance(exc, (KeyboardInterrupt, SystemExit)):
                     raise
                 raise CliFailure(
                     "configure_staging_failed",
                     "A transaction staging file could not be written durably.",
                     module="backend",
-                    details={"purpose": purpose},
+                    details={"purpose": purpose, "preserved": [path.name]},
                 ) from exc
         raise CliFailure(
             "configure_staging_failed",
@@ -406,24 +485,117 @@ class ConfigureTransaction:
         target_publication: AtomicPublishResult | None,
         backup_publication: AtomicPublishResult | None,
         backup_path: Path,
-    ) -> None:
+    ) -> list[CliFailure]:
         failures: list[CliFailure] = []
         if target_publication is not None:
             try:
-                rollback_atomic_publish(
+                residual = rollback_atomic_publish(
                     target_publication, self.original.path, platform=self.platform
                 )
+                if residual is not None:
+                    failures.append(self._residual_failure(residual))
             except CliFailure as exc:
                 failures.append(exc)
         if backup_publication is not None:
             try:
-                rollback_atomic_publish(
+                residual = rollback_atomic_publish(
                     backup_publication, backup_path, platform=self.platform
                 )
+                if residual is not None:
+                    failures.append(self._residual_failure(residual))
             except CliFailure as exc:
                 failures.append(exc)
-        if failures:
-            raise failures[0]
+        return failures
+
+    def _adopt_atomic_failure(
+        self,
+        failure: AtomicPublishFailure,
+        known_snapshots: list[FileSnapshot],
+    ) -> AtomicPublishResult | None:
+        """Recover publication ownership immediately from a typed syscall failure."""
+        state = failure.state
+        by_identity = {
+            (item.identity, item.sha256): item for item in known_snapshots
+        }
+        try:
+            published = state.published or self.platform.snapshot_file(
+                state.destination
+            )
+        except (OSError, ValueError, RuntimeError, KeyError):
+            return None
+        owned_candidate = by_identity.get((published.identity, published.sha256))
+        if owned_candidate is None:
+            return None
+        state.published = published
+        if state.displaced_path is None:
+            state.phase = "adopted_install"
+            return AtomicPublishResult(published, None, None, state)
+        try:
+            displaced = state.displaced or self.platform.snapshot_file(
+                state.displaced_path
+            )
+        except (OSError, ValueError, RuntimeError, KeyError):
+            return None
+        state.displaced = displaced
+        state.phase = "adopted_exchange"
+        return AtomicPublishResult(
+            published, displaced, state.displaced_path, state
+        )
+
+    @classmethod
+    def _merge_failures(
+        cls, primary: CliFailure, secondary: list[CliFailure]
+    ) -> CliFailure:
+        if not secondary:
+            return primary
+        details = dict(primary.details or {})
+        preserved = set(details.get("preserved", []))
+        cleanup: list[dict] = []
+        for failure in secondary:
+            item = cls._warning(failure)
+            cleanup.append(item)
+            preserved.update(item.get("details", {}).get("preserved", []))
+        if preserved:
+            details["preserved"] = sorted(preserved)
+        details["recovery_failures"] = cleanup
+        return CliFailure(
+            primary.code,
+            primary.message,
+            module=primary.module,
+            status=primary.status,
+            exit_code=primary.exit_code,
+            details=details,
+        )
+
+    @staticmethod
+    def _warning(failure: CliFailure) -> dict:
+        return {
+            "code": failure.code,
+            "message": failure.message,
+            "details": dict(failure.details or {}),
+        }
+
+    @staticmethod
+    def _cleanup_residual_warning(path: Path) -> dict:
+        return {
+            "code": "configure_cleanup_residual",
+            "message": "Verified rollback evidence was retained for audit cleanup.",
+            "details": {"preserved": [path.name]},
+        }
+
+    @staticmethod
+    def _residual_failure(path: Path) -> CliFailure:
+        return CliFailure(
+            "configure_cleanup_residual",
+            "Verified recovery evidence was retained for audit cleanup.",
+            module="backend",
+            details={"preserved": [path.name]},
+        )
+
+    @classmethod
+    def _failure_note(cls, failures: list[CliFailure]) -> str:
+        codes = ", ".join(item.code for item in failures)
+        return f"Additional transaction recovery failures: {codes}"
 
     @staticmethod
     def _same_snapshot(actual: FileSnapshot, expected: FileSnapshot) -> bool:
@@ -451,12 +623,16 @@ class ConfigureTransaction:
                 module="backend",
             ) from exc
 
-    def _cleanup(self, snapshots: list[FileSnapshot]) -> None:
-        failure: CliFailure | None = None
+    def _cleanup(self, snapshots: list[FileSnapshot]) -> list[Path]:
+        failures: list[CliFailure] = []
+        residuals: list[Path] = []
         for snapshot in reversed(snapshots):
             try:
-                discard_owned_path(snapshot.path, snapshot, self.platform)
+                residual = discard_owned_path(snapshot.path, snapshot, self.platform)
+                if residual is not None:
+                    residuals.append(residual)
             except CliFailure as exc:
-                failure = failure or exc
-        if failure is not None:
-            raise failure
+                failures.append(exc)
+        if failures:
+            raise self._merge_failures(failures[0], failures[1:])
+        return residuals

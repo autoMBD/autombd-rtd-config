@@ -793,6 +793,8 @@ def _configure_verified_project(args, intent, plan, apply_fn, project: Project) 
             "normalized_intent": _intent_dict(intent),
             "plan": plan.to_dict(),
             "changed_modules": transaction_result.changed_modules,
+            "published": transaction_result.published,
+            "cleanup_warnings": transaction_result.cleanup_warnings,
             "diagnostics": [d.to_dict() for d in diagnostics],
         }
         if static_result is not None:
