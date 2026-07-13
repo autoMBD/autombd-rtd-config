@@ -44,7 +44,13 @@
 # Description: Unit tests for the S32DS validation command builder.
 # =================================================================================
 
+import hashlib
+import os
 from pathlib import Path
+import sys
+import time
+
+import pytest
 
 from rtd_config.backends.s32_mex.validation import (
     ValidationOutcome,
@@ -55,7 +61,14 @@ from rtd_config.backends.s32_mex.validation import (
     find_s32ds_root,
     is_valid_s32ds_root,
     probe_which_root,
+    run_validation,
 )
+from rtd_config.backends.s32_mex.process_tree import (
+    ProcessOutputLimits,
+    ProcessTreeRunner,
+)
+from rtd_config.errors import CliFailure
+from tests.fixtures import copy_uart_fixture
 
 
 def _validate_cmd():
@@ -223,6 +236,135 @@ def test_validation_outcome_pass_gate():
     assert ValidationOutcome(
         exit_code=0, severe_problems=["boom"], generated_files=122, **base
     ).passed is False
+
+
+def test_process_tree_runner_bounds_invalid_output_without_deadlock(tmp_path):
+    runner = ProcessTreeRunner(ProcessOutputLimits(max_bytes=128, max_lines=4))
+    result = runner.run(
+        [
+            sys.executable,
+            "-c",
+            "import os; os.write(1, b'head\\n' + b'x'*4096 + b'\\xfftail\\n')",
+        ],
+        cwd=tmp_path,
+        env={},
+        timeout_s=10,
+    )
+    assert result.exit_code == 0
+    assert result.stdout_truncated is True
+    assert len(result.stdout.encode("utf-8")) <= 256
+    assert "tail" in result.stdout
+    assert "\ufffd" in result.stdout
+
+
+def test_process_tree_timeout_kills_descendant_before_it_can_escape(tmp_path):
+    marker = tmp_path / "escaped.txt"
+    child = (
+        "import pathlib,time,sys; time.sleep(1); "
+        "pathlib.Path(sys.argv[1]).write_text('escaped')"
+    )
+    parent = (
+        "import subprocess,sys,time; "
+        "subprocess.Popen([sys.executable,'-c',sys.argv[1],sys.argv[2]]); "
+        "time.sleep(30)"
+    )
+    result = ProcessTreeRunner().run(
+        [sys.executable, "-c", parent, child, str(marker)],
+        cwd=tmp_path,
+        env={},
+        timeout_s=0.2,
+    )
+    assert result.code == "process_timeout"
+    assert result.timed_out is True
+    time.sleep(1.2)
+    assert not marker.exists()
+
+
+def test_process_tree_argv_is_never_interpreted_by_a_shell(tmp_path):
+    marker = tmp_path / "injected.txt"
+    payload = f"; echo injected > {marker}"
+    result = ProcessTreeRunner().run(
+        [sys.executable, "-c", "import sys; print(sys.argv[1])", payload],
+        cwd=tmp_path,
+        env={},
+        timeout_s=10,
+    )
+    assert result.exit_code == 0
+    assert payload in result.stdout
+    assert not marker.exists()
+
+
+def _project_manifest(root: Path) -> dict[str, tuple[int, str]]:
+    return {
+        path.relative_to(root).as_posix(): (
+            path.stat().st_ino,
+            hashlib.sha256(path.read_bytes()).hexdigest(),
+        )
+        for path in root.rglob("*")
+        if path.is_file()
+    }
+
+
+def test_validation_uses_controlled_copy_and_leaves_project_byte_identical(tmp_path):
+    project = copy_uart_fixture(tmp_path)
+    control = tmp_path / "controlled-validation"
+    before = _project_manifest(project)
+    observed = {}
+
+    class FakeRunner:
+        def run(self, argv, *, cwd, env, timeout_s):
+            observed["argv"] = list(argv)
+            observed["cwd"] = cwd
+            load = Path(argv[argv.index("-Load") + 1])
+            export = Path(argv[argv.index("-ExportSrc") + 1])
+            assert load.is_relative_to(control)
+            assert cwd.is_relative_to(control)
+            assert not load.is_relative_to(project)
+            load.write_bytes(b"vendor-mutated-stage")
+            export.mkdir(parents=True, exist_ok=True)
+            (export / "generated.c").write_bytes(b"generated")
+            return type("Result", (), {
+                "exit_code": 0, "stdout": "ok", "stderr": "",
+                "code": "process_exit", "timed_out": False,
+                "stdout_truncated": False, "stderr_truncated": False,
+            })()
+
+    outcome = run_validation(
+        project,
+        Path("C:/NXP/S32DS.3.6.7"),
+        workspace=control,
+        runner=FakeRunner(),
+    )
+    assert outcome.passed is True
+    assert _project_manifest(project) == before
+    assert not control.exists()
+    assert outcome.log_path == "validation.log"
+    assert all(str(project) not in item for item in outcome.command)
+
+
+def test_validation_rejects_linked_source_without_launch(tmp_path):
+    project = copy_uart_fixture(tmp_path)
+    outside = tmp_path / "outside.txt"
+    outside.write_bytes(b"outside")
+    linked = project / "linked.txt"
+    try:
+        linked.symlink_to(outside)
+    except OSError as exc:
+        pytest.skip(f"symlink unavailable: {exc}")
+
+    class ForbiddenRunner:
+        def run(self, *_args, **_kwargs):
+            pytest.fail("vendor launched for linked source")
+
+    with pytest.raises(CliFailure) as caught:
+        run_validation(
+            project,
+            Path("C:/NXP/S32DS.3.6.7"),
+            workspace=tmp_path / "controlled-validation",
+            runner=ForbiddenRunner(),
+        )
+    assert caught.value.code == "validation_source_unsafe"
+    assert outside.read_bytes() == b"outside"
     # exit 0, no severe, but no code generated -> not a pass.
     assert ValidationOutcome(
         exit_code=0, severe_problems=[], generated_files=0, **base
