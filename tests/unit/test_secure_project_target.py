@@ -69,6 +69,7 @@ from rtd_config.backends.s32_mex.target import (
     VerifiedProjectTarget,
     WindowsFileId,
     _PosixTargetPlatform,
+    _WindowsTargetPlatform,
     release_for_publish,
     default_target_platform,
     revalidate_snapshot,
@@ -401,6 +402,35 @@ def test_posix_without_nonblock_support_fails_closed(tmp_path):
     assert caught.value.code == "project_identity_unavailable"
 
 
+def test_posix_snapshot_opens_nonregular_targets_nonblocking(monkeypatch, tmp_path):
+    _, mex = _project(tmp_path)
+    no_follow = 0x100000
+    nonblock = 0x200000
+    platform = _PosixTargetPlatform(
+        no_follow_flag=no_follow,
+        nonblock_flag=nonblock,
+        mount_detector=lambda _path: False,
+    )
+    opened = []
+    closed = []
+    fifo_status = SimpleNamespace(st_mode=target_module.stat.S_IFIFO)
+
+    def fake_open(path, flags, **kwargs):
+        opened.append((path, flags, kwargs))
+        return 123
+
+    monkeypatch.setattr(target_module.os, "open", fake_open)
+    monkeypatch.setattr(target_module.os, "fstat", lambda _fd: fifo_status)
+    monkeypatch.setattr(target_module.os, "close", closed.append)
+
+    with pytest.raises(ValueError, match="regular file"):
+        platform.snapshot_file(mex)
+
+    assert opened[0][1] & no_follow
+    assert opened[0][1] & nonblock
+    assert closed == [123]
+
+
 def test_static_malformed_snapshot_is_structured_and_releases_lease(tmp_path):
     root, mex = _project(tmp_path, b"<mex>")
     result = run_static_checks(mex)
@@ -508,6 +538,44 @@ def test_posix_lease_holds_component_and_snapshot_fds_until_close(
     assert closed == []
     lease.close()
     assert closed == [snapshot_descriptor, *reversed(opened)]
+
+
+@pytest.mark.parametrize(
+    ("platform", "attribute", "main_value", "worker_value", "worker_default"),
+    [
+        (
+            _PosixTargetPlatform(
+                no_follow_flag=1,
+                nonblock_flag=1,
+                mount_detector=lambda _path: False,
+            ),
+            "_root_fd",
+            101,
+            202,
+            None,
+        ),
+        (_WindowsTargetPlatform(), "_protected_handles", [101], [202], []),
+    ],
+    ids=["posix-fds", "windows-handles"],
+)
+def test_platform_protection_state_is_thread_local(
+    platform, attribute, main_value, worker_value, worker_default
+):
+    setattr(platform, attribute, main_value)
+    observed = []
+
+    def inspect_worker_state():
+        observed.append(getattr(platform, attribute))
+        setattr(platform, attribute, worker_value)
+        observed.append(getattr(platform, attribute))
+
+    thread = threading.Thread(target=inspect_worker_state)
+    thread.start()
+    thread.join(timeout=5)
+
+    assert not thread.is_alive()
+    assert observed == [worker_default, worker_value]
+    assert getattr(platform, attribute) == main_value
 
 
 def test_linux_mountinfo_detector_decodes_escaped_mount_paths(monkeypatch):
@@ -670,6 +738,8 @@ def test_document_parses_captured_bytes_and_revalidation_detects_replacement(tmp
     doc = MexDocument.from_snapshot(target.mex)
 
     assert doc._raw == XML_A
+    assert doc._source_snapshot is target.mex
+    assert not hasattr(doc, "_verified_target")
     assert doc.root.find("instance").attrib["name"] == "A"
     with pytest.raises(CliFailure) as caught:
         revalidate_snapshot(target)
@@ -801,8 +871,29 @@ def test_release_for_publish_revalidates_then_closes(tmp_path):
     root, _ = _project(tmp_path)
     target = verify_project_target(root)
     expectation = release_for_publish(target)
+    assert expectation.path == target.mex.path
+    assert expectation.identity == target.mex.identity
     assert expectation.sha256 == target.mex.sha256
     assert target.lease.closed
+
+
+def test_release_for_publish_rejects_a_changed_target_before_release(tmp_path):
+    root, _ = _project(tmp_path)
+    platform = InjectedPlatform()
+    target = verify_project_target(root, platform=platform)
+    platform.snapshot_override = replace(
+        target.mex,
+        sha256=hashlib.sha256(XML_B).hexdigest(),
+        content=XML_B,
+    )
+
+    try:
+        with pytest.raises(CliFailure) as caught:
+            release_for_publish(target, platform=platform)
+        assert caught.value.code == "project_target_changed"
+        assert not target.lease.closed
+    finally:
+        target.close()
 
 
 @pytest.mark.parametrize("flow", ["inspect", "check", "validate", "configure"])
