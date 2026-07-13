@@ -371,6 +371,66 @@ def test_every_configure_entry_point_plans_and_applies_one_verified_project(
     assert projects[0].verified_target.lease.closed
 
 
+def test_real_configure_pipeline_propagates_one_bundle_identity(
+    monkeypatch, tmp_path, capsys
+):
+    project_root = copy_uart_fixture(tmp_path)
+    seen = {}
+    resolver_type = cli.AssetBundleResolver
+    provider_type = cli.UartProvider
+    normalize = cli.normalize_uart_intent
+    apply_uart = cli.apply_uart_set
+    static_checks = cli.run_static_checks
+
+    class TrackingResolver:
+        def __init__(self, root):
+            self.inner = resolver_type(root)
+
+        def resolve(self, metadata):
+            value = self.inner.resolve(metadata)
+            seen["resolved"] = value
+            return value
+
+    class TrackingProvider:
+        def __init__(self, bundle):
+            seen["provider_ctor"] = bundle
+            self.inner = provider_type(bundle)
+
+        def plan(self, intent):
+            seen["provider_plan"] = seen["provider_ctor"]
+            return self.inner.plan(intent)
+
+    def tracking_normalizer(args, bundle):
+        seen["normalizer"] = bundle
+        return normalize(args, bundle)
+
+    def tracking_apply(doc, intent, *, bundle):
+        seen["apply"] = bundle
+        return apply_uart(doc, intent, bundle=bundle)
+
+    def tracking_static(*args, bundle, **kwargs):
+        seen["static"] = bundle
+        return static_checks(*args, bundle=bundle, **kwargs)
+
+    monkeypatch.setattr(cli, "AssetBundleResolver", TrackingResolver)
+    monkeypatch.setattr(cli, "UartProvider", TrackingProvider)
+    monkeypatch.setattr(cli, "normalize_uart_intent", tracking_normalizer)
+    monkeypatch.setattr(cli, "apply_uart_set", tracking_apply)
+    monkeypatch.setattr(cli, "run_static_checks", tracking_static)
+
+    args = cli.build_parser().parse_args([
+        "uart", "set", "--project", str(project_root), "--configure",
+        "--hw", "LPUART_3", "--mode", "interrupt", "--baud", "115200",
+        "--json",
+    ])
+    assert cli.cmd_uart_set(args) == 0
+    assert json.loads(capsys.readouterr().out)["status"] == "passed"
+    resolved = seen["resolved"]
+    assert all(seen[name] is resolved for name in (
+        "normalizer", "provider_ctor", "provider_plan", "apply", "static",
+    ))
+
+
 @pytest.mark.parametrize(
     "command_name,normalizer_name,provider_name,apply_name",
     CONFIGURE_ENTRY_POINTS,

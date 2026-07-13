@@ -48,18 +48,20 @@ from __future__ import annotations
 
 from dataclasses import replace
 import json
+import os
 from pathlib import Path
 import shutil
-from types import SimpleNamespace
+import subprocess
 
 import pytest
 
 from rtd_config.backends.s32_mex.metadata import ModuleMetadata, ToolMetadata
 from rtd_config import cli
 from rtd_config.errors import CliFailure
-from rtd_config.intent import Intent
 from rtd_config.project import Project
 from rtd_config.resources.bundles import AssetBundleResolver
+import rtd_config.resources.bundles as bundles_module
+from tests.unit.test_secure_project_target import InjectedPlatform
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -218,8 +220,111 @@ def test_asset_symbolic_link_chain_is_rejected_fail_closed(tmp_path, linked_part
     assert caught.value.code == "asset_invalid"
 
 
+@pytest.mark.skipif(os.name != "nt", reason="real junction requires Windows")
+def test_asset_ancestor_real_windows_junction_is_rejected(tmp_path):
+    root = copied_assets(tmp_path)
+    port = root / "nxp/s32k3/port"
+    outside = tmp_path / "outside-port"
+    port.replace(outside)
+    created = subprocess.run(
+        ["cmd", "/c", "mklink", "/J", str(port), str(outside)],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=False,
+    )
+    if created.returncode != 0:
+        pytest.skip(f"junction creation unavailable: exit {created.returncode}")
+    try:
+        with pytest.raises(CliFailure) as caught:
+            AssetBundleResolver(root).resolve(metadata(UART))
+        assert caught.value.code == "asset_invalid"
+        assert str(root) not in json.dumps(dict(caught.value.details))
+    finally:
+        port.rmdir()
+
+
+@pytest.mark.skipif(os.name == "nt", reason="real bind mount requires POSIX")
+def test_asset_ancestor_real_posix_bind_mount_is_rejected(tmp_path):
+    if not hasattr(os, "geteuid") or os.geteuid() != 0 or shutil.which("mount") is None:
+        pytest.skip("bind mount requires root and mount(8)")
+    root = copied_assets(tmp_path)
+    port = root / "nxp/s32k3/port"
+    outside = tmp_path / "outside-port"
+    shutil.copytree(port, outside)
+    mounted = subprocess.run(
+        ["mount", "--bind", str(outside), str(port)], check=False,
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+    )
+    if mounted.returncode != 0:
+        pytest.skip(f"bind mount unavailable: exit {mounted.returncode}")
+    try:
+        with pytest.raises(CliFailure) as caught:
+            AssetBundleResolver(root).resolve(metadata(UART))
+        assert caught.value.code == "asset_invalid"
+        assert str(root) not in json.dumps(dict(caught.value.details))
+    finally:
+        subprocess.run(["umount", str(port)], check=True)
+
+
+@pytest.mark.parametrize("flag", ["is_reparse_point", "is_mount_point"])
+def test_manifest_injected_reparse_or_mount_is_stably_rejected(
+    monkeypatch, tmp_path, flag
+):
+    root = copied_assets(tmp_path)
+    manifest = root / "bundles.json"
+    platform = InjectedPlatform()
+    platform.inspections[manifest] = replace(
+        platform.inspect(manifest), **{flag: True}
+    )
+    monkeypatch.setattr(bundles_module, "default_target_platform", lambda: platform)
+
+    with pytest.raises(CliFailure) as caught:
+        AssetBundleResolver(root)
+    assert caught.value.code == "asset_manifest_invalid"
+    assert str(root) not in json.dumps(dict(caught.value.details))
+
+
+@pytest.mark.parametrize(
+    "injected_code",
+    ["unsafe_project_path", "project_target_changed", "project_identity_unavailable"],
+    ids=["junction-mount", "capture-swap", "identity-change"],
+)
+def test_resolve_maps_injected_asset_capture_failures_without_path_leak(
+    monkeypatch, tmp_path, injected_code
+):
+    root = copied_assets(tmp_path)
+    resolver = AssetBundleResolver(root)
+
+    def reject_capture(*_args, **_kwargs):
+        raise CliFailure(
+            injected_code, "injected capture failure", module="backend",
+            details={"path": str(root / "SECRET_ABSOLUTE_PATH")},
+        )
+
+    monkeypatch.setattr(bundles_module, "snapshot_safe_relative", reject_capture)
+    with pytest.raises(CliFailure) as caught:
+        resolver.resolve(metadata(UART))
+    assert caught.value.code == "asset_invalid"
+    assert str(root) not in json.dumps(dict(caught.value.details))
+
+
 def test_resolution_failure_precedes_provider_apply_and_vendor(monkeypatch):
-    calls = {"plan": 0, "apply": 0, "vendor": 0}
+    calls = {"normalize_asset": 0, "provider_ctor": 0, "plan": 0,
+             "apply": 0, "static": 0, "vendor": 0}
+
+    args = cli.build_parser().parse_args([
+        "uart", "set", "--project", str(UART), "--configure",
+        "--hw", "LPUART_3", "--mode", "interrupt", "--baud", "115200",
+        "--parity", "none", "--stop-bits", "1", "--word-length", "8",
+        "--json",
+    ])
+
+    class GuardBundle:
+        def load_json(self, _name):
+            calls["normalize_asset"] += 1
+            raise RuntimeError("real normalizer reached asset access")
+
+    with pytest.raises(RuntimeError, match="real normalizer reached asset access"):
+        cli.normalize_uart_intent(args, GuardBundle())
+    calls["normalize_asset"] = 0
 
     class RejectingResolver:
         def __init__(self, _root): pass
@@ -227,15 +332,18 @@ def test_resolution_failure_precedes_provider_apply_and_vendor(monkeypatch):
             raise CliFailure("asset_bundle_unsupported", "unsupported")
 
     class Provider:
+        def __init__(self, _bundle):
+            calls["provider_ctor"] += 1
+
         def plan(self, _intent):
             calls["plan"] += 1
 
     monkeypatch.setattr(cli, "AssetBundleResolver", RejectingResolver)
     monkeypatch.setattr(cli, "UartProvider", Provider)
-    monkeypatch.setattr(cli, "normalize_uart_intent", lambda _args: Intent.from_dict({"module":"uart", "action":"set", "payload":{}}))
     monkeypatch.setattr(cli, "apply_uart_set", lambda *_args, **_kwargs: calls.__setitem__("apply", calls["apply"] + 1))
+    monkeypatch.setattr(cli, "run_static_checks", lambda *_args, **_kwargs: calls.__setitem__("static", calls["static"] + 1))
     monkeypatch.setattr(cli, "run_validation", lambda *_args, **_kwargs: calls.__setitem__("vendor", calls["vendor"] + 1))
     with pytest.raises(CliFailure) as caught:
-        cli.cmd_uart_set(SimpleNamespace(project=UART, configure=True))
+        cli.cmd_uart_set(args)
     assert caught.value.code == "asset_bundle_unsupported"
-    assert calls == {"plan": 0, "apply": 0, "vendor": 0}
+    assert calls == {key: 0 for key in calls}
