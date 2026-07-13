@@ -49,7 +49,7 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 import hashlib
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import re
 from typing import Any
 import xml.etree.ElementTree as ET
@@ -69,6 +69,7 @@ from .target import (
 _NXP_NAMESPACE_PREFIX = "http://mcuxpresso.nxp.com/XSD/mex_configuration_"
 _XSI_SCHEMA_LOCATION = "{http://www.w3.org/2001/XMLSchema-instance}schemaLocation"
 _MAX_SOURCE_BYTES = 1024 * 1024
+_MAX_VALIDATOR_MEX_BYTES = 64 * 1024 * 1024
 _AUXILIARY_SOURCES = (
     ".project",
     ".cproject",
@@ -123,6 +124,219 @@ class AuxiliarySourceEvidence:
     relative: str
     observed: bool
     snapshot: FileSnapshot | None
+
+
+@dataclass(frozen=True)
+class ValidatorInputFile:
+    relative: str
+    source_relative: str
+    snapshot: FileSnapshot
+
+
+@dataclass(frozen=True)
+class ValidatorInputInventory:
+    root: Path
+    mex_relative: str
+    files: tuple[ValidatorInputFile, ...]
+
+    def __post_init__(self) -> None:
+        seen: set[str] = set()
+        for item in self.files:
+            _validate_inventory_relative(item.relative)
+            _validate_inventory_relative(item.source_relative)
+            folded = item.relative.casefold()
+            if folded in seen:
+                raise CliFailure(
+                    "validation_inventory_collision",
+                    "Validator inputs contain a duplicate or case-folded path collision.",
+                    module="backend", details={"entry": Path(item.relative).name},
+                )
+            seen.add(folded)
+        if self.mex_relative.casefold() not in seen:
+            raise ValueError("validator inventory mex path is not materialized")
+
+
+def _validate_inventory_relative(relative: str) -> None:
+    parsed = PurePosixPath(relative)
+    if (
+        not relative or parsed.is_absolute()
+        or any(part in {"", ".", ".."} for part in parsed.parts)
+        or "\\" in relative
+    ):
+        raise CliFailure(
+            "validation_inventory_unsafe",
+            "Validator input paths must be stable project-relative paths.",
+            module="backend", details={"entry": Path(relative).name},
+        )
+
+
+def _settings_pref_names(target: VerifiedProjectTarget) -> tuple[str, ...]:
+    platform = target.lease._resources.get("platform")
+    if platform is None:
+        raise CliFailure(
+            "project_identity_unavailable",
+            "The verified project lacks a safe validator inventory reader.",
+            module="backend",
+        )
+    settings = target.root / ".settings"
+    with target.lease.borrow():
+        inspection = platform.inspect(settings)
+        if not inspection.exists:
+            return ()
+        if (
+            not inspection.is_directory or inspection.is_symlink
+            or inspection.is_reparse_point or inspection.is_mount_point
+        ):
+            raise CliFailure(
+                "validation_source_unsafe",
+                "The project settings input must be a safe directory.",
+                module="backend", details={"entry": settings.name},
+            )
+        names: list[str] = []
+        for entry in platform.list_directory(settings):
+            if not entry.name.lower().endswith(".prefs"):
+                continue
+            item = platform.inspect(entry)
+            if (
+                not item.exists or not item.is_regular or item.is_directory
+                or item.is_symlink or item.is_reparse_point or item.is_mount_point
+            ):
+                raise CliFailure(
+                    "validation_source_unsafe",
+                    "Validator preference inputs must be safe regular files.",
+                    module="backend", details={"entry": entry.name},
+                )
+            names.append(entry.name)
+    folded: dict[str, str] = {}
+    for name in names:
+        key = name.casefold()
+        if key in folded:
+            raise CliFailure(
+                "validation_inventory_collision",
+                "Validator preferences contain a case-folded path collision.",
+                module="backend", details={"entry": name},
+            )
+        folded[key] = name
+    return tuple(sorted(names))
+
+
+def capture_validator_input_inventory(
+    target: VerifiedProjectTarget,
+    *,
+    selected_mex: FileSnapshot | None = None,
+    selected_source_relative: str | None = None,
+) -> ValidatorInputInventory:
+    """Capture the minimal real S32DS project exclusively from safe snapshots."""
+    if selected_mex is None:
+        selected_mex = target.mex
+        selected_source_relative = target.mex.path.relative_to(target.root).as_posix()
+    if selected_source_relative is None:
+        raise ValueError("selected_source_relative is required with a candidate snapshot")
+    _validate_inventory_relative(selected_source_relative)
+    mex_relative = target.mex.path.relative_to(target.root).as_posix()
+    required = (".project", ".cproject")
+    files = [ValidatorInputFile(mex_relative, selected_source_relative, selected_mex)]
+    for relative in required:
+        snapshot = snapshot_project_relative(
+            target, relative, max_bytes=_MAX_SOURCE_BYTES
+        )
+        if snapshot is None:
+            raise CliFailure(
+                "validation_inventory_incomplete",
+                "The S32DS project lacks required validator metadata.",
+                module="backend", details={"entry": Path(relative).name},
+            )
+        files.append(ValidatorInputFile(relative, relative, snapshot))
+
+    names_before = _settings_pref_names(target)
+    for name in names_before:
+        relative = f".settings/{name}"
+        snapshot = snapshot_project_relative(
+            target, relative, max_bytes=_MAX_SOURCE_BYTES
+        )
+        if snapshot is None:
+            raise CliFailure(
+                "validation_inventory_changed",
+                "Validator preferences changed during inventory capture.",
+                module="backend", details={"entry": name},
+            )
+        files.append(ValidatorInputFile(relative, relative, snapshot))
+    if _settings_pref_names(target) != names_before:
+        raise CliFailure(
+            "validation_inventory_changed",
+            "Validator preferences changed during inventory capture.",
+            module="backend",
+        )
+    for item in files:
+        current = snapshot_project_relative(
+            target,
+            item.source_relative,
+            max_bytes=(
+                _MAX_VALIDATOR_MEX_BYTES
+                if item.relative == mex_relative else _MAX_SOURCE_BYTES
+            ),
+        )
+        if current is None or (
+            current.identity != item.snapshot.identity
+            or current.size != item.snapshot.size
+            or current.sha256 != item.snapshot.sha256
+        ):
+            raise CliFailure(
+                "validation_inventory_changed",
+                "Validator inputs changed during inventory capture.",
+                module="backend", details={"entry": Path(item.relative).name},
+            )
+    if _settings_pref_names(target) != names_before:
+        raise CliFailure(
+            "validation_inventory_changed",
+            "Validator preferences changed during inventory capture.",
+            module="backend",
+        )
+    return ValidatorInputInventory(target.root, mex_relative, tuple(files))
+
+
+def revalidate_validator_input_inventory(
+    target: VerifiedProjectTarget,
+    expected: ValidatorInputInventory,
+) -> None:
+    selected = snapshot_project_relative(
+        target,
+        next(
+            item.source_relative
+            for item in expected.files if item.relative == expected.mex_relative
+        ),
+        max_bytes=_MAX_VALIDATOR_MEX_BYTES,
+    )
+    if selected is None:
+        raise _validator_inventory_changed(Path(expected.mex_relative).name)
+    current = capture_validator_input_inventory(
+        target,
+        selected_mex=selected,
+        selected_source_relative=next(
+            item.source_relative
+            for item in expected.files if item.relative == expected.mex_relative
+        ),
+    )
+    if len(current.files) != len(expected.files):
+        raise _validator_inventory_changed()
+    for left, right in zip(expected.files, current.files):
+        if (
+            left.relative != right.relative
+            or left.source_relative != right.source_relative
+            or left.snapshot.identity != right.snapshot.identity
+            or left.snapshot.size != right.snapshot.size
+            or left.snapshot.sha256 != right.snapshot.sha256
+        ):
+            raise _validator_inventory_changed(Path(left.relative).name)
+
+
+def _validator_inventory_changed(entry: str | None = None) -> CliFailure:
+    return CliFailure(
+        "validation_source_changed",
+        "Validator input sources changed during isolated validation.",
+        module="backend",
+        details={"entries": [] if entry is None else [entry]},
+    )
 
 
 @dataclass(frozen=True)

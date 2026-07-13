@@ -1132,6 +1132,7 @@ def _read_posix_relative(
             FileIdentity(before.st_dev, before.st_ino, None),
             before.st_size, before.st_mtime_ns, before.st_ctime_ns,
             hashlib.sha256(content).hexdigest(), content,
+            stat.S_IMODE(before.st_mode),
         )
     finally:
         for descriptor in reversed(opened):
@@ -1204,6 +1205,7 @@ def _read_windows_relative(
             basic_before.LastWriteTime * 100,
             basic_before.ChangeTime * 100,
             hashlib.sha256(content).hexdigest(), content,
+            0o444 if basic_before.FileAttributes & _FILE_ATTRIBUTE_READONLY else 0o666,
         )
     finally:
         for handle in reversed(held):

@@ -49,12 +49,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 import hashlib
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import secrets
 import shutil
 import stat
 
 from ...errors import CliFailure
+from .metadata import ValidatorInputInventory
 
 
 @dataclass(frozen=True)
@@ -240,9 +241,9 @@ def _reject_system_temp(path: Path) -> None:
 
 
 class ControlledValidationWorkspace:
-    def __init__(self, base: Path, source_mex: Path) -> None:
+    def __init__(self, base: Path, inventory: ValidatorInputInventory) -> None:
         self.base = Path(base).absolute()
-        self.source_mex = Path(source_mex)
+        self.inventory = inventory
         self.created_base = False
         self.root: Path | None = None
         self.project_dir: Path | None = None
@@ -291,56 +292,62 @@ class ControlledValidationWorkspace:
         ):
             os.mkdir(directory, 0o700)
         self.log_file = logs / "validation.log"
-        self.mex_file = self.project_dir / self.source_mex.name
-        self._copy_regular(self.source_mex, self.mex_file)
+        created_directories = {PurePosixPath(".")}
+        for item in self.inventory.files:
+            relative = PurePosixPath(item.relative)
+            parent = relative.parent
+            pending: list[PurePosixPath] = []
+            while parent not in created_directories and parent != PurePosixPath("."):
+                pending.append(parent)
+                parent = parent.parent
+            for directory_relative in reversed(pending):
+                directory = self.project_dir.joinpath(*directory_relative.parts)
+                os.mkdir(directory, 0o700)
+                created_directories.add(directory_relative)
+            target = self.project_dir.joinpath(*relative.parts)
+            self._materialize_snapshot(item.snapshot, target)
+            if item.relative == self.inventory.mex_relative:
+                self.mex_file = target
+        if self.mex_file is None:
+            raise CliFailure(
+                "validation_inventory_incomplete",
+                "The validator inventory did not materialize its selected .mex.",
+                module="backend",
+            )
         return self
 
     @staticmethod
-    def _copy_regular(source: Path, target: Path) -> None:
-        source_fd = target_fd = -1
-        read_flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0)
+    def _materialize_snapshot(snapshot, target: Path) -> None:
+        target_fd = -1
         write_flags = (
             os.O_WRONLY | os.O_CREAT | os.O_EXCL
             | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0)
         )
         try:
-            source_fd = os.open(source, read_flags)
-            before = os.fstat(source_fd)
-            if not stat.S_ISREG(before.st_mode):
-                raise ValueError("source is not regular")
             target_fd = os.open(target, write_flags, 0o600)
-            digest = hashlib.sha256()
-            size = 0
-            while chunk := os.read(source_fd, 1024 * 1024):
-                digest.update(chunk)
-                size += len(chunk)
-                view = memoryview(chunk)
-                while view:
-                    written = os.write(target_fd, view)
-                    if written <= 0:
-                        raise OSError("short validation staging write")
-                    view = view[written:]
-            after = os.fstat(source_fd)
-            if (
-                before.st_dev, before.st_ino, before.st_size,
-                before.st_mtime_ns, before.st_ctime_ns,
-            ) != (
-                after.st_dev, after.st_ino, after.st_size,
-                after.st_mtime_ns, after.st_ctime_ns,
-            ) or size != before.st_size:
-                raise RuntimeError("source changed during validation staging")
+            view = memoryview(snapshot.content)
+            while view:
+                written = os.write(target_fd, view)
+                if written <= 0:
+                    raise OSError("short validation staging write")
+                view = view[written:]
+            if os.name != "nt" and snapshot.mode is not None:
+                os.fchmod(target_fd, snapshot.mode)
             os.fsync(target_fd)
-        except (OSError, ValueError, RuntimeError) as exc:
+            materialized = os.fstat(target_fd)
+            if materialized.st_size != snapshot.size:
+                raise OSError("validation staging size mismatch")
+        except OSError as exc:
             raise CliFailure(
                 "validation_staging_failed",
                 "The validator input could not be copied safely.",
-                module="backend", details={"entry": source.name},
+                module="backend", details={"entry": target.name},
             ) from exc
         finally:
-            if source_fd >= 0:
-                os.close(source_fd)
             if target_fd >= 0:
                 os.close(target_fd)
+        if os.name == "nt" and snapshot.mode is not None:
+            os.chmod(target, snapshot.mode)
 
     def environment(self) -> dict[str, str]:
         allowed = (

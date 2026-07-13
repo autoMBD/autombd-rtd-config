@@ -711,7 +711,7 @@ def _cmd_validate_verified(args, config: RuntimeConfig, project: Project) -> int
     revalidate_snapshot(target)
     revalidate_project_metadata(target, project.metadata)
     outcome = run_validation(
-        config.project,
+        project,
         root,
         workspace=workspace,
         sdk_path=sdk_path,

@@ -50,8 +50,14 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from .backends.s32_mex.document import MexDocument
-from .backends.s32_mex.metadata import ProjectMetadata, parse_project_metadata
-from .backends.s32_mex.target import VerifiedProjectTarget, verify_project_target
+from .backends.s32_mex.metadata import (
+    ProjectMetadata,
+    ValidatorInputInventory,
+    capture_validator_input_inventory,
+    parse_project_metadata,
+    revalidate_project_metadata,
+)
+from .backends.s32_mex.target import FileSnapshot, VerifiedProjectTarget, verify_project_target
 from .resources.bundles import ResolvedAssetBundle
 
 
@@ -88,6 +94,20 @@ class Project:
     @property
     def mex_file(self) -> Path:
         return self.verified_target.mex.path
+
+    def capture_validator_inputs(
+        self,
+        *,
+        selected_mex: FileSnapshot | None = None,
+        selected_source_relative: str | None = None,
+    ) -> ValidatorInputInventory:
+        self.metadata.require_consistent()
+        revalidate_project_metadata(self.verified_target, self.metadata)
+        return capture_validator_input_inventory(
+            self.verified_target,
+            selected_mex=selected_mex,
+            selected_source_relative=selected_source_relative,
+        )
 
     def close(self) -> None:
         if not self.verified_target.lease.closed:

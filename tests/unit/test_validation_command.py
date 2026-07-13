@@ -73,7 +73,10 @@ from rtd_config.backends.s32_mex.process_tree import (
     ProcessTreeRunner,
 )
 from rtd_config.errors import CliFailure
+from rtd_config.project import Project
 from tests.fixtures import copy_uart_fixture
+from rtd_config.backends.s32_mex.validation_workspace import ControlledValidationWorkspace
+import rtd_config.backends.s32_mex.metadata as metadata_module
 import rtd_config.backends.s32_mex.validation_workspace as workspace_module
 
 
@@ -418,7 +421,7 @@ def test_validation_rejects_linked_source_without_launch(tmp_path):
     project = copy_uart_fixture(tmp_path)
     outside = tmp_path / "outside.txt"
     outside.write_bytes(b"outside")
-    linked = project / "linked.txt"
+    linked = project / ".settings" / "linked.prefs"
     try:
         linked.symlink_to(outside)
     except OSError as exc:
@@ -591,6 +594,80 @@ def test_validation_keyboard_interrupt_cleans_workspace_and_preserves_project(tm
         )
     assert _project_manifest(project) == before
     assert not control.exists()
+
+
+@pytest.mark.parametrize("operation", ["add", "delete"])
+def test_vendor_settings_inventory_drift_is_detected(operation, tmp_path):
+    project = copy_uart_fixture(tmp_path)
+    control = tmp_path / "controlled-validation"
+    settings = project / ".settings"
+    victim = settings / "org.eclipse.core.resources.prefs"
+
+    class DriftingRunner:
+        def run(self, argv, *, cwd, env, timeout_s):
+            if operation == "add":
+                (settings / "added-during-validation.prefs").write_bytes(b"new=true\n")
+            else:
+                victim.unlink()
+            return SimpleNamespace(
+                exit_code=0, stdout="", stderr="", code="process_exit",
+                timed_out=False, stdout_truncated=False, stderr_truncated=False,
+            )
+
+    with pytest.raises(CliFailure) as caught:
+        run_validation(
+            project, Path("C:/NXP/S32DS.3.6.7"),
+            workspace=control, runner=DriftingRunner(),
+        )
+    assert caught.value.code == "validation_source_changed"
+    assert not control.exists()
+
+
+def test_workspace_materializes_captured_bytes_after_source_is_deleted(tmp_path):
+    root = copy_uart_fixture(tmp_path)
+    control = tmp_path / "controlled-validation"
+    with Project.verified(root) as project:
+        inventory = project.capture_validator_inputs()
+        expected = {
+            item.relative: item.snapshot.content for item in inventory.files
+        }
+        (root / ".project").unlink()
+        workspace = ControlledValidationWorkspace(control, inventory).open()
+        try:
+            assert workspace.project_dir is not None
+            for relative, content in expected.items():
+                assert (workspace.project_dir / relative).read_bytes() == content
+        finally:
+            assert workspace.close() == []
+    assert not control.exists()
+
+
+def test_inventory_capture_rejects_same_name_preference_recreation(
+    monkeypatch, tmp_path
+):
+    root = copy_uart_fixture(tmp_path)
+    relative = ".settings/org.eclipse.core.resources.prefs"
+    source = root / relative
+    with Project.verified(root) as project:
+        project.metadata
+        capture = metadata_module.snapshot_project_relative
+        mutated = {"value": False}
+
+        def recreate_after_capture(target, requested, *, max_bytes):
+            snapshot = capture(target, requested, max_bytes=max_bytes)
+            if requested == relative and not mutated["value"]:
+                mutated["value"] = True
+                content = source.read_bytes()
+                source.unlink()
+                source.write_bytes(content)
+            return snapshot
+
+        monkeypatch.setattr(
+            metadata_module, "snapshot_project_relative", recreate_after_capture
+        )
+        with pytest.raises(CliFailure) as caught:
+            project.capture_validator_inputs()
+    assert caught.value.code == "validation_inventory_changed"
 
 
 # ---------------------------------------------------------------------------
