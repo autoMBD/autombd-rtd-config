@@ -48,41 +48,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ...errors import CliFailure
+from .target import verify_project_target
 
 
 def find_single_mex(project: Path) -> Path:
-    if not project.exists():
-        raise CliFailure(
-            code="project_not_found",
-            message=f"Project directory does not exist: {project}",
-            module="backend",
-            details={"project": str(project)},
-        )
-    if not project.is_dir():
-        raise CliFailure(
-            code="project_not_directory",
-            message=f"Project path is not a directory: {project}",
-            module="backend",
-            details={"project": str(project)},
-        )
-    matches = sorted(project.glob("*.mex"))
-    if not matches:
-        raise CliFailure(
-            code="project_mex_not_found",
-            message=f"No .mex file was found in project directory: {project}",
-            module="backend",
-            details={"project": str(project), "mex_count": 0},
-        )
-    if len(matches) != 1:
-        raise CliFailure(
-            code="project_mex_ambiguous",
-            message=f"Expected one .mex file in {project}, found {len(matches)}.",
-            module="backend",
-            details={
-                "project": str(project),
-                "mex_count": len(matches),
-                "matches": [str(path) for path in matches],
-            },
-        )
-    return matches[0]
+    return verify_project_target(project).mex.path

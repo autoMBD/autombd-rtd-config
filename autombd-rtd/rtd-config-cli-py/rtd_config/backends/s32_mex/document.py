@@ -50,8 +50,12 @@ import io
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TYPE_CHECKING
 import xml.etree.ElementTree as ET
 from xml.parsers import expat
+
+if TYPE_CHECKING:
+    from .target import FileSnapshot
 
 
 # The .mex root declares a default namespace. By default ElementTree rewrites
@@ -97,9 +101,18 @@ class MexDocument:
     def load(cls, path: Path) -> "MexDocument":
         path = Path(path)
         raw = path.read_bytes()
-        doc = cls(path=path, tree=ET.parse(path), _raw=raw)
+        return cls.from_bytes(path, raw)
+
+    @classmethod
+    def from_bytes(cls, path: Path, raw: bytes) -> "MexDocument":
+        path = Path(path)
+        doc = cls(path=path, tree=ET.ElementTree(ET.fromstring(raw)), _raw=raw)
         doc._capture_sources()
         return doc
+
+    @classmethod
+    def from_snapshot(cls, snapshot: "FileSnapshot") -> "MexDocument":
+        return cls.from_bytes(snapshot.path, snapshot.content)
 
     @property
     def root(self) -> ET.Element:

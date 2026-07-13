@@ -49,9 +49,17 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from .backends.s32_mex.target import VerifiedProjectTarget, verify_project_target
+
 
 @dataclass(frozen=True)
 class Project:
     root: Path
     backend: str
     mex_file: Path
+    verified_target: VerifiedProjectTarget | None = None
+
+    @classmethod
+    def verified(cls, root: Path, backend: str = "s32-mex") -> "Project":
+        target = verify_project_target(root)
+        return cls(target.root, backend, target.mex.path, target)
