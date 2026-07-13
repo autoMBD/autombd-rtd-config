@@ -65,6 +65,7 @@ from rtd_config.backends.s32_mex.target import (
     verify_project_target,
 )
 from rtd_config.errors import CliFailure
+from rtd_config.project import Project
 
 
 XML_A = b"<mex><instance name='A'/></mex>"
@@ -86,10 +87,13 @@ class InjectedPlatform:
         self.canonical: dict[Path, Path] = {}
         self.snapshot_error: Exception | None = None
         self.snapshot_override: FileSnapshot | None = None
+        self.list_error: Exception | None = None
         self.inspect_error: Exception | None = None
         self.canonical_error: Exception | None = None
 
     def list_directory(self, path: Path) -> tuple[Path, ...]:
+        if self.list_error is not None:
+            raise self.list_error
         return self.native.list_directory(path)
 
     def inspect(self, path: Path) -> PathInspection:
@@ -252,6 +256,17 @@ def test_path_evidence_permission_failure_is_typed(tmp_path, stage):
     assert caught.value.code == "project_permission_denied"
 
 
+def test_directory_enumeration_permission_failure_is_typed(tmp_path):
+    root, _ = _project(tmp_path)
+    platform = InjectedPlatform()
+    platform.list_error = PermissionError("denied")
+
+    with pytest.raises(CliFailure) as caught:
+        verify_project_target(root, platform=platform)
+
+    assert caught.value.code == "project_permission_denied"
+
+
 def test_snapshot_contains_identity_evidence_hash_and_exact_bytes(tmp_path):
     root, mex = _project(tmp_path)
 
@@ -289,18 +304,73 @@ def test_document_parses_captured_bytes_and_revalidation_detects_replacement(tmp
     assert caught.value.code == "project_target_changed"
 
 
+def test_revalidation_detects_identity_change_even_when_bytes_are_identical(tmp_path):
+    root, _ = _project(tmp_path)
+    platform = InjectedPlatform()
+    target = verify_project_target(root, platform=platform)
+    original = target.mex
+    if original.identity.windows_file_id is not None:
+        changed_identity = replace(
+            original.identity,
+            windows_file_id=replace(
+                original.identity.windows_file_id,
+                file_id=b"1" * 16,
+            ),
+        )
+    else:
+        changed_identity = replace(original.identity, inode=original.identity.inode + 1)
+    platform.snapshot_override = replace(original, identity=changed_identity)
+
+    with pytest.raises(CliFailure) as caught:
+        revalidate_snapshot(original, platform=platform)
+
+    assert caught.value.code == "project_target_changed"
+
+
+def test_revalidation_detects_byte_change_even_when_identity_is_unchanged(tmp_path):
+    root, _ = _project(tmp_path)
+    platform = InjectedPlatform()
+    target = verify_project_target(root, platform=platform)
+    original = target.mex
+    platform.snapshot_override = replace(
+        original,
+        size=len(XML_B),
+        sha256=hashlib.sha256(XML_B).hexdigest(),
+        content=XML_B,
+    )
+
+    with pytest.raises(CliFailure) as caught:
+        revalidate_snapshot(original, platform=platform)
+
+    assert caught.value.code == "project_target_changed"
+
+
+def test_project_verified_preserves_locator_compatibility_and_snapshot(tmp_path):
+    root, mex = _project(tmp_path)
+
+    project = Project.verified(root)
+
+    assert project.root == root.resolve()
+    assert project.mex_file == mex.resolve()
+    assert project.verified_target is not None
+    assert project.verified_target.mex.content == XML_A
+
+
 def test_secure_target_value_objects_are_frozen(tmp_path):
     root, _ = _project(tmp_path)
     target = verify_project_target(root)
 
-    with pytest.raises(FrozenInstanceError):
-        target.root = tmp_path
-    with pytest.raises(FrozenInstanceError):
-        target.mex.sha256 = "changed"
-
     windows_id = WindowsFileId(volume_serial=1, file_id=b"0" * 16)
-    with pytest.raises(FrozenInstanceError):
-        windows_id.volume_serial = 2
+    values_and_mutations = (
+        (windows_id, "volume_serial", 2),
+        (target.mex.identity, "device", 999),
+        (target.mex, "sha256", "changed"),
+        (target, "root", tmp_path),
+        (default_target_platform().inspect(root), "exists", False),
+    )
+    for value, attribute, replacement in values_and_mutations:
+        with pytest.raises(FrozenInstanceError):
+            setattr(value, attribute, replacement)
 
 
 @pytest.mark.skipif(os.name != "nt", reason="Windows junction test")
