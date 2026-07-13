@@ -145,6 +145,8 @@ class ProjectMetadata:
             "schema_location", "tools", "modules", "rtd_release",
         )
         missing = [name for name in required if getattr(self, name) is None]
+        if self.schema_identity != "official":
+            missing.append("schema_identity")
         if missing:
             raise CliFailure(
                 "project_metadata_unknown",
@@ -161,12 +163,28 @@ class ProjectMetadata:
     def modules_observed(self) -> bool:
         return self.modules is not None
 
+    @property
+    def schema_identity(self) -> str | None:
+        match = re.fullmatch(
+            re.escape(_NXP_NAMESPACE_PREFIX) + r"(\d+)",
+            self.xml_namespace or "",
+        )
+        if (
+            match is None
+            or self.schema_version != match.group(1)
+            or self.schema_location
+            != f"{self.xml_namespace} {self.xml_namespace}.xsd"
+        ):
+            return None
+        return "official"
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "vendor": self.vendor, "backend": self.backend,
             "processor": self.processor, "family": self.family, "device": self.device,
             "raw_package": self.raw_package, "package": self.package, "mcu_data": self.mcu_data,
             "xml_namespace": self.xml_namespace, "schema_version": self.schema_version,
+            "schema_identity": self.schema_identity,
             "schema_location": self.schema_location,
             "tools": None if self.tools is None else [item.__dict__ for item in self.tools],
             "tools_observed": self.tools_observed,
@@ -249,6 +267,8 @@ def _parse_tools(root: ET.Element, namespace: str | None) -> tuple[ToolMetadata,
         return None
     result = []
     for item in tools:
+        if not item.tag.startswith(f"{{{namespace}}}"):
+            continue
         if item.attrib.get("enabled", "true").lower() != "true":
             continue
         name = item.attrib.get("name")
@@ -261,25 +281,32 @@ def _parse_modules(root: ET.Element, namespace: str | None) -> tuple[ModuleMetad
     tools = _tools_carrier(root, namespace)
     if tools is None:
         return None
-    peripherals = next((item for item in tools if _local_name(item.tag) == "periphs"), None)
+    peripherals = next(
+        (item for item in tools if item.tag == f"{{{namespace}}}periphs"),
+        None,
+    )
     if peripherals is None:
         return None
     modules = []
     if peripherals.attrib.get("enabled", "true").lower() != "true":
         return ()
     for item in peripherals.iter():
-        if _local_name(item.tag) != "instance" or item.attrib.get("enabled", "true").lower() != "true":
+        if item.tag != f"{{{namespace}}}instance" or item.attrib.get("enabled", "true").lower() != "true":
             continue
         name = item.attrib.get("name")
         if not name:
             continue
-        published = next((child for child in item.iter() if child.attrib.get("name") == "CommonPublishedInformation"), None)
+        published = next((
+            child for child in item.iter()
+            if child.tag == f"{{{namespace}}}struct"
+            and child.attrib.get("name") == "CommonPublishedInformation"
+        ), None)
         settings: dict[str, str] = {}
         if published is not None:
             settings = {
                 child.attrib["name"]: child.attrib["value"]
                 for child in published.iter()
-                if _local_name(child.tag) == "setting" and "name" in child.attrib and "value" in child.attrib
+                if child.tag == f"{{{namespace}}}setting" and "name" in child.attrib and "value" in child.attrib
             }
         modules.append(ModuleMetadata(
             name, item.attrib.get("type"), item.attrib.get("type_id"), item.attrib.get("mode"),
@@ -358,7 +385,10 @@ def parse_project_metadata(
         raise TypeError("document must be parsed from the verified target snapshot")
     root = document.root
     namespace = _root_namespace(root)
-    recognized = namespace is not None and namespace.startswith(_NXP_NAMESPACE_PREFIX)
+    official_match = re.fullmatch(
+        re.escape(_NXP_NAMESPACE_PREFIX) + r"(\d+)", namespace or ""
+    )
+    recognized = official_match is not None
     observations = _Observations()
     observations.add("processor", _common_text(root, namespace, "processor"), ".mex", "/configuration/common/processor")
     observations.add("device", root.attrib.get("name"), ".mex", "/configuration/@name")
@@ -371,7 +401,6 @@ def parse_project_metadata(
     schema_location = _normalize("schema_location", root.attrib.get(_XSI_SCHEMA_LOCATION))
     schema_version = root.attrib.get("version")
     observations.add("schema_version", schema_version, ".mex", "/configuration/@version")
-    official_match = re.fullmatch(re.escape(_NXP_NAMESPACE_PREFIX) + r"(\d+)", namespace or "")
     if official_match:
         observations.add("schema_identity", "official", ".mex", "/configuration/namespace-uri()")
         match = official_match
