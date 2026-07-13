@@ -124,10 +124,31 @@ def _check_xml_and_single_mex(
     checks: dict,
     diagnostics: list[Diagnostic],
     verified_target: VerifiedProjectTarget | None = None,
+    doc: MexDocument | None = None,
 ) -> None:
     if verified_target is not None:
         checks["xml_well_formed"] = True
-        checks["single_mex"] = verified_target.mex.path == mex_path
+        checks["single_mex"] = True
+        checks["project_target"] = not verified_target.lease.closed
+        try:
+            original = MexDocument.from_snapshot(verified_target.mex)
+            schema_attribute = "{http://www.w3.org/2001/XMLSchema-instance}schemaLocation"
+            checks["schema"] = bool(doc is not None) and (
+                doc.root.tag == original.root.tag
+                and doc.root.attrib.get(schema_attribute)
+                == original.root.attrib.get(schema_attribute)
+                and doc.root.attrib.get("version") == original.root.attrib.get("version")
+            )
+        except ET.ParseError:
+            checks["schema"] = False
+        if not checks["schema"]:
+            diagnostics.append(Diagnostic(
+                severity="blocker",
+                code="candidate_schema_changed",
+                module="backend",
+                message="The candidate .mex schema differs from the verified project schema.",
+                details={},
+            ))
         return
     well_formed = is_xml_well_formed(mex_path)
     checks["xml_well_formed"] = well_formed
@@ -958,7 +979,9 @@ def run_static_checks(
                     status="blocked", command="check",
                     diagnostics=diagnostics, data={"checks": checks},
                 )
-        _check_xml_and_single_mex(mex_path, checks, diagnostics, verified_target)
+        _check_xml_and_single_mex(
+            mex_path, checks, diagnostics, verified_target, doc
+        )
         if doc is not None and checks.get("xml_well_formed", True):
             _check_enabled_modules(doc, checks, diagnostics)
             _check_dma(doc, diagnostics)

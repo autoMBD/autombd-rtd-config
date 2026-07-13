@@ -84,6 +84,7 @@ class FileSnapshot:
     ctime_ns: int
     sha256: str
     content: bytes
+    mode: int | None = None
 
 
 @dataclass(frozen=True)
@@ -159,8 +160,8 @@ class PublishExpectation:
 @dataclass(frozen=True)
 class AtomicPublishResult:
     published: FileSnapshot
-    displaced: FileSnapshot
-    displaced_path: Path
+    displaced: FileSnapshot | None
+    displaced_path: Path | None
 
 
 @dataclass(frozen=True)
@@ -368,6 +369,7 @@ class _PosixTargetPlatform:
                 before.st_ctime_ns,
                 hashlib.sha256(content).hexdigest(),
                 content,
+                stat.S_IMODE(before.st_mode),
             )
         finally:
             if self._protected_fds is not None:
@@ -400,6 +402,27 @@ class _PosixTargetPlatform:
     def restore_capture(cls, target: Path, capture: Path, _rescue: Path) -> Path:
         return cls.exchange_capture(capture, target, _rescue)
 
+    @staticmethod
+    def install_absent(replacement: Path, target: Path) -> None:
+        import ctypes
+
+        library = ctypes.CDLL(None, use_errno=True)
+        renameat2 = getattr(library, "renameat2", None)
+        if renameat2 is None:
+            raise NotImplementedError("renameat2 is unavailable")
+        renameat2.argtypes = [
+            ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p,
+            ctypes.c_uint,
+        ]
+        renameat2.restype = ctypes.c_int
+        if renameat2(-100, os.fsencode(replacement), -100, os.fsencode(target), 0x1) != 0:
+            error = ctypes.get_errno()
+            raise OSError(error, os.strerror(error))
+
+    @classmethod
+    def capture_remove(cls, source: Path, capture: Path) -> None:
+        cls.install_absent(source, capture)
+
 
 if os.name == "nt":
     import ctypes
@@ -413,6 +436,7 @@ if os.name == "nt":
     _FILE_FLAG_BACKUP_SEMANTICS = 0x02000000
     _FILE_FLAG_OPEN_REPARSE_POINT = 0x00200000
     _FILE_ATTRIBUTE_DIRECTORY = 0x10
+    _FILE_ATTRIBUTE_READONLY = 0x1
     _FILE_ATTRIBUTE_REPARSE_POINT = 0x400
     _INVALID_HANDLE_VALUE = ctypes.c_void_p(-1).value
 
@@ -466,6 +490,9 @@ if os.name == "nt":
         wintypes.DWORD, wintypes.LPVOID, wintypes.LPVOID,
     ]
     _ReplaceFileW.restype = wintypes.BOOL
+    _MoveFileExW = _kernel32.MoveFileExW
+    _MoveFileExW.argtypes = [wintypes.LPCWSTR, wintypes.LPCWSTR, wintypes.DWORD]
+    _MoveFileExW.restype = wintypes.BOOL
 
 
 class _WindowsTargetPlatform:
@@ -608,6 +635,7 @@ class _WindowsTargetPlatform:
                 basic_before.ChangeTime * 100,
                 hashlib.sha256(content).hexdigest(),
                 content,
+                0o444 if basic_before.FileAttributes & _FILE_ATTRIBUTE_READONLY else 0o666,
             )
         finally:
             if self._protected_handles:
@@ -626,6 +654,15 @@ class _WindowsTargetPlatform:
         if not _ReplaceFileW(str(target), str(capture), str(rescue), 0, None, None):
             raise ctypes.WinError(ctypes.get_last_error())
         return rescue
+
+    @staticmethod
+    def install_absent(replacement: Path, target: Path) -> None:
+        if not _MoveFileExW(str(replacement), str(target), 0):
+            raise ctypes.WinError(ctypes.get_last_error())
+
+    @classmethod
+    def capture_remove(cls, source: Path, capture: Path) -> None:
+        cls.install_absent(source, capture)
 
 
 def default_target_platform() -> TargetPlatform:
@@ -821,7 +858,7 @@ def verify_project_target(
             snapshot = _capture_snapshot(supplied_mex, adapter)
             snapshot = FileSnapshot(canonical_mex, snapshot.identity, snapshot.size,
                                     snapshot.mtime_ns, snapshot.ctime_ns,
-                                    snapshot.sha256, snapshot.content)
+                                    snapshot.sha256, snapshot.content, snapshot.mode)
             after_matches = _direct_mex_entries(supplied_root, adapter)
             if tuple(path.name for path in after_matches) != (supplied_mex.name,):
                 raise CliFailure(
@@ -1183,45 +1220,92 @@ def atomic_publish_candidate(
 
     try:
         displaced = adapter.snapshot_file(displaced_path)
+        published = adapter.snapshot_file(expectation.path)
     except (OSError, ValueError, RuntimeError) as exc:
-        _restore_displaced_target(adapter, restore, expectation.path, displaced_path, None)
         raise CliFailure(
             "configure_publish_uncertain",
-            "The displaced .mex target could not be verified; the original name was restored.",
+            "Atomic publication artifacts could not be classified and were preserved.",
             module="backend",
+            details={"preserved": [Path(displaced_path).name]},
         ) from exc
 
     if displaced.identity != expectation.identity or displaced.sha256 != expectation.sha256:
         _restore_displaced_target(
-            adapter, restore, expectation.path, displaced_path, displaced
+            adapter, restore, expectation.path, displaced_path, displaced, published
         )
         raise CliFailure(
             "project_target_changed",
             "The verified project target changed at publication; it was preserved and restored.",
             module="backend",
         )
-
-    try:
-        published = adapter.snapshot_file(expectation.path)
-    except (OSError, ValueError, RuntimeError) as exc:
-        _restore_displaced_target(
-            adapter, restore, expectation.path, displaced_path, displaced
-        )
-        raise CliFailure(
-            "configure_publish_verification_failed",
-            "The published .mex candidate could not be verified; the original was restored.",
-            module="backend",
-        ) from exc
     if published.sha256 != candidate_sha256:
         _restore_displaced_target(
-            adapter, restore, expectation.path, displaced_path, displaced
+            adapter, restore, expectation.path, displaced_path, displaced, published
         )
         raise CliFailure(
             "configure_staging_changed",
             "The staged candidate changed at publication; the original was restored.",
             module="backend",
         )
+    if expectation.identity is not None and expectation.sha256 and (
+        displaced.mode is not None and published.mode is not None
+        and expectation.path.suffix.lower() == ".mex"
+        and published.mode != displaced.mode
+    ):
+        _restore_displaced_target(
+            adapter, restore, expectation.path, displaced_path, displaced, published
+        )
+        raise CliFailure(
+            "configure_publish_metadata_changed",
+            "The published .mex did not preserve required file metadata.",
+            module="backend",
+        )
     return AtomicPublishResult(published, displaced, displaced_path)
+
+
+def atomic_install_absent(
+    path: Path,
+    staging: Path,
+    candidate_sha256: str,
+    platform: TargetPlatform | None = None,
+) -> AtomicPublishResult:
+    """Atomically install a candidate only while its destination is absent."""
+    adapter = platform or default_target_platform()
+    installer = getattr(adapter, "install_absent", None)
+    if not callable(installer):
+        raise CliFailure(
+            "configure_atomic_publish_unavailable",
+            "This platform cannot atomically install an absent destination.",
+            module="backend",
+        )
+    if os.path.lexists(path):
+        raise CliFailure(
+            "configure_backup_changed",
+            "The backup destination appeared before atomic installation.",
+            module="backend",
+        )
+    try:
+        installer(staging, path)
+        published = adapter.snapshot_file(path)
+    except NotImplementedError as exc:
+        raise CliFailure(
+            "configure_atomic_publish_unavailable",
+            "This platform lacks atomic no-replace installation.",
+            module="backend",
+        ) from exc
+    except (OSError, ValueError, RuntimeError) as exc:
+        raise CliFailure(
+            "configure_backup_changed",
+            "The absent backup destination changed at publication.",
+            module="backend",
+        ) from exc
+    if published.sha256 != candidate_sha256:
+        raise CliFailure(
+            "configure_staging_changed",
+            "The installed backup differs from its validated candidate.",
+            module="backend",
+        )
+    return AtomicPublishResult(published, None, None)
 
 
 def rollback_atomic_publish(
@@ -1231,6 +1315,9 @@ def rollback_atomic_publish(
 ) -> None:
     """Restore a captured original only while the published candidate is intact."""
     adapter = platform or default_target_platform()
+    if result.displaced is None or result.displaced_path is None:
+        discard_owned_path(target, result.published, adapter)
+        return
     restore = getattr(adapter, "restore_capture", None)
     if not callable(restore):
         raise CliFailure(
@@ -1256,7 +1343,21 @@ def rollback_atomic_publish(
             module="backend",
         )
     _restore_displaced_target(
-        adapter, restore, target, result.displaced_path, result.displaced
+        adapter, restore, target, result.displaced_path, result.displaced,
+        result.published,
+    )
+
+
+def finalize_atomic_publish(
+    result: AtomicPublishResult,
+    platform: TargetPlatform | None = None,
+) -> None:
+    """Discard only a proven transaction-owned displaced artifact."""
+    if result.displaced is None or result.displaced_path is None:
+        return
+    discard_owned_path(
+        result.displaced_path, result.displaced,
+        platform or default_target_platform(),
     )
 
 
@@ -1265,22 +1366,113 @@ def _restore_displaced_target(
     restore: Callable[[Path, Path, Path], Path],
     target: Path,
     displaced_path: Path,
-    expected_displaced: FileSnapshot | None,
+    expected_displaced: FileSnapshot,
+    expected_current: FileSnapshot,
 ) -> None:
     rescue = _unused_publish_name(target, "rejected")
     try:
         rejected_path = restore(target, displaced_path, rescue)
         restored = adapter.snapshot_file(target)
-        if expected_displaced is not None and (
-            restored.identity != expected_displaced.identity
-            or restored.sha256 != expected_displaced.sha256
-        ):
-            raise OSError("restored target does not match displaced identity")
-        Path(rejected_path).unlink(missing_ok=True)
+        rescued = adapter.snapshot_file(rejected_path)
     except (OSError, ValueError, RuntimeError) as exc:
         raise CliFailure(
             "configure_publish_restore_failed",
             "An unexpected destination was captured but could not be restored safely.",
+            module="backend",
+            details={"preserved": [Path(displaced_path).name, Path(rescue).name]},
+        ) from exc
+    if not _same_snapshot(restored, expected_displaced):
+        raise CliFailure(
+            "configure_publish_restore_failed",
+            "The displaced file was not restored with its verified identity.",
+            module="backend",
+            details={"preserved": [Path(rejected_path).name]},
+        )
+    if not _same_snapshot(rescued, expected_current):
+        recovery = _unused_publish_name(target, "recovery")
+        try:
+            recovered_path = restore(target, rejected_path, recovery)
+            external = adapter.snapshot_file(target)
+            recovered = adapter.snapshot_file(recovered_path)
+        except (OSError, ValueError, RuntimeError) as exc:
+            raise CliFailure(
+                "configure_publish_restore_cas_failed",
+                "Restore captured an external destination and secondary recovery failed.",
+                module="backend",
+                details={"preserved": [Path(rejected_path).name, Path(recovery).name]},
+            ) from exc
+        if not _same_snapshot(external, rescued) or not _same_snapshot(
+            recovered, expected_displaced
+        ):
+            raise CliFailure(
+                "configure_publish_restore_cas_failed",
+                "Secondary recovery could not prove all preserved identities.",
+                module="backend",
+                details={"preserved": [Path(recovered_path).name]},
+            )
+        raise CliFailure(
+            "project_target_changed",
+            "The target changed during restore; external and displaced files were preserved.",
+            module="backend",
+            details={"preserved": [Path(recovered_path).name]},
+        )
+    discard_owned_path(Path(rejected_path), expected_current, adapter)
+
+
+def _same_snapshot(actual: FileSnapshot, expected: FileSnapshot) -> bool:
+    return actual.identity == expected.identity and actual.sha256 == expected.sha256
+
+
+def discard_owned_path(
+    path: Path,
+    expected: FileSnapshot,
+    adapter: TargetPlatform,
+) -> None:
+    if not os.path.lexists(path) and not hasattr(adapter, "files"):
+        return
+    capture_remove = getattr(adapter, "capture_remove", None)
+    install_absent = getattr(adapter, "install_absent", None)
+    if not callable(capture_remove) or not callable(install_absent):
+        raise CliFailure(
+            "configure_cleanup_failed",
+            "The platform cannot atomically capture a cleanup candidate.",
+            module="backend",
+        )
+    quarantine = _unused_publish_name(path, "cleanup")
+    try:
+        capture_remove(path, quarantine)
+        captured = adapter.snapshot_file(quarantine)
+    except (OSError, ValueError, RuntimeError, KeyError) as exc:
+        raise CliFailure(
+            "configure_cleanup_failed",
+            "A cleanup candidate could not be captured safely.",
+            module="backend",
+        ) from exc
+    if not _same_snapshot(captured, expected):
+        try:
+            install_absent(quarantine, path)
+        except (OSError, ValueError, RuntimeError) as exc:
+            raise CliFailure(
+                "configure_cleanup_restore_failed",
+                "An unowned cleanup path was preserved but could not be restored.",
+                module="backend",
+                details={"preserved": [quarantine.name]},
+            ) from exc
+        raise CliFailure(
+            "configure_cleanup_ownership_changed",
+            "An unowned cleanup path was preserved and not deleted.",
+            module="backend",
+        )
+    unlinker = getattr(adapter, "unlink_path", None)
+    try:
+        if callable(unlinker):
+            unlinker(quarantine)
+        else:
+            quarantine.unlink()
+    except OSError as exc:
+        raise CliFailure(
+            "configure_cleanup_failed",
+            "A verified transaction-owned artifact could not be removed.",
             module="backend",
         ) from exc
 

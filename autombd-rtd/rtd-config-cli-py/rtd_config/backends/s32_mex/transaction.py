@@ -65,7 +65,10 @@ from .target import (
     AtomicPublishResult,
     FileSnapshot,
     PublishExpectation,
+    atomic_install_absent,
     atomic_publish_candidate,
+    discard_owned_path,
+    finalize_atomic_publish,
     release_for_publish,
     revalidate_publish_expectation,
     revalidate_snapshot,
@@ -100,7 +103,6 @@ class ConfigureTransaction:
         static_runner: Callable[..., object],
         vendor_runner: Callable[..., object] | None = None,
         atomic_publish_fn: Callable[..., AtomicPublishResult] = atomic_publish_candidate,
-        backup_replace_fn: Callable[[Path, Path], None] = os.replace,
         release_for_publish_fn: Callable[..., PublishExpectation] = release_for_publish,
     ) -> None:
         self.project = project
@@ -113,7 +115,6 @@ class ConfigureTransaction:
         self.static_runner = static_runner
         self.vendor_runner = vendor_runner
         self.atomic_publish_fn = atomic_publish_fn
-        self.backup_replace_fn = backup_replace_fn
         self.release_for_publish_fn = release_for_publish_fn
         self.platform = self.target.lease._resources.get("platform")
         if self.platform is None:
@@ -126,8 +127,9 @@ class ConfigureTransaction:
     def execute(self, intent: "Intent", apply_fn: Callable[..., ApplyResult]) -> ConfigureTransactionResult:
         staging: Path | None = None
         backup_staging: Path | None = None
-        restore_staging: Path | None = None
-        cleanup: list[Path] = []
+        cleanup: list[FileSnapshot] = []
+        target_publication: AtomicPublishResult | None = None
+        backup_publication: AtomicPublishResult | None = None
         try:
             self.metadata.require_identity()
             revalidate_snapshot(self.target, platform=self.platform)
@@ -142,9 +144,9 @@ class ConfigureTransaction:
             candidate = self.project.document.render()
             no_op = candidate == self.original.content
 
-            staging = self._stage_bytes(candidate, "candidate")
-            cleanup.append(staging)
+            staging = self._stage_bytes(candidate, "candidate", self.original.mode)
             candidate_snapshot = self._snapshot_staging(staging, candidate)
+            cleanup.append(candidate_snapshot)
             candidate_doc = MexDocument.from_snapshot(candidate_snapshot)
             static_result = self.static_runner(
                 staging,
@@ -184,11 +186,15 @@ class ConfigureTransaction:
             backup_path = self.original.path.with_name(self.original.path.name + ".bak")
             backup_before = self._backup_before(backup_path) if self.backup else None
             if self.backup:
-                backup_staging = self._stage_bytes(self.original.content, "backup")
-                cleanup.append(backup_staging)
-                if backup_before is not None:
-                    restore_staging = self._stage_bytes(backup_before.content, "restore")
-                    cleanup.append(restore_staging)
+                backup_mode = (
+                    backup_before.mode if backup_before is not None else self.original.mode
+                )
+                backup_staging = self._stage_bytes(
+                    self.original.content, "backup", backup_mode
+                )
+                cleanup.append(
+                    self._snapshot_staging(backup_staging, self.original.content)
+                )
 
             expectation = self.release_for_publish_fn(self.target)
             revalidate_publish_expectation(expectation, platform=self.platform)
@@ -196,44 +202,66 @@ class ConfigureTransaction:
             if self.backup:
                 self._revalidate_backup(backup_path, backup_before)
                 assert backup_staging is not None
-                self._replace_backup(backup_staging, backup_path)
-                cleanup.remove(backup_staging)
-                backup_staging = None
+                backup_sha = hashlib.sha256(self.original.content).hexdigest()
+                if backup_before is None:
+                    backup_publication = atomic_install_absent(
+                        backup_path, backup_staging, backup_sha,
+                        platform=self.platform,
+                    )
+                else:
+                    backup_publication = atomic_publish_candidate(
+                        PublishExpectation(
+                            backup_path, backup_before.identity, backup_before.sha256
+                        ),
+                        backup_staging,
+                        backup_sha,
+                        platform=self.platform,
+                    )
 
             try:
-                publication = self.atomic_publish_fn(
+                target_publication = self.atomic_publish_fn(
                     expectation,
                     staging,
                     hashlib.sha256(candidate).hexdigest(),
                     platform=self.platform,
                 )
             except CliFailure:
-                if self.backup:
-                    self._rollback_backup(backup_path, backup_before, restore_staging)
-                    if restore_staging is not None and not restore_staging.exists():
-                        cleanup.remove(restore_staging)
-                        restore_staging = None
+                self._rollback_publications(
+                    target_publication, backup_publication, backup_path
+                )
                 raise
             except Exception as exc:
-                if self.backup:
-                    self._rollback_backup(backup_path, backup_before, restore_staging)
+                self._rollback_publications(
+                    target_publication, backup_publication, backup_path
+                )
                 raise CliFailure(
                     "configure_publish_failed",
                     "The atomic publication adapter failed unexpectedly.",
                     module="backend",
                 ) from exc
-            if publication.displaced_path not in cleanup:
-                cleanup.append(publication.displaced_path)
             try:
                 self._flush_directory(self.original.path.parent)
-            except CliFailure:
-                rollback_atomic_publish(
-                    publication, self.original.path, platform=self.platform
+                final = self.platform.snapshot_file(self.original.path)
+                if not self._same_snapshot(final, target_publication.published):
+                    raise CliFailure(
+                        "project_target_changed",
+                        "The published target changed before final commit confirmation.",
+                        module="backend",
+                    )
+                revalidate_project_metadata_after_release(
+                    self.project.root, self.metadata
+                )
+            except BaseException:
+                self._rollback_publications(
+                    target_publication, backup_publication, backup_path
                 )
                 raise
+            finalize_atomic_publish(target_publication, platform=self.platform)
+            if backup_publication is not None:
+                finalize_atomic_publish(backup_publication, platform=self.platform)
             return self._result(
                 "passed", apply_result, static_result, vendor_result,
-                publication.published.content,
+                final.content,
             )
         finally:
             if not self.target.lease.closed:
@@ -265,7 +293,9 @@ class ConfigureTransaction:
             no_op=no_op,
         )
 
-    def _stage_bytes(self, content: bytes, purpose: str) -> Path:
+    def _stage_bytes(
+        self, content: bytes, purpose: str, mode: int | None = None
+    ) -> Path:
         prefix = f".{self.original.path.name}.{purpose}."
         flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0)
         flags |= getattr(os, "O_NOFOLLOW", 0)
@@ -282,6 +312,8 @@ class ConfigureTransaction:
                     if written <= 0:
                         raise OSError("short staging write")
                     view = view[written:]
+                if os.name != "nt" and mode is not None:
+                    os.fchmod(descriptor, mode)
                 os.fsync(descriptor)
                 os.close(descriptor)
                 descriptor = -1
@@ -369,34 +401,33 @@ class ConfigureTransaction:
                 module="backend",
             )
 
-    def _replace_backup(self, source: Path, target: Path) -> None:
-        try:
-            self.backup_replace_fn(source, target)
-        except OSError as exc:
-            raise CliFailure(
-                "configure_backup_failed",
-                "The original snapshot could not be published as a backup.",
-                module="backend",
-            ) from exc
-
-    def _rollback_backup(
+    def _rollback_publications(
         self,
-        path: Path,
-        before: FileSnapshot | None,
-        restore: Path | None,
+        target_publication: AtomicPublishResult | None,
+        backup_publication: AtomicPublishResult | None,
+        backup_path: Path,
     ) -> None:
-        try:
-            if before is None:
-                path.unlink(missing_ok=True)
-            else:
-                assert restore is not None
-                os.replace(restore, path)
-        except OSError as exc:
-            raise CliFailure(
-                "configure_backup_rollback_failed",
-                "Publication failed and the prior backup could not be restored.",
-                module="backend",
-            ) from exc
+        failures: list[CliFailure] = []
+        if target_publication is not None:
+            try:
+                rollback_atomic_publish(
+                    target_publication, self.original.path, platform=self.platform
+                )
+            except CliFailure as exc:
+                failures.append(exc)
+        if backup_publication is not None:
+            try:
+                rollback_atomic_publish(
+                    backup_publication, backup_path, platform=self.platform
+                )
+            except CliFailure as exc:
+                failures.append(exc)
+        if failures:
+            raise failures[0]
+
+    @staticmethod
+    def _same_snapshot(actual: FileSnapshot, expected: FileSnapshot) -> bool:
+        return actual.identity == expected.identity and actual.sha256 == expected.sha256
 
     @staticmethod
     def _flush_directory(path: Path) -> None:
@@ -420,17 +451,12 @@ class ConfigureTransaction:
                 module="backend",
             ) from exc
 
-    @staticmethod
-    def _cleanup(paths: list[Path]) -> None:
-        failed = False
-        for path in reversed(paths):
+    def _cleanup(self, snapshots: list[FileSnapshot]) -> None:
+        failure: CliFailure | None = None
+        for snapshot in reversed(snapshots):
             try:
-                path.unlink(missing_ok=True)
-            except OSError:
-                failed = True
-        if failed:
-            raise CliFailure(
-                "configure_cleanup_failed",
-                "Transaction staging cleanup failed.",
-                module="backend",
-            )
+                discard_owned_path(snapshot.path, snapshot, self.platform)
+            except CliFailure as exc:
+                failure = failure or exc
+        if failure is not None:
+            raise failure

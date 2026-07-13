@@ -421,7 +421,7 @@ def test_cleanup_failure_is_typed_without_publishing(monkeypatch, tmp_path):
     real_unlink = Path.unlink
 
     def fail_staging_cleanup(path, *args, **kwargs):
-        if path.name.startswith(f".{mex.name}.candidate."):
+        if ".cleanup." in path.name:
             raise OSError("injected cleanup failure")
         return real_unlink(path, *args, **kwargs)
 
@@ -446,7 +446,10 @@ class _CapturePlatform:
             staging: (FileIdentity(1, 2, None), b"candidate"),
         }
         self.inject_at_exchange = False
+        self.inject_before_restore = False
         self.restore_fails = False
+        self.restore_calls = 0
+        self.fail_restore_call = 0
 
     def snapshot_file(self, path: Path) -> FileSnapshot:
         identity, content = self.files[path]
@@ -467,11 +470,28 @@ class _CapturePlatform:
         return capture
 
     def restore_capture(self, target: Path, capture: Path, rescue: Path) -> Path:
-        if self.restore_fails:
+        self.restore_calls += 1
+        if self.restore_fails or self.restore_calls == self.fail_restore_call:
             raise OSError("injected restore failure")
+        if self.inject_before_restore:
+            self.inject_before_restore = False
+            held = target.with_name("held-candidate.mex")
+            self.files[held] = self.files[target]
+            self.files[target] = (FileIdentity(1, 4, None), b"restore-attacker")
         self.files[rescue] = self.files.pop(target)
         self.files[target] = self.files.pop(capture)
         return rescue
+
+    def install_absent(self, replacement: Path, target: Path) -> None:
+        if target in self.files:
+            raise OSError("destination exists")
+        self.files[target] = self.files.pop(replacement)
+
+    def capture_remove(self, source: Path, capture: Path) -> None:
+        self.install_absent(source, capture)
+
+    def unlink_path(self, path: Path) -> None:
+        self.files.pop(path)
 
 
 def _capture_expectation(platform: _CapturePlatform) -> PublishExpectation:
@@ -517,6 +537,49 @@ def test_atomic_adapter_restore_failure_is_typed_and_preserves_displaced_attacke
     assert b"attacker" in [content for _, content in platform.files.values()]
 
 
+def test_restore_is_a_second_cas_and_restores_new_attacker(tmp_path):
+    target = tmp_path / "project.mex"
+    staging = tmp_path / ".project.mex.candidate.tmp"
+    platform = _CapturePlatform(target, staging)
+    expectation = _capture_expectation(platform)
+    platform.inject_at_exchange = True
+    platform.inject_before_restore = True
+
+    with pytest.raises(CliFailure):
+        atomic_publish_candidate(
+            expectation,
+            staging,
+            __import__("hashlib").sha256(b"candidate").hexdigest(),
+            platform=platform,
+        )
+    assert platform.files[target][1] == b"restore-attacker"
+    assert b"attacker" in [content for _, content in platform.files.values()]
+    assert b"candidate" in [content for _, content in platform.files.values()]
+
+
+def test_secondary_restore_failure_preserves_every_classified_file(tmp_path):
+    target = tmp_path / "project.mex"
+    staging = tmp_path / ".project.mex.candidate.tmp"
+    platform = _CapturePlatform(target, staging)
+    expectation = _capture_expectation(platform)
+    platform.inject_at_exchange = True
+    platform.inject_before_restore = True
+    platform.fail_restore_call = 2
+
+    with pytest.raises(CliFailure) as caught:
+        atomic_publish_candidate(
+            expectation,
+            staging,
+            __import__("hashlib").sha256(b"candidate").hexdigest(),
+            platform=platform,
+        )
+    assert caught.value.code == "configure_publish_restore_cas_failed"
+    contents = [content for _, content in platform.files.values()]
+    assert b"attacker" in contents
+    assert b"restore-attacker" in contents
+    assert b"candidate" in contents
+
+
 def test_atomic_adapter_is_mandatory(tmp_path):
     target = tmp_path / "project.mex"
     staging = tmp_path / ".project.mex.candidate.tmp"
@@ -548,6 +611,8 @@ def test_real_windows_adapter_restores_destination_swapped_at_syscall(tmp_path):
     class InjectAtSyscall:
         snapshot_file = staticmethod(inner.snapshot_file)
         restore_capture = staticmethod(inner.restore_capture)
+        capture_remove = staticmethod(inner.capture_remove)
+        install_absent = staticmethod(inner.install_absent)
 
         @staticmethod
         def exchange_capture(replacement, destination, capture):
@@ -564,3 +629,95 @@ def test_real_windows_adapter_restores_destination_swapped_at_syscall(tmp_path):
     assert caught.value.code == "project_target_changed"
     assert target.read_bytes() == b"attacker"
     assert not list(tmp_path.glob(".project.mex.*.tmp"))
+
+
+def test_atomic_publish_internal_aux_mutation_cannot_return_pass(tmp_path):
+    project = _prepared_project(tmp_path)
+    source = project.root / ".project"
+
+    def publish_then_mutate(*args, **kwargs):
+        result = atomic_publish_candidate(*args, **kwargs)
+        source.write_bytes(source.read_bytes() + b"\n")
+        return result
+
+    with pytest.raises(CliFailure) as caught:
+        ConfigureTransaction(
+            project,
+            static_runner=_passed_static,
+            atomic_publish_fn=publish_then_mutate,
+        ).execute(_intent(), _edit)
+    assert caught.value.code == "project_metadata_source_changed"
+
+
+def test_flush_target_swap_cannot_return_pass(monkeypatch, tmp_path):
+    project = _prepared_project(tmp_path)
+    mex = project.mex_file
+    attacker = b"<flush-attacker/>\n"
+
+    def mutate_target(_directory):
+        replacement = mex.with_name("flush-attacker.mex")
+        replacement.write_bytes(attacker)
+        os.replace(replacement, mex)
+
+    monkeypatch.setattr(ConfigureTransaction, "_flush_directory", staticmethod(mutate_target))
+    with pytest.raises(CliFailure):
+        ConfigureTransaction(project, static_runner=_passed_static).execute(
+            _intent(), _edit
+        )
+    assert mex.read_bytes() == attacker
+
+
+@pytest.mark.parametrize("preexisting", [False, True])
+def test_flush_failure_rolls_back_backup_and_target(monkeypatch, tmp_path, preexisting):
+    project = _prepared_project(tmp_path)
+    mex = project.mex_file
+    original = mex.read_bytes()
+    backup = mex.with_name(mex.name + ".bak")
+    prior_backup = b"prior-backup"
+    if preexisting:
+        backup.write_bytes(prior_backup)
+
+    def fail_flush(_directory):
+        raise CliFailure(
+            "configure_publish_flush_failed", "injected flush failure", module="backend"
+        )
+
+    monkeypatch.setattr(ConfigureTransaction, "_flush_directory", staticmethod(fail_flush))
+    with pytest.raises(CliFailure):
+        ConfigureTransaction(
+            project, backup=True, static_runner=_passed_static
+        ).execute(_intent(), _edit)
+    assert mex.read_bytes() == original
+    if preexisting:
+        assert backup.read_bytes() == prior_backup
+    else:
+        assert not backup.exists()
+
+
+def test_published_mode_matches_original(tmp_path):
+    project = _prepared_project(tmp_path)
+    mex = project.mex_file
+    before_mode = stat.S_IMODE(mex.stat().st_mode)
+    ConfigureTransaction(project, static_runner=_passed_static).execute(
+        _intent(), _edit
+    )
+    assert stat.S_IMODE(mex.stat().st_mode) == before_mode
+
+
+def test_real_static_context_uses_candidate_and_verified_project_facts(tmp_path):
+    project = _prepared_project(tmp_path)
+    result = ConfigureTransaction(
+        project, static_runner=cli.run_static_checks
+    ).execute(_intent(), _edit)
+    assert result.static_result.status == "passed"
+    checks = result.static_result.data["checks"]
+    assert checks["single_mex"] is True
+    assert checks["schema"] is True
+    assert checks["project_target"] is True
+
+
+def test_production_has_no_bare_os_replace():
+    root = Path(transaction_module.__file__).parent
+    production = (root / "transaction.py").read_text(encoding="utf-8")
+    production += (root / "target.py").read_text(encoding="utf-8")
+    assert "os.replace" not in production
