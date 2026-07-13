@@ -2,10 +2,10 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.1.3 |
-| Date | 2026-06-29 |
+| Version | 0.1.4 |
+| Date | 2026-07-08 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
-| Description | Documentation-governance rules for the RTD CfgFile CLI project. Defines the two-category split, official tool name, changelog integrity, archive policy, and the authoritative cross-category documentation map. |
+| Description | Documentation-governance rules for the RTD CfgFile CLI project. Defines the two-category split, official tool name, changelog integrity, archive policy, recovery discipline, and the authoritative cross-category documentation map. |
 
 ## Governance rules
 
@@ -45,6 +45,8 @@ When reorganizing or auditing documentation, the Category A purity check must be
 **repo-wide over all of `docs/`** — not scoped to the files a change happened to
 touch. Grep for the agent-discipline lexicon
 (`orchestrat|explorer|worker|tester|reviewer|subagent|main agent|KPI[- ]optim|convergence gate|iteration loop`),
+plus recovery-discipline terms
+(`interrupted-task-recovery|task-state|resume handshake|heartbeat|checkpoint cadence`),
 excluding frozen changelog rows and `agent-discipline/review-archive-NOT-USED-NEVER-TOUCH!!!/`. The only
 permitted survivors in `docs/` are the `Subagent Prompt` column name (a data
 contract parsed by `tools/blackbox_e2e.py`, its unit tests, and its help text)
@@ -100,6 +102,7 @@ paths are relative to the repository root.
 | `agent-discipline/subagents/tester.md` | Tester role definition | AGENTS.md, test cases |
 | `agent-discipline/subagents/reviewer.md` | Reviewer role definition | AGENTS.md, agent-lessons-learned |
 | `agent-discipline/skills/external-dependency-memory/SKILL.md` | Skill for reusing local external dependency evidence across agents and conversations | AGENTS.md, source materials |
+| `agent-discipline/skills/interrupted-task-recovery/SKILL.md` | Skill defining the long-running Agent task recovery protocol: task-state, checkpoints, heartbeats, resume handshake, and stale-evidence handling | AGENTS.md |
 | `agent-discipline/owner-review-comments.md` | Review-comment resolutions across rounds | agent-discipline/review-archive-NOT-USED-NEVER-TOUCH!!!/ |
 | `agent-discipline/agent-lessons-learned.md` | Reviewer's running lessons log | — |
 | `agent-discipline/documentation-governance.md` | This document: governance rules + documentation map | — |
@@ -125,6 +128,8 @@ flowchart TD
   AR["docs/tests/acceptance-report"] --> TC
   RM["docs/roadmaps/roadmap"]
   ROLES["agent-discipline/subagents/"] --> AGENTS
+  ITR["agent-discipline/skills/interrupted-task-recovery"] --> AGENTS
+  AGENTS --> ITR
   LL["agent-discipline/agent-lessons-learned"] --> AGENTS
   CT["agent-discipline/owner-review-comments"] -.archives.-> OBS["agent-discipline/review-archive-NOT-USED-NEVER-TOUCH!!!/"]
   SKILL["autombd-rtd/SKILL.md + assets/ + CLI"] -. released deliverable .-> TC
@@ -134,6 +139,7 @@ flowchart TD
 
 | Date | Version | Description |
 | --- | --- | --- |
+| 2026-07-08 | 0.1.4 | Issue #59: added the interrupted-task recovery Skill to the Category B map and charter linkage. |
 | 2026-06-29 | 0.1.3 | Issue #35: renamed the read-only review archive to `agent-discipline/review-archive-NOT-USED-NEVER-TOUCH!!!/` to make its frozen status explicit; updated all active references (purity-sweep rule, archive policy, documentation map, mermaid diagram). Frozen changelog rows retain the historical path. |
 | 2026-06-16 | 0.1.2 | Replaced the script-centered agent environment document with the lightweight external-dependency-memory skill entry. |
 | 2026-06-15 | 0.1.1 | Added `agent-discipline/agent-environment.md` to the Category B documentation map for issue #11. |

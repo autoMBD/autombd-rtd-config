@@ -159,6 +159,20 @@ repository — missing project-level Agent directories (`.claude/`, `.opencode/`
 execute this Skill before beginning any other task, so every agent operates
 from the same project discipline.
 
+## Interrupted Task Recovery
+
+For any long-running, unattended, quota-risk, or compaction-risk work, the
+orchestrator MUST load and follow
+`agent-discipline/skills/interrupted-task-recovery/SKILL.md` before the work
+runs past the current attention window. The protocol owns the local task-state
+file at `.agent-state/tasks/<task-id>.md`, the checkpoint and heartbeat cadence,
+and the resume handshake that reconstructs scope, evidence, Git state, and
+approval needs before any resumed Agent edits files or runs mutating commands.
+
+This is Category B Agent discipline only. It does not change Category A
+`docs/`, module ownership, the Tester gate, KPI policy, Reviewer ordering, or
+the black-box E2E protocol.
+
 ## Subagent Roles and Collaboration
 
 The orchestrator dispatches four specialized subagents defined in
