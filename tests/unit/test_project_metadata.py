@@ -47,6 +47,7 @@
 from __future__ import annotations
 
 from dataclasses import FrozenInstanceError, replace
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -70,6 +71,7 @@ from rtd_config.backends.s32_mex.metadata import (
 from rtd_config.backends.s32_mex.target import verify_project_target
 from rtd_config.errors import CliFailure
 from rtd_config.project import Project
+from tests.fixtures import copy_uart_fixture
 
 
 FIXTURES = Path(__file__).parents[1] / "fixtures" / "nxp" / "ds" / "s32k3"
@@ -386,22 +388,50 @@ def test_metadata_to_dict_returns_detached_nested_values():
     }]
 
 
-def test_metadata_records_all_fixed_auxiliary_source_evidence():
+def test_metadata_records_complete_evidence_for_all_fixed_auxiliary_sources():
     metadata = _parse(UART)
-    assert [item.relative for item in metadata.auxiliary_sources] == [
+    expected_relatives = [
         ".project", ".cproject",
         ".settings/com.freescale.s32ds.cross.sdk.support.prefs",
         ".settings/com.nxp.s32ds.cle.runtime.component.prefs",
     ]
-    assert all(item.observed and item.snapshot is not None for item in metadata.auxiliary_sources)
+    assert [item.relative for item in metadata.auxiliary_sources] == expected_relatives
+    for evidence, relative in zip(metadata.auxiliary_sources, expected_relatives):
+        expected_path = UART / relative
+        expected_content = expected_path.read_bytes()
+        snapshot = evidence.snapshot
+        assert evidence.observed is True
+        assert snapshot is not None
+        assert snapshot.path == expected_path
+        assert snapshot.size == len(expected_content)
+        assert snapshot.mtime_ns > 0
+        assert snapshot.ctime_ns > 0
+        assert snapshot.sha256 == hashlib.sha256(expected_content).hexdigest()
+        assert snapshot.content == expected_content
+        assert (
+            snapshot.identity.device is not None
+            and snapshot.identity.inode is not None
+        ) or snapshot.identity.windows_file_id is not None
     payload = metadata.to_dict()
     assert "auxiliary_sources" not in payload
     assert "sha256" not in json.dumps(payload)
 
 
-def test_parse_revalidates_auxiliary_sources_as_one_generation(monkeypatch, tmp_path):
+@pytest.mark.parametrize("changed_relative", [
+    ".project", ".cproject",
+    ".settings/com.freescale.s32ds.cross.sdk.support.prefs",
+    ".settings/com.nxp.s32ds.cle.runtime.component.prefs",
+])
+def test_parse_revalidates_all_auxiliary_sources_as_one_generation(
+    monkeypatch, tmp_path, changed_relative
+):
     root = _temporary_project(tmp_path)
-    (root / ".project").write_text("<project/>", encoding="utf-8")
+    changed_source = root / changed_relative
+    changed_source.parent.mkdir(parents=True, exist_ok=True)
+    is_xml = changed_source.suffix == ".project" or changed_source.name in {
+        ".project", ".cproject"
+    }
+    changed_source.write_text("<initial/>" if is_xml else "initial", encoding="utf-8")
     real_read = metadata_module.snapshot_project_relative
     calls = 0
 
@@ -410,7 +440,9 @@ def test_parse_revalidates_auxiliary_sources_as_one_generation(monkeypatch, tmp_
         result = real_read(target, relative, max_bytes=max_bytes)
         calls += 1
         if calls == 4:
-            (root / ".project").write_text("<changed/>", encoding="utf-8")
+            changed_source.write_text(
+                "<changed/>" if is_xml else "changed", encoding="utf-8"
+            )
         return result
 
     monkeypatch.setattr(metadata_module, "snapshot_project_relative", mutate_after_initial_reads)
@@ -419,11 +451,19 @@ def test_parse_revalidates_auxiliary_sources_as_one_generation(monkeypatch, tmp_
     assert caught.value.code == "project_metadata_source_changed"
 
 
-def test_metadata_revalidation_rejects_same_bytes_new_identity(tmp_path):
-    with Project.verified(UART) as project:
+@pytest.mark.parametrize("changed_relative", [
+    ".project", ".cproject",
+    ".settings/com.freescale.s32ds.cross.sdk.support.prefs",
+    ".settings/com.nxp.s32ds.cle.runtime.component.prefs",
+])
+def test_metadata_revalidation_rejects_same_bytes_new_identity(
+    tmp_path, changed_relative
+):
+    root = copy_uart_fixture(tmp_path)
+    with Project.verified(root) as project:
         metadata = project.metadata
-        source = project.root / ".project"
-        replacement = project.root / ".project.replacement"
+        source = project.root / changed_relative
+        replacement = source.with_name(f"{source.name}.replacement")
         replacement.write_bytes(source.read_bytes())
         os.replace(replacement, source)
         with pytest.raises(CliFailure) as caught:

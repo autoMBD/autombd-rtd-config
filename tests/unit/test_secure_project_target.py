@@ -931,6 +931,52 @@ def test_target_lease_close_waits_for_every_concurrent_reader():
     assert lease.closed
 
 
+def test_project_relative_reader_rejects_internal_mount_before_open(
+    monkeypatch, tmp_path
+):
+    root, mex = _project(tmp_path)
+    settings = root / ".settings"
+    platform = _PosixTargetPlatform(
+        no_follow_flag=1,
+        nonblock_flag=1,
+        mount_detector=lambda path: path == settings,
+    )
+    lease = TargetLease(lambda: None)
+    lease._resources.update(platform=platform, root_fd=101)
+    target = VerifiedProjectTarget(
+        root,
+        FileSnapshot(
+            mex,
+            FileIdentity(1, 2, None),
+            len(XML_A),
+            1,
+            1,
+            hashlib.sha256(XML_A).hexdigest(),
+            XML_A,
+        ),
+        lease,
+    )
+    monkeypatch.setattr(
+        target_module.os,
+        "open",
+        lambda *_args, **_kwargs: pytest.fail(
+            "an internal mount must be rejected before opening it"
+        ),
+    )
+    monkeypatch.setattr(target_module.os, "O_DIRECTORY", 0x10000, raising=False)
+
+    try:
+        with pytest.raises(CliFailure) as caught:
+            target_module.read_project_relative(
+                target, ".settings/sample.prefs", max_bytes=32
+            )
+    finally:
+        target.close()
+
+    assert caught.value.code == "unsafe_project_path"
+    assert caught.value.details["path"] == str(settings)
+
+
 @pytest.mark.skipif(os.name != "posix", reason="POSIX openat mount guard")
 def test_project_relative_reader_resamples_descendant_mounts(tmp_path):
     root, _ = _project(tmp_path)
