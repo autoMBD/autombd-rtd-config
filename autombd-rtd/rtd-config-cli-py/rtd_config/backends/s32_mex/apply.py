@@ -4007,12 +4007,12 @@ def apply_uart_add_flexio_channel(doc: MexDocument, intent: Intent, *, bundle: R
     # =====================================================================
 
     # ---- Part 1a: Mcl UART2_TX logic channel ----
-    _apply_mcl_add_channel_inner(doc, tx_name, result)
+    _apply_mcl_add_channel_inner(doc, tx_name, result, bundle=bundle)
     if result.blocked:
         return result
 
     # ---- Part 1b: Mcl UART2_RX logic channel (after tx, so pin/channel indices are correct) ----
-    _apply_mcl_add_channel_inner(doc, rx_name, result)
+    _apply_mcl_add_channel_inner(doc, rx_name, result, bundle=bundle)
     if result.blocked:
         return result
 
@@ -4109,6 +4109,8 @@ def _apply_mcl_add_channel_inner(
     doc: MexDocument,
     channel_name: str,
     result: ApplyResult,
+    *,
+    bundle: ResolvedAssetBundle,
 ) -> None:
     """Reuse apply_mcl_set's insertion logic to add one MCL channel.
 
