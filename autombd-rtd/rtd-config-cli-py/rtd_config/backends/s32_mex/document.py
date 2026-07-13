@@ -55,7 +55,7 @@ import xml.etree.ElementTree as ET
 from xml.parsers import expat
 
 if TYPE_CHECKING:
-    from .target import FileSnapshot
+    from .target import FileSnapshot, VerifiedProjectTarget
 
 
 # The .mex root declares a default namespace. By default ElementTree rewrites
@@ -96,12 +96,31 @@ class MexDocument:
     _raw: bytes = field(default=b"", repr=False, compare=False)
     _sources: list[_ElementSource] = field(default_factory=list, repr=False, compare=False)
     _aligned: bool = field(default=False, repr=False, compare=False)
+    _verified_target: "VerifiedProjectTarget | None" = field(
+        default=None, repr=False, compare=False
+    )
 
     @classmethod
     def load(cls, path: Path) -> "MexDocument":
+        """Safely load through a verified project snapshot.
+
+        This compatibility API verifies the containing single-.mex project,
+        parses only captured bytes, stores the verification evidence, and then
+        releases its lease. Public command flows keep their target lease alive
+        and call ``from_snapshot`` directly.
+        """
         path = Path(path)
-        raw = path.read_bytes()
-        return cls.from_bytes(path, raw)
+        from .target import verify_project_target
+
+        target = verify_project_target(path.parent)
+        try:
+            if target.mex.path != path.resolve():
+                raise ValueError(f"verified .mex target does not match requested path: {path}")
+            doc = cls.from_snapshot(target.mex)
+            doc._verified_target = target
+            return doc
+        finally:
+            target.close()
 
     @classmethod
     def from_bytes(cls, path: Path, raw: bytes) -> "MexDocument":

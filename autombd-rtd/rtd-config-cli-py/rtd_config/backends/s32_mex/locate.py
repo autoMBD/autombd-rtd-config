@@ -48,8 +48,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .target import verify_project_target
+from .target import VerifiedProjectTarget, verify_project_target
 
 
-def find_single_mex(project: Path) -> Path:
-    return verify_project_target(project).mex.path
+def find_single_mex(project: Path) -> VerifiedProjectTarget:
+    """Return a leased, verified single-.mex project target."""
+    return verify_project_target(project)

@@ -741,6 +741,7 @@ def _configure_module(args: argparse.Namespace, intent: Intent, plan, apply_fn) 
 
     apply_result = apply_fn(doc, intent)
     if apply_result.blocked:
+        target.close()
         return emit({
             "status": "blocked",
             "command": "configure",
@@ -774,6 +775,10 @@ def _configure_module(args: argparse.Namespace, intent: Intent, plan, apply_fn) 
             if args.backup:
                 backup = mex.with_name(mex.name + ".bak")
                 backup.write_bytes(target.mex.content)
+            # Windows deliberately denies replacement while the verified file
+            # lease is live. Task 4 owns closing the remaining CAS-to-replace
+            # window; release immediately before the existing atomic publish.
+            target.close()
             os.replace(staging, mex)
             staging = None
         return emit({
@@ -813,6 +818,7 @@ def _configure_module(args: argparse.Namespace, intent: Intent, plan, apply_fn) 
             "diagnostics": [d.to_dict() for d in diagnostics],
         })
     finally:
+        target.close()
         if staging is not None:
             staging.unlink(missing_ok=True)
 

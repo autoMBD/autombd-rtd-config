@@ -140,7 +140,10 @@ def _check_xml_and_single_mex(
         ))
     try:
         located = find_single_mex(mex_path.parent)
-        checks["single_mex"] = located == mex_path
+        try:
+            checks["single_mex"] = located.mex.path == mex_path
+        finally:
+            located.close()
     except ValueError as exc:
         checks["single_mex"] = False
         diagnostics.append(Diagnostic(
@@ -932,29 +935,35 @@ def run_static_checks(
     present, otherwise "passed". Never raises for expected validation failures;
     structured diagnostics are returned instead of tracebacks.
     """
-    diagnostics: list[Diagnostic] = []
-    checks: dict = {}
-
-    _check_xml_and_single_mex(mex_path, checks, diagnostics, verified_target)
-
-    if doc is None and checks.get("xml_well_formed"):
-        doc = MexDocument.load(mex_path)
-
-    if doc is not None and checks.get("xml_well_formed", True):
-        _check_enabled_modules(doc, checks, diagnostics)
-        _check_dma(doc, diagnostics)
-        _check_flexio_refs(doc, diagnostics)
-        _check_duplicate_lpuart_hw(doc, diagnostics)
-        _check_uart_channel_ids(doc, diagnostics)
-        _check_adc(doc, diagnostics)
-        _check_quick_selection_conflict(doc, modified_elements or [], diagnostics)
-        _check_callback(requested_callback, diagnostics)
-
-    has_blocker = any(d.severity == "blocker" for d in diagnostics)
-    status = "blocked" if has_blocker else "passed"
-    return Result(
-        status=status,
-        command="check",
-        diagnostics=diagnostics,
-        data={"checks": checks},
-    )
+    owned_target: VerifiedProjectTarget | None = None
+    if verified_target is None:
+        owned_target = find_single_mex(mex_path.parent)
+        verified_target = owned_target
+        mex_path = owned_target.mex.path
+        if doc is None:
+            doc = MexDocument.from_snapshot(owned_target.mex)
+    try:
+        diagnostics: list[Diagnostic] = []
+        checks: dict = {}
+        _check_xml_and_single_mex(mex_path, checks, diagnostics, verified_target)
+        if doc is None and checks.get("xml_well_formed"):
+            doc = MexDocument.load(mex_path)
+        if doc is not None and checks.get("xml_well_formed", True):
+            _check_enabled_modules(doc, checks, diagnostics)
+            _check_dma(doc, diagnostics)
+            _check_flexio_refs(doc, diagnostics)
+            _check_duplicate_lpuart_hw(doc, diagnostics)
+            _check_uart_channel_ids(doc, diagnostics)
+            _check_adc(doc, diagnostics)
+            _check_quick_selection_conflict(doc, modified_elements or [], diagnostics)
+            _check_callback(requested_callback, diagnostics)
+        has_blocker = any(d.severity == "blocker" for d in diagnostics)
+        return Result(
+            status="blocked" if has_blocker else "passed",
+            command="check",
+            diagnostics=diagnostics,
+            data={"checks": checks},
+        )
+    finally:
+        if owned_target is not None:
+            owned_target.close()

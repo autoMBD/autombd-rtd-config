@@ -47,6 +47,7 @@
 from __future__ import annotations
 
 from dataclasses import FrozenInstanceError, replace
+import gc
 import hashlib
 import json
 import os
@@ -384,11 +385,25 @@ def test_posix_without_no_follow_support_fails_closed(tmp_path):
     assert caught.value.code == "project_identity_unavailable"
 
 
+def test_injected_bind_mount_detector_fails_closed(tmp_path):
+    root, _ = _project(tmp_path)
+    platform = _PosixTargetPlatform(
+        no_follow_flag=1,
+        mount_detector=lambda path: path == root.absolute(),
+    )
+
+    with pytest.raises(CliFailure) as caught:
+        verify_project_target(root, platform=platform)
+
+    assert caught.value.code == "unsafe_project_path"
+
+
 def _swap_project_after_verification(monkeypatch, root: Path, mex: Path) -> None:
     original_verified = cli.Project.verified
 
     def verified_then_swap(project_root: Path, backend: str = "s32-mex"):
         project = original_verified(project_root, backend)
+        project.verified_target.close()
         replacement = root / "replacement.mex"
         replacement.write_bytes(XML_B)
         os.replace(replacement, mex)
@@ -489,6 +504,7 @@ def test_document_parses_captured_bytes_and_revalidation_detects_replacement(tmp
     target = verify_project_target(root)
     replacement = root / "replacement.mex"
     replacement.write_bytes(XML_B)
+    target.close()
     os.replace(replacement, mex)
 
     doc = MexDocument.from_snapshot(target.mex)
@@ -496,7 +512,7 @@ def test_document_parses_captured_bytes_and_revalidation_detects_replacement(tmp
     assert doc._raw == XML_A
     assert doc.root.find("instance").attrib["name"] == "A"
     with pytest.raises(CliFailure) as caught:
-        revalidate_snapshot(target.mex)
+        revalidate_snapshot(target)
     assert caught.value.code == "project_target_changed"
 
 
@@ -518,7 +534,7 @@ def test_revalidation_detects_identity_change_even_when_bytes_are_identical(tmp_
     platform.snapshot_override = replace(original, identity=changed_identity)
 
     with pytest.raises(CliFailure) as caught:
-        revalidate_snapshot(original, platform=platform)
+        revalidate_snapshot(target, platform=platform)
 
     assert caught.value.code == "project_target_changed"
 
@@ -536,9 +552,19 @@ def test_revalidation_detects_byte_change_even_when_identity_is_unchanged(tmp_pa
     )
 
     with pytest.raises(CliFailure) as caught:
-        revalidate_snapshot(original, platform=platform)
+        revalidate_snapshot(target, platform=platform)
 
     assert caught.value.code == "project_target_changed"
+
+
+def test_public_revalidation_rejects_bare_snapshot(tmp_path):
+    root, _ = _project(tmp_path)
+    target = verify_project_target(root)
+    try:
+        with pytest.raises(TypeError):
+            revalidate_snapshot(target.mex)
+    finally:
+        target.close()
 
 
 def test_project_verified_preserves_locator_compatibility_and_snapshot(tmp_path):
@@ -604,3 +630,40 @@ def test_real_windows_root_handle_blocks_path_swap(tmp_path):
 
     assert root.is_dir()
     assert not replacement.exists()
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows lease lifecycle test")
+def test_windows_target_close_releases_path_locks(tmp_path):
+    root, _ = _project(tmp_path)
+    target = verify_project_target(root)
+    target.close()
+
+    replacement = tmp_path / "replacement"
+    root.rename(replacement)
+    assert replacement.is_dir()
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows lease lifecycle test")
+def test_windows_target_context_and_finalizer_release_locks(tmp_path):
+    root, _ = _project(tmp_path)
+    with verify_project_target(root):
+        with pytest.raises(PermissionError):
+            root.rename(tmp_path / "blocked")
+    first = tmp_path / "first"
+    root.rename(first)
+    first.rename(root)
+
+    target = verify_project_target(root)
+    del target
+    gc.collect()
+    root.rename(tmp_path / "finalized")
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows lease cleanup test")
+def test_windows_verification_failure_releases_all_handles(tmp_path):
+    root = tmp_path / "empty"
+    root.mkdir()
+    with pytest.raises(CliFailure):
+        verify_project_target(root)
+
+    root.rename(tmp_path / "released")

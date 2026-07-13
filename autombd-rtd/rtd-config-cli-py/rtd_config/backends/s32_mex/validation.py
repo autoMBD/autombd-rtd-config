@@ -463,7 +463,10 @@ def run_validation(
     try:
         target = stage / project.name
         shutil.copytree(project, target)
-        target_mex = find_single_mex(target) if mex_file is None else target / Path(mex_file).name
+        located_target = find_single_mex(target) if mex_file is None else None
+        target_mex = located_target.mex.path if located_target is not None else target / Path(mex_file).name
+        if located_target is not None:
+            located_target.close()
         export_dir = stage / "_export"
         export_dir.mkdir()
         data_ws = Path(workspace) if workspace is not None else stage / "_ws"

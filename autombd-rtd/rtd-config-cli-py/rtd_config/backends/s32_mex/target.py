@@ -47,11 +47,13 @@
 from __future__ import annotations
 
 from contextlib import contextmanager, nullcontext
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import hashlib
 import os
 from pathlib import Path
 import stat
+import sys
+from collections.abc import Callable
 from typing import Protocol
 
 from ...errors import CliFailure
@@ -82,9 +84,49 @@ class FileSnapshot:
 
 
 @dataclass(frozen=True)
+class TargetLease:
+    _release: Callable[[], None] = field(repr=False, compare=False)
+    _retained: bool = field(default=False, init=False, repr=False, compare=False)
+    _closed: bool = field(default=False, init=False, repr=False, compare=False)
+
+    def retain(self) -> None:
+        object.__setattr__(self, "_retained", True)
+
+    @property
+    def retained(self) -> bool:
+        return self._retained
+
+    @property
+    def closed(self) -> bool:
+        return self._closed
+
+    def close(self) -> None:
+        if not self._closed:
+            self._release()
+            object.__setattr__(self, "_closed", True)
+
+    def __del__(self) -> None:
+        self.close()
+
+
+@dataclass(frozen=True)
 class VerifiedProjectTarget:
     root: Path
     mex: FileSnapshot
+    lease: TargetLease = field(repr=False, compare=False)
+
+    def close(self) -> None:
+        self.lease.close()
+
+    def __fspath__(self) -> str:
+        """Internal path compatibility; callers still retain this lease."""
+        return os.fspath(self.mex.path)
+
+    def __enter__(self) -> "VerifiedProjectTarget":
+        return self
+
+    def __exit__(self, *_exc_info) -> None:
+        self.close()
 
 
 @dataclass(frozen=True)
@@ -106,10 +148,43 @@ class TargetPlatform(Protocol):
 
 
 class _PosixTargetPlatform:
-    def __init__(self, no_follow_flag: int | None = None) -> None:
+    def __init__(
+        self,
+        no_follow_flag: int | None = None,
+        mount_detector: Callable[[Path], bool] | None = None,
+    ) -> None:
         self._no_follow = getattr(os, "O_NOFOLLOW", 0) if no_follow_flag is None else no_follow_flag
+        self._mount_detector = mount_detector or self._default_mount_detector()
         self._root_fd: int | None = None
         self._root_path: Path | None = None
+        self._protected_fds: list[int] | None = None
+
+    @staticmethod
+    def _default_mount_detector() -> Callable[[Path], bool]:
+        if not sys.platform.startswith("linux"):
+            def unsupported(_path: Path) -> bool:
+                raise CliFailure(
+                    "project_identity_unavailable",
+                    "Mount-point safety cannot be proven on this POSIX platform.",
+                    module="backend",
+                )
+            return unsupported
+        try:
+            lines = Path("/proc/self/mountinfo").read_text(encoding="utf-8").splitlines()
+        except OSError:
+            def unavailable(_path: Path) -> bool:
+                raise CliFailure(
+                    "project_identity_unavailable",
+                    "Linux mount information is unavailable; project safety cannot be proven.",
+                    module="backend",
+                )
+            return unavailable
+        mounts = {
+            Path(fields[4].replace("\\040", " ").replace("\\011", "\t").replace("\\134", "\\"))
+            for line in lines
+            if len(fields := line.split()) > 5
+        }
+        return lambda path: path in mounts
 
     @contextmanager
     def protect_root(self, path: Path):
@@ -120,20 +195,32 @@ class _PosixTargetPlatform:
                 module="backend",
             )
         absolute = path.absolute()
+        for component in _path_components(absolute):
+            if self._mount_detector(component):
+                raise CliFailure(
+                    "unsafe_project_path",
+                    "Project paths must not cross mount points or bind mounts.",
+                    module="backend", details={"path": str(component)},
+                )
         flags = os.O_RDONLY | os.O_DIRECTORY | self._no_follow
         fd = os.open(absolute.anchor, flags)
+        fds = [fd]
+        lease = TargetLease(lambda: [os.close(item) for item in reversed(fds)])
         try:
             for name in absolute.parts[1:]:
                 child = os.open(name, flags, dir_fd=fd)
-                os.close(fd)
+                fds.append(child)
                 fd = child
             self._root_fd = fd
             self._root_path = absolute
-            yield
+            self._protected_fds = fds
+            yield lease
         finally:
             self._root_fd = None
             self._root_path = None
-            os.close(fd)
+            self._protected_fds = None
+            if not lease.retained:
+                lease.close()
 
     def list_directory(self, path: Path) -> tuple[Path, ...]:
         if self._root_fd is not None and path == self._root_path:
@@ -203,7 +290,10 @@ class _PosixTargetPlatform:
                 content,
             )
         finally:
-            os.close(descriptor)
+            if self._protected_fds is not None:
+                self._protected_fds.append(descriptor)
+            else:
+                os.close(descriptor)
 
 
 if os.name == "nt":
@@ -274,9 +364,10 @@ class _WindowsTargetPlatform:
     @contextmanager
     def protect_root(self, path: Path):
         handles: list = []
+        lease = TargetLease(lambda: [_CloseHandle(item) for item in reversed(handles)])
         try:
             for component in _path_components(path):
-                handle = self._open(component, read=False, directory=True, share_delete=False)
+                handle = self._open(component, read=True, directory=True, share_delete=False)
                 handles.append(handle)
                 tag = self._query(handle, 9, _FILE_ATTRIBUTE_TAG_INFO)
                 if tag.FileAttributes & _FILE_ATTRIBUTE_REPARSE_POINT:
@@ -286,22 +377,31 @@ class _WindowsTargetPlatform:
                         module="backend", details={"path": str(component)},
                     )
             self._protected_handles = handles
-            yield
+            yield lease
         finally:
             self._protected_handles = []
-            for handle in reversed(handles):
-                _CloseHandle(handle)
+            if not lease.retained:
+                lease.close()
 
     def list_directory(self, path: Path) -> tuple[Path, ...]:
         return tuple(path.iterdir())
 
-    def _open(self, path: Path, *, read: bool, directory: bool, share_delete: bool = True):
+    def _open(
+        self,
+        path: Path,
+        *,
+        read: bool,
+        directory: bool,
+        share_delete: bool = True,
+        share_write: bool = True,
+    ):
         flags = _FILE_FLAG_OPEN_REPARSE_POINT
         if directory:
             flags |= _FILE_FLAG_BACKUP_SEMANTICS
         handle = _CreateFileW(
             str(path), _GENERIC_READ if read else 0,
-            _FILE_SHARE_READ | _FILE_SHARE_WRITE | (_FILE_SHARE_DELETE if share_delete else 0),
+            _FILE_SHARE_READ | (_FILE_SHARE_WRITE if share_write else 0)
+            | (_FILE_SHARE_DELETE if share_delete else 0),
             None, _OPEN_EXISTING, flags, None,
         )
         if handle == _INVALID_HANDLE_VALUE:
@@ -346,7 +446,9 @@ class _WindowsTargetPlatform:
         return path.resolve(strict=True)
 
     def snapshot_file(self, path: Path) -> FileSnapshot:
-        handle = self._open(path, read=True, directory=False)
+        handle = self._open(
+            path, read=True, directory=False, share_delete=False, share_write=False
+        )
         try:
             tag = self._query(handle, 9, _FILE_ATTRIBUTE_TAG_INFO)
             if tag.FileAttributes & _FILE_ATTRIBUTE_REPARSE_POINT:
@@ -390,7 +492,10 @@ class _WindowsTargetPlatform:
                 content,
             )
         finally:
-            _CloseHandle(handle)
+            if self._protected_handles:
+                self._protected_handles.append(handle)
+            else:
+                _CloseHandle(handle)
 
 
 def default_target_platform() -> TargetPlatform:
@@ -519,7 +624,7 @@ def verify_project_target(
     supplied_root = Path(project).absolute()
     try:
         protection = _protected_root(adapter, supplied_root)
-        with protection:
+        with protection as lease:
             root_evidence = _inspect(supplied_root, adapter)
             if not root_evidence.exists:
                 raise CliFailure(
@@ -595,7 +700,9 @@ def verify_project_target(
                     "The project path changed while the target was being verified.",
                     module="backend", details={"project": str(canonical_root)},
                 )
-            return VerifiedProjectTarget(canonical_root, snapshot)
+            owned_lease = lease or TargetLease(lambda: None)
+            owned_lease.retain()
+            return VerifiedProjectTarget(canonical_root, snapshot, owned_lease)
     except FileNotFoundError as exc:
         raise CliFailure(
             "project_not_found", f"Project directory does not exist: {project}",
@@ -604,11 +711,13 @@ def verify_project_target(
 
 
 def revalidate_snapshot(
-    snapshot: FileSnapshot | VerifiedProjectTarget,
+    snapshot: VerifiedProjectTarget,
     platform: TargetPlatform | None = None,
 ) -> FileSnapshot:
-    if isinstance(snapshot, VerifiedProjectTarget):
-        current_target = verify_project_target(snapshot.root, platform=platform)
+    if not isinstance(snapshot, VerifiedProjectTarget):
+        raise TypeError("revalidate_snapshot requires VerifiedProjectTarget")
+    current_target = verify_project_target(snapshot.root, platform=platform)
+    try:
         if current_target.mex.identity != snapshot.mex.identity or current_target.mex.sha256 != snapshot.mex.sha256:
             raise CliFailure(
                 "project_target_changed",
@@ -616,13 +725,5 @@ def revalidate_snapshot(
                 module="backend", details={"path": str(snapshot.mex.path)},
             )
         return current_target.mex
-    adapter = platform or default_target_platform()
-    _inspect_safe_chain(snapshot.path, adapter)
-    current = _capture_snapshot(snapshot.path, adapter)
-    if current.identity != snapshot.identity or current.sha256 != snapshot.sha256:
-        raise CliFailure(
-            "project_target_changed",
-            "The project .mex file changed after it was loaded; reload and retry.",
-            module="backend", details={"path": str(snapshot.path)},
-        )
-    return current
+    finally:
+        current_target.close()

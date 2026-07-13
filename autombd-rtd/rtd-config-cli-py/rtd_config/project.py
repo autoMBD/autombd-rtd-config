@@ -56,10 +56,13 @@ from .backends.s32_mex.target import VerifiedProjectTarget, verify_project_targe
 class Project:
     root: Path
     backend: str
-    mex_file: Path
-    verified_target: VerifiedProjectTarget | None = None
+    verified_target: VerifiedProjectTarget
+
+    @property
+    def mex_file(self) -> Path:
+        return self.verified_target.mex.path
 
     @classmethod
     def verified(cls, root: Path, backend: str = "s32-mex") -> "Project":
         target = verify_project_target(root)
-        return cls(target.root, backend, target.mex.path, target)
+        return cls(target.root, backend, target)
