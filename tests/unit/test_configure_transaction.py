@@ -57,6 +57,8 @@ import pytest
 from rtd_config import cli
 from rtd_config.backends.s32_mex.apply import ApplyResult
 from rtd_config.backends.s32_mex.target import (
+    AtomicPublishFailure,
+    AtomicPublishState,
     FileIdentity,
     FileSnapshot,
     PublishExpectation,
@@ -420,14 +422,12 @@ def test_cleanup_failure_is_typed_without_publishing(monkeypatch, tmp_path):
     project = _prepared_project(tmp_path)
     mex = project.mex_file
     original = mex.read_bytes()
-    real_unlink = Path.unlink
+    platform = project.verified_target.lease._resources["platform"]
 
-    def fail_staging_cleanup(path, *args, **kwargs):
-        if ".cleanup." in path.name:
-            raise OSError("injected cleanup failure")
-        return real_unlink(path, *args, **kwargs)
+    def fail_secure_delete(_path, _expected):
+        raise OSError("injected secure-delete failure")
 
-    monkeypatch.setattr(Path, "unlink", fail_staging_cleanup)
+    monkeypatch.setattr(platform, "secure_delete_owned", fail_secure_delete)
     blocked = SimpleNamespace(status="blocked", diagnostics=[])
     with pytest.raises(CliFailure) as caught:
         ConfigureTransaction(
@@ -436,7 +436,7 @@ def test_cleanup_failure_is_typed_without_publishing(monkeypatch, tmp_path):
     assert caught.value.code == "configure_cleanup_failed"
     assert mex.read_bytes() == original
     for staging in mex.parent.glob(f".{mex.name}.*.tmp"):
-        real_unlink(staging)
+        staging.unlink()
 
 
 def test_finally_preserves_staging_replaced_by_external_bytes(tmp_path):
@@ -519,6 +519,42 @@ class _CapturePlatform:
 def _capture_expectation(platform: _CapturePlatform) -> PublishExpectation:
     original = platform.snapshot_file(platform.target)
     return PublishExpectation(original.path, original.identity, original.sha256)
+
+
+def test_exchange_snapshot_failure_carries_structured_publication_state(tmp_path):
+    target = tmp_path / "project.mex"
+    staging = tmp_path / ".project.mex.candidate.tmp"
+    platform = _CapturePlatform(target, staging)
+    expectation = _capture_expectation(platform)
+    snapshot = platform.snapshot_file
+    exchanged = {"value": False}
+    exchange = platform.exchange_capture
+
+    def mark_exchange(*args):
+        result = exchange(*args)
+        exchanged["value"] = True
+        return result
+
+    def fail_after_exchange(path):
+        if exchanged["value"]:
+            exchanged["value"] = False
+            raise OSError("injected post-exchange snapshot failure")
+        return snapshot(path)
+
+    platform.exchange_capture = mark_exchange
+    platform.snapshot_file = fail_after_exchange
+    with pytest.raises(AtomicPublishFailure) as caught:
+        atomic_publish_candidate(
+            expectation, staging,
+            __import__("hashlib").sha256(b"candidate").hexdigest(),
+            platform=platform,
+        )
+    assert isinstance(caught.value.state, AtomicPublishState)
+    assert caught.value.state.phase == "exchanged"
+    assert caught.value.state.displaced_path is not None
+    assert set(caught.value.details["preserved"]) == set(
+        caught.value.state.preserved_basenames
+    )
 
 
 def test_atomic_adapter_captures_syscall_window_swap_and_restores_attacker(tmp_path):
@@ -661,6 +697,27 @@ def test_injected_cleanup_quarantine_restores_unowned_replacement(tmp_path):
     assert platform.files[staging][1] == b"external"
 
 
+def test_secure_delete_window_swap_never_deletes_external_bytes(tmp_path):
+    target = tmp_path / "project.mex"
+    staging = tmp_path / ".project.mex.candidate.tmp"
+
+    class SwapBeforeDelete(_CapturePlatform):
+        def secure_delete_owned(self, path, expected):
+            self.files[path] = (FileIdentity(1, 99, None), b"external")
+            actual = self.snapshot_file(path)
+            if actual.identity != expected.identity or actual.sha256 != expected.sha256:
+                raise OSError("conditional delete identity mismatch")
+            self.files.pop(path)
+
+    platform = SwapBeforeDelete(target, staging)
+    expected = platform.snapshot_file(staging)
+    with pytest.raises(CliFailure) as caught:
+        discard_owned_path(staging, expected, platform)
+    assert caught.value.code == "configure_cleanup_failed"
+    assert b"external" in [content for _, content in platform.files.values()]
+    assert caught.value.details["preserved"]
+
+
 @pytest.mark.skipif(os.name != "nt", reason="Windows ReplaceFileW capture test")
 def test_real_windows_adapter_restores_destination_swapped_at_syscall(tmp_path):
     target = tmp_path / "project.mex"
@@ -772,7 +829,10 @@ def test_final_cas_external_target_preserves_attacker_and_restores_backup_pair(
         ConfigureTransaction(
             project, backup=True, static_runner=_passed_static
         ).execute(_intent(), _edit)
-    assert caught.value.code == "configure_publish_restore_failed"
+    assert caught.value.code == "project_target_changed"
+    assert caught.value.details["recovery_failures"][0]["code"] == (
+        "configure_publish_restore_failed"
+    )
     assert mex.read_bytes() == attacker
     if preexisting:
         assert backup.read_bytes() == prior
@@ -929,6 +989,151 @@ def test_real_static_context_uses_candidate_and_verified_project_facts(tmp_path)
     assert checks["single_mex"] is True
     assert checks["schema"] is True
     assert checks["project_target"] is True
+
+
+def test_exchange_classification_failure_is_adopted_and_primary_code_survives(
+    monkeypatch, tmp_path
+):
+    project = _prepared_project(tmp_path)
+    mex = project.mex_file
+    original = mex.read_bytes()
+    platform = project.verified_target.lease._resources["platform"]
+    snapshot = platform.snapshot_file
+    exchange = platform.exchange_capture
+    state = {"exchanged": False, "failed": False}
+
+    def mark_exchange(*args):
+        result = exchange(*args)
+        state["exchanged"] = True
+        return result
+
+    def fail_first_classification(path):
+        if state["exchanged"] and not state["failed"]:
+            state["failed"] = True
+            raise OSError("injected classification failure")
+        return snapshot(path)
+
+    monkeypatch.setattr(platform, "exchange_capture", mark_exchange)
+    monkeypatch.setattr(platform, "snapshot_file", fail_first_classification)
+    with pytest.raises(CliFailure) as caught:
+        ConfigureTransaction(project, static_runner=_passed_static).execute(
+            _intent(), _edit
+        )
+    assert caught.value.code == "configure_publish_uncertain"
+    assert mex.read_bytes() == original
+    assert len(caught.value.details["preserved"]) >= 2
+
+
+def test_absent_backup_snapshot_failure_is_adopted_and_restored_absent(
+    monkeypatch, tmp_path
+):
+    project = _prepared_project(tmp_path)
+    mex = project.mex_file
+    backup = mex.with_name(mex.name + ".bak")
+    platform = project.verified_target.lease._resources["platform"]
+    install = platform.install_absent
+    snapshot = platform.snapshot_file
+    state = {"installed": False, "failed": False}
+
+    def mark_install(replacement, destination):
+        install(replacement, destination)
+        if destination == backup:
+            state["installed"] = True
+
+    def fail_first_backup_snapshot(path):
+        if path == backup and state["installed"] and not state["failed"]:
+            state["failed"] = True
+            raise OSError("injected backup classification failure")
+        return snapshot(path)
+
+    monkeypatch.setattr(platform, "install_absent", mark_install)
+    monkeypatch.setattr(platform, "snapshot_file", fail_first_backup_snapshot)
+    with pytest.raises(CliFailure) as caught:
+        ConfigureTransaction(
+            project, backup=True, static_runner=_passed_static
+        ).execute(_intent(), _edit)
+    assert caught.value.code == "configure_backup_uncertain"
+    assert not backup.exists()
+
+
+def test_second_finalize_failure_returns_published_with_cleanup_warning(
+    monkeypatch, tmp_path
+):
+    project = _prepared_project(tmp_path)
+    mex = project.mex_file
+    original = mex.read_bytes()
+    finalize = transaction_module.finalize_atomic_publish
+    calls = {"count": 0}
+
+    def fail_second(result, *, platform):
+        calls["count"] += 1
+        if calls["count"] == 2:
+            raise CliFailure(
+                "configure_cleanup_failed", "injected finalize failure",
+                module="backend", details={"preserved": ["backup-evidence.tmp"]},
+            )
+        return finalize(result, platform=platform)
+
+    monkeypatch.setattr(transaction_module, "finalize_atomic_publish", fail_second)
+    result = ConfigureTransaction(
+        project, backup=True, static_runner=_passed_static
+    ).execute(_intent(), _edit)
+    assert result.status == "passed"
+    assert result.published is True
+    assert mex.read_bytes() == result.published_bytes != original
+    assert mex.with_name(mex.name + ".bak").read_bytes() == original
+    assert result.cleanup_warnings[0]["code"] == "configure_cleanup_failed"
+
+
+def test_backup_displaced_drift_fails_before_commit_and_keeps_primary_code(
+    monkeypatch, tmp_path
+):
+    project = _prepared_project(tmp_path)
+    mex = project.mex_file
+    original = mex.read_bytes()
+    backup = mex.with_name(mex.name + ".bak")
+    backup.write_bytes(b"prior-backup")
+    prepare = transaction_module.prepare_atomic_finalize
+    calls = {"count": 0}
+
+    def drift_second(result, *, platform):
+        calls["count"] += 1
+        if calls["count"] == 2:
+            assert result.displaced_path is not None
+            result.displaced_path.write_bytes(b"external-displaced")
+        return prepare(result, platform=platform)
+
+    monkeypatch.setattr(transaction_module, "prepare_atomic_finalize", drift_second)
+    with pytest.raises(CliFailure) as caught:
+        ConfigureTransaction(
+            project, backup=True, static_runner=_passed_static
+        ).execute(_intent(), _edit)
+    assert caught.value.code == "configure_finalize_prepare_changed"
+    assert mex.read_bytes() == original
+    assert backup.read_bytes() == b"external-displaced"
+
+
+def test_target_displaced_drift_fails_before_commit_and_preserves_drift(
+    monkeypatch, tmp_path
+):
+    project = _prepared_project(tmp_path)
+    mex = project.mex_file
+    prepare = transaction_module.prepare_atomic_finalize
+    changed = b"external-target-evidence"
+
+    def drift_target(result, *, platform):
+        assert result.displaced_path is not None
+        result.displaced_path.write_bytes(changed)
+        return prepare(result, platform=platform)
+
+    monkeypatch.setattr(transaction_module, "prepare_atomic_finalize", drift_target)
+    with pytest.raises(CliFailure) as caught:
+        ConfigureTransaction(project, static_runner=_passed_static).execute(
+            _intent(), _edit
+        )
+    assert caught.value.code == "configure_finalize_prepare_changed"
+    assert mex.read_bytes() == changed
+    assert caught.value.details["preserved"]
 
 
 def test_production_has_no_bare_os_replace():
