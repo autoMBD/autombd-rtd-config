@@ -54,7 +54,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 from . import __version__
-from .config import RuntimeConfig
+from .config import DEFAULT_ASSET_ROOT, RuntimeConfig
 from .backends.s32_mex.document import MexDocument, MexWriteError
 from .backends.s32_mex.metadata import revalidate_project_metadata
 from .backends.s32_mex.target import release_for_publish, revalidate_snapshot
@@ -79,13 +79,10 @@ from .diagnostics import Diagnostic, render_failure
 from .errors import CliFailure
 
 
-# Skill root, used to resolve committed runtime assets independently of cwd.
-# This file lives at autombd-rtd/rtd-config-cli-py/rtd_config/cli.py, so
-# parents[2] is the skill root (autombd-rtd/) that owns assets/.
-SKILL_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_ASSET_ROOT = SKILL_ROOT / "assets"
 ROOT_COMMANDS = frozenset(
     {
+        "plan",
+        "configure",
         "pin-options",
         "inspect",
         "check",
@@ -141,6 +138,36 @@ def _add_spec_argument(parser: argparse.ArgumentParser) -> None:
             "For compatibility, a raw payload object is also accepted."
         ),
     )
+
+
+def _add_canonical_arguments(parser: argparse.ArgumentParser, *, configure: bool) -> None:
+    """Add generic request fields without defaults that could mask JSON config."""
+    parser.add_argument("--intent", required=True, metavar="PATH")
+    parser.add_argument("--config", default=argparse.SUPPRESS, metavar="PATH")
+    for option, dest in (
+        ("--project", "project"),
+        ("--backend", "backend"),
+        ("--vendor", "vendor"),
+        ("--family", "family"),
+        ("--device", "device"),
+        ("--package", "package"),
+        ("--rtd-version", "rtd_version"),
+        ("--schema-version", "schema_version"),
+        ("--s32ds-root", "s32ds_root"),
+        ("--sdk-path", "sdk_path"),
+        ("--workspace", "workspace"),
+        ("--temp-root", "temp_root"),
+        ("--log-root", "log_root"),
+        ("--asset-root", "asset_root"),
+    ):
+        parser.add_argument(option, dest=dest, default=argparse.SUPPRESS)
+    parser.add_argument(
+        "--timeout", "--validation-timeout-s", dest="validation_timeout_s",
+        type=int, default=argparse.SUPPRESS,
+    )
+    if configure:
+        parser.add_argument("--backup", action="store_true")
+    parser.add_argument("--json", action="store_true")
 
 
 def _load_spec_payload(args: argparse.Namespace, module: str, action: str = "set") -> dict | None:
@@ -214,12 +241,105 @@ def _load_spec_payload(args: argparse.Namespace, module: str, action: str = "set
     return payload
 
 
+_RUNTIME_FIELDS = (
+    "project", "backend", "vendor", "family", "device", "package",
+    "rtd_version", "schema_version", "s32ds_root", "sdk_path", "workspace",
+    "validation_timeout_s", "temp_root", "log_root", "asset_root",
+)
+_RUNTIME_PATH_FIELDS = frozenset({
+    "project", "s32ds_root", "sdk_path", "workspace", "temp_root", "log_root",
+    "asset_root",
+})
+_EXPECTED_IDENTITY_FIELDS = frozenset({
+    "vendor", "family", "device", "package", "rtd_version", "schema_version",
+})
+
+
+def _read_json_object(raw_path: str, *, code: str, label: str, exit_code: int = 1) -> dict:
+    """Read one bounded regular JSON file without echoing its path in failures."""
+    path = Path(raw_path)
+    try:
+        if path.is_symlink() or not path.is_file() or path.stat().st_size > 1024 * 1024:
+            raise OSError("unsafe JSON input")
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise CliFailure(
+            code, f"{label} must be a readable bounded UTF-8 JSON object.",
+            module="cli", exit_code=exit_code,
+        ) from exc
+    if not isinstance(raw, dict):
+        raise CliFailure(
+            code, f"{label} must contain a JSON object.",
+            module="cli", exit_code=exit_code,
+        )
+    return raw
+
+
+def _load_runtime_config(args: argparse.Namespace) -> tuple[RuntimeConfig, frozenset[str]]:
+    values: dict = {}
+    explicit: set[str] = set()
+    config_path = getattr(args, "config", None)
+    if config_path is not None:
+        values = _read_json_object(
+            config_path, code="invalid_arguments", label="Runtime configuration",
+            exit_code=2,
+        )
+        fragment = dict(values)
+        fragment.setdefault("project", ".")
+        RuntimeConfig.from_dict(fragment)
+        explicit.update(values)
+        base = Path(config_path).resolve().parent
+        for key in _RUNTIME_PATH_FIELDS & values.keys():
+            value = values[key]
+            if isinstance(value, str) and value and not Path(value).is_absolute():
+                values[key] = base / value
+    for key in _RUNTIME_FIELDS:
+        if hasattr(args, key):
+            values[key] = getattr(args, key)
+            explicit.add(key)
+    values.setdefault("asset_root", DEFAULT_ASSET_ROOT)
+    config = RuntimeConfig.from_dict(values)
+    return config, frozenset(explicit & _EXPECTED_IDENTITY_FIELDS)
+
+
+def _load_canonical_intent(raw_path: str, *, backend: str) -> Intent:
+    raw = _read_json_object(raw_path, code="intent_invalid", label="Intent")
+    if set(raw) != {"module", "action", "payload"}:
+        raise CliFailure(
+            "intent_invalid", "Intent must contain exactly module, action, and payload.",
+            module="cli",
+        )
+    if (
+        not isinstance(raw["module"], str) or not raw["module"]
+        or not isinstance(raw["action"], str) or not raw["action"]
+        or not isinstance(raw["payload"], dict)
+    ):
+        raise CliFailure(
+            "intent_invalid", "Intent fields have invalid types.", module="cli",
+        )
+    intent = Intent.from_dict(raw)
+    try:
+        get_provider_registry().require_intent(intent, backend=backend)
+    except CliFailure as exc:
+        raise CliFailure(
+            "intent_invalid", "Intent does not select a registered provider action.",
+            module="cli",
+        ) from exc
+    return intent
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = RaisingArgumentParser(prog="rtd-config")
     parser.add_argument("--version", action="store_true")
     parser.add_argument("--json", action="store_true")
 
     subparsers = parser.add_subparsers(dest="command")
+
+    plan_parser = subparsers.add_parser("plan")
+    _add_canonical_arguments(plan_parser, configure=False)
+
+    configure_parser = subparsers.add_parser("configure")
+    _add_canonical_arguments(configure_parser, configure=True)
 
     pin_options_parser = subparsers.add_parser("pin-options")
     pin_options_parser.add_argument("--bundle-id")
@@ -602,50 +722,88 @@ def _intent_dict(intent: Intent) -> dict:
     }
 
 
-def _preflight_project(project: Project) -> Project:
+def _preflight_project(
+    project: Project, *, asset_root: Path | None = None
+) -> Project:
     """Resolve and cache exact project assets before provider or vendor work."""
     metadata = project.metadata.require_identity()
-    project._cache["asset_bundle"] = AssetBundleResolver(DEFAULT_ASSET_ROOT).resolve(metadata)
+    project._cache["asset_bundle"] = AssetBundleResolver(
+        asset_root or DEFAULT_ASSET_ROOT
+    ).resolve(metadata)
     return project
 
 
-def _preflight_plan(args, binding: ProviderBinding):
-    """Verify observed project identity before module-specific planning."""
-    config = RuntimeConfig.from_dict({"project": args.project})
+def _assert_expected_identity(
+    project: Project, config: RuntimeConfig, expected_fields: frozenset[str]
+) -> None:
+    metadata = project.metadata.require_identity()
+    metadata_names = {"rtd_version": "rtd_release"}
+    mismatches = []
+    for field in sorted(expected_fields):
+        observed = getattr(metadata, metadata_names.get(field, field))
+        expected = getattr(config, field)
+        observed_token = str(observed).casefold()
+        expected_token = str(expected).casefold()
+        if field == "rtd_version":
+            observed_token = "".join(char for char in observed_token if char.isalnum())
+            expected_token = "".join(char for char in expected_token if char.isalnum())
+        if observed_token != expected_token:
+            mismatches.append(field)
+    if mismatches:
+        raise CliFailure(
+            "project_identity_mismatch",
+            "Observed project identity does not match runtime constraints.",
+            module="backend", details={"fields": mismatches},
+        )
+
+
+def _execute_canonical_request(
+    config: RuntimeConfig,
+    *,
+    configure: bool,
+    backup: bool,
+    expected_fields: frozenset[str] = frozenset(),
+    intent: Intent | None = None,
+    binding: ProviderBinding | None = None,
+    shortcut_args: argparse.Namespace | None = None,
+) -> int:
+    """Execute generic and shortcut requests through one registry-owned flow."""
     project = Project.verified(config.project, config.backend)
     try:
-        _preflight_project(project)
+        _preflight_project(project, asset_root=config.asset_root)
+        _assert_expected_identity(project, config, expected_fields)
         bundle = project.asset_bundle
-        intent = binding.normalizer(args, bundle)
+        if shortcut_args is not None:
+            if binding is None:
+                raise CliFailure(
+                    "provider_binding_unknown", "Shortcut binding is unavailable.",
+                    module="backend",
+                )
+            intent = binding.normalizer(shortcut_args, bundle)
+        if intent is None:
+            raise CliFailure("intent_invalid", "Canonical intent is unavailable.", module="cli")
         registered = get_provider_registry().require_intent(intent, backend=config.backend)
-        if registered is not binding:
+        if binding is not None and registered is not binding:
             raise CliFailure(
                 "provider_binding_changed",
                 "The provider registry changed during command preflight.",
                 module="backend",
             )
-        return intent, binding.create_plan(bundle, intent), project
-    except BaseException:
-        project.close()
-        raise
-
-
-def _complete_planned_command(
-    args, intent, plan, binding: ProviderBinding, project: Project
-) -> int:
-    if not args.configure:
-        try:
+        binding = registered
+        plan = binding.create_plan(bundle, intent)
+        if not configure:
             return emit({
                 "status": "passed",
                 "command": "plan",
                 "normalized_intent": _intent_dict(intent),
                 "plan": plan.to_dict(),
             })
-        finally:
-            project.close()
-    return _configure_module(
-        args, intent, plan, binding.apply_fn, project=project, binding=binding
-    )
+        execution_args = argparse.Namespace(backup=backup)
+        return _configure_verified_project(
+            execution_args, intent, plan, binding.apply_fn, project, binding=binding
+        )
+    finally:
+        project.close()
 
 
 def cmd_validate(args: argparse.Namespace) -> int:
@@ -1090,15 +1248,38 @@ def _run_registered_shortcut(
     args: argparse.Namespace, module: str | None = None, cli_action: str | None = None
 ) -> int:
     binding = _shortcut_binding(args, module, cli_action)
-    intent, plan, project = _preflight_plan(args, binding)
-    return _complete_planned_command(args, intent, plan, binding, project)
+    config = RuntimeConfig.from_dict({
+        "project": args.project, "asset_root": DEFAULT_ASSET_ROOT,
+    })
+    return _execute_canonical_request(
+        config,
+        configure=bool(getattr(args, "configure", False)),
+        backup=bool(getattr(args, "backup", False)),
+        binding=binding,
+        shortcut_args=args,
+    )
 
 
 def cmd_adc_set(args: argparse.Namespace) -> int:
     return _run_registered_shortcut(args, "adc", "set")
 
 
+def _run_generic(args: argparse.Namespace) -> int:
+    config, expected_fields = _load_runtime_config(args)
+    intent = _load_canonical_intent(args.intent, backend=config.backend)
+    return _execute_canonical_request(
+        config,
+        configure=args.command == "configure",
+        backup=bool(getattr(args, "backup", False)),
+        expected_fields=expected_fields,
+        intent=intent,
+    )
+
+
 def _dispatch(args: argparse.Namespace, parser: argparse.ArgumentParser) -> int:
+
+    if args.command in {"plan", "configure"}:
+        return _run_generic(args)
 
     if args.command == "pin-options":
         return cmd_pin_options(args)

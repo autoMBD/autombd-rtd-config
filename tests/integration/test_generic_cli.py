@@ -212,6 +212,52 @@ def test_runtime_precedence_uses_explicit_flag_over_json_without_parser_defaults
     assert payload["status"] == "passed"
 
 
+def test_runtime_config_resolves_all_json_paths_relative_to_config(tmp_path):
+    config_path = _write_json(
+        tmp_path / "runtime.json",
+        {
+            "project": "project", "backend": "mex", "s32ds_root": "s32ds",
+            "sdk_path": "sdk", "workspace": "workspace", "temp_root": "temp",
+            "log_root": "logs", "asset_root": "assets", "validation_timeout_s": 90,
+        },
+    )
+    intent = _write_json(
+        tmp_path / "intent.json", {"module": "mcl", "action": "set", "payload": {}}
+    )
+    args = cli.build_parser().parse_args(
+        ["plan", "--intent", str(intent), "--config", str(config_path)]
+    )
+
+    config, _expected = cli._load_runtime_config(args)
+
+    assert config.project == tmp_path / "project"
+    assert config.s32ds_root == tmp_path / "s32ds"
+    assert config.sdk_path == tmp_path / "sdk"
+    assert config.workspace == tmp_path / "workspace"
+    assert config.temp_root == tmp_path / "temp"
+    assert config.log_root == tmp_path / "logs"
+    assert config.asset_root == tmp_path / "assets"
+    assert config.validation_timeout_s == 90
+
+
+def test_expected_identity_is_asserted_against_observed_project(tmp_path, capsys):
+    project = copy_uart_fixture(tmp_path)
+    intent = _write_json(
+        tmp_path / "intent.json", {"module": "mcl", "action": "set", "payload": {}}
+    )
+
+    rc, payload = _invoke(
+        capsys,
+        [
+            "plan", "--project", str(project), "--intent", str(intent),
+            "--family", "not-the-observed-family",
+        ],
+    )
+
+    assert rc == 1
+    assert payload["diagnostics"][0]["code"] == "project_identity_mismatch"
+
+
 def test_generic_plan_is_read_only_and_has_zero_validation_side_effects(
     tmp_path, monkeypatch, capsys
 ):
@@ -292,3 +338,39 @@ def test_generic_configure_matches_shortcut_noop(tmp_path, capsys):
     for key in ("status", "command", "normalized_intent", "plan", "changed_modules", "published"):
         assert generic[key] == shortcut[key]
     assert generic["published"] is False
+
+
+def test_generic_configure_matches_shortcut_published_bytes(tmp_path, capsys):
+    generic_root = tmp_path / "generic-write"
+    shortcut_root = tmp_path / "shortcut-write"
+    generic_root.mkdir()
+    shortcut_root.mkdir()
+    generic_project = copy_uart_fixture(generic_root)
+    shortcut_project = copy_uart_fixture(shortcut_root)
+    parameters = {
+        "hw": "LPUART_0", "mode": "interrupt", "baud": 115200,
+        "pins": {"tx": "PTA15", "rx": "PTA16"},
+    }
+    intent = _write_json(
+        tmp_path / "write-intent.json",
+        {"module": "uart", "action": "set", "payload": parameters},
+    )
+    spec = _write_json(tmp_path / "write-spec.json", parameters)
+
+    generic_rc, generic = _invoke(
+        capsys,
+        ["configure", "--project", str(generic_project), "--intent", str(intent)],
+    )
+    shortcut_rc, shortcut = _invoke(
+        capsys,
+        [
+            "uart", "set", "--project", str(shortcut_project), "--spec", str(spec),
+            "--configure",
+        ],
+    )
+
+    assert generic_rc == shortcut_rc == 0
+    assert generic["changed_modules"] == shortcut["changed_modules"]
+    assert (generic_project / "Uart_Example.mex").read_bytes() == (
+        shortcut_project / "Uart_Example.mex"
+    ).read_bytes()

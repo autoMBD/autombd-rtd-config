@@ -54,4 +54,5 @@ def test_runtime_config_defaults_to_skill_assets_dir(tmp_path):
     assert config.family == "s32k3"
     assert config.device == "s32k344"
     assert config.rtd_version == "7_0_1"
-    assert config.data_root == Path("assets")
+    assert config.data_root.is_absolute()
+    assert config.data_root.name == "assets"
