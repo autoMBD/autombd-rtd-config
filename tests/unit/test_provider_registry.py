@@ -103,6 +103,23 @@ def test_registry_rejects_provider_ownership_contract_errors(binding, code):
     assert caught.value.code == code
 
 
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"normalizer": lambda _args: Intent("uart", "set", {})},
+        {"apply_fn": lambda _doc, _intent: None},
+        {"write_owners": {"uart"}},
+        {"read_dependencies": ("mcu",)},
+        {"allowed_regions": {PhysicalRegion("uart", "config_set:Uart")}},
+        {"write_owners": frozenset({"uart", 1})},
+    ],
+)
+def test_registry_rejects_invalid_callable_signatures_and_runtime_field_types(overrides):
+    with pytest.raises(CliFailure) as caught:
+        ProviderRegistry((_binding(**overrides),))
+    assert caught.value.code == "provider_registry_invalid"
+
+
 def test_registry_lookup_rejects_unknown_and_wrong_intent():
     registry = ProviderRegistry((_binding(),))
     with pytest.raises(CliFailure) as unknown:

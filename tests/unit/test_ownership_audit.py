@@ -30,7 +30,7 @@ from rtd_config.backends.s32_mex.transaction import ConfigureTransaction
 from rtd_config.errors import CliFailure
 from rtd_config.intent import Intent
 from rtd_config.modules.registry import PhysicalRegion, ProviderBinding
-from rtd_config.plan import Plan, PlannedChange
+from rtd_config.plan import Plan, PlannedChange, TargetSelector
 from rtd_config.project import Project
 from tests.fixtures import copy_uart_fixture
 
@@ -309,3 +309,65 @@ def test_transaction_blocks_undeclared_physical_region_before_validation(tmp_pat
     assert caught.value.code == "provider_region_violation"
     assert calls == {"static": 0, "vendor": 0}
     assert project.mex_file.read_bytes() == original
+
+
+@pytest.mark.parametrize(
+    "candidate",
+    [
+        _XML.replace(b"<tools>", b"<tools><!-- ownership comment -->"),
+        _XML.replace(b"<setting name=\"Baud\"", b"<setting xmlns=\"urn:foreign\" name=\"Baud\""),
+        _XML.replace(
+            b'<setting name="Baud" value="9600"/>\n<config_set name="BaseNXP">',
+            b'<config_set name="BaseNXP">',
+        ).replace(
+            b'</config_set>\n<config_set name="Mcu">',
+            b'</config_set>\n<setting name="Baud" value="9600"/><config_set name="Mcu">',
+            1,
+        ),
+        _XML.replace(b'</setting></config_set>', b'</setting> \t</config_set>', 1),
+    ],
+    ids=["comment", "namespace", "sibling-order", "tail-whitespace"],
+)
+def test_byte_distinct_candidate_never_has_an_empty_journal(candidate):
+    assert candidate != _XML
+    entries = collect_actual_deltas(_XML, candidate)
+    assert entries
+
+
+def test_foreign_or_nested_region_markers_fail_closed():
+    nested = _XML.replace(
+        b'<setting name="Baud" value="9600"/>',
+        b'<pins><pin name="FAKE" value="B"/></pins>',
+    )
+    binding = _binding(
+        write=("uart", "port"),
+        regions=(
+            PhysicalRegion("uart", "config_set:Uart"),
+            PhysicalRegion("port", "Pins/Port"),
+        ),
+    )
+    with pytest.raises(CliFailure) as caught:
+        audit_candidate(_XML, nested, binding, _plan("uart", "port"))
+    assert caught.value.code == "ownership_unknown"
+
+
+def test_plan_target_selector_rejects_unrelated_mcu_write_but_allows_exact_clock():
+    binding = _binding(
+        write=("uart", "mcu"),
+        regions=(
+            PhysicalRegion("uart", "config_set:Uart"),
+            PhysicalRegion("mcu", "config_set:Mcu"),
+        ),
+    )
+    plan = Plan([PlannedChange(
+        "mcu", "mcu", "/Mcu/McuClockReferencePoint", "ensure clock",
+        target=TargetSelector(
+            region="config_set:Mcu",
+            path=("McuClockReferencePoint",),
+            identity=(("Name", "LPUART8_CLK"),),
+        ),
+    )])
+    unrelated = _XML.replace(b'value="CORE"', b'value="FIRC"')
+    with pytest.raises(CliFailure) as caught:
+        audit_candidate(_XML, unrelated, binding, plan)
+    assert caught.value.code == "provider_ownership_violation"
