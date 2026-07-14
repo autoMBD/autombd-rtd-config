@@ -58,6 +58,7 @@ import pytest
 
 from rtd_config import cli
 from rtd_config.config import RuntimeConfig
+from rtd_config.errors import CliFailure
 from rtd_config.modules.registry import ProviderRegistry
 from tests.fixtures import copy_uart_fixture
 
@@ -84,6 +85,18 @@ CASES = (
         {"core_clk": 160, "aips_plat_clk": 80, "aips_slow_clk": 40},
     ),
     ("adc", "set", {}),
+)
+
+SHORTCUTS = (
+    ("uart", "set"),
+    ("uart", "add-flexio-channel"),
+    ("platform", "set"),
+    ("basenxp", "set"),
+    ("mcl", "set"),
+    ("port", "set"),
+    ("dio", "set"),
+    ("mcu", "set"),
+    ("adc", "set"),
 )
 
 
@@ -309,7 +322,11 @@ def test_expected_identity_is_asserted_against_observed_project(tmp_path, capsys
 
 @pytest.mark.parametrize(
     ("expected", "status"),
-    [("7_0_1", "passed"), ("7.01", "failed"), ("70.1", "failed")],
+    [
+        ("7_0_1", "passed"), ("7.01", "failed"), ("70.1", "failed"),
+        ("7..0.1", "failed"), ("7._0-1", "failed"), ("7.0.1.", "failed"),
+        (".7.0.1", "failed"), ("7/0/1", "failed"),
+    ],
 )
 def test_rtd_version_alias_preserves_numeric_segment_boundaries(
     tmp_path, capsys, expected, status
@@ -377,6 +394,46 @@ def test_shortcut_accepts_the_same_explicit_vendor_runtime_controls(tmp_path):
     config, _expected = cli._load_runtime_config(args)
     assert config.s32ds_root == tmp_path / "s32ds"
     assert config.validation_timeout_s == 81
+
+
+@pytest.mark.parametrize("shortcut", SHORTCUTS)
+def test_every_shortcut_uses_the_same_config_only_runtime_contract(
+    tmp_path, shortcut
+):
+    configured_project = tmp_path / "configured-project"
+    explicit_project = tmp_path / "explicit-project"
+    config_path = _write_json(tmp_path / "runtime.json", {
+        "project": str(configured_project), "backend": "mex", "vendor": "nxp",
+        "family": "s32k3", "device": "s32k344", "package": "default",
+        "rtd_version": "7_0_1", "schema_version": "19",
+        "s32ds_root": str(tmp_path / "s32ds"), "sdk_path": str(tmp_path / "sdk"),
+        "workspace": str(tmp_path / "workspace"), "temp_root": str(tmp_path / "temp"),
+        "log_root": str(tmp_path / "logs"), "asset_root": str(tmp_path / "assets"),
+        "validation_timeout_s": 91,
+    })
+    parser = cli.build_parser()
+
+    config_only, expected = cli._load_runtime_config(parser.parse_args([
+        *shortcut, "--config", str(config_path),
+    ]))
+    overridden, overridden_expected = cli._load_runtime_config(parser.parse_args([
+        *shortcut, "--config", str(config_path), "--project", str(explicit_project),
+    ]))
+
+    assert config_only.project == configured_project
+    assert overridden == replace(config_only, project=explicit_project)
+    assert expected == overridden_expected == cli._EXPECTED_IDENTITY_FIELDS
+
+
+@pytest.mark.parametrize("shortcut", SHORTCUTS)
+def test_every_shortcut_reports_one_missing_project_contract(shortcut):
+    args = cli.build_parser().parse_args([*shortcut])
+
+    with pytest.raises(CliFailure) as caught:
+        cli._load_runtime_config(args)
+
+    assert caught.value.code == "invalid_arguments"
+    assert caught.value.exit_code == 2
 
 
 def test_generic_plan_is_read_only_and_has_zero_validation_side_effects(

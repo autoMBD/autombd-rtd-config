@@ -46,6 +46,7 @@
 
 import hashlib
 import _thread
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 import json
 import os
@@ -422,6 +423,84 @@ def test_validation_uses_controlled_copy_and_leaves_project_byte_identical(tmp_p
     assert not control.exists()
     assert outcome.log_path == "validation.log"
     assert all(str(project) not in item for item in outcome.command)
+
+
+class _TempWritingRunner:
+    def __init__(self) -> None:
+        self.lock = threading.Lock()
+        self.temp_dirs: list[Path] = []
+
+    def run(self, argv, *, cwd, env, timeout_s):
+        temp_dir = Path(env["TEMP"])
+        assert Path(env["TMP"]) == temp_dir
+        with self.lock:
+            self.temp_dirs.append(temp_dir)
+        (temp_dir / "vendor.tmp").write_bytes(b"vendor scratch")
+        export = Path(argv[argv.index("-ExportSrc") + 1])
+        (export / "generated.c").write_bytes(b"generated")
+        return type("Result", (), {
+            "exit_code": 0, "stdout": "ok", "stderr": "",
+            "code": "process_exit", "timed_out": False,
+            "stdout_truncated": False, "stderr_truncated": False,
+        })()
+
+
+def _run_with_external_bases(project, workspace, temp_base, log_base, runner):
+    return run_validation(
+        project, Path("C:/NXP/S32DS.3.6.7"), workspace=workspace,
+        temp_root=temp_base, log_root=log_base, runner=runner,
+    )
+
+
+def test_external_temp_and_log_bases_isolate_consecutive_validation_runs(tmp_path):
+    project = copy_uart_fixture(tmp_path)
+    workspace = tmp_path / "controlled-validation"
+    temp_base = tmp_path / "vendor-temp"
+    log_base = tmp_path / "vendor-logs"
+    temp_base.mkdir()
+    log_base.mkdir()
+    runner = _TempWritingRunner()
+
+    outcomes = [
+        _run_with_external_bases(project, workspace, temp_base, log_base, runner)
+        for _ in range(2)
+    ]
+
+    assert len(set(runner.temp_dirs)) == 2
+    assert all(path.parent == temp_base for path in runner.temp_dirs)
+    assert not tuple(temp_base.iterdir())
+    assert len({outcome.log_path for outcome in outcomes}) == 2
+    for outcome in outcomes:
+        log_path = Path(outcome.log_path)
+        assert not log_path.is_absolute()
+        assert str(tmp_path) not in outcome.log_path
+        assert (log_base / log_path).is_file()
+    assert workspace.exists() is False
+
+
+def test_external_temp_and_log_bases_isolate_concurrent_validation_runs(tmp_path):
+    project = copy_uart_fixture(tmp_path)
+    workspace = tmp_path / "controlled-validation"
+    temp_base = tmp_path / "vendor-temp"
+    log_base = tmp_path / "vendor-logs"
+    temp_base.mkdir()
+    log_base.mkdir()
+    runner = _TempWritingRunner()
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        outcomes = list(pool.map(
+            lambda _index: _run_with_external_bases(
+                project, workspace, temp_base, log_base, runner
+            ),
+            range(2),
+        ))
+
+    assert len(set(runner.temp_dirs)) == 2
+    assert all(path.parent == temp_base for path in runner.temp_dirs)
+    assert not tuple(temp_base.iterdir())
+    assert len({outcome.log_path for outcome in outcomes}) == 2
+    assert all((log_base / outcome.log_path).is_file() for outcome in outcomes)
+    assert workspace.exists() is False
 
 
 def test_validation_rejects_linked_source_without_launch(tmp_path):
