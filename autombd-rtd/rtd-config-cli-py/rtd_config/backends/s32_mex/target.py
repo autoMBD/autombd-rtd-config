@@ -771,13 +771,13 @@ def _inspect(path: Path, platform: TargetPlatform) -> PathInspection:
         raise CliFailure(
             "project_permission_denied",
             "Permission was denied while inspecting the project path.",
-            module="backend", details={"path": str(path)},
+            module="backend", details={},
         ) from exc
     except OSError as exc:
         raise CliFailure(
             "unsafe_project_path",
             "The project path could not be inspected safely.",
-            module="backend", details={"path": str(path)},
+            module="backend", details={},
         ) from exc
 
 
@@ -788,13 +788,13 @@ def _canonicalize(path: Path, platform: TargetPlatform) -> Path:
         raise CliFailure(
             "project_permission_denied",
             "Permission was denied while resolving the project path.",
-            module="backend", details={"path": str(path)},
+            module="backend", details={},
         ) from exc
     except OSError as exc:
         raise CliFailure(
             "unsafe_project_path",
             "The project path could not be resolved safely.",
-            module="backend", details={"path": str(path)},
+            module="backend", details={},
         ) from exc
 
 
@@ -808,7 +808,7 @@ def _inspect_safe_chain(path: Path, platform: TargetPlatform) -> None:
                 "unsafe_project_path",
                 "Project paths must not contain links, junctions, mount points, or reparse points.",
                 module="backend",
-                details={"path": str(component)},
+                details={},
             )
 
 
@@ -826,25 +826,25 @@ def _capture_snapshot(path: Path, platform: TargetPlatform) -> FileSnapshot:
         raise CliFailure(
             "project_permission_denied",
             "Permission was denied while reading the project .mex file.",
-            module="backend", details={"path": str(path)},
+            module="backend", details={},
         ) from exc
     except RuntimeError as exc:
         raise CliFailure(
             "project_target_changed",
             "The project .mex file changed while it was being read; reload and retry.",
-            module="backend", details={"path": str(path)},
+            module="backend", details={},
         ) from exc
     except (OSError, ValueError) as exc:
         raise CliFailure(
             "unsafe_project_path",
             "The project .mex file could not be opened as a safe regular file.",
-            module="backend", details={"path": str(path)},
+            module="backend", details={},
         ) from exc
     if not _identity_available(snapshot.identity):
         raise CliFailure(
             "project_identity_unavailable",
             "A reliable platform file identity is unavailable for the project .mex file.",
-            module="backend", details={"path": str(path)},
+            module="backend", details={},
         )
     return snapshot
 
@@ -855,7 +855,7 @@ def _protected_root(platform: TargetPlatform, path: Path):
         raise CliFailure(
             "project_identity_unavailable",
             "The target platform cannot provide a protected project-root lease.",
-            module="backend", details={"path": str(path)},
+            module="backend", details={},
         )
     return protector(path)
 
@@ -867,7 +867,7 @@ def _direct_mex_entries(root: Path, platform: TargetPlatform) -> tuple[Path, ...
         raise CliFailure(
             "project_permission_denied",
             "Permission was denied while enumerating the project directory.",
-            module="backend", details={"project": str(root)},
+            module="backend", details={},
         ) from exc
     return tuple(sorted(
         (entry for entry in entries if entry.suffix.lower() == ".mex"), key=str
@@ -887,18 +887,18 @@ def verify_project_target(
                 raise CliFailure(
                     "project_identity_unavailable",
                     "The target platform returned an invalid project-root lease.",
-                    module="backend", details={"path": str(supplied_root)},
+                    module="backend", details={},
                 )
             root_evidence = _inspect(supplied_root, adapter)
             if not root_evidence.exists:
                 raise CliFailure(
-                    "project_not_found", f"Project directory does not exist: {project}",
-                    module="backend", details={"project": str(project)},
+                    "project_not_found", "The project directory does not exist.",
+                    module="backend", details={},
                 )
             if not root_evidence.is_directory:
                 raise CliFailure(
-                    "project_not_directory", f"Project path is not a directory: {project}",
-                    module="backend", details={"project": str(project)},
+                    "project_not_directory", "The project path is not a directory.",
+                    module="backend", details={},
                 )
             _inspect_safe_chain(supplied_root, adapter)
             canonical_root = _canonicalize(supplied_root, adapter)
@@ -906,16 +906,15 @@ def verify_project_target(
             if not matches:
                 raise CliFailure(
                     "project_mex_not_found",
-                    f"No .mex file was found in project directory: {canonical_root}",
-                    module="backend", details={"project": str(canonical_root), "mex_count": 0},
+                    "No .mex file was found in the project directory.",
+                    module="backend", details={"mex_count": 0},
                 )
             if len(matches) != 1:
                 raise CliFailure(
                     "project_mex_ambiguous",
-                    f"Expected one .mex file in {canonical_root}, found {len(matches)}.",
+                    f"Expected one .mex file, found {len(matches)}.",
                     module="backend",
-                    details={"project": str(canonical_root), "mex_count": len(matches),
-                             "matches": [str(path) for path in matches]},
+                    details={"mex_count": len(matches)},
                 )
             supplied_mex = matches[0]
             mex_evidence = _inspect(supplied_mex, adapter)
@@ -923,12 +922,12 @@ def verify_project_target(
                 raise CliFailure(
                     "unsafe_project_path",
                     "The project .mex file must not be a link, mount point, or reparse point.",
-                    module="backend", details={"path": str(supplied_mex)},
+                    module="backend", details={},
                 )
             if not mex_evidence.is_regular:
                 raise CliFailure(
                     "project_mex_not_regular", "The project .mex path is not a regular file.",
-                    module="backend", details={"path": str(supplied_mex)},
+                    module="backend", details={},
                 )
             canonical_mex = _canonicalize(supplied_mex, adapter)
             try:
@@ -938,7 +937,7 @@ def verify_project_target(
                     "unsafe_project_path",
                     "The project .mex file resolves outside the project root.",
                     module="backend",
-                    details={"path": str(canonical_mex), "root": str(canonical_root)},
+                    details={},
                 ) from exc
             snapshot = _capture_snapshot(supplied_mex, adapter)
             snapshot = FileSnapshot(canonical_mex, snapshot.identity, snapshot.size,
@@ -949,20 +948,20 @@ def verify_project_target(
                 raise CliFailure(
                     "project_target_changed",
                     "The project .mex set changed while the target was being verified.",
-                    module="backend", details={"project": str(canonical_root)},
+                    module="backend", details={},
                 )
             after = _capture_snapshot(after_matches[0], adapter)
             if after.identity != snapshot.identity or after.sha256 != snapshot.sha256:
                 raise CliFailure(
                     "project_target_changed",
                     "The project .mex file changed while the target was being verified.",
-                    module="backend", details={"path": str(canonical_mex)},
+                    module="backend", details={},
                 )
             if _canonicalize(supplied_root, adapter) != canonical_root:
                 raise CliFailure(
                     "project_target_changed",
                     "The project path changed while the target was being verified.",
-                    module="backend", details={"project": str(canonical_root)},
+                    module="backend", details={},
                 )
             lease.retain()
             return VerifiedProjectTarget(canonical_root, snapshot, lease)
@@ -974,8 +973,8 @@ def verify_project_target(
         ) from exc
     except FileNotFoundError as exc:
         raise CliFailure(
-            "project_not_found", f"Project directory does not exist: {project}",
-            module="backend", details={"project": str(project)},
+            "project_not_found", "The project directory does not exist.",
+            module="backend", details={},
         ) from exc
     except OSError as exc:
         raise CliFailure(

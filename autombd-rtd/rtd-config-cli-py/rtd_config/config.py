@@ -71,6 +71,15 @@ def _invalid_config(message: str) -> CliFailure:
     )
 
 
+def validate_runtime_config_fields(raw: dict[str, Any]) -> None:
+    """Validate only the JSON object's shape before precedence is applied."""
+    if not isinstance(raw, dict):
+        raise _invalid_config("Runtime configuration must be a JSON object.")
+    unknown = sorted(set(raw) - _ALLOWED_FIELDS - {"data_root"})
+    if unknown:
+        raise _invalid_config("Runtime configuration contains unknown fields.")
+
+
 @dataclass(frozen=True)
 class RuntimeConfig:
     project: Path
@@ -96,16 +105,12 @@ class RuntimeConfig:
 
     @classmethod
     def from_dict(cls, raw: dict[str, Any]) -> "RuntimeConfig":
-        if not isinstance(raw, dict):
-            raise _invalid_config("Runtime configuration must be a JSON object.")
+        validate_runtime_config_fields(raw)
         values = dict(raw)
         if "data_root" in values:
             if "asset_root" in values:
                 raise _invalid_config("Runtime configuration repeats the asset root.")
             values["asset_root"] = values.pop("data_root")
-        unknown = sorted(set(values) - _ALLOWED_FIELDS)
-        if unknown:
-            raise _invalid_config("Runtime configuration contains unknown fields.")
         if "project" not in values:
             raise _invalid_config("Runtime configuration requires a project path.")
         for key in _STRING_FIELDS & values.keys():

@@ -54,7 +54,11 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 from . import __version__
-from .config import DEFAULT_ASSET_ROOT, RuntimeConfig
+from .config import (
+    DEFAULT_ASSET_ROOT,
+    RuntimeConfig,
+    validate_runtime_config_fields,
+)
 from .backends.s32_mex.document import MexDocument, MexWriteError
 from .backends.s32_mex.metadata import revalidate_project_metadata
 from .backends.s32_mex.target import release_for_publish, revalidate_snapshot
@@ -284,9 +288,7 @@ def _load_runtime_config(args: argparse.Namespace) -> tuple[RuntimeConfig, froze
             config_path, code="invalid_arguments", label="Runtime configuration",
             exit_code=2,
         )
-        fragment = dict(values)
-        fragment.setdefault("project", ".")
-        RuntimeConfig.from_dict(fragment)
+        validate_runtime_config_fields(values)
         explicit.update(values)
         base = Path(config_path).resolve().parent
         for key in _RUNTIME_PATH_FIELDS & values.keys():
@@ -1000,7 +1002,7 @@ def _configure_verified_project(
                 "byte-faithful narrow writer. The original file was left "
                 "unchanged."
             ),
-            details={"reason": str(exc)},
+            details={"reason_code": "narrow_writer_rejected", "failure_count": 1},
         )
         return emit({
             "status": "blocked",
