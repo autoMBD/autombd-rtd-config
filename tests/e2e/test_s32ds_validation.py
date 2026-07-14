@@ -48,6 +48,7 @@ import json
 import os
 import subprocess
 import sys
+from pathlib import Path
 
 from tests.fixtures import copy_uart_fixture
 
@@ -56,8 +57,13 @@ def test_validate_uart_fixture_headless(tmp_path):
     if not os.environ.get("RTD_CONFIG_RUN_S32DS_VALIDATION"):
         return
     project = copy_uart_fixture(tmp_path)
+    workspace = tmp_path / "live-s32ds-workspace"
+    assert Path("tests/.tmp").absolute() in workspace.absolute().parents
     result = subprocess.run(
-        [sys.executable, "-m", "rtd_config", "validate", "--project", str(project), "--json"],
+        [
+            sys.executable, "-m", "rtd_config", "validate",
+            "--project", str(project), "--workspace", str(workspace), "--json",
+        ],
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
