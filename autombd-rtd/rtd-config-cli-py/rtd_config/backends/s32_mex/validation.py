@@ -602,7 +602,7 @@ def run_validation(
         outcome = ValidationOutcome(
             exit_code=process.exit_code,
             command=sanitized,
-            log_path="validation.log",
+            log_path=controlled.public_log_path,
             stdout=stdout,
             stderr=stderr,
             severe_problems=severe,

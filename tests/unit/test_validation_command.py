@@ -457,6 +457,7 @@ def test_external_temp_and_log_bases_isolate_consecutive_validation_runs(tmp_pat
     workspace = tmp_path / "controlled-validation"
     temp_base = tmp_path / "vendor-temp"
     log_base = tmp_path / "vendor-logs"
+    workspace.mkdir()
     temp_base.mkdir()
     log_base.mkdir()
     runner = _TempWritingRunner()
@@ -475,7 +476,8 @@ def test_external_temp_and_log_bases_isolate_consecutive_validation_runs(tmp_pat
         assert not log_path.is_absolute()
         assert str(tmp_path) not in outcome.log_path
         assert (log_base / log_path).is_file()
-    assert workspace.exists() is False
+    assert workspace.is_dir()
+    assert not tuple(workspace.iterdir())
 
 
 def test_external_temp_and_log_bases_isolate_concurrent_validation_runs(tmp_path):
@@ -483,6 +485,7 @@ def test_external_temp_and_log_bases_isolate_concurrent_validation_runs(tmp_path
     workspace = tmp_path / "controlled-validation"
     temp_base = tmp_path / "vendor-temp"
     log_base = tmp_path / "vendor-logs"
+    workspace.mkdir()
     temp_base.mkdir()
     log_base.mkdir()
     runner = _TempWritingRunner()
@@ -500,7 +503,8 @@ def test_external_temp_and_log_bases_isolate_concurrent_validation_runs(tmp_path
     assert not tuple(temp_base.iterdir())
     assert len({outcome.log_path for outcome in outcomes}) == 2
     assert all((log_base / outcome.log_path).is_file() for outcome in outcomes)
-    assert workspace.exists() is False
+    assert workspace.is_dir()
+    assert not tuple(workspace.iterdir())
 
 
 def test_validation_rejects_linked_source_without_launch(tmp_path):

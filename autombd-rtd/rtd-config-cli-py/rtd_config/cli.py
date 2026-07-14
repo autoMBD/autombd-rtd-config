@@ -265,6 +265,19 @@ _RUNTIME_PATH_FIELDS = frozenset({
 _EXPECTED_IDENTITY_FIELDS = frozenset({
     "vendor", "family", "device", "package", "rtd_version", "schema_version",
 })
+_RTD_VERSION_GRAMMAR = re.compile(
+    r"[A-Za-z0-9]+(?:[._-][A-Za-z0-9]+)*", re.ASCII
+)
+
+
+def _normalized_rtd_version(value: object) -> tuple[str, ...] | None:
+    token = str(value).casefold()
+    if _RTD_VERSION_GRAMMAR.fullmatch(token) is None:
+        return None
+    return tuple(
+        str(int(segment)) if segment.isdigit() else segment
+        for segment in re.split(r"[._-]", token)
+    )
 
 
 def _read_json_object(raw_path: str, *, code: str, label: str, exit_code: int = 1) -> dict:
@@ -381,8 +394,7 @@ def build_parser() -> argparse.ArgumentParser:
     uart_parser = subparsers.add_parser("uart")
     uart_actions = uart_parser.add_subparsers(dest="action")
     uart_set = uart_actions.add_parser("set")
-    uart_set.add_argument("--project", required=True)
-    _add_runtime_arguments(uart_set, include_project=False)
+    _add_runtime_arguments(uart_set, include_project=True)
     uart_set.add_argument("--hw", required=False)
     # RTD 7.0.1 has no polling async-method value; interrupt and DMA are supported.
     uart_set.add_argument("--mode", default="interrupt", choices=["interrupt", "dma"])
@@ -424,8 +436,7 @@ def build_parser() -> argparse.ArgumentParser:
             "FLEXIO_CLK Mcu clock reference are ensured (idempotent)."
         ),
     )
-    uart_add_flexio.add_argument("--project", required=True)
-    _add_runtime_arguments(uart_add_flexio, include_project=False)
+    _add_runtime_arguments(uart_add_flexio, include_project=True)
     uart_add_flexio.add_argument(
         "--baud", type=int, default=921600,
         help="Desired baud rate (default: 921600). Maps to FLEXIO_UART_BAUDRATE_<baud>.",
@@ -457,8 +468,7 @@ def build_parser() -> argparse.ArgumentParser:
     platform_parser = subparsers.add_parser("platform")
     platform_actions = platform_parser.add_subparsers(dest="action")
     platform_set = platform_actions.add_parser("set")
-    platform_set.add_argument("--project", required=True)
-    _add_runtime_arguments(platform_set, include_project=False)
+    _add_runtime_arguments(platform_set, include_project=True)
     # Target an existing interrupt by peripheral (e.g. LPUART_3) or exact IsrName.
     platform_set.add_argument("--peripheral")
     platform_set.add_argument("--isr-name")
@@ -471,8 +481,7 @@ def build_parser() -> argparse.ArgumentParser:
     basenxp_parser = subparsers.add_parser("basenxp")
     basenxp_actions = basenxp_parser.add_subparsers(dest="action")
     basenxp_set = basenxp_actions.add_parser("set")
-    basenxp_set.add_argument("--project", required=True)
-    _add_runtime_arguments(basenxp_set, include_project=False)
+    _add_runtime_arguments(basenxp_set, include_project=True)
     basenxp_set.add_argument(
         "--enable-system-timer",
         action="store_true",
@@ -493,8 +502,7 @@ def build_parser() -> argparse.ArgumentParser:
     mcl_parser = subparsers.add_parser("mcl")
     mcl_actions = mcl_parser.add_subparsers(dest="action")
     mcl_set = mcl_actions.add_parser("set")
-    mcl_set.add_argument("--project", required=True)
-    _add_runtime_arguments(mcl_set, include_project=False)
+    _add_runtime_arguments(mcl_set, include_project=True)
     mcl_set.add_argument(
         "--add-flexio-logic-channel",
         metavar="NAME",
@@ -512,8 +520,7 @@ def build_parser() -> argparse.ArgumentParser:
     port_parser = subparsers.add_parser("port")
     port_actions = port_parser.add_subparsers(dest="action")
     port_set = port_actions.add_parser("set")
-    port_set.add_argument("--project", required=True)
-    _add_runtime_arguments(port_set, include_project=False)
+    _add_runtime_arguments(port_set, include_project=True)
     port_set.add_argument(
         "--peripheral",
         help="Peripheral whose TX/RX pins to configure, e.g. LPUART_0.",
@@ -528,8 +535,7 @@ def build_parser() -> argparse.ArgumentParser:
     dio_parser = subparsers.add_parser("dio")
     dio_actions = dio_parser.add_subparsers(dest="action")
     dio_set = dio_actions.add_parser("set")
-    dio_set.add_argument("--project", required=True)
-    _add_runtime_arguments(dio_set, include_project=False)
+    _add_runtime_arguments(dio_set, include_project=True)
     dio_set.add_argument(
         "--add-channel",
         metavar="NAME",
@@ -557,8 +563,7 @@ def build_parser() -> argparse.ArgumentParser:
     mcu_parser = subparsers.add_parser("mcu")
     mcu_actions = mcu_parser.add_subparsers(dest="action")
     mcu_set = mcu_actions.add_parser("set")
-    mcu_set.add_argument("--project", required=True)
-    _add_runtime_arguments(mcu_set, include_project=False)
+    _add_runtime_arguments(mcu_set, include_project=True)
     mcu_set.add_argument(
         "--core-clk",
         type=int,
@@ -602,8 +607,7 @@ def build_parser() -> argparse.ArgumentParser:
             "One `adc set --spec X --configure` expresses a full case."
         ),
     )
-    adc_set.add_argument("--project", required=True)
-    _add_runtime_arguments(adc_set, include_project=False)
+    _add_runtime_arguments(adc_set, include_project=True)
     _add_spec_argument(adc_set)
     adc_set.add_argument("--configure", action="store_true")
     adc_set.add_argument("--backup", action="store_true")
@@ -761,23 +765,17 @@ def _assert_expected_identity(
     for field in sorted(expected_fields):
         observed = getattr(metadata, metadata_names.get(field, field))
         expected = getattr(config, field)
-        observed_token = str(observed).casefold()
-        expected_token = str(expected).casefold()
         if field == "rtd_version":
-            observed_value = tuple(
-                str(int(item)) if item.isdigit() else item
-                for item in re.split(r"[._-]", observed_token)
-                if item
-            )
-            expected_value = tuple(
-                str(int(item)) if item.isdigit() else item
-                for item in re.split(r"[._-]", expected_token)
-                if item
+            observed_value = _normalized_rtd_version(observed)
+            expected_value = _normalized_rtd_version(expected)
+            matches = (
+                observed_value is not None
+                and expected_value is not None
+                and observed_value == expected_value
             )
         else:
-            observed_value = observed_token
-            expected_value = expected_token
-        if observed_value != expected_value:
+            matches = str(observed).casefold() == str(expected).casefold()
+        if not matches:
             mismatches.append(field)
     if mismatches:
         raise CliFailure(

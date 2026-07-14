@@ -265,7 +265,9 @@ class ControlledValidationWorkspace:
         self.export_dir: Path | None = None
         self.data_dir: Path | None = None
         self.log_file: Path | None = None
+        self.public_log_path = "validation.log"
         self.temp_dir: Path | None = None
+        self.log_dir: Path | None = None
         self.cleanup_warnings: list[dict] = []
         self._guards: list = []
         self._guarded_paths: set[Path] = set()
@@ -360,6 +362,18 @@ class ControlledValidationWorkspace:
             ) from exc
         return target
 
+    def _mkdir_unique(self, parent: Path) -> Path:
+        for _ in range(32):
+            try:
+                return self._mkdir(parent, f"run-{secrets.token_hex(12)}")
+            except FileExistsError:
+                continue
+        raise CliFailure(
+            "validation_workspace_create_failed",
+            "A unique controlled validation directory could not be created.",
+            module="backend",
+        )
+
     def open(self) -> "ControlledValidationWorkspace":
         _reject_system_temp(self.base)
         _validate_components(self.base)
@@ -390,33 +404,18 @@ class ControlledValidationWorkspace:
                 "The controlled validation root must be a directory.",
                 module="backend", details={"entry": self.base.name},
             )
-        for _ in range(32):
-            name = f"run-{secrets.token_hex(12)}"
-            try:
-                self.root = self._mkdir(self.base, name)
-                break
-            except FileExistsError:
-                continue
-        if self.root is None:
-            raise CliFailure(
-                "validation_workspace_create_failed",
-                "A unique controlled validation workspace could not be created.",
-                module="backend",
-            )
+        self.root = self._mkdir_unique(self.base)
         self._root_identity = _directory_identity(self.root)
         self.project_dir = self.root / "project"
         self.export_dir = self.root / "export"
         self.data_dir = self.root / "data"
-        self.temp_dir = self.configured_temp_root or self.root / "temp"
-        logs = self.configured_log_root or self.root / "logs"
         for configured, label in (
             (self.configured_temp_root, "temporary"),
             (self.configured_log_root, "log"),
         ):
             if configured is None:
                 continue
-            if configured == self.configured_temp_root:
-                _reject_system_temp(configured)
+            _reject_system_temp(configured)
             _validate_components(configured)
             if not configured.is_dir():
                 raise CliFailure(
@@ -432,7 +431,16 @@ class ControlledValidationWorkspace:
             names.append("logs")
         for name in names:
             self._mkdir(self.root, name)
-        self.log_file = logs / "validation.log"
+        if self.configured_temp_root is None:
+            self.temp_dir = self.root / "temp"
+        else:
+            self.temp_dir = self._mkdir_unique(self.configured_temp_root)
+        if self.configured_log_root is None:
+            self.log_dir = self.root / "logs"
+        else:
+            self.log_dir = self._mkdir_unique(self.configured_log_root)
+            self.public_log_path = f"{self.log_dir.name}/validation.log"
+        self.log_file = self.log_dir / "validation.log"
         created_directories = {PurePosixPath(".")}
         for item in self.inventory.files:
             relative = PurePosixPath(item.relative)
@@ -524,10 +532,27 @@ class ControlledValidationWorkspace:
         return result
 
     def close(self) -> list[dict]:
-        cleanup_ok = True
+        temp_cleanup_ok = True
+        if self.configured_temp_root is not None and self.temp_dir is not None:
+            temp_cleanup_ok = self._secure_delete_directory(
+                self.temp_dir, self.configured_temp_root
+            )
+            if not temp_cleanup_ok:
+                self.cleanup_warnings.append({
+                    "code": "validation_cleanup_failed",
+                    "message": (
+                        "The controlled validation temporary directory was "
+                        "preserved for audit."
+                    ),
+                    "details": {"preserved": [self.temp_dir.name]},
+                })
+        cleanup_ok = temp_cleanup_ok
         if self.root is not None:
-            cleanup_ok = self._secure_delete_root()
-        if not cleanup_ok:
+            root_cleanup_ok = self._secure_delete_root()
+            cleanup_ok = cleanup_ok and root_cleanup_ok
+        else:
+            root_cleanup_ok = True
+        if not root_cleanup_ok:
             self.cleanup_warnings.append({
                 "code": "validation_cleanup_failed",
                 "message": "The controlled validation workspace was preserved for audit.",
@@ -543,25 +568,27 @@ class ControlledValidationWorkspace:
         self._release_guards()
         return self.cleanup_warnings
 
-    def _secure_delete_root(self) -> bool:
+    def _secure_delete_directory(self, path: Path, parent: Path) -> bool:
         try:
             if os.name == "nt":
-                assert self.root is not None
                 return _windows_delete_tree(
-                    self.root, self._windows_handles, self._windows_deletable
+                    path, self._windows_handles, self._windows_deletable
                 )
             if os.name == "posix":
-                assert self.root is not None
-                root_fd = self._directory_fds.get(self.root.absolute())
-                base_fd = self._directory_fds.get(self.base.absolute())
-                if root_fd is None or base_fd is None:
+                path_fd = self._directory_fds.get(path.absolute())
+                parent_fd = self._directory_fds.get(parent.absolute())
+                if path_fd is None or parent_fd is None:
                     return False
-                return _posix_delete_tree(root_fd) and _posix_remove_bound_name(
-                    base_fd, self.root.name, root_fd, directory=True
+                return _posix_delete_tree(path_fd) and _posix_remove_bound_name(
+                    parent_fd, path.name, path_fd, directory=True
                 )
             return False
         except (OSError, CliFailure, ValueError):
             return False
+
+    def _secure_delete_root(self) -> bool:
+        assert self.root is not None
+        return self._secure_delete_directory(self.root, self.base)
 
     def _secure_delete_created_base(self) -> bool:
         try:
