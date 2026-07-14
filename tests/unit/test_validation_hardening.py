@@ -377,3 +377,111 @@ def test_workspace_cleanup_keeps_identity_guard_until_recursive_delete(
             shutil.rmtree(run_root)
         if displaced.exists():
             shutil.rmtree(displaced)
+
+
+def test_workspace_cleanup_deletes_nested_bound_tree_before_releasing_guards(
+    monkeypatch, tmp_path
+):
+    project_root = copy_uart_fixture(tmp_path)
+    with Project.verified(project_root) as project:
+        inventory = project.capture_validator_inputs()
+    base = tmp_path / "controlled"
+    base.mkdir()
+    workspace = ControlledValidationWorkspace(base, inventory).open()
+    assert workspace.root is not None and workspace.export_dir is not None
+    nested = workspace.export_dir / "one" / "two"
+    nested.mkdir(parents=True)
+    (nested / "generated.c").write_bytes(b"generated")
+    root = workspace.root
+    original_release = workspace._release_guards
+    release_observations = []
+
+    def observed_release():
+        release_observations.append(root.exists())
+        original_release()
+
+    monkeypatch.setattr(workspace, "_release_guards", observed_release)
+    assert workspace.close() == []
+    assert release_observations == [False]
+    assert not root.exists()
+
+
+@pytest.mark.parametrize("target_is_directory", [False, True])
+def test_workspace_cleanup_rejects_links_without_touching_external_target(
+    tmp_path, target_is_directory
+):
+    project_root = copy_uart_fixture(tmp_path)
+    with Project.verified(project_root) as project:
+        inventory = project.capture_validator_inputs()
+    base = tmp_path / "controlled"
+    base.mkdir()
+    workspace = ControlledValidationWorkspace(base, inventory).open()
+    assert workspace.root is not None and workspace.export_dir is not None
+    outside = tmp_path / ("outside-dir" if target_is_directory else "outside.txt")
+    if target_is_directory:
+        outside.mkdir()
+        (outside / "keep.txt").write_bytes(b"keep")
+    else:
+        outside.write_bytes(b"keep")
+    link = workspace.export_dir / "untrusted-link"
+    try:
+        link.symlink_to(outside, target_is_directory=target_is_directory)
+    except OSError as exc:
+        workspace.close()
+        pytest.skip(f"symlink unavailable: {exc}")
+
+    warnings = workspace.close()
+    assert warnings and warnings[0]["code"] == "validation_cleanup_failed"
+    if target_is_directory:
+        assert (outside / "keep.txt").read_bytes() == b"keep"
+    else:
+        assert outside.read_bytes() == b"keep"
+    shutil.rmtree(workspace.root)
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows handle-lock behavior")
+@pytest.mark.parametrize("seam", ["enumerate", "delete"])
+def test_windows_cleanup_blocks_root_swap_during_enumerate_or_delete(
+    monkeypatch, tmp_path, seam
+):
+    project_root = copy_uart_fixture(tmp_path)
+    with Project.verified(project_root) as project:
+        inventory = project.capture_validator_inputs()
+    base = tmp_path / "controlled"
+    base.mkdir()
+    workspace = ControlledValidationWorkspace(base, inventory).open()
+    assert workspace.root is not None
+    root = workspace.root
+    displaced = tmp_path / "displaced-run"
+    attack_succeeded = False
+
+    def attack():
+        nonlocal attack_succeeded
+        try:
+            root.rename(displaced)
+            root.mkdir()
+            attack_succeeded = True
+        except OSError:
+            pass
+
+    if seam == "enumerate":
+        real_scandir = os.scandir
+
+        def attacking_scandir(path):
+            if Path(path) == root:
+                attack()
+            return real_scandir(path)
+
+        monkeypatch.setattr(os, "scandir", attacking_scandir)
+    else:
+        real_delete = workspace_module._windows_mark_delete
+
+        def attacking_delete(handle):
+            attack()
+            return real_delete(handle)
+
+        monkeypatch.setattr(workspace_module, "_windows_mark_delete", attacking_delete)
+
+    assert workspace.close() == []
+    assert attack_succeeded is False
+    assert not root.exists()

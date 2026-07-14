@@ -50,6 +50,7 @@ from dataclasses import replace
 import json
 import os
 from pathlib import Path
+import shutil
 import sys
 import time
 import threading
@@ -557,7 +558,7 @@ def test_cleanup_failure_is_explicit_and_preserves_only_workspace_basename(
 ):
     project = copy_uart_fixture(tmp_path)
     control = tmp_path / "controlled-validation"
-    real_rmtree = workspace_module.shutil.rmtree
+    real_cleanup = ControlledValidationWorkspace._secure_delete_root
 
     class PassingRunner:
         def run(self, argv, *, cwd, env, timeout_s):
@@ -569,8 +570,7 @@ def test_cleanup_failure_is_explicit_and_preserves_only_workspace_basename(
             )
 
     monkeypatch.setattr(
-        workspace_module.shutil, "rmtree",
-        lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("injected cleanup")),
+        ControlledValidationWorkspace, "_secure_delete_root", lambda _self: False,
     )
     outcome = run_validation(
         project, Path("C:/NXP/S32DS.3.6.7"),
@@ -580,8 +580,10 @@ def test_cleanup_failure_is_explicit_and_preserves_only_workspace_basename(
     assert outcome.cleanup_warnings[0]["code"] == "validation_cleanup_failed"
     preserved = outcome.cleanup_warnings[0]["details"]["preserved"]
     assert len(preserved) == 1 and not Path(preserved[0]).is_absolute()
-    monkeypatch.setattr(workspace_module.shutil, "rmtree", real_rmtree)
-    real_rmtree(control)
+    monkeypatch.setattr(
+        ControlledValidationWorkspace, "_secure_delete_root", real_cleanup,
+    )
+    shutil.rmtree(control)
 
 
 def test_validation_keyboard_interrupt_cleans_workspace_and_preserves_project(tmp_path):

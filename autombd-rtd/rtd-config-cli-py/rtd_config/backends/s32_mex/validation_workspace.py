@@ -51,12 +51,12 @@ import hashlib
 import os
 from pathlib import Path, PurePosixPath
 import secrets
-import shutil
 import stat
 
 from ...errors import CliFailure
 from .metadata import ValidatorInputInventory
 from .target import default_target_platform
+from . import target as target_module
 
 
 @dataclass(frozen=True)
@@ -259,10 +259,31 @@ class ControlledValidationWorkspace:
         self._directory_fds: dict[Path, int] = {}
         self._directory_identities: dict[Path, tuple[int, int]] = {}
         self._root_identity: tuple[int, int] | None = None
+        self._windows_handles: dict[Path, object] = {}
+        self._windows_deletable: set[Path] = set()
 
-    def _guard_directory(self, path: Path) -> None:
+    def _guard_directory(self, path: Path, *, owned: bool = False) -> None:
         path = path.absolute()
         if path in self._guarded_paths:
+            return
+        if os.name == "nt":
+            components: list[Path] = []
+            current = path
+            while current != current.parent:
+                components.append(current)
+                current = current.parent
+            for component in reversed(components):
+                if component in self._guarded_paths:
+                    continue
+                delete_access = owned and component == path
+                handle = _windows_open_entry(
+                    component, directory=True, delete_access=delete_access
+                )
+                self._windows_handles[component] = handle
+                if delete_access:
+                    self._windows_deletable.add(component)
+                self._guarded_paths.add(component)
+                self._directory_identities[component] = _windows_handle_identity(handle)
             return
         platform = default_target_platform()
         guard = platform.protect_root(path)
@@ -292,6 +313,14 @@ class ControlledValidationWorkspace:
         self._guarded_paths.clear()
         self._directory_fds.clear()
         self._directory_identities.clear()
+        if os.name == "nt":
+            for path, handle in tuple(reversed(tuple(self._windows_handles.items()))):
+                try:
+                    _windows_close(handle)
+                except OSError:
+                    failures = True
+                self._windows_handles.pop(path, None)
+            self._windows_deletable.clear()
         if failures:
             self.cleanup_warnings.append({
                 "code": "validation_cleanup_failed",
@@ -307,7 +336,7 @@ class ControlledValidationWorkspace:
                 os.mkdir(name, 0o700, dir_fd=parent_fd)
             else:
                 os.mkdir(target, 0o700)
-            self._guard_directory(target)
+            self._guard_directory(target, owned=True)
         except FileExistsError:
             raise
         except (OSError, CliFailure) as exc:
@@ -401,7 +430,12 @@ class ControlledValidationWorkspace:
 
     def verify_identity(self) -> None:
         for path, expected in self._directory_identities.items():
-            if _directory_identity(path) != expected:
+            actual = (
+                _windows_handle_identity(self._windows_handles[path])
+                if os.name == "nt" and path in self._windows_handles
+                else _directory_identity(path)
+            )
+            if actual != expected:
                 raise CliFailure(
                     "validation_workspace_unsafe",
                     "A controlled workspace directory changed during staging.",
@@ -456,39 +490,66 @@ class ControlledValidationWorkspace:
         return result
 
     def close(self) -> list[dict]:
-        expected_root = self._root_identity
-        self._release_guards()
-        safe_to_remove = False
+        cleanup_ok = True
         if self.root is not None:
-            try:
-                safe_to_remove = _directory_identity(self.root) == expected_root
-            except (OSError, CliFailure):
-                safe_to_remove = False
-        if self.root is not None and self.root.exists() and safe_to_remove:
-            try:
-                shutil.rmtree(self.root)
-            except OSError:
-                self.cleanup_warnings.append({
-                    "code": "validation_cleanup_failed",
-                    "message": "The controlled validation workspace was preserved for audit.",
-                    "details": {"preserved": [self.root.name]},
-                })
-        elif self.root is not None and self.root.exists() and not safe_to_remove:
+            cleanup_ok = self._secure_delete_root()
+        if not cleanup_ok:
             self.cleanup_warnings.append({
                 "code": "validation_cleanup_failed",
-                "message": "The controlled workspace identity changed; cleanup was blocked.",
+                "message": "The controlled validation workspace was preserved for audit.",
                 "details": {"preserved": [self.root.name]},
             })
-        if self.created_base and self.base.exists() and not self.cleanup_warnings:
-            try:
-                self.base.rmdir()
-            except OSError:
+        if self.created_base and cleanup_ok:
+            if not self._secure_delete_created_base():
                 self.cleanup_warnings.append({
                     "code": "validation_cleanup_failed",
                     "message": "The empty validation root could not be removed.",
                     "details": {"preserved": [self.base.name]},
                 })
+        self._release_guards()
         return self.cleanup_warnings
+
+    def _secure_delete_root(self) -> bool:
+        try:
+            if os.name == "nt":
+                assert self.root is not None
+                return _windows_delete_tree(
+                    self.root, self._windows_handles, self._windows_deletable
+                )
+            if os.name == "posix":
+                assert self.root is not None
+                root_fd = self._directory_fds.get(self.root.absolute())
+                base_fd = self._directory_fds.get(self.base.absolute())
+                if root_fd is None or base_fd is None:
+                    return False
+                return _posix_delete_tree(root_fd) and _posix_remove_bound_name(
+                    base_fd, self.root.name, root_fd, directory=True
+                )
+            return False
+        except (OSError, CliFailure, ValueError):
+            return False
+
+    def _secure_delete_created_base(self) -> bool:
+        try:
+            if os.name == "nt":
+                handle = self._windows_handles.get(self.base.absolute())
+                if handle is None or self.base.absolute() not in self._windows_deletable:
+                    return False
+                _windows_mark_delete(handle)
+                _windows_close(handle)
+                self._windows_handles.pop(self.base.absolute(), None)
+                return True
+            if os.name == "posix":
+                base_fd = self._directory_fds.get(self.base.absolute())
+                parent_fd = self._directory_fds.get(self.base.parent.absolute())
+                if base_fd is None or parent_fd is None:
+                    return False
+                return _posix_remove_bound_name(
+                    parent_fd, self.base.name, base_fd, directory=True
+                )
+            return False
+        except (OSError, CliFailure):
+            return False
 
 
 def _directory_identity(path: Path) -> tuple[int, int]:
@@ -508,3 +569,184 @@ def _directory_identity(path: Path) -> tuple[int, int]:
             module="backend", details={"entry": path.name},
         )
     return status.st_dev, status.st_ino
+
+
+def _windows_open_entry(
+    path: Path, *, directory: bool, delete_access: bool
+):
+    if os.name != "nt":
+        raise OSError("Windows cleanup primitives are unavailable")
+    desired_access = target_module._GENERIC_READ
+    if delete_access:
+        desired_access |= 0x00010000  # DELETE
+    flags = target_module._FILE_FLAG_OPEN_REPARSE_POINT
+    if directory:
+        flags |= target_module._FILE_FLAG_BACKUP_SEMANTICS
+    handle = target_module._CreateFileW(
+        str(path), desired_access,
+        target_module._FILE_SHARE_READ | target_module._FILE_SHARE_WRITE,
+        None, target_module._OPEN_EXISTING, flags, None,
+    )
+    if handle == target_module._INVALID_HANDLE_VALUE:
+        raise target_module.ctypes.WinError(target_module.ctypes.get_last_error())
+    try:
+        tag = target_module._WindowsTargetPlatform._query(
+            handle, 9, target_module._FILE_ATTRIBUTE_TAG_INFO
+        )
+        standard = target_module._WindowsTargetPlatform._query(
+            handle, 1, target_module._FILE_STANDARD_INFO
+        )
+        if tag.FileAttributes & target_module._FILE_ATTRIBUTE_REPARSE_POINT:
+            raise OSError("cleanup entry is a reparse point")
+        if bool(standard.Directory) != directory:
+            raise OSError("cleanup entry type changed")
+        return handle
+    except BaseException:
+        target_module._CloseHandle(handle)
+        raise
+
+
+def _windows_handle_identity(handle) -> tuple[int, bytes]:
+    identity = target_module._WindowsTargetPlatform._query(
+        handle, 18, target_module._FILE_ID_INFO
+    )
+    return identity.VolumeSerialNumber, bytes(identity.FileId.Identifier)
+
+
+def _windows_mark_delete(handle) -> None:
+    disposition = target_module._FILE_DISPOSITION_INFO(True)
+    if not target_module._SetFileInformationByHandle(
+        handle, 4, target_module.ctypes.byref(disposition),
+        target_module.ctypes.sizeof(disposition),
+    ):
+        raise target_module.ctypes.WinError(target_module.ctypes.get_last_error())
+
+
+def _windows_close(handle) -> None:
+    if not target_module._CloseHandle(handle):
+        raise target_module.ctypes.WinError(target_module.ctypes.get_last_error())
+
+
+def _windows_delete_tree(
+    root: Path,
+    owned_handles: dict[Path, object],
+    deletable: set[Path],
+) -> bool:
+    """Open the complete tree first, then delete bound handles post-order."""
+    records: list[tuple[Path, object]] = []
+    transient: dict[Path, object] = {}
+
+    def capture(path: Path) -> None:
+        absolute = path.absolute()
+        handle = owned_handles.get(absolute)
+        if handle is None:
+            status = os.lstat(absolute)
+            if stat.S_ISLNK(status.st_mode) or _is_reparse(status):
+                raise OSError("cleanup tree contains a link or reparse point")
+            is_directory = stat.S_ISDIR(status.st_mode)
+            if not is_directory and not stat.S_ISREG(status.st_mode):
+                raise OSError("cleanup tree contains an unsupported entry")
+            handle = _windows_open_entry(
+                absolute, directory=is_directory, delete_access=True
+            )
+            transient[absolute] = handle
+        elif absolute not in deletable:
+            raise OSError("owned cleanup handle lacks delete access")
+        standard = target_module._WindowsTargetPlatform._query(
+            handle, 1, target_module._FILE_STANDARD_INFO
+        )
+        if standard.Directory:
+            with os.scandir(absolute) as entries:
+                children = tuple(Path(entry.path) for entry in entries)
+            for child in children:
+                capture(child)
+        records.append((absolute, handle))
+
+    try:
+        capture(root)
+        for path, handle in records:
+            _windows_mark_delete(handle)
+            _windows_close(handle)
+            transient.pop(path, None)
+            owned_handles.pop(path, None)
+            deletable.discard(path)
+        return True
+    except (OSError, ValueError):
+        return False
+    finally:
+        for path, handle in tuple(transient.items()):
+            try:
+                _windows_close(handle)
+            except OSError:
+                pass
+            transient.pop(path, None)
+
+
+def _posix_identity(status: os.stat_result) -> tuple[int, int, int]:
+    return status.st_dev, status.st_ino, stat.S_IFMT(status.st_mode)
+
+
+def _posix_remove_bound_name(
+    parent_fd: int,
+    name: str,
+    object_fd: int,
+    *,
+    directory: bool,
+) -> bool:
+    opened = os.fstat(object_fd)
+    named = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+    if _posix_identity(opened) != _posix_identity(named):
+        return False
+    if directory:
+        os.rmdir(name, dir_fd=parent_fd)
+    else:
+        os.unlink(name, dir_fd=parent_fd)
+    return True
+
+
+def _posix_delete_tree(directory_fd: int) -> bool:
+    if os.name != "posix" or not getattr(os, "O_NOFOLLOW", 0):
+        return False
+    directory_flags = (
+        os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+        | getattr(os, "O_NONBLOCK", 0)
+    )
+    file_flags = (
+        os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_NONBLOCK", 0)
+        | getattr(os, "O_BINARY", 0)
+    )
+    try:
+        names = tuple(os.listdir(directory_fd))
+        for name in names:
+            status = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+            if stat.S_ISLNK(status.st_mode):
+                return False
+            if stat.S_ISDIR(status.st_mode):
+                child_fd = os.open(name, directory_flags, dir_fd=directory_fd)
+                try:
+                    if _posix_identity(os.fstat(child_fd)) != _posix_identity(status):
+                        return False
+                    if not _posix_delete_tree(child_fd):
+                        return False
+                    if not _posix_remove_bound_name(
+                        directory_fd, name, child_fd, directory=True
+                    ):
+                        return False
+                finally:
+                    os.close(child_fd)
+            elif stat.S_ISREG(status.st_mode):
+                child_fd = os.open(name, file_flags, dir_fd=directory_fd)
+                try:
+                    if _posix_identity(os.fstat(child_fd)) != _posix_identity(status):
+                        return False
+                    if not _posix_remove_bound_name(
+                        directory_fd, name, child_fd, directory=False
+                    ):
+                        return False
+                finally:
+                    os.close(child_fd)
+            else:
+                return False
+        return not os.listdir(directory_fd)
+    except (OSError, ValueError):
+        return False
