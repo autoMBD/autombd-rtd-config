@@ -421,13 +421,16 @@ def test_every_configure_entry_point_plans_and_applies_one_verified_project(
         return ApplyResult()
 
     def configure_same_project(
-        _args, _intent, _plan, apply_fn, project, *, binding=None
+        _args, _intent, _plan, apply_fn, project, *, binding=None,
+        runtime_config=None,
     ):
         assert project is projects[0]
         assert injected["provider"] is project.asset_bundle
         assert injected["normalizer"] is project.asset_bundle
         assert apply_fn is expected_apply
         assert binding is not None and binding.apply_fn is expected_apply
+        assert runtime_config is not None
+        assert runtime_config.project == project_root
         assert not project.verified_target.lease.closed
         return 0
 
