@@ -47,7 +47,7 @@
 from __future__ import annotations
 
 from rtd_config.intent import Intent
-from rtd_config.plan import Plan, PlannedChange
+from rtd_config.plan import Plan, PlannedChange, TargetSelector
 from rtd_config.resources.bundles import ResolvedAssetBundle
 
 
@@ -106,6 +106,9 @@ class BaseNxpProvider:
                 owner="basenxp",
                 path=path,
                 description=description,
+                targets=(TargetSelector(
+                    "config_set:BaseNXP", ("OsIfGeneral", path.rsplit("/", 1)[-1]),
+                ),),
             ))
         if intent.payload.get("enable_system_timer", False):
             # Basenxp-owned change 1: enable the OsIf system timer flag.
@@ -114,6 +117,9 @@ class BaseNxpProvider:
                 owner="basenxp",
                 path="/BaseNXP/BaseNXP/OsIfGeneral/OsIfUseSystemTimer",
                 description="Enable OsIf system timer (OsIfUseSystemTimer=true)",
+                targets=(TargetSelector(
+                    "config_set:BaseNXP", ("OsIfGeneral", "OsIfUseSystemTimer"),
+                ),),
             ))
             # Basenxp-owned change 2: insert one OsIfCounterConfig whose
             # OsIfSystemTimerClockRef is populated with an Mcu McuClockReferencePoint
@@ -130,6 +136,15 @@ class BaseNxpProvider:
                     "else first available); OsIfSystemTimerClockFreq as empty array "
                     "(ConfigTools ArraySetting type)"
                 ),
+                targets=tuple(
+                    TargetSelector("config_set:BaseNXP", ("OsIfCounterConfig", leaf))
+                    for leaf in (
+                        "OsIfCounterConfig_0", "Name", "OsIfSystemTimerClockRef",
+                        "OsIfSystemTimerClockFreq", "OsIfOsCounterRef",
+                    )
+                ) + (TargetSelector(
+                    "config_set:BaseNXP", ("OsIfCounterConfig",),
+                ),),
             ))
             # Cross-module dependency: BaseNXP reads (read-only) an existing Mcu
             # McuClockReferencePoint to populate OsIfSystemTimerClockRef. This

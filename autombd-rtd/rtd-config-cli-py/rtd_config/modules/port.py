@@ -76,6 +76,11 @@ class PortProvider:
         tx = pins.get("tx")
         rx = pins.get("rx")
         changes: list[PlannedChange] = []
+        normalized_peripheral = peripheral.replace("_", "").upper()
+        preserved_pin_target = TargetSelector(
+            "Pins/Port", ("PortContainer_0_VS_0",),
+            (("peripheral", "FXIO"), ("pin_signal", "PTD1")),
+        )
         if tx:
             changes.append(PlannedChange(
                 module="port",
@@ -85,6 +90,14 @@ class PortProvider:
                     f"Insert <pin> header + PortPin struct for {peripheral} TX={tx}: "
                     f"signal={peripheral.lower().replace('_', '')}_tx, "
                     f"port section PortContainer_0_VS_0"
+                ),
+                targets=(
+                    TargetSelector(
+                        "Pins/Port", ("PortContainer_0_VS_0",),
+                        (("peripheral", normalized_peripheral), ("pin_signal", tx)),
+                    ),
+                    preserved_pin_target,
+                    TargetSelector("config_set:Port", ("PortConfigSet", "PortContainer", "PortPin")),
                 ),
             ))
         if rx:
@@ -96,6 +109,14 @@ class PortProvider:
                     f"Insert <pin> header + PortPin struct for {peripheral} RX={rx}: "
                     f"signal={peripheral.lower().replace('_', '')}_rx, "
                     f"port section PortContainer_0_VS_0"
+                ),
+                targets=(
+                    TargetSelector(
+                        "Pins/Port", ("PortContainer_0_VS_0",),
+                        (("peripheral", normalized_peripheral), ("pin_signal", rx)),
+                    ),
+                    preserved_pin_target,
+                    TargetSelector("config_set:Port", ("PortConfigSet", "PortContainer", "PortPin")),
                 ),
             ))
         if not changes:
