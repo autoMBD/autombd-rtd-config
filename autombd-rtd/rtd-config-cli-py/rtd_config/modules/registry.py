@@ -48,6 +48,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import inspect
+import re
 from types import MappingProxyType
 from typing import Callable, Mapping
 
@@ -159,6 +160,25 @@ def _signature_accepts(callable_value, *args, **kwargs) -> bool:
     return True
 
 
+_CONFIG_REGION = re.compile(r"config_set:[A-Za-z][A-Za-z0-9_]{0,63}\Z")
+_LOGICAL_TOKEN = re.compile(r"[A-Za-z_][A-Za-z0-9_-]{0,127}\Z")
+_LOGICAL_VALUE = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_-]{0,127}\Z")
+_PHYSICAL_REGIONS = frozenset({"Pins/Port", "Clocks/clock_settings"})
+
+
+def _valid_region(value: str) -> bool:
+    return bool(_CONFIG_REGION.fullmatch(value)) or value in _PHYSICAL_REGIONS
+
+
+def _valid_identity(value: tuple[tuple[str, str], ...]) -> bool:
+    return type(value) is tuple and all(
+        type(item) is tuple and len(item) == 2
+        and isinstance(item[0], str) and bool(_LOGICAL_TOKEN.fullmatch(item[0]))
+        and isinstance(item[1], str) and bool(_LOGICAL_VALUE.fullmatch(item[1]))
+        for item in value
+    )
+
+
 def validate_provider_plan(plan, *, binding: ProviderBinding | None = None) -> None:
     if not isinstance(plan, Plan) or not isinstance(plan.changes, list):
         raise CliFailure(
@@ -167,16 +187,14 @@ def validate_provider_plan(plan, *, binding: ProviderBinding | None = None) -> N
     for change in plan.changes:
         valid_targets = isinstance(change, PlannedChange) and type(change.targets) is tuple and all(
             isinstance(target, TargetSelector)
-            and isinstance(target.region, str) and bool(target.region)
+            and isinstance(target.region, str) and _valid_region(target.region)
             and type(target.path) is tuple
             and bool(target.path)
-            and all(isinstance(item, str) and item for item in target.path)
-            and type(target.identity) is tuple
             and all(
-                type(item) is tuple and len(item) == 2
-                and all(isinstance(value, str) and value for value in item)
-                for item in target.identity
+                isinstance(item, str) and bool(_LOGICAL_TOKEN.fullmatch(item))
+                for item in target.path
             )
+            and _valid_identity(target.identity)
             and target.access in {"write", "read"}
             for target in change.targets
         )

@@ -130,6 +130,15 @@ def test_runtime_plan_rejects_empty_or_non_concrete_write_targets():
         (TargetSelector("config_set:Uart", ()),),
         (TargetSelector("config_set:Uart", ("*",)),),
         (TargetSelector("config_set:*", ("Uart",)),),
+        (TargetSelector("config_set:Uart", ("Uart?",)),),
+        (TargetSelector("config_set:Uart", ("Uart[0]",)),),
+        (TargetSelector("config_set:Uart", ("Uart{0}",)),),
+        (TargetSelector("config_set:Uart", ("Uart.name",)),),
+        (TargetSelector("config_set:Uart", ("Uart/name",)),),
+        (TargetSelector("config_set:Uart", (r"Uart\name",)),),
+        (TargetSelector("config_set:Uart", ("Uart\x00name",)),),
+        (TargetSelector("config_set:Uart", ("Uart",), (("name", "*"),)),),
+        (TargetSelector("config_set:Uart", ("Uart",), (("na?me", "safe"),)),),
     ):
         with pytest.raises(CliFailure) as caught:
             validate_provider_plan(Plan([

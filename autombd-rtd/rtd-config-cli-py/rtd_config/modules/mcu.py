@@ -130,7 +130,7 @@ class McuProvider:
                     "McuPll_Parameter PLL params, McuCgm0ClockMux0 divisors)."
                 ),
                 targets=tuple(
-                    TargetSelector("Clocks/clock_settings", (setting_id,))
+                    TargetSelector("Clocks/clock_settings", tuple(setting_id.split(".")))
                     for setting_id in (
                         "MC_CGM_MUX_0_DIV1.scale", "MC_CGM_MUX_0_DIV2.scale",
                         "MC_CGM_MUX_0_DIV3.scale", "MC_CGM_MUX_0_DIV4.scale",

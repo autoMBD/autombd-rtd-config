@@ -186,8 +186,10 @@ def _records(raw: bytes) -> dict[str, _Record]:
         path = f"{parent_path}/{qname}[{index}]"
         local = qname.rsplit("}", 1)[-1]
         values = (local,) + tuple(
-            str(element.attrib[key]) for key in ("name", "id", "key", "type")
+            token
+            for key in ("name", "id", "key", "type")
             if key in element.attrib
+            for token in str(element.attrib[key]).split(".")
         ) if element.tag is not ET.Comment else ()
         own_logical = logical + values
         if local in {"array", "struct", "pin", "setting"}:
