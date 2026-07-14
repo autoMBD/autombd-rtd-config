@@ -624,7 +624,7 @@ def _preflight_plan(args, binding: ProviderBinding):
                 "The provider registry changed during command preflight.",
                 module="backend",
             )
-        return intent, binding.provider_type(bundle).plan(intent), project
+        return intent, binding.create_plan(bundle, intent), project
     except BaseException:
         project.close()
         raise

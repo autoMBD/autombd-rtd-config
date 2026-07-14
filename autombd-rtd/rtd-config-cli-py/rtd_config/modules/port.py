@@ -47,7 +47,7 @@
 from __future__ import annotations
 
 from rtd_config.intent import Intent
-from rtd_config.plan import Plan, PlannedChange
+from rtd_config.plan import Plan, PlannedChange, TargetSelector
 from rtd_config.resources.bundles import ResolvedAssetBundle
 
 
@@ -112,4 +112,8 @@ class PortProvider:
             owner="port",
             path="/Port/Port/PortConfigSet",
             description=f"Configure pin mux TX={tx} RX={rx}",
+            targets=(
+                TargetSelector("Pins/Port", ("PortContainer_0_VS_0",)),
+                TargetSelector("config_set:Port", ("PortConfigSet", "PortContainer", "PortPin")),
+            ),
         )

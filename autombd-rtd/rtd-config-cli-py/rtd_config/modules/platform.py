@@ -49,7 +49,7 @@ from __future__ import annotations
 import re
 
 from rtd_config.intent import Intent
-from rtd_config.plan import Plan, PlannedChange
+from rtd_config.plan import Plan, PlannedChange, TargetSelector
 from rtd_config.resources.bundles import ResolvedAssetBundle
 
 
@@ -134,6 +134,9 @@ class PlatformProvider:
             owner="platform",
             path="/Platform/Platform/IntCtrlConfig",
             description=description,
+            targets=(TargetSelector(
+                "config_set:Platform", ("PlatformIsrConfig",),
+            ),),
         )
 
     def irq_dependency(
@@ -182,6 +185,9 @@ class PlatformProvider:
             owner="platform",
             path="/Platform/Platform/IntCtrlConfig",
             description=description,
+            targets=(TargetSelector(
+                "config_set:Platform", ("PlatformIsrConfig",),
+            ),),
         )
 
     def dma_isr_dependency(self, hw: str) -> PlannedChange:

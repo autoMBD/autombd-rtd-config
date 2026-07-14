@@ -50,7 +50,7 @@ from __future__ import annotations
 import re
 
 from rtd_config.intent import Intent
-from rtd_config.plan import Plan, PlannedChange
+from rtd_config.plan import Plan, PlannedChange, TargetSelector
 from rtd_config.resources.bundles import ResolvedAssetBundle
 
 
@@ -182,4 +182,8 @@ class McuProvider:
             owner="mcu",
             path="/Mcu/Mcu/McuModuleConfiguration/McuClockSettingConfig_0",
             description=description,
+            targets=(TargetSelector(
+                "config_set:Mcu",
+                ("McuClockReferencePoint",),
+            ),),
         )

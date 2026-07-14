@@ -8,13 +8,40 @@
 #
 # Copyright (c) 2026 autoMBD
 # 版权所有 (c) 2026 autoMBD
+#
+# Permission is hereby granted, free of charge, to any person obtaining a
+# copy of this software and associated documentation files (the "Software"),
+# to deal in the Software without restriction, including without limitation
+# the rights to use, copy, modify, merge, publish, distribute, sublicense,
+# and/or sell copies of the Software, and to permit persons to whom the
+# Software is furnished to do so, subject to the following conditions:
+# 特此向获得本软件及相关文档（合称"本软件"）副本的任何人免费授予不受限制地利用本软
+# 件的许可，包括而不限于：使用、复制、修改、合并、发布、分发、分许可和/或销售本软
+# 件副本，并允许本软件的接收者也获得前述许可，但须遵守以下条件：
+#
+# The above copyright notice and this permission notice shall be included
+# in all copies or substantial portions of the Software.
+# 以上版权声明及本许可声明应包含在本软件的所有副本或主要部分中。
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+# NONINFRINGEMENT. IN NO EVENT SHALLTHE AUTHORS OR COPYRIGHT
+# HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+# IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+# CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+# 本软件系"按原样"提供，不包含任何形式的明示或默示保证，包括但不限于适销性、特定
+# 目的适用性及不侵权的保证。在任何情况下，无论是在合同、侵权或其他案件中，作者或版
+# 权持有人均不对因本软件、或因本软件的使用或其他利用而引起的、引发的或与之相关的任
+# 何权利主张、损害赔偿或其他责任承担责任。
 # =================================================================================
 # Project:     RTD CfgFile CLI <https://github.com/autoMBD/autombd-rtd-config>
 # File:        ownership.py
 # Author:      autoMBD <tkung.lqk@foxmail.com>
 # Date:        2026-07-14
 # Version:     0.1.0
-# Description: Derive and authorize actual structural XML ownership deltas.
+# Description: Byte-complete XML delta journal and target-level ownership audit.
 # =================================================================================
 
 from __future__ import annotations
@@ -23,7 +50,15 @@ from dataclasses import dataclass
 import xml.etree.ElementTree as ET
 
 from ...errors import CliFailure
-from ...modules.registry import PhysicalRegion, ProviderBinding
+from ...modules.registry import PhysicalRegion, ProviderBinding, validate_provider_plan
+from ...plan import PlannedChange, TargetSelector
+
+
+_MEX_NS = "http://mcuxpresso.nxp.com/XSD/mex_configuration_19"
+
+
+def _mex(local: str) -> str:
+    return f"{{{_MEX_NS}}}{local}"
 
 
 @dataclass(frozen=True)
@@ -34,6 +69,8 @@ class DeltaEntry:
     region: str
     attributes: tuple[tuple[str, str], ...]
     text: str
+    logical_path: tuple[str, ...] = ()
+    facts: tuple[tuple[str, str], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -47,123 +84,208 @@ class _Record:
     path: str
     owner: str
     region: str
+    qname: str
     attributes: tuple[tuple[str, str], ...]
     text: str
+    tail: str
+    logical_path: tuple[str, ...]
+    facts: tuple[tuple[str, str], ...]
 
     @property
     def signature(self) -> tuple:
-        return self.attributes, self.text
+        return self.qname, self.attributes, self.text, self.tail
 
 
-def _local(tag: str) -> str:
-    return tag.rsplit("}", 1)[-1]
+def _parse(raw: bytes) -> ET.Element:
+    try:
+        parser = ET.XMLParser(target=ET.TreeBuilder(insert_comments=True))
+        return ET.fromstring(raw, parser=parser)
+    except (ET.ParseError, ValueError) as exc:
+        raise CliFailure(
+            "ownership_unknown", "The XML delta could not be safely journaled.",
+            module="backend",
+        ) from exc
 
 
-def _selector(element: ET.Element) -> str:
-    tag = _local(element.tag)
-    for attribute in ("name", "id", "type", "key"):
-        value = element.attrib.get(attribute)
-        if value is not None:
-            return f"{tag}[@{attribute}={value!r}]"
-    return tag
+def _qname(element: ET.Element) -> str:
+    return "#comment" if element.tag is ET.Comment else str(element.tag)
+
+
+def _subtree_facts(element: ET.Element) -> tuple[tuple[str, str], ...]:
+    facts: set[tuple[str, str]] = set()
+    for item in element.iter():
+        if item.tag is ET.Comment:
+            continue
+        for key, value in item.attrib.items():
+            facts.add((str(key), str(value)))
+        if str(item.tag).rsplit("}", 1)[-1] == "setting" and item.attrib.get("name") and "value" in item.attrib:
+            facts.add((item.attrib["name"], item.attrib["value"]))
+    return tuple(sorted(facts))
+
+
+def _classify(element, ancestors, inherited):
+    qname = _qname(element)
+    if qname == "#comment":
+        return inherited
+    tags = tuple(_qname(item) for item in ancestors)
+    local = qname.rsplit("}", 1)[-1]
+    supported = not qname.startswith("{") or qname.startswith(f"{{{_MEX_NS}}}")
+    if not supported:
+        return "unknown", "unknown"
+    if local == "config_set":
+        direct = tags == ("mex", "tools", "periphs")
+        full = tags[-7:] == tuple(_mex(item) for item in (
+            "configuration", "tools", "periphs", "functional_groups",
+            "functional_group", "instances", "instance",
+        ))
+        compact = tags == ("mex",)
+        name = element.attrib.get("name")
+        if name and (direct or full or compact):
+            return name.lower(), f"config_set:{name}"
+        return "unknown", "unknown"
+    if local == "pins":
+        top = tags in {
+            ("mex", "tools"),
+            (_mex("configuration"), _mex("tools")),
+        }
+        if top:
+            return "port", "Pins/Port"
+        if inherited == ("port", "Pins/Port"):
+            return inherited
+        return "unknown", "unknown"
+    if local == "clock_settings":
+        synthetic = tags == ("mex", "tools", "clocks")
+        full = tags[-5:] == tuple(_mex(item) for item in (
+            "configuration", "tools", "clocks", "clock_configurations", "clock_configuration",
+        ))
+        return ("mcu", "Clocks/clock_settings") if synthetic or full else ("unknown", "unknown")
+    return inherited
 
 
 def _records(raw: bytes) -> dict[str, _Record]:
-    root = ET.fromstring(raw)
+    root = _parse(raw)
     result: dict[str, _Record] = {}
 
-    def visit(element, parent_path, owner, region):
-        tag = _local(element.tag)
-        if tag == "config_set" and element.attrib.get("name"):
-            name = element.attrib["name"]
-            owner = name.lower()
-            region = f"config_set:{name}"
-        elif tag == "pins":
-            owner, region = "port", "Pins/Port"
-        elif tag == "clock_settings":
-            owner, region = "mcu", "Clocks/clock_settings"
-        path = f"{parent_path}/{_selector(element)}"
-        own_path = path
-        suffix = 1
-        while own_path in result:
-            suffix += 1
-            own_path = f"{path}[{suffix}]"
-        text = (element.text or "").strip()
-        result[own_path] = _Record(
-            own_path, owner, region,
-            tuple(sorted((str(key), str(value)) for key, value in element.attrib.items())),
-            text,
+    def visit(element, ancestors, parent_path, inherited, logical, fact_scope):
+        qname = _qname(element)
+        owner, region = _classify(element, ancestors, inherited)
+        siblings = list(ancestors[-1]) if ancestors else [element]
+        same = [item for item in siblings if _qname(item) == qname]
+        index = same.index(element) + 1
+        path = f"{parent_path}/{qname}[{index}]"
+        values = tuple(
+            str(element.attrib[key]) for key in ("name", "id", "key", "type")
+            if key in element.attrib
+        ) if element.tag is not ET.Comment else ()
+        own_logical = logical + values
+        local = qname.rsplit("}", 1)[-1]
+        if local == "struct" or local in {"pin", "setting"}:
+            fact_scope = _subtree_facts(element)
+        result[path] = _Record(
+            path, owner, region, qname,
+            tuple((str(key), str(value)) for key, value in element.attrib.items()),
+            element.text or "", element.tail or "", own_logical, fact_scope,
         )
-        # Distinct named children keep stable paths when sibling order changes.
         for child in element:
-            visit(child, own_path, owner, region)
+            visit(child, ancestors + (element,), path, (owner, region), own_logical, fact_scope)
 
-    visit(root, "", "unknown", "unknown")
+    visit(root, (), "", ("unknown", "unknown"), (), ())
     return result
 
 
 def collect_actual_deltas(before: bytes, candidate: bytes) -> tuple[DeltaEntry, ...]:
     if before == candidate:
         return ()
-    old = _records(before)
-    new = _records(candidate)
+    old, new = _records(before), _records(candidate)
     entries: list[DeltaEntry] = []
     for path in sorted(set(old) | set(new)):
-        prior = old.get(path)
-        later = new.get(path)
+        prior, later = old.get(path), new.get(path)
         if prior is not None and later is not None and prior.signature == later.signature:
             continue
         record = later or prior
         assert record is not None
         entries.append(DeltaEntry(
             "added" if prior is None else "removed" if later is None else "modified",
-            path, record.owner, record.region, record.attributes, record.text,
+            path, record.owner, record.region, record.attributes,
+            record.text, record.logical_path, record.facts,
         ))
+    if not entries:
+        raise CliFailure(
+            "ownership_unknown",
+            "Byte-distinct XML produced no safely attributable journal entries.",
+            module="backend",
+        )
     return tuple(entries)
+
+
+def _in_order(needles: tuple[str, ...], values: tuple[str, ...]) -> bool:
+    iterator = iter(values)
+    return all(any(value == needle for value in iterator) for needle in needles)
+
+
+def _inferred_target(change: PlannedChange) -> TargetSelector:
+    parts = tuple(item for item in change.path.split("/") if item)
+    while parts and parts[0].lower() == change.owner.lower():
+        parts = parts[1:]
+    return TargetSelector("" if not parts else f"config_set:{change.owner.title()}", parts)
+
+
+def _matches(entry: DeltaEntry, change: PlannedChange) -> bool:
+    targets = change.targets or (_inferred_target(change),)
+    return entry.owner == change.owner and any(
+        (not target.region or entry.region == target.region)
+        and _in_order(target.path, entry.logical_path)
+        and set(target.identity) <= set(entry.facts)
+        for target in targets
+    )
 
 
 def audit_candidate(before: bytes, candidate: bytes, binding: ProviderBinding, plan) -> OwnershipAudit:
     binding.validate_ownership()
-    try:
-        changes = tuple(plan.changes)
-        declared = {str(change.owner) for change in changes}
-    except (AttributeError, TypeError) as exc:
+    validate_provider_plan(plan)
+    changes = tuple(plan.changes)
+    declared = {change.owner for change in changes}
+    permitted = binding.write_owners | binding.read_dependencies
+    if not declared <= permitted:
         raise CliFailure(
-            "provider_plan_invalid", "Provider ownership audit requires a typed Plan.",
-            module="backend",
-        ) from exc
-    permitted_declarations = binding.write_owners | binding.read_dependencies
-    if not declared <= permitted_declarations:
-        raise CliFailure(
-            "provider_plan_invalid",
-            "The provider plan declares an owner outside its binding contract.",
-            module="backend", details={"owners": sorted(declared - permitted_declarations)},
+            "provider_plan_invalid", "The plan declares an owner outside its binding.",
+            module="backend", details={"owners": sorted(declared - permitted)},
         )
-    authorized_writes = declared & binding.write_owners
-    allowed_regions = {(item.owner, item.name) for item in binding.allowed_regions}
     entries = collect_actual_deltas(before, candidate)
-    owner_violations = sorted({
-        entry.owner for entry in entries if entry.owner not in authorized_writes
+    unknown = sorted(entry.path for entry in entries if entry.owner == "unknown")
+    if unknown:
+        raise CliFailure(
+            "ownership_unknown", "An XML delta has no safe physical ownership mapping.",
+            module="backend", details={"paths": unknown},
+        )
+    invalid_owners = sorted({
+        entry.owner for entry in entries if entry.owner not in binding.write_owners
     })
-    if owner_violations:
+    if invalid_owners:
+        raise CliFailure(
+            "provider_ownership_violation", "The candidate changes an unauthorized owner.",
+            module="backend", details={"owners": invalid_owners},
+        )
+    allowed_regions = {(item.owner, item.name) for item in binding.allowed_regions}
+    invalid_regions = sorted({
+        f"{entry.owner}:{entry.region}" for entry in entries
+        if (entry.owner, entry.region) not in allowed_regions
+    })
+    if invalid_regions:
+        raise CliFailure(
+            "provider_region_violation", "The candidate changes an undeclared XML region.",
+            module="backend", details={"regions": invalid_regions},
+        )
+    unauthorized = [
+        entry for entry in entries
+        if not any(_matches(entry, change) for change in changes)
+    ]
+    if unauthorized:
         raise CliFailure(
             "provider_ownership_violation",
-            "The candidate changes a module not authorized by the provider plan.",
-            module="backend", details={"owners": owner_violations},
-        )
-    region_violations = sorted({
-        f"{entry.owner}:{entry.region}"
-        for entry in entries if (entry.owner, entry.region) not in allowed_regions
-    })
-    if region_violations:
-        raise CliFailure(
-            "provider_region_violation",
-            "The candidate changes a physical XML region outside its binding contract.",
-            module="backend", details={"regions": region_violations},
+            "The candidate delta does not match a planned target selector.",
+            module="backend", details={"paths": sorted(item.path for item in unauthorized)},
         )
     actual = {entry.owner for entry in entries}
-    ordered = tuple(
-        ([binding.module] if binding.module in actual else [])
-        + sorted(actual - {binding.module})
-    )
+    ordered = tuple(([binding.module] if binding.module in actual else []) + sorted(actual - {binding.module}))
     return OwnershipAudit(entries, ordered)

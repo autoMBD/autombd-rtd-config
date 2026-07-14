@@ -47,7 +47,7 @@
 from __future__ import annotations
 
 from rtd_config.intent import Intent
-from rtd_config.plan import Plan, PlannedChange
+from rtd_config.plan import Plan, PlannedChange, TargetSelector
 from rtd_config.modules.mcu import McuProvider
 from rtd_config.modules.port import PortProvider
 from rtd_config.modules.platform import PlatformProvider
@@ -97,6 +97,13 @@ class UartProvider:
                 owner="uart",
                 path="/Uart/Uart/UartGlobalConfig/UartChannel",
                 description=f"Configure {hw} channel in {mode} mode",
+                targets=(
+                    TargetSelector("config_set:Uart", ("UartGlobalConfig", "UartChannel")),
+                    TargetSelector(
+                        "config_set:Uart", ("GeneralConfiguration", "UartCallbackCapability")
+                    ),
+                    TargetSelector("config_set:Uart", ("GeneralConfiguration", "UartCallback")),
+                ),
             )
         ]
 

@@ -69,16 +69,16 @@ _XML = b"""<mex><tools>
 </tools></mex>"""
 
 
-def test_actual_delta_ignores_comments_whitespace_attribute_and_element_order():
+def test_actual_delta_fails_closed_when_reformatting_crosses_unknown_regions():
     equivalent = b"""<mex>\n<!-- ignored --><tools><periphs>
 <config_set name="Mcu"><setting value="CORE" name="Clock"/></config_set>
 <config_set name="BaseNXP"><setting value="false" name="Timer"/></config_set>
 <config_set name="Uart"><setting value="9600" name="Baud"/></config_set></periphs>
 <clocks><clock_settings><setting value="1" name="CORE"/></clock_settings></clocks>
 <pins><pin value="A" name="PTA0"/></pins></tools></mex>"""
-    result = audit_candidate(_XML, equivalent, _binding(), _plan("uart"))
-    assert result.entries == ()
-    assert result.changed_modules == ()
+    with pytest.raises(CliFailure) as caught:
+        audit_candidate(_XML, equivalent, _binding(), _plan("uart"))
+    assert caught.value.code == "ownership_unknown"
 
 
 @pytest.mark.parametrize(
@@ -116,9 +116,7 @@ def test_owner_mapping_is_case_normalized_but_region_identity_is_exact():
     entries = collect_actual_deltas(_XML, candidate)
     assert entries
     assert {item.owner for item in entries} == {"uart"}
-    assert {item.region for item in entries} == {
-        "config_set:Uart", "config_set:uArT"
-    }
+    assert {item.region for item in entries} == {"config_set:uArT"}
 
 
 def test_audit_rejects_undeclared_module_and_region():
@@ -324,7 +322,7 @@ def test_transaction_blocks_undeclared_physical_region_before_validation(tmp_pat
             b'</config_set>\n<setting name="Baud" value="9600"/><config_set name="Mcu">',
             1,
         ),
-        _XML.replace(b'</setting></config_set>', b'</setting> \t</config_set>', 1),
+        _XML.replace(b'/></config_set>', b'/> \t</config_set>', 1),
     ],
     ids=["comment", "namespace", "sibling-order", "tail-whitespace"],
 )
@@ -361,11 +359,11 @@ def test_plan_target_selector_rejects_unrelated_mcu_write_but_allows_exact_clock
     )
     plan = Plan([PlannedChange(
         "mcu", "mcu", "/Mcu/McuClockReferencePoint", "ensure clock",
-        target=TargetSelector(
+        targets=(TargetSelector(
             region="config_set:Mcu",
             path=("McuClockReferencePoint",),
             identity=(("Name", "LPUART8_CLK"),),
-        ),
+        ),),
     )])
     unrelated = _XML.replace(b'value="CORE"', b'value="FIRC"')
     with pytest.raises(CliFailure) as caught:

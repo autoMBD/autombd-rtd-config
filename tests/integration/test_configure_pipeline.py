@@ -61,6 +61,7 @@ import rtd_config.backends.s32_mex.transaction as transaction_module
 from rtd_config.errors import CliFailure
 from rtd_config.intent import Intent
 from rtd_config.modules.registry import ProviderRegistry
+from rtd_config.plan import Plan
 from tests.fixtures import copy_uart_fixture
 
 
@@ -283,9 +284,9 @@ def test_configure_revalidates_plan_metadata_before_apply(monkeypatch, tmp_path)
                 "PlatformSDK_S32K3_S32K344_M7_6.0.0_PATH|Debug_FLASH\n",
                 encoding="utf-8",
             )
-            return SimpleNamespace(to_dict=lambda: {})
+            return Plan()
 
-    def unexpected_apply(*_args):
+    def unexpected_apply(*_args, **_kwargs):
         nonlocal apply_called
         apply_called = True
 
@@ -414,7 +415,7 @@ def test_every_configure_entry_point_plans_and_applies_one_verified_project(
             injected["provider"] = bundle
 
         def plan(self, _intent):
-            return SimpleNamespace(to_dict=lambda: {})
+            return Plan()
 
     def expected_apply(*_args, **_kwargs):
         return ApplyResult()
@@ -547,7 +548,7 @@ def test_every_configure_entry_point_rejects_target_swap_before_apply(
             pass
 
         def plan(self, _intent):
-            return SimpleNamespace(to_dict=lambda: {})
+            return Plan()
 
     def unexpected_apply(*_args, **_kwargs):
         pytest.fail("apply ran after the verified .mex target was swapped")
