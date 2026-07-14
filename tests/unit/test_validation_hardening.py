@@ -439,6 +439,36 @@ def test_workspace_cleanup_rejects_links_without_touching_external_target(
     shutil.rmtree(workspace.root)
 
 
+@pytest.mark.skipif(os.name != "nt", reason="Windows junction behavior")
+def test_windows_cleanup_rejects_junction_without_touching_external_tree(tmp_path):
+    project_root = copy_uart_fixture(tmp_path)
+    with Project.verified(project_root) as project:
+        inventory = project.capture_validator_inputs()
+    base = tmp_path / "controlled"
+    base.mkdir()
+    workspace = ControlledValidationWorkspace(base, inventory).open()
+    assert workspace.root is not None and workspace.export_dir is not None
+    outside = tmp_path / "outside-junction-target"
+    outside.mkdir()
+    marker = outside / "keep.txt"
+    marker.write_bytes(b"keep")
+    junction = workspace.export_dir / "untrusted-junction"
+    created = subprocess.run(
+        ["cmd.exe", "/d", "/c", "mklink", "/J", str(junction), str(outside)],
+        capture_output=True, check=False,
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+    )
+    if created.returncode != 0:
+        workspace.close()
+        pytest.skip("junction creation unavailable")
+
+    warnings = workspace.close()
+    assert warnings and warnings[0]["code"] == "validation_cleanup_failed"
+    assert marker.read_bytes() == b"keep"
+    os.rmdir(junction)
+    shutil.rmtree(workspace.root)
+
+
 @pytest.mark.skipif(os.name != "nt", reason="Windows handle-lock behavior")
 @pytest.mark.parametrize("seam", ["enumerate", "delete"])
 def test_windows_cleanup_blocks_root_swap_during_enumerate_or_delete(
@@ -482,6 +512,40 @@ def test_windows_cleanup_blocks_root_swap_during_enumerate_or_delete(
 
         monkeypatch.setattr(workspace_module, "_windows_mark_delete", attacking_delete)
 
+    assert workspace.close() == []
+    assert attack_succeeded is False
+    assert not root.exists()
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows handle-lock behavior")
+def test_windows_cleanup_holds_workspace_ancestors_during_recursive_delete(
+    monkeypatch, tmp_path
+):
+    project_root = copy_uart_fixture(tmp_path)
+    with Project.verified(project_root) as project:
+        inventory = project.capture_validator_inputs()
+    ancestor = tmp_path / "workspace-ancestor"
+    base = ancestor / "controlled"
+    base.mkdir(parents=True)
+    workspace = ControlledValidationWorkspace(base, inventory).open()
+    assert workspace.root is not None
+    root = workspace.root
+    displaced = tmp_path / "displaced-ancestor"
+    attack_succeeded = False
+    real_scandir = os.scandir
+
+    def attacking_scandir(path):
+        nonlocal attack_succeeded
+        if Path(path) == root and not attack_succeeded:
+            try:
+                ancestor.rename(displaced)
+                ancestor.mkdir()
+                attack_succeeded = True
+            except OSError:
+                pass
+        return real_scandir(path)
+
+    monkeypatch.setattr(os, "scandir", attacking_scandir)
     assert workspace.close() == []
     assert attack_succeeded is False
     assert not root.exists()
