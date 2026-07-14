@@ -52,10 +52,12 @@ import subprocess
 import sys
 from dataclasses import replace
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
 from rtd_config import cli
+from rtd_config.config import RuntimeConfig
 from rtd_config.modules.registry import ProviderRegistry
 from tests.fixtures import copy_uart_fixture
 
@@ -303,6 +305,78 @@ def test_expected_identity_is_asserted_against_observed_project(tmp_path, capsys
 
     assert rc == 1
     assert payload["diagnostics"][0]["code"] == "project_identity_mismatch"
+
+
+@pytest.mark.parametrize(
+    ("expected", "status"),
+    [("7_0_1", "passed"), ("7.01", "failed"), ("70.1", "failed")],
+)
+def test_rtd_version_alias_preserves_numeric_segment_boundaries(
+    tmp_path, capsys, expected, status
+):
+    project = copy_uart_fixture(tmp_path)
+    intent = _write_json(
+        tmp_path / "intent.json", {"module": "mcl", "action": "set", "payload": {}}
+    )
+    rc, payload = _invoke(
+        capsys,
+        [
+            "plan", "--project", str(project), "--intent", str(intent),
+            "--rtd-version", expected,
+        ],
+    )
+    assert payload["status"] == status
+    assert (rc == 0) is (status == "passed")
+
+
+def test_configured_vendor_runner_forwards_every_runtime_control(monkeypatch, tmp_path):
+    config = RuntimeConfig.from_dict({
+        "project": tmp_path / "project", "s32ds_root": tmp_path / "s32ds",
+        "sdk_path": tmp_path / "sdk", "workspace": tmp_path / "workspace",
+        "temp_root": tmp_path / "temp", "log_root": tmp_path / "logs",
+        "validation_timeout_s": 73,
+    })
+    calls = []
+
+    def validate(project, root, **kwargs):
+        calls.append((project, root, kwargs))
+        return SimpleNamespace(passed=True)
+
+    monkeypatch.setattr(cli, "run_validation", validate)
+    runner = cli._configured_vendor_runner(config)
+    project = object()
+    staging = tmp_path / "candidate.mex"
+    result = runner(
+        staging=staging, document=object(), project=project, bundle=object()
+    )
+
+    assert result.status == "passed"
+    assert calls == [(project, config.s32ds_root, {
+        "sdk_path": config.sdk_path,
+        "workspace": config.workspace,
+        "timeout_s": 73,
+        "temp_root": config.temp_root,
+        "log_root": config.log_root,
+        "mex_file": staging,
+    })]
+    assert cli._configured_vendor_runner(RuntimeConfig.from_dict({
+        "project": tmp_path / "project",
+    })) is None
+
+
+def test_shortcut_accepts_the_same_explicit_vendor_runtime_controls(tmp_path):
+    args = cli.build_parser().parse_args([
+        "mcl", "set", "--project", str(tmp_path / "project"),
+        "--s32ds-root", str(tmp_path / "s32ds"),
+        "--sdk-path", str(tmp_path / "sdk"),
+        "--workspace", str(tmp_path / "workspace"),
+        "--temp-root", str(tmp_path / "temp"),
+        "--log-root", str(tmp_path / "logs"),
+        "--timeout", "81",
+    ])
+    config, _expected = cli._load_runtime_config(args)
+    assert config.s32ds_root == tmp_path / "s32ds"
+    assert config.validation_timeout_s == 81
 
 
 def test_generic_plan_is_read_only_and_has_zero_validation_side_effects(

@@ -256,3 +256,58 @@ def test_spec_envelope_wrong_module_uses_public_json_failure_boundary(
     assert payload["diagnostics"][0]["code"] == "spec_invalid"
     assert payload["diagnostics"][0]["module"] == "port"
     assert "Traceback" not in captured.err
+
+
+@pytest.mark.parametrize(
+    ("case", "code"),
+    [
+        ("missing", "spec_not_found"),
+        ("permission", "permission_denied"),
+        ("oserror", "spec_read_failed"),
+        ("encoding", "spec_invalid"),
+        ("json", "spec_invalid"),
+        ("module", "spec_invalid"),
+        ("action", "spec_invalid"),
+    ],
+)
+def test_shortcut_spec_failures_never_echo_paths_or_untrusted_values(
+    tmp_path, monkeypatch, capsys, case, code
+):
+    project = copy_uart_fixture(tmp_path)
+    spec = tmp_path / "PRIVATE_SPEC_sk_live_SUPERSECRET.json"
+    secret_value = "sk_live_UNTRUSTED_VALUE"
+    if case == "encoding":
+        spec.write_bytes(b"\xff\xfe")
+    elif case == "json":
+        spec.write_text("{", encoding="utf-8")
+    elif case in {"module", "action"}:
+        spec.write_text(json.dumps({
+            "module": secret_value if case == "module" else "platform",
+            "action": secret_value if case == "action" else "set",
+            "payload": {},
+        }), encoding="utf-8")
+    elif case in {"permission", "oserror"}:
+        spec.write_text("{}", encoding="utf-8")
+        original = cli.Path.read_text
+
+        def fail_read(path, *args, **kwargs):
+            if path == spec:
+                error = PermissionError if case == "permission" else OSError
+                raise error(f"private failure {spec}")
+            return original(path, *args, **kwargs)
+
+        monkeypatch.setattr(cli.Path, "read_text", fail_read)
+
+    rc = cli.main([
+        "platform", "set", "--project", str(project), "--spec", str(spec), "--json",
+    ])
+    captured = capsys.readouterr()
+    payload = json.loads(captured.out)
+
+    assert rc != 0
+    assert payload["diagnostics"][0]["code"] == code
+    public = (captured.out + captured.err).lower()
+    assert "private_spec" not in public
+    assert "sk_live_supersecret" not in public
+    assert "sk_live_untrusted_value" not in public
+    assert str(spec).lower() not in public
