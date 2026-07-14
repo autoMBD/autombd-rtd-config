@@ -33,7 +33,7 @@ from rtd_config.backends.s32_mex.process_tree import (
     ProcessOutputLimits,
     ProcessTreeRunner,
 )
-from rtd_config.backends.s32_mex.validation import run_validation
+from rtd_config.backends.s32_mex.validation import ValidationOutcome, run_validation
 from rtd_config.backends.s32_mex.validation_workspace import (
     ControlledValidationWorkspace,
 )
@@ -41,6 +41,21 @@ from rtd_config.errors import CliFailure
 from rtd_config.project import Project
 from tests.fixtures import copy_uart_fixture
 import rtd_config.backends.s32_mex.process_tree as process_tree_module
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"stdout_truncated": True},
+        {"stderr_truncated": True},
+        {"output_faults": ["process_output_read_failed"]},
+    ],
+)
+def test_validation_outcome_rejects_untrustworthy_output(kwargs):
+    outcome = ValidationOutcome(
+        exit_code=0, command=[], log_path="validation.log", **kwargs
+    )
+    assert outcome.passed is False
 
 
 @pytest.mark.parametrize("fd,field", [(1, "stdout"), (2, "stderr")])
@@ -292,7 +307,7 @@ def test_workspace_identity_cannot_swap_during_materialization(
     attack_succeeded = False
     original = ControlledValidationWorkspace._materialize_snapshot
 
-    def attacking_materialize(snapshot, target):
+    def attacking_materialize(snapshot, target, **kwargs):
         nonlocal attack_succeeded
         if not attack_succeeded:
             try:
@@ -301,7 +316,7 @@ def test_workspace_identity_cannot_swap_during_materialization(
                 attack_succeeded = True
             except OSError:
                 pass
-        return original(snapshot, target)
+        return original(snapshot, target, **kwargs)
 
     monkeypatch.setattr(
         ControlledValidationWorkspace, "_materialize_snapshot",

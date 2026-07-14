@@ -735,6 +735,7 @@ def _cmd_validate_verified(args, config: RuntimeConfig, project: Project) -> int
             "timed_out": outcome.timed_out,
             "stdout_truncated": outcome.stdout_truncated,
             "stderr_truncated": outcome.stderr_truncated,
+            "output_faults": outcome.output_faults,
             "cleanup_warnings": outcome.cleanup_warnings,
         },
     })

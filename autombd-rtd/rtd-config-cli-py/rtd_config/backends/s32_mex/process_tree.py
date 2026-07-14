@@ -47,6 +47,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import codecs
 import os
 from pathlib import Path
 import signal
@@ -78,6 +79,8 @@ class ProcessTreeResult:
     timed_out: bool = False
     stdout_truncated: bool = False
     stderr_truncated: bool = False
+    severe_problems: tuple[str, ...] = ()
+    output_faults: tuple[str, ...] = ()
 
 
 class _BoundedTail:
@@ -104,12 +107,75 @@ class _BoundedTail:
         return bytes(self._data).decode("utf-8", errors="replace")
 
 
-def _drain(stream: BinaryIO, sink: _BoundedTail) -> None:
+def _is_qualifying_severe(line: str) -> bool:
+    return (
+        ("[TOOL]" in line and "has the following error" in line)
+        or ("From Problems view:" in line and "Tool problem issue:" in line)
+    )
+
+
+class _OutputCollector:
+    """Bound the display tail while retaining streamed validation verdicts."""
+
+    def __init__(self, limits: ProcessOutputLimits) -> None:
+        self.tail = _BoundedTail(limits)
+        self._decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
+        self._pending = ""
+        self.severe: list[str] = []
+        self.faults: list[str] = []
+
+    def append(self, chunk: bytes) -> None:
+        self.tail.append(chunk)
+        self._consume(self._decoder.decode(chunk))
+
+    def finish(self) -> None:
+        self._consume(self._decoder.decode(b"", final=True), final=True)
+
+    def fault(self, _exc: BaseException) -> None:
+        # Exception text can contain paths or vendor data. Only the stable fault
+        # class crosses the process boundary.
+        self.faults.append("process_output_read_failed")
+
+    def _consume(self, text: str, *, final: bool = False) -> None:
+        self._pending += text
+        lines = self._pending.split("\n")
+        self._pending = "" if final else lines.pop()
+        if final and self._pending:
+            lines.append(self._pending)
+            self._pending = ""
+        for line in lines:
+            candidate = line.rstrip("\r").strip()
+            if _is_qualifying_severe(candidate) and candidate not in self.severe:
+                self.severe.append(candidate)
+        # A hostile no-newline stream must not turn verdict extraction into an
+        # unbounded allocation. Detect a complete sentinel before retaining only
+        # the bounded suffix; truncation itself remains a fail-closed condition.
+        if len(self._pending) > self.tail._limits.max_bytes:
+            candidate = self._pending.strip()
+            if _is_qualifying_severe(candidate) and candidate not in self.severe:
+                self.severe.append(candidate)
+            self._pending = self._pending[-self.tail._limits.max_bytes :]
+
+    @property
+    def truncated(self) -> bool:
+        return self.tail.truncated
+
+    def text(self) -> str:
+        return self.tail.text()
+
+
+def _drain(stream: BinaryIO, sink: _OutputCollector) -> None:
     try:
         while chunk := stream.read(64 * 1024):
             sink.append(chunk)
+        sink.finish()
+    except BaseException as exc:
+        sink.fault(exc)
     finally:
-        stream.close()
+        try:
+            stream.close()
+        except BaseException as exc:
+            sink.fault(exc)
 
 
 if os.name == "nt":
@@ -203,7 +269,8 @@ class _WindowsJob:
 
     def close(self) -> None:
         if self.handle:
-            _CloseHandle(self.handle)
+            if not _CloseHandle(self.handle):
+                raise OSError("job close failed")
             self.handle = None
 
 
@@ -265,22 +332,27 @@ class ProcessTreeRunner:
             if job is not None:
                 job.assign_and_resume(process)
         except (OSError, ValueError, subprocess.SubprocessError):
+            cleanup_ok = True
             if process is not None:
-                try:
-                    process.kill()
-                    process.wait(timeout=5)
-                except Exception:
-                    pass
+                cleanup_ok = self._terminate_tree(process, job)
             if job is not None:
-                job.close()
+                try:
+                    job.close()
+                except OSError:
+                    cleanup_ok = False
+            if not cleanup_ok:
+                return ProcessTreeResult(
+                    125, "", "Validator process tree cleanup failed.",
+                    "process_tree_kill_failed",
+                )
             return ProcessTreeResult(
                 127, "", "Validator process could not be launched.",
                 "process_spawn_failed",
             )
 
         assert process.stdout is not None and process.stderr is not None
-        stdout = _BoundedTail(self.limits)
-        stderr = _BoundedTail(self.limits)
+        stdout = _OutputCollector(self.limits)
+        stderr = _OutputCollector(self.limits)
         readers = [
             threading.Thread(target=_drain, args=(process.stdout, stdout), daemon=True),
             threading.Thread(target=_drain, args=(process.stderr, stderr), daemon=True),
@@ -289,62 +361,79 @@ class ProcessTreeRunner:
             reader.start()
 
         timed_out = False
-        kill_failed = False
+        interrupted: BaseException | None = None
         try:
             self._interruptible_wait(process, timeout_s)
         except subprocess.TimeoutExpired:
             timed_out = True
-            kill_failed = not self._terminate_tree(process, job)
-        except BaseException:
-            self._terminate_tree(process, job)
-            process.wait()
-            for reader in readers:
-                reader.join(timeout=5)
-            if job is not None:
-                job.close()
-            raise
-        finally:
-            if process.poll() is None and (timed_out or kill_failed):
-                try:
-                    process.kill()
-                except OSError:
-                    pass
-            if timed_out:
-                try:
-                    process.wait(timeout=10)
-                except subprocess.TimeoutExpired:
-                    kill_failed = True
+        except BaseException as exc:
+            interrupted = exc
 
-        # A successful parent exit is not permission for descendants to escape.
-        # Closing the Windows job kills any remaining members; on POSIX the
-        # dedicated process group receives TERM before output pipes are joined.
-        if not timed_out:
-            if job is not None:
+        # This is deliberately unconditional: a successful parent exit does not
+        # prove that children which inherited stdout/stderr have exited.
+        cleanup_ok = self._terminate_tree(process, job)
+        if not cleanup_ok:
+            # Last-resort parent cleanup is still bounded. It cannot restore
+            # confidence in descendant cleanup, so the final result remains
+            # process_tree_kill_failed even when this reap succeeds.
+            try:
+                process.kill()
+            except OSError:
+                pass
+            try:
+                process.wait(timeout=2)
+            except (OSError, subprocess.TimeoutExpired):
+                pass
+        if job is not None:
+            try:
                 job.close()
-                job = None
-            else:
+            except OSError:
+                cleanup_ok = False
+            job = None
+        for pipe in (process.stdout, process.stderr):
+            if pipe is not None and not getattr(pipe, "closed", False):
                 try:
-                    os.killpg(process.pid, signal.SIGTERM)
-                except OSError:
+                    pipe.close()
+                except (OSError, ValueError):
                     pass
         for reader in readers:
-            reader.join(timeout=10)
-        if job is not None:
-            job.close()
-        if kill_failed:
+            reader.join(timeout=2)
+            if reader.is_alive():
+                cleanup_ok = False
+        if not cleanup_ok:
+            if interrupted is not None:
+                raise CliFailure(
+                    "process_tree_kill_failed",
+                    "The validator process tree could not be terminated safely.",
+                    module="backend",
+                ) from interrupted
             return ProcessTreeResult(
                 125, stdout.text(), stderr.text(), "process_tree_kill_failed",
                 timed_out=timed_out,
                 stdout_truncated=stdout.truncated,
                 stderr_truncated=stderr.truncated,
+                severe_problems=tuple(stdout.severe + stderr.severe),
+                output_faults=tuple(stdout.faults + stderr.faults),
             )
+        if interrupted is not None:
+            raise interrupted
+        faults = tuple(stdout.faults + stderr.faults)
+        truncated = stdout.truncated or stderr.truncated
+        code = (
+            "process_timeout" if timed_out
+            else "process_output_fault" if faults
+            else "process_output_truncated" if truncated
+            else "process_exit"
+        )
         return ProcessTreeResult(
             124 if timed_out else int(process.returncode or 0),
             stdout.text(), stderr.text(),
-            "process_timeout" if timed_out else "process_exit",
+            code,
             timed_out=timed_out,
             stdout_truncated=stdout.truncated,
             stderr_truncated=stderr.truncated,
+            severe_problems=tuple(stdout.severe + stderr.severe),
+            output_faults=faults,
         )
 
     @staticmethod
@@ -365,16 +454,38 @@ class ProcessTreeRunner:
     def _terminate_tree(
         process: subprocess.Popen[bytes], job: _WindowsJob | None
     ) -> bool:
+        deadline = time.monotonic() + 4.0
         try:
             if job is not None:
                 job.terminate()
-                return True
-            os.killpg(process.pid, signal.SIGTERM)
+            else:
+                try:
+                    os.killpg(process.pid, signal.SIGTERM)
+                except ProcessLookupError:
+                    pass
             try:
-                process.wait(timeout=2)
-                return True
+                process.wait(timeout=min(2.0, max(0.01, deadline - time.monotonic())))
             except subprocess.TimeoutExpired:
+                if job is not None:
+                    job.terminate()
+                else:
+                    os.killpg(process.pid, signal.SIGKILL)
+                process.wait(timeout=min(2.0, max(0.01, deadline - time.monotonic())))
+            if job is None:
+                # The parent may already be reaped while a signal-ignoring
+                # descendant remains in the dedicated process group.
+                try:
+                    os.killpg(process.pid, 0)
+                except ProcessLookupError:
+                    return True
                 os.killpg(process.pid, signal.SIGKILL)
-                return True
-        except (OSError, ProcessLookupError):
+                while time.monotonic() < deadline:
+                    try:
+                        os.killpg(process.pid, 0)
+                    except ProcessLookupError:
+                        return True
+                    time.sleep(0.02)
+                return False
             return process.poll() is not None
+        except (OSError, ProcessLookupError, subprocess.TimeoutExpired):
+            return False

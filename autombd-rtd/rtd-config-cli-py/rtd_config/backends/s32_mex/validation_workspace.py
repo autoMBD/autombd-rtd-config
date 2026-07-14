@@ -56,6 +56,7 @@ import stat
 
 from ...errors import CliFailure
 from .metadata import ValidatorInputInventory
+from .target import default_target_platform
 
 
 @dataclass(frozen=True)
@@ -253,13 +254,92 @@ class ControlledValidationWorkspace:
         self.log_file: Path | None = None
         self.temp_dir: Path | None = None
         self.cleanup_warnings: list[dict] = []
+        self._guards: list = []
+        self._guarded_paths: set[Path] = set()
+        self._directory_fds: dict[Path, int] = {}
+        self._directory_identities: dict[Path, tuple[int, int]] = {}
+        self._root_identity: tuple[int, int] | None = None
+
+    def _guard_directory(self, path: Path) -> None:
+        path = path.absolute()
+        if path in self._guarded_paths:
+            return
+        platform = default_target_platform()
+        guard = platform.protect_root(path)
+        try:
+            lease = guard.__enter__()
+        except (OSError, ValueError) as exc:
+            raise CliFailure(
+                "validation_workspace_unsafe",
+                "A validation workspace directory could not be identity-bound.",
+                module="backend", details={"entry": path.name},
+            ) from exc
+        self._guards.append(guard)
+        self._guarded_paths.add(path)
+        self._directory_identities[path] = _directory_identity(path)
+        root_fd = lease._resources.get("root_fd")
+        if root_fd is not None:
+            self._directory_fds[path] = root_fd
+
+    def _release_guards(self) -> None:
+        failures = False
+        for guard in reversed(self._guards):
+            try:
+                guard.__exit__(None, None, None)
+            except (OSError, CliFailure):
+                failures = True
+        self._guards.clear()
+        self._guarded_paths.clear()
+        self._directory_fds.clear()
+        self._directory_identities.clear()
+        if failures:
+            self.cleanup_warnings.append({
+                "code": "validation_cleanup_failed",
+                "message": "Validation workspace identity handles could not be released.",
+                "details": {"preserved": [self.base.name]},
+            })
+
+    def _mkdir(self, parent: Path, name: str) -> Path:
+        target = parent / name
+        parent_fd = self._directory_fds.get(parent.absolute())
+        try:
+            if parent_fd is not None and os.name == "posix":
+                os.mkdir(name, 0o700, dir_fd=parent_fd)
+            else:
+                os.mkdir(target, 0o700)
+            self._guard_directory(target)
+        except FileExistsError:
+            raise
+        except (OSError, CliFailure) as exc:
+            raise CliFailure(
+                "validation_workspace_unsafe",
+                "A controlled workspace directory could not be created safely.",
+                module="backend", details={"entry": target.name},
+            ) from exc
+        return target
 
     def open(self) -> "ControlledValidationWorkspace":
         _reject_system_temp(self.base)
         _validate_components(self.base)
         if not self.base.exists():
-            self.base.mkdir(parents=True, mode=0o700)
+            if not self.base.parent.exists():
+                raise CliFailure(
+                    "validation_workspace_unsafe",
+                    "The configured validation workspace parent must already exist.",
+                    module="backend", details={"entry": self.base.parent.name},
+                )
+            self._guard_directory(self.base.parent)
+            self._mkdir(self.base.parent, self.base.name)
             self.created_base = True
+        else:
+            before_identity = _directory_identity(self.base)
+            self._guard_directory(self.base)
+            if _directory_identity(self.base) != before_identity:
+                raise CliFailure(
+                    "validation_workspace_unsafe",
+                    "The controlled validation root changed while it was opened.",
+                    module="backend", details={"entry": self.base.name},
+                )
         status = os.lstat(self.base)
         _reject_unsafe(self.base, status)
         if not stat.S_ISDIR(status.st_mode):
@@ -269,10 +349,9 @@ class ControlledValidationWorkspace:
                 module="backend", details={"entry": self.base.name},
             )
         for _ in range(32):
-            candidate = self.base / f"run-{secrets.token_hex(12)}"
+            name = f"run-{secrets.token_hex(12)}"
             try:
-                os.mkdir(candidate, 0o700)
-                self.root = candidate
+                self.root = self._mkdir(self.base, name)
                 break
             except FileExistsError:
                 continue
@@ -282,15 +361,14 @@ class ControlledValidationWorkspace:
                 "A unique controlled validation workspace could not be created.",
                 module="backend",
             )
+        self._root_identity = _directory_identity(self.root)
         self.project_dir = self.root / "project"
         self.export_dir = self.root / "export"
         self.data_dir = self.root / "data"
         self.temp_dir = self.root / "temp"
         logs = self.root / "logs"
-        for directory in (
-            self.project_dir, self.export_dir, self.data_dir, self.temp_dir, logs
-        ):
-            os.mkdir(directory, 0o700)
+        for name in ("project", "export", "data", "temp", "logs"):
+            self._mkdir(self.root, name)
         self.log_file = logs / "validation.log"
         created_directories = {PurePosixPath(".")}
         for item in self.inventory.files:
@@ -302,10 +380,15 @@ class ControlledValidationWorkspace:
                 parent = parent.parent
             for directory_relative in reversed(pending):
                 directory = self.project_dir.joinpath(*directory_relative.parts)
-                os.mkdir(directory, 0o700)
+                self._mkdir(directory.parent, directory.name)
                 created_directories.add(directory_relative)
             target = self.project_dir.joinpath(*relative.parts)
-            self._materialize_snapshot(item.snapshot, target)
+            parent_fd = self._directory_fds.get(target.parent.absolute())
+            self._materialize_snapshot(
+                item.snapshot, target,
+                dir_fd=parent_fd if os.name == "posix" else None,
+            )
+            self.verify_identity()
             if item.relative == self.inventory.mex_relative:
                 self.mex_file = target
         if self.mex_file is None:
@@ -316,15 +399,27 @@ class ControlledValidationWorkspace:
             )
         return self
 
+    def verify_identity(self) -> None:
+        for path, expected in self._directory_identities.items():
+            if _directory_identity(path) != expected:
+                raise CliFailure(
+                    "validation_workspace_unsafe",
+                    "A controlled workspace directory changed during staging.",
+                    module="backend", details={"entry": path.name},
+                )
+
     @staticmethod
-    def _materialize_snapshot(snapshot, target: Path) -> None:
+    def _materialize_snapshot(snapshot, target: Path, *, dir_fd: int | None = None) -> None:
         target_fd = -1
         write_flags = (
             os.O_WRONLY | os.O_CREAT | os.O_EXCL
             | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0)
         )
         try:
-            target_fd = os.open(target, write_flags, 0o600)
+            target_fd = os.open(
+                target.name if dir_fd is not None else target,
+                write_flags, 0o600, dir_fd=dir_fd,
+            )
             view = memoryview(snapshot.content)
             while view:
                 written = os.write(target_fd, view)
@@ -361,7 +456,15 @@ class ControlledValidationWorkspace:
         return result
 
     def close(self) -> list[dict]:
-        if self.root is not None and self.root.exists():
+        expected_root = self._root_identity
+        self._release_guards()
+        safe_to_remove = False
+        if self.root is not None:
+            try:
+                safe_to_remove = _directory_identity(self.root) == expected_root
+            except (OSError, CliFailure):
+                safe_to_remove = False
+        if self.root is not None and self.root.exists() and safe_to_remove:
             try:
                 shutil.rmtree(self.root)
             except OSError:
@@ -370,6 +473,12 @@ class ControlledValidationWorkspace:
                     "message": "The controlled validation workspace was preserved for audit.",
                     "details": {"preserved": [self.root.name]},
                 })
+        elif self.root is not None and self.root.exists() and not safe_to_remove:
+            self.cleanup_warnings.append({
+                "code": "validation_cleanup_failed",
+                "message": "The controlled workspace identity changed; cleanup was blocked.",
+                "details": {"preserved": [self.root.name]},
+            })
         if self.created_base and self.base.exists() and not self.cleanup_warnings:
             try:
                 self.base.rmdir()
@@ -380,3 +489,22 @@ class ControlledValidationWorkspace:
                     "details": {"preserved": [self.base.name]},
                 })
         return self.cleanup_warnings
+
+
+def _directory_identity(path: Path) -> tuple[int, int]:
+    try:
+        status = os.lstat(path)
+    except OSError as exc:
+        raise CliFailure(
+            "validation_workspace_unsafe",
+            "A controlled workspace directory became unavailable.",
+            module="backend", details={"entry": path.name},
+        ) from exc
+    _reject_unsafe(path, status)
+    if not stat.S_ISDIR(status.st_mode):
+        raise CliFailure(
+            "validation_workspace_unsafe",
+            "A controlled workspace entry is no longer a directory.",
+            module="backend", details={"entry": path.name},
+        )
+    return status.st_dev, status.st_ino

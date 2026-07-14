@@ -394,6 +394,7 @@ class ValidationOutcome:
     timed_out: bool = False
     stdout_truncated: bool = False
     stderr_truncated: bool = False
+    output_faults: list[str] = field(default_factory=list)
     cleanup_warnings: list[dict] = field(default_factory=list)
 
     @property
@@ -411,6 +412,9 @@ class ValidationOutcome:
             self.exit_code == 0
             and self.process_code == "process_exit"
             and not self.severe_problems
+            and not self.stdout_truncated
+            and not self.stderr_truncated
+            and not self.output_faults
             and not self.cleanup_warnings
         )
 
@@ -492,62 +496,62 @@ def run_validation(
     s32ds_root = Path(s32ds_root)
     sdk_path = sdk_path or default_sdk_path(s32ds_root)
     owned_project: Project | None = None
-    if isinstance(project_argument, Project):
-        verified_project = project_argument
-    else:
-        owned_project = Project.verified(Path(project_argument))
-        verified_project = owned_project
-    project = verified_project.root
-    selected_snapshot = None
-    selected_relative = None
-    if mex_file is not None:
-        source_mex = Path(mex_file).absolute()
-        try:
-            selected_relative = source_mex.relative_to(project).as_posix()
-        except ValueError as exc:
-            if owned_project is not None:
-                owned_project.close()
-            raise CliFailure(
-                "validation_source_unsafe",
-                "The validator input must remain inside the verified project.",
-                module="backend", details={"entry": source_mex.name},
-            ) from exc
-        selected_snapshot = snapshot_project_relative(
-            verified_project.verified_target,
-            selected_relative,
-            max_bytes=64 * 1024 * 1024,
-        )
-        if selected_snapshot is None:
-            if owned_project is not None:
-                owned_project.close()
-            raise CliFailure(
-                "validation_source_changed",
-                "The selected validator candidate is no longer available.",
-                module="backend", details={"entry": source_mex.name},
-            )
-    inventory = verified_project.capture_validator_inputs(
-        selected_mex=selected_snapshot,
-        selected_source_relative=selected_relative,
-    )
-    controlled_root = (
-        Path(workspace).absolute()
-        if workspace is not None
-        else project.parent / ".rtd-config-validation"
-    )
-    try:
-        controlled_root.relative_to(project)
-    except ValueError:
-        pass
-    else:
-        raise CliFailure(
-            "validation_workspace_unsafe",
-            "The controlled validation workspace must be outside the project.",
-            module="backend", details={"entry": controlled_root.name},
-        )
-    controlled = ControlledValidationWorkspace(controlled_root, inventory)
+    verified_project: Project | None = None
+    inventory = None
+    controlled: ControlledValidationWorkspace | None = None
     primary: BaseException | None = None
     outcome: ValidationOutcome | None = None
+    cleanup_warnings: list[dict] = []
     try:
+        if isinstance(project_argument, Project):
+            verified_project = project_argument
+        else:
+            owned_project = Project.verified(Path(project_argument))
+            verified_project = owned_project
+        project_root = verified_project.root
+        selected_snapshot = None
+        selected_relative = None
+        if mex_file is not None:
+            source_mex = Path(mex_file).absolute()
+            try:
+                selected_relative = source_mex.relative_to(project_root).as_posix()
+            except ValueError as exc:
+                raise CliFailure(
+                    "validation_source_unsafe",
+                    "The validator input must remain inside the verified project.",
+                    module="backend", details={"entry": source_mex.name},
+                ) from exc
+            selected_snapshot = snapshot_project_relative(
+                verified_project.verified_target,
+                selected_relative,
+                max_bytes=64 * 1024 * 1024,
+            )
+            if selected_snapshot is None:
+                raise CliFailure(
+                    "validation_source_changed",
+                    "The selected validator candidate is no longer available.",
+                    module="backend", details={"entry": source_mex.name},
+                )
+        inventory = verified_project.capture_validator_inputs(
+            selected_mex=selected_snapshot,
+            selected_source_relative=selected_relative,
+        )
+        controlled_root = (
+            Path(workspace).absolute()
+            if workspace is not None
+            else project_root.parent / ".rtd-config-validation"
+        )
+        try:
+            controlled_root.relative_to(project_root)
+        except ValueError:
+            pass
+        else:
+            raise CliFailure(
+                "validation_workspace_unsafe",
+                "The controlled validation workspace must be outside the project.",
+                module="backend", details={"entry": controlled_root.name},
+            )
+        controlled = ControlledValidationWorkspace(controlled_root, inventory)
         controlled.open()
         assert controlled.mex_file is not None
         assert controlled.data_dir is not None
@@ -559,6 +563,7 @@ def run_validation(
             workspace=controlled.data_dir, export_dir=controlled.export_dir,
             sdk_path=sdk_path, headless_tool=headless_tool,
         )
+        controlled.verify_identity()
         process = (runner or ProcessTreeRunner()).run(
             val_cmd,
             cwd=controlled.root,
@@ -567,13 +572,16 @@ def run_validation(
         )
         replacements = [
             (controlled.root, "<validation-workspace>"),
-            (project, "<project>"),
+            (project_root, "<project>"),
             (s32ds_root, "<s32ds>"),
             (sdk_path, "<sdk>"),
         ]
         stdout = _redact_validation_text(process.stdout, replacements)
         stderr = _redact_validation_text(process.stderr, replacements)
         severe = find_severe_tool_problems(stdout + "\n" + stderr)
+        for item in getattr(process, "severe_problems", ()):
+            if item not in severe:
+                severe.append(item)
         generated_files = len(snapshot_project_tree(controlled.export_dir))
         sanitized = _sanitized_command(val_cmd)
         _write_controlled_log(
@@ -595,30 +603,34 @@ def run_validation(
             timed_out=process.timed_out,
             stdout_truncated=process.stdout_truncated,
             stderr_truncated=process.stderr_truncated,
+            output_faults=list(getattr(process, "output_faults", ())),
         )
     except BaseException as exc:
         primary = exc
-
-    try:
-        revalidate_validator_input_inventory(
-            verified_project.verified_target, inventory
-        )
-    except CliFailure as exc:
-        if primary is None:
-            primary = exc
-        elif isinstance(primary, CliFailure):
-            details = dict(primary.details)
-            details["source_verification"] = {
-                "code": exc.code, "details": dict(exc.details),
-            }
-            primary = CliFailure(
-                primary.code, primary.message, status=primary.status,
-                module=primary.module, details=details,
-                exit_code=primary.exit_code,
-            )
-    cleanup_warnings = controlled.close()
-    if owned_project is not None:
-        owned_project.close()
+    finally:
+        if verified_project is not None and inventory is not None:
+            try:
+                revalidate_validator_input_inventory(
+                    verified_project.verified_target, inventory
+                )
+            except CliFailure as exc:
+                primary = _merge_validation_failure(
+                    primary, "source_verification", exc
+                )
+        if controlled is not None:
+            try:
+                cleanup_warnings = controlled.close()
+            except BaseException as exc:
+                primary = _merge_validation_failure(
+                    primary, "workspace_close_failure", exc
+                )
+        if owned_project is not None:
+            try:
+                owned_project.close()
+            except BaseException as exc:
+                primary = _merge_validation_failure(
+                    primary, "project_close_failure", exc
+                )
     if primary is not None:
         if cleanup_warnings and isinstance(primary, CliFailure):
             details = dict(primary.details)
@@ -632,3 +644,25 @@ def run_validation(
     assert outcome is not None
     outcome.cleanup_warnings.extend(cleanup_warnings)
     return outcome
+
+
+def _merge_validation_failure(
+    primary: BaseException | None,
+    key: str,
+    secondary: BaseException,
+) -> BaseException:
+    if primary is None:
+        return secondary
+    if not isinstance(primary, CliFailure):
+        return primary
+    if isinstance(secondary, CliFailure):
+        evidence = {"code": secondary.code, "details": dict(secondary.details)}
+    else:
+        evidence = {"code": type(secondary).__name__}
+    details = dict(primary.details)
+    details[key] = evidence
+    return CliFailure(
+        primary.code, primary.message, status=primary.status,
+        module=primary.module, details=details,
+        exit_code=primary.exit_code,
+    )
