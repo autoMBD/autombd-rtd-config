@@ -4,56 +4,6 @@
   "rtd_version": "7.0.1",
   "module": "BaseNXP",
 
-  "_coverage": {
-    "_note": "Forward, Spec-first coverage inventory for BaseNXP.xdm. The CLI exposes the BaseNXP-owned OsIfGeneral settings that are legal to edit in the current S32K3 baremetal .mex fixtures without inventing OS/EcuC partition data. The deferred items below are real BaseNXP.xdm editable or descriptor-defined fields; they are recorded explicitly instead of being silently treated as out of scope.",
-    "configurable_today": {
-      "OsIfGeneral": [
-        "OsIfEnableUserModeSupport",
-        "OsIfDevErrorDetect",
-        "OsIfUseCustomTimer",
-        "OsIfUseGetUserId",
-        "OsIfInstanceId",
-        "OsIfGetPhysicalCoreIdEnable",
-        "OsIfSoftwareSemaphoredEnable",
-        "OsIfUseSystemTimer",
-        "OsIfCounterConfig"
-      ]
-    },
-    "not_yet_exposed": {
-      "_note": "Each item exists in BaseNXP.xdm but is not user-tunable through `basenxp set` yet because it needs cross-module OS/EcuC ownership, generated metadata ownership, or no useful user degree of freedom in the current S32K3 baremetal flow.",
-      "multicore_partition_os": [
-        "OsIfMulticoreSupport",
-        "OsIfEcucPartitionRef",
-        "OsIfCounterEcucPartitionRef",
-        "GET_PARTITION_ID mode for OsIfUseGetUserId"
-      ],
-      "autosar_os": [
-        "OsIfOperatingSystemType choices other than OsIfBaremetalType",
-        "OsIfOsCounterRef"
-      ],
-      "published_information": [
-        "CommonPublishedInformation",
-        "ModuleId",
-        "VendorId",
-        "VendorApiInfix",
-        "ArReleaseMajorVersion",
-        "ArReleaseMinorVersion",
-        "ArReleaseRevisionVersion",
-        "SwMajorVersion",
-        "SwMinorVersion",
-        "SwPatchVersion"
-      ],
-      "single_literal_or_metadata": [
-        "IMPLEMENTATION_CONFIG_VARIANT",
-        "OsIfPhysicalCoreId"
-      ]
-    },
-    "references": [
-      "issue #39 (BaseNXP forward-hardening)",
-      "issue #37 (forward Spec-first correction)",
-      "issue #30 (ADC audit exemplar)"
-    ]
-  },
 
   "enum_domains": {
     "IMPLEMENTATION_CONFIG_VARIANT": ["VariantPreCompile"],

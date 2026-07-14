@@ -803,10 +803,7 @@ def _execute_canonical_request(
         bundle = project.asset_bundle
         if shortcut_args is not None:
             if binding is None:
-                raise CliFailure(
-                    "provider_binding_unknown", "Shortcut binding is unavailable.",
-                    module="backend",
-                )
+                binding = _shortcut_binding(shortcut_args)
             intent = binding.normalizer(shortcut_args, bundle)
         if intent is None:
             raise CliFailure("intent_invalid", "Canonical intent is unavailable.", module="cli")
@@ -1316,14 +1313,13 @@ def _shortcut_binding(
 def _run_registered_shortcut(
     args: argparse.Namespace, module: str | None = None, cli_action: str | None = None
 ) -> int:
-    binding = _shortcut_binding(args, module, cli_action)
     config, expected_fields = _load_runtime_config(args)
     return _execute_canonical_request(
         config,
         configure=bool(getattr(args, "configure", False)),
         backup=bool(getattr(args, "backup", False)),
         expected_fields=expected_fields,
-        binding=binding,
+        binding=None,
         shortcut_args=args,
     )
 

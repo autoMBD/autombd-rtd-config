@@ -81,7 +81,7 @@ class McuProvider:
     The provider plans PLL clock-tree edits and McuClockReferencePoint array
     merges within McuClockSettingConfig_0. The full editable surface described
     by Mcu.xdm is inventoried in the committed asset
-    ``autombd-rtd/assets/nxp/s32k3/mcu/clock.json`` (_coverage section).
+    ``docs/specs/rtd-config-module-coverage/mcu.json`` during development.
     Currently only the 160/80/40 MHz recipe is supported as a fixed
     clock-tree configuration; the deferred surface (oscillators, clock monitors,
     power modes, CGM muxes 1-20, etc.) is tracked in the asset's

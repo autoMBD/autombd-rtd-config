@@ -137,34 +137,13 @@ def _changed_lines(before: bytes, after: bytes) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
-# Forward surface coverage: osif.json must account for the BaseNXP.xdm surface.
+# Development coverage must not be published in osif.json.
 # ---------------------------------------------------------------------------
-def test_osif_json_asset_has_forward_surface_coverage():
+def test_osif_json_asset_excludes_development_coverage():
     asset = json.loads(_asset_path().read_text(encoding="utf-8"))
 
     assert "BaseNXP.xdm" in asset["_source"]
-    coverage = asset["_coverage"]
-
-    configurable = coverage["configurable_today"]
-    osif_general = configurable["OsIfGeneral"]
-    for item in (
-        "OsIfEnableUserModeSupport",
-        "OsIfDevErrorDetect",
-        "OsIfUseCustomTimer",
-        "OsIfUseGetUserId",
-        "OsIfInstanceId",
-        "OsIfGetPhysicalCoreIdEnable",
-        "OsIfSoftwareSemaphoredEnable",
-        "OsIfUseSystemTimer",
-        "OsIfCounterConfig",
-    ):
-        assert item in osif_general
-
-    not_yet = coverage["not_yet_exposed"]
-    assert "OsIfMulticoreSupport" in not_yet["multicore_partition_os"]
-    assert "OsIfEcucPartitionRef" in not_yet["multicore_partition_os"]
-    assert "OsIfOsCounterRef" in not_yet["autosar_os"]
-    assert "CommonPublishedInformation" in not_yet["published_information"]
+    assert "_coverage" not in asset
 
     assert asset["enum_domains"]["OsIfUseGetUserId"] == [
         "GET_CORE_ID",

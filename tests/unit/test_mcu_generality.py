@@ -106,29 +106,17 @@ def _get_ref_point_names(doc: MexDocument) -> set[str]:
 
 
 # ---------------------------------------------------------------------------
-# Test G01: Asset _coverage section exists and is well-formed
+# Test G01: Coverage stays outside runtime assets
 # ---------------------------------------------------------------------------
 
-def test_asset_has_coverage_section():
-    """clock.json must carry _coverage inventory mapping configurable vs deferred."""
+def test_asset_excludes_development_coverage():
+    """clock.json must not publish development descriptor coverage."""
     asset_path = (
         Path(__file__).resolve().parents[2]
         / "autombd-rtd" / "assets" / "nxp" / "s32k3" / "mcu" / "clock.json"
     )
     asset = json.loads(asset_path.read_text(encoding="utf-8"))
-    assert "_coverage" in asset, (
-        "clock.json must have _coverage section (forward-harden #38)"
-    )
-    cov = asset["_coverage"]
-    assert "configurable_today" in cov, "_coverage.configurable_today missing"
-    assert "not_yet_exposed" in cov, "_coverage.not_yet_exposed missing"
-    assert isinstance(cov["configurable_today"], dict)
-    assert isinstance(cov["not_yet_exposed"], dict)
-    # not_yet_exposed must list multiple sub-categories
-    not_yet = cov["not_yet_exposed"]
-    assert len(not_yet) >= 3, (
-        f"not_yet_exposed must document 3+ categories of deferred surface; got {len(not_yet)}"
-    )
+    assert "_coverage" not in asset
 
 
 # ---------------------------------------------------------------------------

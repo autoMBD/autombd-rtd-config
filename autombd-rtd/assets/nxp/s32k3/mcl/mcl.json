@@ -3,48 +3,6 @@
   "_source": "Mcl.xdm (RTD 7.0.1, FlexioCommon / FlexioMclLogicChannels) + per-package EPD enum validation (RTD/Mcl_TS_T40D34M70I1R0/autosar/Mcl_s32k344_lqfp100.epd / Mcl_s32k344_hdqfp172.epd / Mcl_s32k344_mapbga257.epd)",
   "rtd_version": "7.0.1",
   "module": "Mcl",
-  "_coverage": {
-    "_note": "Forward, Spec-first coverage inventory for the Mcl.xdm FlexIO common editable surface used by the current Mcl provider. The CLI exposes the Mcl-owned FlexioCommon enablement precondition and one legal FlexioMclLogicChannels append operation. Other Mcl.xdm editable surfaces are recorded below as deferred rather than being silently treated as absent.",
-    "configurable_today": {
-      "MclGeneral/MclFlexioCommon": [
-        "MclEnableFlexioCommon"
-      ],
-      "MclConfig/FlexioCommon/FlexioMclLogicChannels": [
-        "Name",
-        "FlexioMclChannelId",
-        "FlexioMclPinId",
-        "FlexioMclAddPinEnable",
-        "FlexioMclAddPinId",
-        "FlexioMclAddChannelEnable",
-        "FlexioMclAddChannelId"
-      ]
-    },
-    "not_yet_exposed": {
-      "_note": "Each item exists in Mcl.xdm but is not user-tunable through `mcl set` yet. The current provider appends a normal single-channel FlexIO logic channel using descriptor-derived legal enum values; it does not expose broader Mcl module setup or optional extra pin/channel tuning.",
-      "MclConfig/FlexioCommon/FlexioMclLogicChannels": [
-        "editing an existing logic channel by Name",
-        "removing a logic channel",
-        "choosing a specific FlexioMclChannelId/FlexioMclPinId instead of first-unused allocation",
-        "enabling and selecting FlexioMclAddPinId",
-        "enabling and selecting FlexioMclAddChannelId"
-      ],
-      "MclConfig/FlexioCommon": [
-        "creating the first FlexioCommon container when absent",
-        "multiple FlexioCommon instances beyond the first configured fixture instance",
-        "FlexioMclDebugEnable"
-      ],
-      "other_mcl_surfaces": [
-        "Dma logic-channel configuration outside existing Uart-owned DMA flows",
-        "Emios common/support surfaces",
-        "Mcl published information and generated metadata"
-      ]
-    },
-    "references": [
-      "Mcl.xdm:MclGeneral/MclFlexioCommon",
-      "Mcl.xdm:MclConfig/FlexioCommon/FlexioMclLogicChannels",
-      "issue #53 Mcl KPI route correction"
-    ]
-  },
   "FlexioMclLogicChannel": {
     "description": "One FlexIO logic-channel entry under Mcl/MclConfig/FlexioCommon[n]/FlexioMclLogicChannels. Each channel consumes one FlexIO timer/shifter pair identified by a unique channel+pin id pair within the array.",
     "source_ref": "Mcl.xdm:MclConfig/FlexioCommon/FlexioMclLogicChannels",

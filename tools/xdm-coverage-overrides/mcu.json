@@ -1,0 +1,50 @@
+{
+  "default": {
+    "classification": "deferred",
+    "reason": "The descriptor item is not caller-controlled by the current Mcu provider and is retained at the verified project or descriptor default.",
+    "dependency": "A future descriptor-forward Mcu intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+  },
+  "known_gap_rules": {
+    "mcu_reset": [
+      {
+        "kind": "variable",
+        "key_regex": "\\[McuResetConfig\\]"
+      },
+      {
+        "name": "McuResetConfig"
+      },
+      {
+        "name": "McuResetSourcesConfig"
+      }
+    ]
+  },
+  "rules": [
+    {
+      "match": {
+        "key_regex": "\\[(McuNoPll|McuPll0UnderMcuControl|McuPLLUnderMcuControl|McuPllOdiv0_En|McuPllOdiv1_En|McuClockReferencePoint|McuClockFrequencySelect)\\]$"
+      },
+      "classification": "configurable",
+      "trace": {
+        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/mcu.py:McuProvider",
+        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_mcu_set",
+        "asset": "autombd-rtd/assets/nxp/s32k3/mcu/clock.json#/enum_domains",
+        "tests": [
+          "tests/unit/test_mcu_generality.py::test_merge_preserves_existing_for_arbitrary_clock_subset",
+          "tests/unit/test_mcu_generality.py::test_well_formed_for_different_clock_subsets"
+        ]
+      }
+    },
+    {
+      "match": {
+        "key_regex": "\\[(McuPll_Parameter|PLL_PHI0_Frequency|PLL_PHI1_Frequency|PLL_PHI2_Frequency|VCO_Frequency|clock_output)\\]$"
+      },
+      "classification": "derived",
+      "trace": {
+        "implementation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_mcu_set",
+        "tests": [
+          "tests/unit/test_mcu_generality.py::test_recipe_still_pinned_after_forward_harden"
+        ]
+      }
+    }
+  ]
+}

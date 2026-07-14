@@ -1,0 +1,47 @@
+{
+  "default": {
+    "classification": "deferred",
+    "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
+    "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+  },
+  "known_gap_rules": {
+    "adc_dspss": [{"key_regex": "Dspss|DSPSS"}],
+    "adc_self_test": [{"key_regex": "SelfTest|Self_Test"}],
+    "adc_timing": [{"key_regex": "ConvTimings|SamplingDuration"}],
+    "adc_general": [{"name": "AdcGeneral"}],
+    "adc_power": [{"key_regex": "Power|LowPower"}],
+    "adc_published_information": [{"key_regex": "PublishedInformation"}],
+    "adc_autosar_extension": [{"key_regex": "AutosarExt"}]
+  },
+  "rules": [
+    {
+      "match": {
+        "key_regex": "\\[(AdcHwUnitId|AdcTransferType|AdcGroupAccessMode|AdcGroupConversionMode|AdcGroupTriggSrc|AdcStreamingNumSamples|AdcNotification|AdcGroupDefinition|AdcChannelName|AdcChannelId|AdcEnableThresholds|AdcThresholdRegister|AdcWdogNotification|AdcThresholdControlRegister|AdcHighThreshold|AdcLowThreshold|AdcEnableWatchdogApi|WdgThresholdEnable|AdcHwTrigger|AdcHwTrigSrc|BctuInternalTrigger|BctuDataDestination|BctuTriggerConversionMode|BctuAdcChannelSingle|BctuListItems|BctuResultFifos|BctuFifoDmaEnable|BctuFifoDmaChannelId|BctuAdcNewDataNotification|BctuWatermarkNotification)\\]$"
+      },
+      "classification": "configurable",
+      "trace": {
+        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/adc.py:AdcProvider",
+        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "asset": "autombd-rtd/assets/nxp/s32k3/adc/adc.json#/unit",
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_single_interrupt_on_s15",
+          "tests/unit/test_adc_generality.py::test_bctu_list_partition_4_4_fifo2",
+          "tests/unit/test_adc_generality.py::test_generality_configs_reapply_byte_stable"
+        ]
+      }
+    },
+    {
+      "match": {
+        "key_regex": "\\[(AdcPrescale|AdcSamplingDuration0|AdcSamplingDuration1|AdcSamplingDuration2|AdcGroupConversionType|AdcGroupHwTriggerSource|BctuTriggerSource|BctuAdcTargetMask|BctuLastChannel|BctuWatermarkValue)\\]$"
+      },
+      "classification": "derived",
+      "trace": {
+        "implementation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit"
+        ]
+      }
+    }
+  ]
+}

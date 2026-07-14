@@ -100,22 +100,11 @@ def _setting_value(doc: MexDocument, entry, name: str) -> str | None:
     return setting.attrib.get("value") if setting is not None else None
 
 
-def test_platform_json_asset_has_forward_surface_coverage():
+def test_platform_json_asset_excludes_development_coverage():
     asset = json.loads(_asset_path().read_text(encoding="utf-8"))
 
     assert "Platform.xdm" in asset["source"]
-    coverage = asset["_coverage"]
-
-    isr_surface = coverage["configurable_today"]["IntCtrlConfig/PlatformIsrConfig"]
-    for item in ("IsrName", "IsrEnabled", "IsrPriority", "IsrHandler"):
-        assert item in isr_surface
-
-    assert "PlatformNvicEcucPartitionRef" in coverage["not_yet_exposed"]["partitioning"]
-    assert "SystemIsrConfig" in coverage["not_yet_exposed"]["system_interrupts"]
-    assert coverage["references"] == [
-        "Platform.xdm:IntCtrlConfig/PlatformIsrConfig",
-        "issue #53 Platform KPI route correction",
-    ]
+    assert "_coverage" not in asset
 
 
 def test_set_priority_by_peripheral(tmp_path):

@@ -1490,12 +1490,15 @@ def _validate_basenxp_payload(payload: dict, asset: dict) -> list[Diagnostic]:
                 message=(
                     "GET_PARTITION_ID is a legal BaseNXP.xdm enum but requires "
                     "Autosar OS and multicore/EcuC partition references, which "
-                    "are tracked in osif.json _coverage.not_yet_exposed."
+                    "are outside the current BaseNXP provider surface."
                 ),
                 details={
                     "field": "OsIfUseGetUserId",
                     "value": value,
-                    "not_yet_exposed": asset["_coverage"]["not_yet_exposed"]["multicore_partition_os"],
+                    "dependencies": [
+                        "OsIfMulticoreSupport", "OsIfEcucPartitionRef",
+                        "OsIfCounterEcucPartitionRef", "OsIfAutosarOsType",
+                    ],
                 },
             ))
 
@@ -3497,7 +3500,7 @@ def apply_mcu_set(doc: MexDocument, intent: Intent, *, bundle: ResolvedAssetBund
     exercises. 10 deferred clocks (Mux12-20 + CM7_CORE_CLK) are documented in
     clock.json deferred_clocks. The complete editable surface
     not yet exposed through the CLI is tracked in the committed asset
-    ``clock.json`` (_coverage.not_yet_exposed).
+    the development-only Mcu descriptor coverage sidecar.
 
     Two regions are edited:
     (A) clock_settings section (top-level clocks tool, elements use id="..."):
@@ -5226,7 +5229,7 @@ def _apply_adc_bctu_multi_trigger(
     The shared top-level ``bctu`` keys (destination, new_data_notification) supply
     defaults when a sub-trigger omits them. Returns True on success; appends a
     blocker and returns False otherwise. LIST sub-triggers / FIFO destinations are
-    not part of the multi-trigger surface yet (see adc.json `_coverage`).
+    not part of the multi-trigger surface yet.
     """
     triggers = [t for t in (bctu.get("triggers") or []) if isinstance(t, dict)]
     if not triggers:
