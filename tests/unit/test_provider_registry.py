@@ -19,6 +19,7 @@
 
 from __future__ import annotations
 
+from dataclasses import FrozenInstanceError
 from types import SimpleNamespace
 
 import pytest
@@ -70,10 +71,28 @@ def test_registry_rejects_duplicate_keys_stably():
     assert not caught.value.details.get("path")
 
 
+def test_registry_rejects_duplicate_shortcut_even_when_registry_actions_differ():
+    with pytest.raises(CliFailure) as caught:
+        ProviderRegistry((_binding(), _binding(action="other")))
+    assert caught.value.code == "provider_registry_duplicate"
+
+
+def test_registry_and_bindings_are_immutable_after_validation():
+    binding = _binding()
+    registry = ProviderRegistry((binding,))
+    with pytest.raises(TypeError):
+        registry._bindings[binding.key] = binding
+    with pytest.raises(TypeError):
+        registry._shortcuts[(binding.module, binding.cli_action)] = binding
+    with pytest.raises(FrozenInstanceError):
+        binding.module = "mcu"
+
+
 @pytest.mark.parametrize(
     "binding,code",
     [
         (_binding(provider_type=type("Wrong", (), {"name": "mcu"})), "provider_registry_invalid"),
+        (_binding(provider_type=SimpleNamespace(name="uart")), "provider_registry_invalid"),
         (_binding(read_dependencies=frozenset({"uart"})), "provider_registry_invalid"),
         (_binding(allowed_regions=frozenset({PhysicalRegion("mcu", "config_set:Mcu")})), "provider_registry_invalid"),
     ],
@@ -92,6 +111,12 @@ def test_registry_lookup_rejects_unknown_and_wrong_intent():
     with pytest.raises(CliFailure) as wrong:
         registry.require_intent(Intent("uart", "other", {}), backend="mex")
     assert wrong.value.code == "provider_intent_mismatch"
+    with pytest.raises(CliFailure) as invalid:
+        registry.require_intent(SimpleNamespace(module="uart", action="set"), backend="mex")
+    assert invalid.value.code == "provider_intent_invalid"
+    with pytest.raises(CliFailure) as shortcut:
+        registry.lookup_shortcut("uart", "missing")
+    assert shortcut.value.code == "provider_binding_unknown"
 
 
 def test_default_registry_has_exactly_all_nine_supported_bindings():

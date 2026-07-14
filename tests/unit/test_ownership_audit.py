@@ -25,7 +25,7 @@ import pytest
 
 from rtd_config import cli
 from rtd_config.backends.s32_mex.apply import ApplyResult
-from rtd_config.backends.s32_mex.ownership import audit_candidate
+from rtd_config.backends.s32_mex.ownership import audit_candidate, collect_actual_deltas
 from rtd_config.backends.s32_mex.transaction import ConfigureTransaction
 from rtd_config.errors import CliFailure
 from rtd_config.intent import Intent
@@ -81,6 +81,46 @@ def test_actual_delta_ignores_comments_whitespace_attribute_and_element_order():
     assert result.changed_modules == ()
 
 
+@pytest.mark.parametrize(
+    "candidate,kind",
+    [
+        (_XML.replace(b'value="9600"', b'value="115200"'), "modified"),
+        (_XML.replace(b'/></config_set>', b'>polling</setting></config_set>', 1), "modified"),
+        (_XML.replace(
+            b'<setting name="Baud" value="9600"/>',
+            b'<setting name="Baud" value="9600"/><setting name="Parity" value="NONE"/>',
+        ), "added"),
+        (_XML.replace(b'<setting name="Baud" value="9600"/>', b''), "removed"),
+    ],
+)
+def test_actual_delta_classifies_attribute_text_element_add_and_remove(candidate, kind):
+    entries = collect_actual_deltas(_XML, candidate)
+    assert any(item.kind == kind and item.owner == "uart" for item in entries)
+
+
+def test_actual_delta_preserves_duplicate_siblings_without_collapsing_changes():
+    before = b'''<mex><config_set name="Uart">
+<setting name="Dup" value="A"/><setting name="Dup" value="B"/>
+</config_set></mex>'''
+    added = before.replace(
+        b'</config_set>', b'<setting name="Dup" value="C"/></config_set>'
+    )
+    entries = collect_actual_deltas(before, added)
+    assert len(entries) == 1
+    assert entries[0].kind == "added"
+    assert entries[0].owner == "uart"
+
+
+def test_owner_mapping_is_case_normalized_but_region_identity_is_exact():
+    candidate = _XML.replace(b'name="Uart"', b'name="uArT"')
+    entries = collect_actual_deltas(_XML, candidate)
+    assert entries
+    assert {item.owner for item in entries} == {"uart"}
+    assert {item.region for item in entries} == {
+        "config_set:Uart", "config_set:uArT"
+    }
+
+
 def test_audit_rejects_undeclared_module_and_region():
     changed_mcu = _XML.replace(b'value="CORE"', b'value="FIRC"')
     with pytest.raises(CliFailure) as module_error:
@@ -129,6 +169,28 @@ def test_pins_and_clocks_map_to_explicit_physical_regions():
     }
 
 
+@pytest.mark.parametrize(
+    "owner,old,new",
+    [
+        ("mcu", b'value="CORE"', b'value="FIRC"'),
+        ("port", b'value="PORT_OLD"', b'value="PORT_NEW"'),
+        ("platform", b'value="PLATFORM_OLD"', b'value="PLATFORM_NEW"'),
+        ("mcl", b'value="MCL_OLD"', b'value="MCL_NEW"'),
+    ],
+)
+def test_uart_binding_authorizes_each_plan_declared_cross_module_write(owner, old, new):
+    before = _XML.replace(
+        b'</periphs>',
+        b'<config_set name="Port"><setting name="P" value="PORT_OLD"/></config_set>'
+        b'<config_set name="Platform"><setting name="P" value="PLATFORM_OLD"/></config_set>'
+        b'<config_set name="Mcl"><setting name="P" value="MCL_OLD"/></config_set>'
+        b'</periphs>',
+    )
+    binding = cli.get_provider_registry().lookup("mex", "uart", "set")
+    result = audit_candidate(before, before.replace(old, new), binding, _plan("uart", owner))
+    assert result.changed_modules == (owner,)
+
+
 def _prepared_project(tmp_path):
     project = Project.verified(copy_uart_fixture(tmp_path))
     cli._preflight_project(project)
@@ -162,6 +224,21 @@ def test_transaction_uses_actual_delta_not_apply_self_report(tmp_path):
     assert result.changed_modules == ["uart"]
 
 
+def test_transaction_recovers_omitted_self_report_from_published_bytes(tmp_path):
+    project = _prepared_project(tmp_path)
+
+    def silent_apply(doc, _intent, *, bundle):
+        element = _change_first_setting(doc, "Uart", "ACTUAL_ONLY")
+        return ApplyResult(changed_modules=[], modified_elements=[element])
+
+    binding = _binding(apply_fn=silent_apply)
+    result = ConfigureTransaction(
+        project, plan=_plan("uart"), binding=binding, static_runner=_passed_static
+    ).execute(Intent("uart", "set", {}), binding.apply_fn)
+    assert result.changed_modules == ["uart"]
+    assert result.published_bytes == project.mex_file.read_bytes()
+
+
 def test_transaction_self_reported_change_on_noop_is_empty(tmp_path):
     project = _prepared_project(tmp_path)
     binding = _binding(apply_fn=lambda *_a, **_k: ApplyResult(changed_modules=["uart"]))
@@ -176,6 +253,7 @@ def test_transaction_blocks_unauthorized_apply_before_static_or_publish(tmp_path
     project = _prepared_project(tmp_path)
     original = project.mex_file.read_bytes()
     static_called = False
+    vendor_called = False
 
     def malicious(doc, _intent, *, bundle):
         element = _change_first_setting(doc, "Mcu", "UNAUTHORIZED")
@@ -186,6 +264,11 @@ def test_transaction_blocks_unauthorized_apply_before_static_or_publish(tmp_path
         static_called = True
         return _passed_static()
 
+    def vendor(**_kwargs):
+        nonlocal vendor_called
+        vendor_called = True
+        return SimpleNamespace(status="passed")
+
     binding = _binding(
         module="basenxp", write=("basenxp",), read=("mcu",),
         regions=(PhysicalRegion("basenxp", "config_set:BaseNXP"),),
@@ -194,8 +277,35 @@ def test_transaction_blocks_unauthorized_apply_before_static_or_publish(tmp_path
     with pytest.raises(CliFailure) as caught:
         ConfigureTransaction(
             project, plan=_plan("basenxp", "mcu"), binding=binding,
-            static_runner=static,
+            static_runner=static, vendor_runner=vendor,
         ).execute(Intent("basenxp", "set", {}), binding.apply_fn)
     assert caught.value.code == "provider_ownership_violation"
     assert static_called is False
+    assert vendor_called is False
+    assert project.mex_file.read_bytes() == original
+
+
+def test_transaction_blocks_undeclared_physical_region_before_validation(tmp_path):
+    project = _prepared_project(tmp_path)
+    original = project.mex_file.read_bytes()
+    calls = {"static": 0, "vendor": 0}
+
+    def edit_pin(doc, _intent, *, bundle):
+        pin = next(item for item in doc.root.iter() if item.tag.endswith("pin"))
+        pin.attrib["signal"] = "UNDECLARED_REGION"
+        return ApplyResult(changed_modules=["port"], modified_elements=[pin])
+
+    binding = _binding(
+        module="port", write=("port",),
+        regions=(PhysicalRegion("port", "config_set:Port"),),
+        apply_fn=edit_pin,
+    )
+    with pytest.raises(CliFailure) as caught:
+        ConfigureTransaction(
+            project, plan=_plan("port"), binding=binding,
+            static_runner=lambda *_a, **_k: calls.__setitem__("static", 1),
+            vendor_runner=lambda **_k: calls.__setitem__("vendor", 1),
+        ).execute(Intent("port", "set", {}), binding.apply_fn)
+    assert caught.value.code == "provider_region_violation"
+    assert calls == {"static": 0, "vendor": 0}
     assert project.mex_file.read_bytes() == original
