@@ -369,3 +369,54 @@ def test_plan_target_selector_rejects_unrelated_mcu_write_but_allows_exact_clock
     with pytest.raises(CliFailure) as caught:
         audit_candidate(_XML, unrelated, binding, plan)
     assert caught.value.code == "provider_ownership_violation"
+
+
+_SELECTOR_XML = b'''<mex><config_set name="Mcu">
+<array name="McuClockReferencePoint">
+<struct name="ref0"><setting name="Name" value="LPUART8_CLK"/><setting name="Select" value="CORE"/></struct>
+<struct name="ref1"><setting name="Name" value="OTHER_CLK"/><setting name="Select" value="ALT"/></struct>
+</array>
+<struct name="Sibling"><setting name="Name" value="LPUART8_CLK"/><setting name="Select" value="SIB"/></struct>
+</config_set></mex>'''
+
+
+def _identity_scoped_clock_plan():
+    return Plan([PlannedChange(
+        "mcu", "mcu", "/Mcu/McuClockReferencePoint", "ensure exact clock",
+        targets=(TargetSelector(
+            "config_set:Mcu", ("McuClockReferencePoint",),
+            (("Name", "LPUART8_CLK"),),
+        ),),
+    )])
+
+
+def test_target_selector_allows_only_the_exact_declared_identity():
+    binding = _binding(
+        module="mcu", write=("mcu",),
+        regions=(PhysicalRegion("mcu", "config_set:Mcu"),),
+    )
+    candidate = _SELECTOR_XML.replace(b'value="CORE"', b'value="FIRC"')
+    result = audit_candidate(
+        _SELECTOR_XML, candidate, binding, _identity_scoped_clock_plan()
+    )
+    assert result.changed_modules == ("mcu",)
+
+
+@pytest.mark.parametrize(
+    "candidate",
+    [
+        _SELECTOR_XML.replace(b'value="ALT"', b'value="SIRC"'),
+        _SELECTOR_XML.replace(b'value="SIB"', b'value="UNDECLARED"'),
+    ],
+    ids=["wrong-identity", "undeclared-sibling"],
+)
+def test_target_selector_rejects_wrong_identity_and_undeclared_sibling(candidate):
+    binding = _binding(
+        module="mcu", write=("mcu",),
+        regions=(PhysicalRegion("mcu", "config_set:Mcu"),),
+    )
+    with pytest.raises(CliFailure) as caught:
+        audit_candidate(
+            _SELECTOR_XML, candidate, binding, _identity_scoped_clock_plan()
+        )
+    assert caught.value.code == "provider_ownership_violation"
