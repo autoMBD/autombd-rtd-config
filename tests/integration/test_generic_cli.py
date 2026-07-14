@@ -50,11 +50,13 @@ import json
 import os
 import subprocess
 import sys
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
 
 from rtd_config import cli
+from rtd_config.modules.registry import ProviderRegistry
 from tests.fixtures import copy_uart_fixture
 
 
@@ -212,6 +214,51 @@ def test_runtime_precedence_uses_explicit_flag_over_json_without_parser_defaults
     assert payload["status"] == "passed"
 
 
+@pytest.mark.parametrize(
+    ("invalid_field", "invalid_value", "override"),
+    [
+        ("project", None, lambda project: ["--project", str(project)]),
+        ("backend", None, lambda _project: ["--backend", "mex"]),
+        (
+            "validation_timeout_s", "not-an-integer",
+            lambda _project: ["--validation-timeout-s", "60"],
+        ),
+        (
+            "asset_root", None,
+            lambda _project: ["--asset-root", str(cli.DEFAULT_ASSET_ROOT)],
+        ),
+    ],
+)
+def test_explicit_flags_override_invalid_lower_precedence_config_values(
+    tmp_path, capsys, invalid_field, invalid_value, override
+):
+    project = copy_uart_fixture(tmp_path)
+    intent = _write_json(
+        tmp_path / "intent.json", {"module": "mcl", "action": "set", "payload": {}}
+    )
+    values = {"project": str(project), invalid_field: invalid_value}
+    config = _write_json(tmp_path / "runtime.json", values)
+
+    rc, payload = _invoke(
+        capsys,
+        [
+            "plan", "--intent", str(intent), "--config", str(config),
+            *override(project),
+        ],
+    )
+
+    assert rc == 0
+    assert payload["status"] == "passed"
+
+
+def test_every_optional_runtime_flag_is_suppressed_until_explicit():
+    args = cli.build_parser().parse_args(["plan", "--intent", "intent.json"])
+
+    assert not {
+        field for field in cli._RUNTIME_FIELDS if hasattr(args, field)
+    }
+
+
 def test_runtime_config_resolves_all_json_paths_relative_to_config(tmp_path):
     config_path = _write_json(
         tmp_path / "runtime.json",
@@ -276,6 +323,31 @@ def test_generic_plan_is_read_only_and_has_zero_validation_side_effects(
         cli, "ConfigureTransaction",
         lambda *_a, **_k: pytest.fail("plan must not construct a transaction"),
     )
+    monkeypatch.setattr(
+        cli, "run_validation",
+        lambda *_a, **_k: pytest.fail("plan must not run vendor validation"),
+    )
+    monkeypatch.setattr(
+        cli, "release_for_publish",
+        lambda *_a, **_k: pytest.fail("plan must not enter the publish gate"),
+    )
+    monkeypatch.setattr(
+        cli, "_configure_verified_project",
+        lambda *_a, **_k: pytest.fail("plan must not enter configure dispatch"),
+    )
+
+    def forbidden_apply(_document, _intent, *, bundle):
+        pytest.fail("plan must not invoke the registered apply function")
+
+    registry = cli.get_provider_registry()
+    bindings = []
+    for key in registry.keys():
+        binding = registry.lookup(*key)
+        if key == ("mex", "uart", "set"):
+            binding = replace(binding, apply_fn=forbidden_apply)
+        bindings.append(binding)
+    isolated_registry = ProviderRegistry(bindings)
+    monkeypatch.setattr(cli, "get_provider_registry", lambda: isolated_registry)
 
     rc, payload = _invoke(
         capsys, ["plan", "--project", str(project), "--intent", str(intent)]
@@ -308,6 +380,38 @@ def test_generic_commands_resolve_default_assets_outside_current_directory(tmp_p
     assert result.returncode == 0, result.stdout + result.stderr
     assert json.loads(result.stdout)["status"] == "passed"
     assert result.stderr == ""
+
+
+def test_generic_and_shortcut_configure_use_one_canonical_dispatcher(
+    tmp_path, monkeypatch
+):
+    project = tmp_path / "project-need-not-be-opened-by-the-dispatch-spy"
+    intent = _write_json(
+        tmp_path / "intent.json", {"module": "mcl", "action": "set", "payload": {}}
+    )
+    spec = _write_json(tmp_path / "spec.json", {})
+    calls = []
+
+    def capture(config, **kwargs):
+        calls.append((config, kwargs))
+        return 17
+
+    monkeypatch.setattr(cli, "_execute_canonical_request", capture)
+
+    assert cli.main([
+        "configure", "--project", str(project), "--intent", str(intent), "--json",
+    ]) == 17
+    assert cli.main([
+        "mcl", "set", "--project", str(project), "--spec", str(spec),
+        "--configure", "--json",
+    ]) == 17
+
+    assert len(calls) == 2
+    assert all(kwargs["configure"] is True for _config, kwargs in calls)
+    assert calls[0][1]["intent"].module == "mcl"
+    assert calls[0][1].get("binding") is None
+    assert calls[1][1]["binding"].key == ("mex", "mcl", "set")
+    assert calls[1][1]["shortcut_args"].command == "mcl"
 
 
 def test_generic_configure_matches_shortcut_noop(tmp_path, capsys):
@@ -374,3 +478,95 @@ def test_generic_configure_matches_shortcut_published_bytes(tmp_path, capsys):
     assert (generic_project / "Uart_Example.mex").read_bytes() == (
         shortcut_project / "Uart_Example.mex"
     ).read_bytes()
+
+
+@pytest.mark.parametrize(("module", "action", "parameters"), CASES)
+def test_generic_configure_matches_every_registered_shortcut_and_published_bytes(
+    tmp_path, capsys, module, action, parameters
+):
+    generic_root = tmp_path / "generic"
+    shortcut_root = tmp_path / "shortcut"
+    generic_root.mkdir()
+    shortcut_root.mkdir()
+    generic_project = copy_uart_fixture(generic_root)
+    shortcut_project = copy_uart_fixture(shortcut_root)
+    intent = _write_json(
+        tmp_path / "intent.json",
+        {"module": module, "action": action, "payload": parameters},
+    )
+    spec = _write_json(tmp_path / "spec.json", parameters)
+
+    generic_rc, generic = _invoke(
+        capsys,
+        ["configure", "--project", str(generic_project), "--intent", str(intent)],
+    )
+    shortcut_rc, shortcut = _invoke(
+        capsys,
+        [*_shortcut(module, action, shortcut_project, spec), "--configure"],
+    )
+
+    assert generic_rc == shortcut_rc
+    assert generic == shortcut
+    assert (generic_project / "Uart_Example.mex").read_bytes() == (
+        shortcut_project / "Uart_Example.mex"
+    ).read_bytes()
+
+
+@pytest.mark.parametrize(("module", "action", "parameters"), CASES)
+def test_generic_and_shortcut_failures_have_equal_path_safe_diagnostics(
+    tmp_path, capsys, module, action, parameters
+):
+    secret_project = tmp_path / "PRIVATE_PROJECT_sk_live_SUPERSECRET"
+    intent = _write_json(
+        tmp_path / "intent.json",
+        {"module": module, "action": action, "payload": parameters},
+    )
+    spec = _write_json(tmp_path / "spec.json", parameters)
+
+    generic_rc, generic = _invoke(
+        capsys,
+        ["plan", "--project", str(secret_project), "--intent", str(intent)],
+    )
+    shortcut_rc, shortcut = _invoke(
+        capsys, _shortcut(module, action, secret_project, spec),
+    )
+
+    assert generic_rc == shortcut_rc != 0
+    assert generic["diagnostics"] == shortcut["diagnostics"]
+    public = json.dumps(
+        {"generic": generic, "shortcut": shortcut}, ensure_ascii=False
+    ).lower()
+    assert "private_project" not in public
+    assert "sk_live_supersecret" not in public
+    assert str(secret_project).lower() not in public
+
+
+def test_generic_configure_redacts_internal_write_failure_secrets(
+    tmp_path, monkeypatch, capsys
+):
+    project = copy_uart_fixture(tmp_path)
+    intent = _write_json(
+        tmp_path / "intent.json", {"module": "mcl", "action": "set", "payload": {}}
+    )
+    secret = str(tmp_path / "PRIVATE_WRITE_sk_live_SUPERSECRET.mex")
+
+    class FailingTransaction:
+        def __init__(self, *_args, **_kwargs):
+            pass
+
+        def execute(self, *_args, **_kwargs):
+            raise cli.MexWriteError(f"write failed for {secret}")
+
+    monkeypatch.setattr(cli, "ConfigureTransaction", FailingTransaction)
+
+    rc, payload = _invoke(
+        capsys,
+        ["configure", "--project", str(project), "--intent", str(intent)],
+    )
+
+    assert rc != 0
+    assert payload["diagnostics"][0]["code"] == "narrow_mex_write_unavailable"
+    public = json.dumps(payload, ensure_ascii=False).lower()
+    assert "private_write" not in public
+    assert "sk_live_supersecret" not in public
+    assert secret.lower() not in public
