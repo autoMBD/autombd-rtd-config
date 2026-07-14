@@ -46,6 +46,7 @@
 
 from __future__ import annotations
 
+import ast
 import copy
 import hashlib
 import importlib.util
@@ -97,6 +98,30 @@ def _synthetic_xdm(path: Path) -> Path:
     return path
 
 
+def _synthetic_repeated_facts_xdm(path: Path) -> Path:
+    path.write_text(
+        """<?xml version="1.0" encoding="UTF-8"?>
+<a:datamodel xmlns:a="urn:test" version="3.0">
+  <a:ctr name="Root">
+    <a:var name="Bounded" type="INTEGER">
+      <a:a name="INVALID" type="XPath">
+        <a:tst expr="../Enabled='false'" true="disabled"/>
+      </a:a>
+      <a:da name="INVALID" type="Range">
+        <a:tst expr="&lt;=10"/><a:tst expr="&gt;=1"/>
+      </a:da>
+    </a:var>
+    <a:ref name="External" type="REFERENCE">
+      <a:da name="REF" value="ASPathDataOfSchema:/AUTOSAR/EcucDefs/EcuC/Partition"/>
+    </a:ref>
+  </a:ctr>
+</a:datamodel>
+""",
+        encoding="utf-8",
+    )
+    return path
+
+
 def test_synthetic_extractor_is_deterministic_and_preserves_descriptor_facts(tmp_path):
     tool = _tool_module()
     source = _synthetic_xdm(tmp_path / "Synthetic.xdm")
@@ -119,6 +144,32 @@ def test_synthetic_extractor_is_deterministic_and_preserves_descriptor_facts(tmp
     assert target["cross_references"] == ["Other"]
 
 
+def test_extractor_preserves_every_repeated_a_and_da_constraint(tmp_path):
+    tool = _tool_module()
+    source = _synthetic_repeated_facts_xdm(tmp_path / "Repeated.xdm")
+
+    extracted = tool.extract_descriptor(source, module="Synthetic")
+    bounded = next(item for item in extracted["items"] if item["name"] == "Bounded")
+    evidence = json.dumps(bounded["invalid"], ensure_ascii=False)
+
+    assert "../Enabled='false'" in evidence
+    assert "disabled" in evidence
+    assert "<=10" in evidence
+    assert ">=1" in evidence
+
+
+@pytest.mark.parametrize("module", ["Mcu", "Adc"])
+def test_exact_module_extraction_retains_named_cross_module_references(tmp_path, module):
+    tool = _tool_module()
+    source = _synthetic_repeated_facts_xdm(tmp_path / f"{module}.xdm")
+
+    extracted = tool.extract_descriptor(source, module=module)
+    external = next(item for item in extracted["items"] if item["name"] == "External")
+
+    assert external["kind"] == "reference"
+    assert external["cross_references"] == ["EcuC"]
+
+
 @pytest.mark.parametrize(
     ("module", "count", "sha256"),
     [
@@ -136,7 +187,10 @@ def test_committed_descriptor_inventory_has_golden_count_and_identity(module, co
 
 @pytest.mark.parametrize(
     "mutation",
-    ["duplicate_key", "double_classification", "missing_trace", "empty_reason", "bad_cross_ref"],
+    [
+        "duplicate_key", "double_classification", "missing_trace", "empty_reason",
+        "bad_cross_ref", "symbol_substring", "test_node_substring",
+    ],
 )
 def test_offline_gate_rejects_inventory_mutations(mutation):
     tool = _tool_module()
@@ -152,8 +206,16 @@ def test_offline_gate_rejects_inventory_mutations(mutation):
     elif mutation == "empty_reason":
         item = next(item for item in broken["items"] if item["classification"] == "deferred")
         item["reason"] = ""
-    else:
+    elif mutation == "bad_cross_ref":
         broken["items"][0]["cross_references"] = ["NotARealModule"]
+    elif mutation == "symbol_substring":
+        item = next(item for item in broken["items"] if item["classification"] == "configurable")
+        path = item["trace"]["provider"].split(":", 1)[0]
+        item["trace"]["provider"] = f"{path}:from"
+    else:
+        item = next(item for item in broken["items"] if item["classification"] == "configurable")
+        path = item["trace"]["tests"][0].split("::", 1)[0]
+        item["trace"]["tests"] = [f"{path}::test_"]
 
     with pytest.raises(tool.InventoryError):
         tool.validate_sidecar(broken, repo_root=ROOT)
@@ -181,3 +243,62 @@ def test_runtime_assets_and_release_manifest_exclude_coverage_sidecars():
     manifest = RUNTIME_ROOT / "release-manifest.json"
     if manifest.exists():
         assert "rtd-config-module-coverage" not in manifest.read_text(encoding="utf-8")
+
+
+def test_known_descriptor_gap_groups_are_complete_and_explicitly_deferred():
+    expected = {
+        "mcu": {"mcu_reset": 23},
+        "adc": {
+            "adc_dspss": 25,
+            "adc_self_test": 8,
+            "adc_timing": 18,
+            "adc_general": 1,
+            "adc_power": 11,
+            "adc_published_information": 14,
+            "adc_autosar_extension": 45,
+        },
+    }
+    for module, groups in expected.items():
+        sidecar = json.loads(
+            (COVERAGE_ROOT / f"{module}.json").read_text(encoding="utf-8")
+        )
+        by_key = {item["key"]: item for item in sidecar["items"]}
+        assert {name: len(keys) for name, keys in sidecar["known_gaps"].items()} == groups
+        assert all(
+            by_key[key]["classification"] == "deferred"
+            for keys in sidecar["known_gaps"].values()
+            for key in keys
+        )
+
+
+def test_recipe_fixed_and_automatic_fields_are_not_claimed_caller_configurable():
+    expectations = {
+        "mcu": {
+            "McuNoPll", "McuPll0UnderMcuControl", "McuPLLUnderMcuControl",
+            "McuPllOdiv0_En", "McuPllOdiv1_En",
+        },
+        "adc": {"AdcEnableWatchdogApi", "WdgThresholdEnable"},
+    }
+    for module, names in expectations.items():
+        sidecar = json.loads(
+            (COVERAGE_ROOT / f"{module}.json").read_text(encoding="utf-8")
+        )
+        matched = [item for item in sidecar["items"] if item["name"] in names]
+        assert {item["name"] for item in matched} == names
+        assert all(item["classification"] != "configurable" for item in matched)
+
+
+def test_runtime_python_never_reads_development_coverage_sidecars():
+    forbidden = ("rtd-config-module-coverage", "known_gaps")
+    for path in (RUNTIME_ROOT / "rtd-config-cli-py" / "rtd_config").rglob("*.py"):
+        source = path.read_text(encoding="utf-8")
+        tree = ast.parse(source, filename=str(path))
+        call_literals = [
+            value.value
+            for call in ast.walk(tree) if isinstance(call, ast.Call)
+            for value in ast.walk(call)
+            if isinstance(value, ast.Constant) and isinstance(value.value, str)
+        ]
+        assert not any(
+            token in literal for token in forbidden for literal in call_literals
+        ), path
