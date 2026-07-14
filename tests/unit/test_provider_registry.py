@@ -128,6 +128,8 @@ def test_runtime_plan_rejects_empty_or_non_concrete_write_targets():
         (),
         (TargetSelector("", ("Uart",)),),
         (TargetSelector("config_set:Uart", ()),),
+        (TargetSelector("config_set:Uart", ("*",)),),
+        (TargetSelector("config_set:*", ("Uart",)),),
     ):
         with pytest.raises(CliFailure) as caught:
             validate_provider_plan(Plan([
