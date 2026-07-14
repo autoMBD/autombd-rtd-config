@@ -163,12 +163,21 @@ def test_json_flag_is_honored_before_or_after_subcommand(argv):
     assert_json_failure(run_cli(*argv), "invalid_arguments", exit_code=2)
 
 
-@pytest.mark.parametrize("argv", [("--json",), ("uart", "--json")])
+@pytest.mark.parametrize(
+    "argv",
+    [("--json",)] + [
+        (module, "--json")
+        for module in (
+            "uart", "platform", "basenxp", "mcl",
+            "port", "dio", "mcu", "adc",
+        )
+    ],
+)
 def test_missing_command_level_is_a_json_argument_failure(argv):
     payload = assert_json_failure(
         run_cli(*argv), "invalid_arguments", exit_code=2
     )
-    assert payload["command"] in {"unknown", "uart"}
+    assert payload["command"] == ("unknown" if argv == ("--json",) else argv[0])
 
 
 def test_missing_command_without_json_is_nonzero_and_human_readable():
