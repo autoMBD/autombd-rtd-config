@@ -23,6 +23,7 @@ from io import BytesIO
 import os
 from pathlib import Path
 import signal
+import shutil
 import subprocess
 import sys
 import time
@@ -41,6 +42,7 @@ from rtd_config.errors import CliFailure
 from rtd_config.project import Project
 from tests.fixtures import copy_uart_fixture
 import rtd_config.backends.s32_mex.process_tree as process_tree_module
+import rtd_config.backends.s32_mex.validation_workspace as workspace_module
 
 
 @pytest.mark.parametrize(
@@ -330,3 +332,48 @@ def test_workspace_identity_cannot_swap_during_materialization(
     finally:
         workspace.close()
     assert attack_succeeded is False
+
+
+def test_workspace_cleanup_keeps_identity_guard_until_recursive_delete(
+    monkeypatch, tmp_path
+):
+    """Cleanup must never delete a replacement installed at the run path."""
+    project_root = copy_uart_fixture(tmp_path)
+    with Project.verified(project_root) as project:
+        inventory = project.capture_validator_inputs()
+    base = tmp_path / "controlled"
+    base.mkdir()
+    workspace = ControlledValidationWorkspace(base, inventory).open()
+    assert workspace.root is not None
+    run_root = workspace.root
+    displaced = tmp_path / "displaced-run"
+    real_identity = workspace_module._directory_identity
+    attack_succeeded = False
+    armed = True
+
+    def attack_after_identity_check(path):
+        nonlocal attack_succeeded
+        identity = real_identity(path)
+        if armed and Path(path) == run_root and not attack_succeeded:
+            try:
+                run_root.rename(displaced)
+                run_root.mkdir()
+                (run_root / "attacker-owned.txt").write_bytes(b"do not delete")
+                attack_succeeded = True
+            except OSError:
+                pass
+        return identity
+
+    monkeypatch.setattr(
+        workspace_module, "_directory_identity", attack_after_identity_check
+    )
+    try:
+        workspace.close()
+        assert attack_succeeded is False
+    finally:
+        armed = False
+        monkeypatch.setattr(workspace_module, "_directory_identity", real_identity)
+        if run_root.exists():
+            shutil.rmtree(run_root)
+        if displaced.exists():
+            shutil.rmtree(displaced)
