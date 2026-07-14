@@ -103,6 +103,7 @@ class UartProvider:
                         "config_set:Uart", ("GeneralConfiguration", "UartCallbackCapability")
                     ),
                     TargetSelector("config_set:Uart", ("GeneralConfiguration", "UartCallback")),
+                    TargetSelector("config_set:Uart", ("GeneralConfiguration", "UartDmaEnable")),
                 ),
             )
         ]

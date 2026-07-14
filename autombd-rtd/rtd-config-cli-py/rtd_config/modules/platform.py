@@ -200,11 +200,17 @@ class PlatformProvider:
         ISR names and handlers loaded from uart.json dma_hw_channel_irq_map (not hardcoded).
         Grounded in: Platform.epd DMATCD IRQ table, Dma_Ip_Irq.c, Spi_Transfer example.
         """
+        ch0 = None
+        ch1 = None
+        preserved_irq_names: tuple[str, ...] = ()
         try:
             data = self.bundle.load_json("uart")
             dma_map = data.get("dma_hw_channel_irq_map", {})
             ch0 = dma_map.get("0") or dma_map.get(0)
             ch1 = dma_map.get("1") or dma_map.get(1)
+            flexio = data.get("instance_irq_clock_map", {}).get("FLEXIO", {})
+            if flexio.get("irq_name"):
+                preserved_irq_names = (str(flexio["irq_name"]),)
             if ch0 and ch1:
                 description = (
                     f"Insert two DMATCD PlatformIsrConfig entries for {hw} DMA mode "
@@ -222,4 +228,17 @@ class PlatformProvider:
             owner="platform",
             path="/Platform/Platform/IntCtrlConfig",
             description=description,
+            targets=tuple(
+                TargetSelector(
+                    "config_set:Platform", ("PlatformIsrConfig",),
+                    (("IsrName", item["irq_name"]),),
+                )
+                for item in (ch0, ch1) if item is not None
+            ) + tuple(
+                TargetSelector(
+                    "config_set:Platform", ("PlatformIsrConfig",),
+                    (("IsrName", irq_name),),
+                )
+                for irq_name in preserved_irq_names
+            ),
         )

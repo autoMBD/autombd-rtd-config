@@ -111,16 +111,26 @@ def _qname(element: ET.Element) -> str:
     return "#comment" if element.tag is ET.Comment else str(element.tag)
 
 
-def _subtree_facts(element: ET.Element) -> tuple[tuple[str, str], ...]:
-    facts: set[tuple[str, str]] = set()
-    for item in element.iter():
-        if item.tag is ET.Comment:
-            continue
-        for key, value in item.attrib.items():
-            facts.add((str(key), str(value)))
-        if str(item.tag).rsplit("}", 1)[-1] == "setting" and item.attrib.get("name") and "value" in item.attrib:
-            facts.add((item.attrib["name"], item.attrib["value"]))
-    return tuple(sorted(facts))
+def _scope_facts(element: ET.Element) -> tuple[tuple[str, str], ...]:
+    """Return facts owned by one lexical element scope, excluding sibling scopes."""
+    facts = {str(key): str(value) for key, value in element.attrib.items()}
+    for child in element:
+        if (
+            str(child.tag).rsplit("}", 1)[-1] == "setting"
+            and child.attrib.get("name")
+            and "value" in child.attrib
+        ):
+            facts[child.attrib["name"]] = child.attrib["value"]
+    return tuple(sorted(facts.items()))
+
+
+def _merge_facts(
+    inherited: tuple[tuple[str, str], ...],
+    local: tuple[tuple[str, str], ...],
+) -> tuple[tuple[str, str], ...]:
+    merged = dict(inherited)
+    merged.update(local)
+    return tuple(sorted(merged.items()))
 
 
 def _classify(element, ancestors, inherited):
@@ -179,8 +189,8 @@ def _records(raw: bytes) -> dict[str, _Record]:
         ) if element.tag is not ET.Comment else ()
         own_logical = logical + values
         local = qname.rsplit("}", 1)[-1]
-        if local == "struct" or local in {"pin", "setting"}:
-            fact_scope = _subtree_facts(element)
+        if local in {"array", "struct", "pin", "setting"}:
+            fact_scope = _merge_facts(fact_scope, _scope_facts(element))
         result[path] = _Record(
             path, owner, region, qname,
             tuple((str(key), str(value)) for key, value in element.attrib.items()),
@@ -284,7 +294,13 @@ def audit_candidate(before: bytes, candidate: bytes, binding: ProviderBinding, p
         raise CliFailure(
             "provider_ownership_violation",
             "The candidate delta does not match a planned target selector.",
-            module="backend", details={"paths": sorted(item.path for item in unauthorized)},
+            module="backend", details={
+                "paths": sorted(item.path for item in unauthorized),
+                "facts": {
+                    item.path: [list(fact) for fact in item.facts]
+                    for item in unauthorized
+                },
+            },
         )
     actual = {entry.owner for entry in entries}
     ordered = tuple(([binding.module] if binding.module in actual else []) + sorted(actual - {binding.module}))
