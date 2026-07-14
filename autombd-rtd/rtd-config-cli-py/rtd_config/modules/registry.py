@@ -20,6 +20,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import inspect
 from types import MappingProxyType
 from typing import Callable, Mapping
 
@@ -51,11 +52,25 @@ class ProviderBinding:
         return self.backend, self.module, self.action
 
     def validate(self) -> None:
+        provider_is_type = isinstance(self.provider_type, type)
+        provider_name = getattr(self.provider_type, "name", None) if provider_is_type else None
+        provider_plan = getattr(self.provider_type, "plan", None) if provider_is_type else None
+        if (
+            not provider_is_type
+            or not isinstance(provider_name, str) or provider_name != self.module
+            or not callable(provider_plan)
+            or not _signature_accepts(self.provider_type, object())
+            or not _signature_accepts(provider_plan, object(), object())
+        ):
+            self._raise_invalid()
+        self.validate_ownership()
+
+    def validate_ownership(self) -> None:
+        """Validate the callable and ownership fields consumed by a transaction."""
         invalid = (
             not all(isinstance(item, str) and item for item in self.key)
             or not isinstance(self.cli_action, str) or not self.cli_action
             or not callable(self.normalizer) or not callable(self.apply_fn)
-            or getattr(self.provider_type, "name", None) != self.module
             or self.module not in self.write_owners
             or bool(self.write_owners & self.read_dependencies)
             or not self.write_owners
@@ -65,12 +80,24 @@ class ProviderBinding:
             or not self.write_owners <= {region.owner for region in self.allowed_regions}
         )
         if invalid:
-            raise CliFailure(
-                "provider_registry_invalid",
-                "A provider binding has an invalid typed ownership contract.",
-                module="backend",
-                details={"backend": self.backend, "module": self.module, "action": self.action},
-            )
+            self._raise_invalid()
+
+    def _raise_invalid(self) -> None:
+        raise CliFailure(
+            "provider_registry_invalid",
+            "A provider binding has an invalid typed ownership contract.",
+            module="backend",
+            details={"backend": self.backend, "module": self.module, "action": self.action},
+        )
+
+
+def _signature_accepts(callable_value, *args, **kwargs) -> bool:
+    """Check a callable contract without constructing providers or invoking code."""
+    try:
+        inspect.signature(callable_value).bind(*args, **kwargs)
+    except (TypeError, ValueError):
+        return False
+    return True
 
 
 class ProviderRegistry:

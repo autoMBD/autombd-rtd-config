@@ -123,7 +123,7 @@ def collect_actual_deltas(before: bytes, candidate: bytes) -> tuple[DeltaEntry, 
 
 
 def audit_candidate(before: bytes, candidate: bytes, binding: ProviderBinding, plan) -> OwnershipAudit:
-    binding.validate()
+    binding.validate_ownership()
     try:
         changes = tuple(plan.changes)
         declared = {str(change.owner) for change in changes}
