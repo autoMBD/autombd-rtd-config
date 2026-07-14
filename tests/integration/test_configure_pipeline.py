@@ -49,6 +49,7 @@ import os
 import subprocess
 import sys
 from argparse import Namespace
+from dataclasses import replace
 from types import SimpleNamespace
 
 import pytest
@@ -59,6 +60,7 @@ from rtd_config.backends.s32_mex.document import MexDocument, MexWriteError
 import rtd_config.backends.s32_mex.transaction as transaction_module
 from rtd_config.errors import CliFailure
 from rtd_config.intent import Intent
+from rtd_config.modules.registry import ProviderRegistry
 from tests.fixtures import copy_uart_fixture
 
 
@@ -78,6 +80,32 @@ CONFIGURE_ENTRY_POINTS = (
     ("cmd_mcu_set", "normalize_mcu_intent", "McuProvider", "apply_mcu_set"),
     ("cmd_adc_set", "normalize_adc_intent", "AdcProvider", "apply_adc_set"),
 )
+
+
+def _install_binding(
+    monkeypatch, command_name, *, provider_type=None, normalizer=None, apply_fn=None
+):
+    registry = cli.get_provider_registry()
+    stem = command_name.removeprefix("cmd_")
+    if stem == "uart_add_flexio_channel":
+        module, cli_action = "uart", "add-flexio-channel"
+    else:
+        module, cli_action = stem.removesuffix("_set"), "set"
+    current = registry.lookup_shortcut(module, cli_action)
+    if provider_type is not None:
+        provider_type.name = module
+    updated = replace(
+        current,
+        provider_type=provider_type or current.provider_type,
+        normalizer=normalizer or current.normalizer,
+        apply_fn=apply_fn or current.apply_fn,
+    )
+    bindings = tuple(
+        updated if item.key == current.key else item
+        for item in registry._bindings.values()
+    )
+    monkeypatch.setattr(cli, "_PROVIDER_REGISTRY", ProviderRegistry(bindings))
+    return updated
 
 
 def _run_configure(project, *extra):
@@ -261,11 +289,12 @@ def test_configure_revalidates_plan_metadata_before_apply(monkeypatch, tmp_path)
         nonlocal apply_called
         apply_called = True
 
-    monkeypatch.setattr(cli, "UartProvider", Provider)
-    monkeypatch.setattr(cli, "apply_uart_set", unexpected_apply)
-    monkeypatch.setattr(
-        cli, "normalize_uart_intent",
-        lambda _args, _bundle: Intent.from_dict({"module": "uart", "action": "set", "payload": {}}),
+    _install_binding(
+        monkeypatch, "cmd_uart_set", provider_type=Provider,
+        apply_fn=unexpected_apply,
+        normalizer=lambda _args, _bundle: Intent.from_dict(
+            {"module": "uart", "action": "set", "payload": {}}
+        ),
     )
     with pytest.raises(Exception) as caught:
         cli.cmd_uart_set(Namespace(project=project_root, configure=True, backup=False))
@@ -387,26 +416,34 @@ def test_every_configure_entry_point_plans_and_applies_one_verified_project(
         def plan(self, _intent):
             return SimpleNamespace(to_dict=lambda: {})
 
-    expected_apply = object()
+    def expected_apply(*_args, **_kwargs):
+        return ApplyResult()
 
-    def configure_same_project(_args, _intent, _plan, apply_fn, project):
+    def configure_same_project(
+        _args, _intent, _plan, apply_fn, project, *, binding=None
+    ):
         assert project is projects[0]
         assert injected["provider"] is project.asset_bundle
         assert injected["normalizer"] is project.asset_bundle
         assert apply_fn is expected_apply
+        assert binding is not None and binding.apply_fn is expected_apply
         assert not project.verified_target.lease.closed
         return 0
 
     monkeypatch.setattr(cli.Project, "verified", tracked_verified)
-    monkeypatch.setattr(cli, provider_name, Provider)
+    stem = command_name.removeprefix("cmd_")
+    module = "uart" if stem == "uart_add_flexio_channel" else stem.removesuffix("_set")
+    action = "add_flexio_channel" if stem == "uart_add_flexio_channel" else "set"
     def normalize(_args, bundle):
         injected["normalizer"] = bundle
         return Intent.from_dict(
-            {"module": "test", "action": "set", "payload": {}}
+            {"module": module, "action": action, "payload": {}}
         )
 
-    monkeypatch.setattr(cli, normalizer_name, normalize)
-    monkeypatch.setattr(cli, apply_name, expected_apply)
+    _install_binding(
+        monkeypatch, command_name, provider_type=Provider,
+        normalizer=normalize, apply_fn=expected_apply,
+    )
     monkeypatch.setattr(cli, "_configure_verified_project", configure_same_project)
 
     assert getattr(cli, command_name)(
@@ -458,9 +495,10 @@ def test_real_configure_pipeline_propagates_one_bundle_identity(
         return static_checks(*args, bundle=bundle, **kwargs)
 
     monkeypatch.setattr(cli, "AssetBundleResolver", TrackingResolver)
-    monkeypatch.setattr(cli, "UartProvider", TrackingProvider)
-    monkeypatch.setattr(cli, "normalize_uart_intent", tracking_normalizer)
-    monkeypatch.setattr(cli, "apply_uart_set", tracking_apply)
+    _install_binding(
+        monkeypatch, "cmd_uart_set", provider_type=TrackingProvider,
+        normalizer=tracking_normalizer, apply_fn=tracking_apply,
+    )
     monkeypatch.setattr(cli, "run_static_checks", tracking_static)
 
     args = cli.build_parser().parse_args([
@@ -515,15 +553,16 @@ def test_every_configure_entry_point_rejects_target_swap_before_apply(
         pytest.fail("apply ran after the verified .mex target was swapped")
 
     monkeypatch.setattr(cli.Project, "verified", verified_then_swap)
-    monkeypatch.setattr(cli, provider_name, Provider)
-    monkeypatch.setattr(
-        cli,
-        normalizer_name,
-        lambda _args, _bundle: Intent.from_dict(
-            {"module": "test", "action": "set", "payload": {}}
+    stem = command_name.removeprefix("cmd_")
+    module = "uart" if stem == "uart_add_flexio_channel" else stem.removesuffix("_set")
+    action = "add_flexio_channel" if stem == "uart_add_flexio_channel" else "set"
+    _install_binding(
+        monkeypatch, command_name, provider_type=Provider,
+        normalizer=lambda _args, _bundle: Intent.from_dict(
+            {"module": module, "action": action, "payload": {}}
         ),
+        apply_fn=unexpected_apply,
     )
-    monkeypatch.setattr(cli, apply_name, unexpected_apply)
 
     with pytest.raises(CliFailure) as caught:
         getattr(cli, command_name)(

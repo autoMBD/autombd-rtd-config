@@ -68,6 +68,7 @@ from rtd_config.backends.s32_mex.metadata import (
     ToolMetadata,
     parse_project_metadata,
 )
+from rtd_config.modules.registry import ProviderRegistry
 from rtd_config.backends.s32_mex.target import verify_project_target
 from rtd_config.errors import CliFailure
 from rtd_config.project import Project
@@ -627,6 +628,8 @@ def test_module_plan_preflights_metadata_before_provider(monkeypatch, tmp_path):
     provider_called = False
 
     class Provider:
+        name = "uart"
+
         def __init__(self, _bundle):
             pass
 
@@ -635,8 +638,17 @@ def test_module_plan_preflights_metadata_before_provider(monkeypatch, tmp_path):
             provider_called = True
             pytest.fail("provider planned before metadata preflight")
 
-    monkeypatch.setattr(cli, "normalize_uart_intent", lambda _args, _bundle: SimpleNamespace(module="uart", action="set", payload={}))
-    monkeypatch.setattr(cli, "UartProvider", Provider)
+    registry = cli.get_provider_registry()
+    current = registry.lookup_shortcut("uart", "set")
+    replacement = replace(current, provider_type=Provider)
+    monkeypatch.setattr(
+        cli,
+        "_PROVIDER_REGISTRY",
+        ProviderRegistry(
+            replacement if binding.key == current.key else binding
+            for binding in registry._bindings.values()
+        ),
+    )
     with pytest.raises(CliFailure) as caught:
         cli.cmd_uart_set(SimpleNamespace(project=root, configure=False))
     assert caught.value.code == "project_metadata_conflict"
@@ -833,11 +845,24 @@ def test_every_module_plan_requires_complete_observed_identity(
             provider_called = True
             pytest.fail("provider planned before complete metadata identity")
 
+    del normalizer_name, provider_name
+    stem = command_name.removeprefix("cmd_")
+    if stem == "uart_add_flexio_channel":
+        module, cli_action = "uart", "add-flexio-channel"
+    else:
+        module, cli_action = stem.removesuffix("_set"), "set"
+    Provider.name = module
+    registry = cli.get_provider_registry()
+    current = registry.lookup_shortcut(module, cli_action)
+    replacement = replace(current, provider_type=Provider)
     monkeypatch.setattr(
-        cli, normalizer_name,
-        lambda _args, _bundle: SimpleNamespace(module="test", action="set", payload={}),
+        cli,
+        "_PROVIDER_REGISTRY",
+        ProviderRegistry(
+            replacement if binding.key == current.key else binding
+            for binding in registry._bindings.values()
+        ),
     )
-    monkeypatch.setattr(cli, provider_name, Provider)
     with pytest.raises(CliFailure) as caught:
         getattr(cli, command_name)(SimpleNamespace(project=root, configure=False))
     assert caught.value.code == "project_metadata_unknown"

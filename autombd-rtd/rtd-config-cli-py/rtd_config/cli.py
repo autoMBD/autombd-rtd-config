@@ -71,6 +71,7 @@ from .modules.mcu import McuProvider
 from .modules.port import PortProvider
 from .modules.dio import DioProvider
 from .modules.adc import AdcProvider
+from .modules.registry import PhysicalRegion, ProviderBinding, ProviderRegistry
 from .checks.static import run_static_checks
 from .backends.s32_mex.apply import apply_uart_set, apply_uart_add_flexio_channel, apply_platform_set, apply_basenxp_set, apply_mcl_set, apply_port_set, apply_dio_set, apply_mcu_set, apply_adc_set
 from .backends.s32_mex.validation import find_s32ds_root, probe_which_root, run_validation
@@ -608,21 +609,30 @@ def _preflight_project(project: Project) -> Project:
     return project
 
 
-def _preflight_plan(args, normalizer, provider_type):
+def _preflight_plan(args, binding: ProviderBinding):
     """Verify observed project identity before module-specific planning."""
     config = RuntimeConfig.from_dict({"project": args.project})
     project = Project.verified(config.project, config.backend)
     try:
         _preflight_project(project)
         bundle = project.asset_bundle
-        intent = normalizer(args, bundle)
-        return intent, provider_type(bundle).plan(intent), project
+        intent = binding.normalizer(args, bundle)
+        registered = get_provider_registry().require_intent(intent, backend=config.backend)
+        if registered is not binding:
+            raise CliFailure(
+                "provider_binding_changed",
+                "The provider registry changed during command preflight.",
+                module="backend",
+            )
+        return intent, binding.provider_type(bundle).plan(intent), project
     except BaseException:
         project.close()
         raise
 
 
-def _complete_planned_command(args, intent, plan, apply_fn, project: Project) -> int:
+def _complete_planned_command(
+    args, intent, plan, binding: ProviderBinding, project: Project
+) -> int:
     if not args.configure:
         try:
             return emit({
@@ -633,7 +643,9 @@ def _complete_planned_command(args, intent, plan, apply_fn, project: Project) ->
             })
         finally:
             project.close()
-    return _configure_module(args, intent, plan, apply_fn, project=project)
+    return _configure_module(
+        args, intent, plan, binding.apply_fn, project=project, binding=binding
+    )
 
 
 def cmd_validate(args: argparse.Namespace) -> int:
@@ -742,8 +754,7 @@ def _cmd_validate_verified(args, config: RuntimeConfig, project: Project) -> int
 
 
 def cmd_uart_set(args: argparse.Namespace) -> int:
-    intent, plan, project = _preflight_plan(args, normalize_uart_intent, UartProvider)
-    return _complete_planned_command(args, intent, plan, apply_uart_set, project)
+    return _run_registered_shortcut(args, "uart", "set")
 
 
 def normalize_uart_add_flexio_intent(args: argparse.Namespace, _bundle) -> Intent:
@@ -763,15 +774,13 @@ def normalize_uart_add_flexio_intent(args: argparse.Namespace, _bundle) -> Inten
 
 
 def cmd_uart_add_flexio_channel(args: argparse.Namespace) -> int:
-    intent, plan, project = _preflight_plan(args, normalize_uart_add_flexio_intent, UartProvider)
-    return _complete_planned_command(
-        args, intent, plan, apply_uart_add_flexio_channel, project
-    )
+    return _run_registered_shortcut(args, "uart", "add-flexio-channel")
 
 
 def _configure_module(
     args: argparse.Namespace, intent: Intent, plan, apply_fn,
     project: Project | None = None,
+    binding: ProviderBinding | None = None,
 ) -> int:
     """Shared configure pipeline: apply an owned edit, preflight, then commit.
 
@@ -784,16 +793,22 @@ def _configure_module(
         project = Project.verified(config.project, config.backend)
         _preflight_project(project)
     try:
-        return _configure_verified_project(args, intent, plan, apply_fn, project)
+        return _configure_verified_project(
+            args, intent, plan, apply_fn, project, binding=binding
+        )
     finally:
         project.close()
 
 
-def _configure_verified_project(args, intent, plan, apply_fn, project: Project) -> int:
+def _configure_verified_project(
+    args, intent, plan, apply_fn, project: Project,
+    *, binding: ProviderBinding | None = None,
+) -> int:
     try:
         transaction_result = ConfigureTransaction(
             project,
             plan=plan,
+            binding=binding,
             backup=args.backup,
             static_runner=run_static_checks,
         ).execute(intent, apply_fn)
@@ -856,8 +871,7 @@ def normalize_platform_intent(args: argparse.Namespace, _bundle) -> Intent:
 
 
 def cmd_platform_set(args: argparse.Namespace) -> int:
-    intent, plan, project = _preflight_plan(args, normalize_platform_intent, PlatformProvider)
-    return _complete_planned_command(args, intent, plan, apply_platform_set, project)
+    return _run_registered_shortcut(args, "platform", "set")
 
 
 def normalize_basenxp_intent(args: argparse.Namespace, bundle) -> Intent:
@@ -888,8 +902,7 @@ def normalize_basenxp_intent(args: argparse.Namespace, bundle) -> Intent:
 
 
 def cmd_basenxp_set(args: argparse.Namespace) -> int:
-    intent, plan, project = _preflight_plan(args, normalize_basenxp_intent, BaseNxpProvider)
-    return _complete_planned_command(args, intent, plan, apply_basenxp_set, project)
+    return _run_registered_shortcut(args, "basenxp", "set")
 
 
 def normalize_mcl_intent(args: argparse.Namespace, _bundle) -> Intent:
@@ -906,8 +919,7 @@ def normalize_mcl_intent(args: argparse.Namespace, _bundle) -> Intent:
 
 
 def cmd_mcl_set(args: argparse.Namespace) -> int:
-    intent, plan, project = _preflight_plan(args, normalize_mcl_intent, MclProvider)
-    return _complete_planned_command(args, intent, plan, apply_mcl_set, project)
+    return _run_registered_shortcut(args, "mcl", "set")
 
 
 def normalize_port_intent(args: argparse.Namespace, _bundle) -> Intent:
@@ -930,8 +942,7 @@ def normalize_port_intent(args: argparse.Namespace, _bundle) -> Intent:
 
 
 def cmd_port_set(args: argparse.Namespace) -> int:
-    intent, plan, project = _preflight_plan(args, normalize_port_intent, PortProvider)
-    return _complete_planned_command(args, intent, plan, apply_port_set, project)
+    return _run_registered_shortcut(args, "port", "set")
 
 
 def normalize_dio_intent(args: argparse.Namespace, _bundle) -> Intent:
@@ -976,13 +987,11 @@ def normalize_mcu_intent(args: argparse.Namespace, _bundle) -> Intent:
 
 
 def cmd_dio_set(args: argparse.Namespace) -> int:
-    intent, plan, project = _preflight_plan(args, normalize_dio_intent, DioProvider)
-    return _complete_planned_command(args, intent, plan, apply_dio_set, project)
+    return _run_registered_shortcut(args, "dio", "set")
 
 
 def cmd_mcu_set(args: argparse.Namespace) -> int:
-    intent, plan, project = _preflight_plan(args, normalize_mcu_intent, McuProvider)
-    return _complete_planned_command(args, intent, plan, apply_mcu_set, project)
+    return _run_registered_shortcut(args, "mcu", "set")
 
 
 def normalize_adc_intent(args: argparse.Namespace, _bundle) -> Intent:
@@ -998,9 +1007,95 @@ def normalize_adc_intent(args: argparse.Namespace, _bundle) -> Intent:
     return Intent.from_dict({"module": "adc", "action": "set", "payload": payload})
 
 
+_PROVIDER_REGISTRY: ProviderRegistry | None = None
+
+
+def get_provider_registry() -> ProviderRegistry:
+    """Return the validated single source of provider dispatch and ownership."""
+    global _PROVIDER_REGISTRY
+    if _PROVIDER_REGISTRY is None:
+        config_region = lambda owner, name: PhysicalRegion(owner, f"config_set:{name}")
+        bindings = (
+            ProviderBinding(
+                "mex", "uart", "set", "set", normalize_uart_intent,
+                UartProvider, apply_uart_set,
+                frozenset({"uart", "mcu", "port", "platform", "mcl"}), frozenset(),
+                frozenset({
+                    config_region("uart", "Uart"), config_region("mcu", "Mcu"),
+                    config_region("port", "Port"), PhysicalRegion("port", "Pins/Port"),
+                    config_region("platform", "Platform"), config_region("mcl", "Mcl"),
+                    PhysicalRegion("mcu", "Clocks/clock_settings"),
+                }),
+            ),
+            ProviderBinding(
+                "mex", "uart", "add_flexio_channel", "add-flexio-channel",
+                normalize_uart_add_flexio_intent, UartProvider,
+                apply_uart_add_flexio_channel,
+                frozenset({"uart", "mcu", "platform", "mcl"}), frozenset(),
+                frozenset({
+                    config_region("uart", "Uart"), config_region("mcu", "Mcu"),
+                    config_region("platform", "Platform"), config_region("mcl", "Mcl"),
+                    PhysicalRegion("mcu", "Clocks/clock_settings"),
+                }),
+            ),
+            ProviderBinding(
+                "mex", "platform", "set", "set", normalize_platform_intent,
+                PlatformProvider, apply_platform_set, frozenset({"platform"}), frozenset(),
+                frozenset({config_region("platform", "Platform")}),
+            ),
+            ProviderBinding(
+                "mex", "basenxp", "set", "set", normalize_basenxp_intent,
+                BaseNxpProvider, apply_basenxp_set, frozenset({"basenxp"}), frozenset({"mcu"}),
+                frozenset({config_region("basenxp", "BaseNXP")}),
+            ),
+            ProviderBinding(
+                "mex", "mcl", "set", "set", normalize_mcl_intent,
+                MclProvider, apply_mcl_set, frozenset({"mcl"}), frozenset(),
+                frozenset({config_region("mcl", "Mcl")}),
+            ),
+            ProviderBinding(
+                "mex", "port", "set", "set", normalize_port_intent,
+                PortProvider, apply_port_set, frozenset({"port"}), frozenset(),
+                frozenset({config_region("port", "Port"), PhysicalRegion("port", "Pins/Port")}),
+            ),
+            ProviderBinding(
+                "mex", "dio", "set", "set", normalize_dio_intent,
+                DioProvider, apply_dio_set, frozenset({"dio", "port"}), frozenset(),
+                frozenset({config_region("dio", "Dio"), config_region("port", "Port"), PhysicalRegion("port", "Pins/Port")}),
+            ),
+            ProviderBinding(
+                "mex", "mcu", "set", "set", normalize_mcu_intent,
+                McuProvider, apply_mcu_set, frozenset({"mcu"}), frozenset(),
+                frozenset({config_region("mcu", "Mcu"), PhysicalRegion("mcu", "Clocks/clock_settings")}),
+            ),
+            ProviderBinding(
+                "mex", "adc", "set", "set", normalize_adc_intent,
+                AdcProvider, apply_adc_set, frozenset({"adc", "mcl"}), frozenset(),
+                frozenset({config_region("adc", "Adc"), config_region("mcl", "Mcl")}),
+            ),
+        )
+        _PROVIDER_REGISTRY = ProviderRegistry(bindings)
+    return _PROVIDER_REGISTRY
+
+
+def _shortcut_binding(
+    args: argparse.Namespace, module: str | None = None, cli_action: str | None = None
+) -> ProviderBinding:
+    return get_provider_registry().lookup_shortcut(
+        module or args.command, cli_action or args.action
+    )
+
+
+def _run_registered_shortcut(
+    args: argparse.Namespace, module: str | None = None, cli_action: str | None = None
+) -> int:
+    binding = _shortcut_binding(args, module, cli_action)
+    intent, plan, project = _preflight_plan(args, binding)
+    return _complete_planned_command(args, intent, plan, binding, project)
+
+
 def cmd_adc_set(args: argparse.Namespace) -> int:
-    intent, plan, project = _preflight_plan(args, normalize_adc_intent, AdcProvider)
-    return _complete_planned_command(args, intent, plan, apply_adc_set, project)
+    return _run_registered_shortcut(args, "adc", "set")
 
 
 def _dispatch(args: argparse.Namespace, parser: argparse.ArgumentParser) -> int:
@@ -1017,32 +1112,8 @@ def _dispatch(args: argparse.Namespace, parser: argparse.ArgumentParser) -> int:
     if args.command == "validate":
         return cmd_validate(args)
 
-    if args.command == "uart" and getattr(args, "action", None) == "set":
-        return cmd_uart_set(args)
-
-    if args.command == "uart" and getattr(args, "action", None) == "add-flexio-channel":
-        return cmd_uart_add_flexio_channel(args)
-
-    if args.command == "platform" and getattr(args, "action", None) == "set":
-        return cmd_platform_set(args)
-
-    if args.command == "basenxp" and getattr(args, "action", None) == "set":
-        return cmd_basenxp_set(args)
-
-    if args.command == "mcl" and getattr(args, "action", None) == "set":
-        return cmd_mcl_set(args)
-
-    if args.command == "port" and getattr(args, "action", None) == "set":
-        return cmd_port_set(args)
-
-    if args.command == "dio" and getattr(args, "action", None) == "set":
-        return cmd_dio_set(args)
-
-    if args.command == "mcu" and getattr(args, "action", None) == "set":
-        return cmd_mcu_set(args)
-
-    if args.command == "adc" and getattr(args, "action", None) == "set":
-        return cmd_adc_set(args)
+    if args.command in {"uart", "platform", "basenxp", "mcl", "port", "dio", "mcu", "adc"}:
+        return _run_registered_shortcut(args)
 
     if args.version:
         return emit({

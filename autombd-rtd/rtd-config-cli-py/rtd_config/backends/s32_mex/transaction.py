@@ -62,6 +62,7 @@ from .metadata import (
     revalidate_project_metadata,
     revalidate_project_metadata_after_release,
 )
+from .ownership import audit_candidate
 from .target import (
     AtomicPublishResult,
     AtomicPublishFailure,
@@ -82,6 +83,7 @@ from .target import (
 if TYPE_CHECKING:
     from ...intent import Intent
     from ...project import Project
+    from ...modules.registry import ProviderBinding
 
 
 @dataclass(frozen=True)
@@ -105,6 +107,7 @@ class ConfigureTransaction:
         project: "Project",
         *,
         plan: object | None = None,
+        binding: "ProviderBinding | None" = None,
         backup: bool = False,
         static_runner: Callable[..., object],
         vendor_runner: Callable[..., object] | None = None,
@@ -113,6 +116,7 @@ class ConfigureTransaction:
     ) -> None:
         self.project = project
         self.plan = plan
+        self.binding = binding
         self.target = project.verified_target
         self.original = self.target.mex
         self.metadata = project.metadata
@@ -130,7 +134,9 @@ class ConfigureTransaction:
                 module="backend",
             )
 
-    def execute(self, intent: "Intent", apply_fn: Callable[..., ApplyResult]) -> ConfigureTransactionResult:
+    def execute(
+        self, intent: "Intent", apply_fn: Callable[..., ApplyResult] | None = None
+    ) -> ConfigureTransactionResult:
         staging: Path | None = None
         backup_staging: Path | None = None
         cleanup: list[FileSnapshot] = []
@@ -138,11 +144,34 @@ class ConfigureTransaction:
         backup_publication: AtomicPublishResult | None = None
         committed = False
         cleanup_warnings: list[dict] = []
+        actual_changed_modules: list[str] = []
         try:
             self.metadata.require_identity()
             revalidate_snapshot(self.target, platform=self.platform)
             revalidate_project_metadata(self.target, self.metadata)
 
+            if self.binding is not None:
+                if (
+                    intent.module != self.binding.module
+                    or intent.action != self.binding.action
+                ):
+                    raise CliFailure(
+                        "provider_intent_mismatch",
+                        "The transaction intent does not match its provider binding.",
+                        module="backend",
+                    )
+                if apply_fn is not None and apply_fn is not self.binding.apply_fn:
+                    raise CliFailure(
+                        "provider_apply_mismatch",
+                        "The transaction apply operation is not the registered operation.",
+                        module="backend",
+                    )
+                apply_fn = self.binding.apply_fn
+            if apply_fn is None:
+                raise CliFailure(
+                    "provider_apply_missing", "No apply operation was bound to the transaction.",
+                    module="backend",
+                )
             apply_result = apply_fn(
                 self.project.document, intent, bundle=self.bundle
             )
@@ -154,6 +183,11 @@ class ConfigureTransaction:
 
             candidate = self.project.document.render()
             no_op = candidate == self.original.content
+            if self.binding is not None:
+                audit = audit_candidate(
+                    self.original.content, candidate, self.binding, self.plan
+                )
+                actual_changed_modules = list(audit.changed_modules)
 
             staging = self._stage_bytes(candidate, "candidate", self.original.mode)
             candidate_snapshot = self._snapshot_staging(staging, candidate)
@@ -306,6 +340,7 @@ class ConfigureTransaction:
             return self._result(
                 "passed", apply_result, static_result, vendor_result,
                 final.content,
+                changed_modules=actual_changed_modules,
                 published=True,
                 cleanup_warnings=cleanup_warnings,
             )

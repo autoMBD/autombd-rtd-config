@@ -53,7 +53,7 @@ def _apply(_doc, _intent, *, bundle):
 
 def _binding(**overrides):
     values = dict(
-        backend="s32-mex", module="uart", action="set",
+        backend="mex", module="uart", action="set",
         cli_action="set", normalizer=_normalizer,
         provider_type=_Provider, apply_fn=_apply,
         write_owners=frozenset({"uart"}), read_dependencies=frozenset(),
@@ -87,27 +87,27 @@ def test_registry_rejects_provider_ownership_contract_errors(binding, code):
 def test_registry_lookup_rejects_unknown_and_wrong_intent():
     registry = ProviderRegistry((_binding(),))
     with pytest.raises(CliFailure) as unknown:
-        registry.lookup("s32-mex", "adc", "set")
+        registry.lookup("mex", "adc", "set")
     assert unknown.value.code == "provider_binding_unknown"
     with pytest.raises(CliFailure) as wrong:
-        registry.require_intent(Intent("uart", "other", {}), backend="s32-mex")
+        registry.require_intent(Intent("uart", "other", {}), backend="mex")
     assert wrong.value.code == "provider_intent_mismatch"
 
 
 def test_default_registry_has_exactly_all_nine_supported_bindings():
     registry = cli.get_provider_registry()
     assert registry.keys() == (
-        ("s32-mex", "adc", "set"),
-        ("s32-mex", "basenxp", "set"),
-        ("s32-mex", "dio", "set"),
-        ("s32-mex", "mcl", "set"),
-        ("s32-mex", "mcu", "set"),
-        ("s32-mex", "platform", "set"),
-        ("s32-mex", "port", "set"),
-        ("s32-mex", "uart", "add_flexio_channel"),
-        ("s32-mex", "uart", "set"),
+        ("mex", "adc", "set"),
+        ("mex", "basenxp", "set"),
+        ("mex", "dio", "set"),
+        ("mex", "mcl", "set"),
+        ("mex", "mcu", "set"),
+        ("mex", "platform", "set"),
+        ("mex", "port", "set"),
+        ("mex", "uart", "add_flexio_channel"),
+        ("mex", "uart", "set"),
     )
-    basenxp = registry.lookup("s32-mex", "basenxp", "set")
+    basenxp = registry.lookup("mex", "basenxp", "set")
     assert basenxp.write_owners == frozenset({"basenxp"})
     assert basenxp.read_dependencies == frozenset({"mcu"})
 

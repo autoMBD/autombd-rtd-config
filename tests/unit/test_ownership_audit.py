@@ -44,7 +44,7 @@ def _binding(
 ):
     provider = type("Provider", (), {"name": module})
     return ProviderBinding(
-        backend="s32-mex", module=module, action="set", cli_action="set",
+        backend="mex", module=module, action="set", cli_action="set",
         normalizer=lambda *_a: Intent(module, "set", {}),
         provider_type=provider, apply_fn=apply_fn,
         write_owners=frozenset(write), read_dependencies=frozenset(read),
@@ -90,7 +90,10 @@ def test_audit_rejects_undeclared_module_and_region():
     changed_pin = _XML.replace(b'value="A"', b'value="B"')
     broad = _binding(
         write=("uart", "port"),
-        regions=(PhysicalRegion("uart", "config_set:Uart"),),
+        regions=(
+            PhysicalRegion("uart", "config_set:Uart"),
+            PhysicalRegion("port", "config_set:Port"),
+        ),
     )
     with pytest.raises(CliFailure) as region_error:
         audit_candidate(_XML, changed_pin, broad, _plan("uart", "port"))
