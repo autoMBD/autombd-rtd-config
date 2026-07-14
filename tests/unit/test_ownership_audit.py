@@ -457,3 +457,36 @@ def test_public_ownership_failure_redacts_values_facts_and_raw_paths():
     assert "attributes" not in public
     assert "value" not in public.lower()
     assert "http://mcuxpresso.nxp.com" not in public
+
+
+def test_public_ownership_failure_does_not_echo_xml_derived_owner_or_region():
+    secret = "sk_live_SUPERSECRET"
+    candidate = _XML.replace(
+        b"</periphs>",
+        f'<config_set name="{secret}"><setting name="Token" value="x"/>'
+        f"</config_set></periphs>".encode(),
+    )
+
+    with pytest.raises(CliFailure) as caught:
+        audit_candidate(_XML, candidate, _binding(), _plan("uart"))
+
+    public = str(caught.value.details).lower()
+    assert secret.lower() not in public
+    assert dict(caught.value.details) == {"owners": ("unknown",), "count": 2}
+
+
+def test_public_ownership_failure_does_not_echo_plan_owner_outside_binding():
+    secret = "sk_live_SUPERSECRET"
+    plan = Plan([PlannedChange(
+        secret, secret, "/secret", "untrusted owner",
+        targets=(TargetSelector(
+            f"config_set:{secret}", ("config_set", secret)
+        ),),
+    )])
+
+    with pytest.raises(CliFailure) as caught:
+        audit_candidate(_XML, _XML, _binding(), plan)
+
+    public = str(caught.value.details).lower()
+    assert secret.lower() not in public
+    assert dict(caught.value.details) == {"owners": ("unknown",), "count": 1}

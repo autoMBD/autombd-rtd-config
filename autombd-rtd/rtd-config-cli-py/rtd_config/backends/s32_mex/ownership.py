@@ -246,7 +246,6 @@ def _matches(entry: DeltaEntry, change: PlannedChange) -> bool:
     )
 
 
-_SAFE_NAME = re.compile(r"^[A-Za-z][A-Za-z0-9_.:-]{0,63}$")
 _SAFE_ELEMENTS = frozenset({
     "configuration", "mex", "tools", "pins", "clocks", "clock_settings",
     "periphs", "functional_groups", "functional_group", "instances", "instance",
@@ -256,25 +255,25 @@ _SAFE_ELEMENTS = frozenset({
 _SAFE_SELECTOR_KEYS = frozenset({"name", "id", "key", "type"})
 
 
-def _safe_label(value: str, fallback: str = "unknown") -> str:
-    return value if _SAFE_NAME.fullmatch(value) else fallback
+def _canonical_owner(value: str, binding: ProviderBinding) -> str:
+    permitted = binding.write_owners | binding.read_dependencies
+    return value if value in permitted else "unknown"
 
 
-def _safe_region(value: str) -> str:
-    if value in {"Pins/Port", "Clocks/clock_settings"}:
-        return value
-    return _safe_label(value)
+def _canonical_region(entry: DeltaEntry, binding: ProviderBinding) -> str:
+    allowed = {(item.owner, item.name) for item in binding.allowed_regions}
+    return entry.region if (entry.owner, entry.region) in allowed else "unknown"
 
 
-def _public_delta(entry: DeltaEntry) -> dict:
+def _public_delta(entry: DeltaEntry, binding: ProviderBinding) -> dict:
     elements = []
     for raw in re.findall(r"/([^/]+?)\[\d+\]", entry.path)[-8:]:
         local = raw.rsplit("}", 1)[-1]
         elements.append(local if local in _SAFE_ELEMENTS else "unknown")
     keys = sorted({key for key, _value in entry.attributes if key in _SAFE_SELECTOR_KEYS})
     return {
-        "owner": _safe_label(entry.owner),
-        "region": _safe_region(entry.region),
+        "owner": _canonical_owner(entry.owner, binding),
+        "region": _canonical_region(entry, binding),
         "delta_kind": entry.kind if entry.kind in {"added", "removed", "modified"} else "unknown",
         "locator": {"elements": elements, "selector_keys": keys[:4]},
     }
@@ -282,44 +281,54 @@ def _public_delta(entry: DeltaEntry) -> dict:
 
 def audit_candidate(before: bytes, candidate: bytes, binding: ProviderBinding, plan) -> OwnershipAudit:
     binding.validate_ownership()
-    validate_provider_plan(plan, binding=binding)
+    validate_provider_plan(plan)
     changes = tuple(plan.changes)
     declared = {change.owner for change in changes}
     permitted = binding.write_owners | binding.read_dependencies
     if not declared <= permitted:
+        invalid_count = len(declared - permitted)
         raise CliFailure(
             "provider_plan_invalid", "The plan declares an owner outside its binding.",
             module="backend", details={
-                "owners": sorted(_safe_label(item) for item in declared - permitted)
+                "owners": ["unknown"], "count": invalid_count,
             },
         )
+    validate_provider_plan(plan, binding=binding)
     entries = collect_actual_deltas(before, candidate)
     unknown = [entry for entry in entries if entry.owner == "unknown"]
     if unknown:
         raise CliFailure(
             "ownership_unknown", "An XML delta has no safe physical ownership mapping.",
-            module="backend", details={"deltas": [_public_delta(item) for item in unknown]},
+            module="backend", details={
+                "deltas": [_public_delta(item, binding) for item in unknown]
+            },
         )
-    invalid_owners = sorted({
-        entry.owner for entry in entries if entry.owner not in binding.write_owners
-    })
+    invalid_owners = [
+        entry for entry in entries if entry.owner not in binding.write_owners
+    ]
     if invalid_owners:
         raise CliFailure(
             "provider_ownership_violation", "The candidate changes an unauthorized owner.",
-            module="backend", details={"owners": [_safe_label(item) for item in invalid_owners]},
+            module="backend", details={
+                "owners": ["unknown"], "count": len(invalid_owners),
+            },
         )
     allowed_regions = {(item.owner, item.name) for item in binding.allowed_regions}
-    invalid_regions = sorted({
-        (entry.owner, entry.region) for entry in entries
+    invalid_regions = [
+        entry for entry in entries
         if (entry.owner, entry.region) not in allowed_regions
-    })
+    ]
     if invalid_regions:
+        public_regions = sorted({
+            (_canonical_owner(entry.owner, binding), "unknown")
+            for entry in invalid_regions
+        })
         raise CliFailure(
             "provider_region_violation", "The candidate changes an undeclared XML region.",
             module="backend", details={"regions": [
-                {"owner": _safe_label(owner), "region": _safe_region(region)}
-                for owner, region in invalid_regions
-            ]},
+                {"owner": owner, "region": region}
+                for owner, region in public_regions
+            ], "count": len(invalid_regions)},
         )
     unauthorized = [
         entry for entry in entries
@@ -330,7 +339,7 @@ def audit_candidate(before: bytes, candidate: bytes, binding: ProviderBinding, p
             "provider_ownership_violation",
             "The candidate delta does not match a planned target selector.",
             module="backend", details={
-                "deltas": [_public_delta(item) for item in unauthorized],
+                "deltas": [_public_delta(item, binding) for item in unauthorized],
             },
         )
     actual = {entry.owner for entry in entries}
