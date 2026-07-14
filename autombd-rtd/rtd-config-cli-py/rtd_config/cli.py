@@ -1112,7 +1112,12 @@ def _dispatch(args: argparse.Namespace, parser: argparse.ArgumentParser) -> int:
     if args.command == "validate":
         return cmd_validate(args)
 
-    if args.command in {"uart", "platform", "basenxp", "mcl", "port", "dio", "mcu", "adc"}:
+    action = getattr(args, "action", None)
+    if (
+        args.command in {"uart", "platform", "basenxp", "mcl", "port", "dio", "mcu", "adc"}
+        and isinstance(action, str)
+        and action
+    ):
         return _run_registered_shortcut(args)
 
     if args.version:
