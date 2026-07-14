@@ -48,6 +48,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 import traceback
 import xml.etree.ElementTree as ET
@@ -144,31 +145,42 @@ def _add_spec_argument(parser: argparse.ArgumentParser) -> None:
     )
 
 
-def _add_canonical_arguments(parser: argparse.ArgumentParser, *, configure: bool) -> None:
-    """Add generic request fields without defaults that could mask JSON config."""
-    parser.add_argument("--intent", required=True, metavar="PATH")
+_RUNTIME_OPTIONS = (
+    ("--project", "project"),
+    ("--backend", "backend"),
+    ("--vendor", "vendor"),
+    ("--family", "family"),
+    ("--device", "device"),
+    ("--package", "package"),
+    ("--rtd-version", "rtd_version"),
+    ("--schema-version", "schema_version"),
+    ("--s32ds-root", "s32ds_root"),
+    ("--sdk-path", "sdk_path"),
+    ("--workspace", "workspace"),
+    ("--temp-root", "temp_root"),
+    ("--log-root", "log_root"),
+    ("--asset-root", "asset_root"),
+)
+
+
+def _add_runtime_arguments(
+    parser: argparse.ArgumentParser, *, include_project: bool
+) -> None:
     parser.add_argument("--config", default=argparse.SUPPRESS, metavar="PATH")
-    for option, dest in (
-        ("--project", "project"),
-        ("--backend", "backend"),
-        ("--vendor", "vendor"),
-        ("--family", "family"),
-        ("--device", "device"),
-        ("--package", "package"),
-        ("--rtd-version", "rtd_version"),
-        ("--schema-version", "schema_version"),
-        ("--s32ds-root", "s32ds_root"),
-        ("--sdk-path", "sdk_path"),
-        ("--workspace", "workspace"),
-        ("--temp-root", "temp_root"),
-        ("--log-root", "log_root"),
-        ("--asset-root", "asset_root"),
-    ):
+    for option, dest in _RUNTIME_OPTIONS:
+        if dest == "project" and not include_project:
+            continue
         parser.add_argument(option, dest=dest, default=argparse.SUPPRESS)
     parser.add_argument(
         "--timeout", "--validation-timeout-s", dest="validation_timeout_s",
         type=int, default=argparse.SUPPRESS,
     )
+
+
+def _add_canonical_arguments(parser: argparse.ArgumentParser, *, configure: bool) -> None:
+    """Add generic request fields without defaults that could mask JSON config."""
+    parser.add_argument("--intent", required=True, metavar="PATH")
+    _add_runtime_arguments(parser, include_project=True)
     if configure:
         parser.add_argument("--backup", action="store_true")
     parser.add_argument("--json", action="store_true")
@@ -184,37 +196,33 @@ def _load_spec_payload(args: argparse.Namespace, module: str, action: str = "set
     except FileNotFoundError as exc:
         raise CliFailure(
             code="spec_not_found",
-            message=f"Spec file does not exist: {spec_path}",
+            message="The module spec file does not exist.",
             module=module,
-            details={"spec": str(spec_path)},
         ) from exc
     except PermissionError as exc:
         raise CliFailure(
             code="permission_denied",
-            message=f"Permission denied while reading spec: {spec_path}",
+            message="Permission was denied while reading the module spec.",
             module=module,
-            details={"spec": str(spec_path)},
         ) from exc
     except UnicodeError as exc:
         raise CliFailure(
             code="spec_invalid",
-            message=f"Spec is not valid UTF-8: {spec_path}",
+            message="The module spec is not valid UTF-8.",
             module=module,
-            details={"spec": str(spec_path), "reason": str(exc)},
         ) from exc
     except OSError as exc:
         raise CliFailure(
             code="spec_read_failed",
-            message=f"Failed to read spec: {spec_path}",
+            message="The module spec could not be read.",
             module=module,
-            details={"spec": str(spec_path), "reason": str(exc)},
         ) from exc
     except json.JSONDecodeError as exc:
         raise CliFailure(
             code="spec_invalid",
-            message=f"Spec is not valid JSON: {spec_path}",
+            message="The module spec is not valid JSON.",
             module=module,
-            details={"spec": str(spec_path), "line": exc.lineno, "column": exc.colno},
+            details={"line": exc.lineno, "column": exc.colno},
         ) from exc
 
     if not isinstance(raw, dict):
@@ -227,7 +235,7 @@ def _load_spec_payload(args: argparse.Namespace, module: str, action: str = "set
     if spec_module is not None and spec_module != module:
         raise CliFailure(
             "spec_invalid",
-            f"Spec module mismatch: expected {module!r}, got {spec_module!r}.",
+            "The module spec does not match the selected shortcut module.",
             module=module,
         )
 
@@ -235,7 +243,7 @@ def _load_spec_payload(args: argparse.Namespace, module: str, action: str = "set
     if spec_action is not None and spec_action != action:
         raise CliFailure(
             "spec_invalid",
-            f"Spec action mismatch: expected {action!r}, got {spec_action!r}.",
+            "The module spec does not match the selected shortcut action.",
             module=module,
         )
 
@@ -374,6 +382,7 @@ def build_parser() -> argparse.ArgumentParser:
     uart_actions = uart_parser.add_subparsers(dest="action")
     uart_set = uart_actions.add_parser("set")
     uart_set.add_argument("--project", required=True)
+    _add_runtime_arguments(uart_set, include_project=False)
     uart_set.add_argument("--hw", required=False)
     # RTD 7.0.1 has no polling async-method value; interrupt and DMA are supported.
     uart_set.add_argument("--mode", default="interrupt", choices=["interrupt", "dma"])
@@ -416,6 +425,7 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     uart_add_flexio.add_argument("--project", required=True)
+    _add_runtime_arguments(uart_add_flexio, include_project=False)
     uart_add_flexio.add_argument(
         "--baud", type=int, default=921600,
         help="Desired baud rate (default: 921600). Maps to FLEXIO_UART_BAUDRATE_<baud>.",
@@ -448,6 +458,7 @@ def build_parser() -> argparse.ArgumentParser:
     platform_actions = platform_parser.add_subparsers(dest="action")
     platform_set = platform_actions.add_parser("set")
     platform_set.add_argument("--project", required=True)
+    _add_runtime_arguments(platform_set, include_project=False)
     # Target an existing interrupt by peripheral (e.g. LPUART_3) or exact IsrName.
     platform_set.add_argument("--peripheral")
     platform_set.add_argument("--isr-name")
@@ -461,6 +472,7 @@ def build_parser() -> argparse.ArgumentParser:
     basenxp_actions = basenxp_parser.add_subparsers(dest="action")
     basenxp_set = basenxp_actions.add_parser("set")
     basenxp_set.add_argument("--project", required=True)
+    _add_runtime_arguments(basenxp_set, include_project=False)
     basenxp_set.add_argument(
         "--enable-system-timer",
         action="store_true",
@@ -482,6 +494,7 @@ def build_parser() -> argparse.ArgumentParser:
     mcl_actions = mcl_parser.add_subparsers(dest="action")
     mcl_set = mcl_actions.add_parser("set")
     mcl_set.add_argument("--project", required=True)
+    _add_runtime_arguments(mcl_set, include_project=False)
     mcl_set.add_argument(
         "--add-flexio-logic-channel",
         metavar="NAME",
@@ -500,6 +513,7 @@ def build_parser() -> argparse.ArgumentParser:
     port_actions = port_parser.add_subparsers(dest="action")
     port_set = port_actions.add_parser("set")
     port_set.add_argument("--project", required=True)
+    _add_runtime_arguments(port_set, include_project=False)
     port_set.add_argument(
         "--peripheral",
         help="Peripheral whose TX/RX pins to configure, e.g. LPUART_0.",
@@ -515,6 +529,7 @@ def build_parser() -> argparse.ArgumentParser:
     dio_actions = dio_parser.add_subparsers(dest="action")
     dio_set = dio_actions.add_parser("set")
     dio_set.add_argument("--project", required=True)
+    _add_runtime_arguments(dio_set, include_project=False)
     dio_set.add_argument(
         "--add-channel",
         metavar="NAME",
@@ -543,6 +558,7 @@ def build_parser() -> argparse.ArgumentParser:
     mcu_actions = mcu_parser.add_subparsers(dest="action")
     mcu_set = mcu_actions.add_parser("set")
     mcu_set.add_argument("--project", required=True)
+    _add_runtime_arguments(mcu_set, include_project=False)
     mcu_set.add_argument(
         "--core-clk",
         type=int,
@@ -587,6 +603,7 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     adc_set.add_argument("--project", required=True)
+    _add_runtime_arguments(adc_set, include_project=False)
     _add_spec_argument(adc_set)
     adc_set.add_argument("--configure", action="store_true")
     adc_set.add_argument("--backup", action="store_true")
@@ -747,9 +764,20 @@ def _assert_expected_identity(
         observed_token = str(observed).casefold()
         expected_token = str(expected).casefold()
         if field == "rtd_version":
-            observed_token = "".join(char for char in observed_token if char.isalnum())
-            expected_token = "".join(char for char in expected_token if char.isalnum())
-        if observed_token != expected_token:
+            observed_value = tuple(
+                str(int(item)) if item.isdigit() else item
+                for item in re.split(r"[._-]", observed_token)
+                if item
+            )
+            expected_value = tuple(
+                str(int(item)) if item.isdigit() else item
+                for item in re.split(r"[._-]", expected_token)
+                if item
+            )
+        else:
+            observed_value = observed_token
+            expected_value = expected_token
+        if observed_value != expected_value:
             mismatches.append(field)
     if mismatches:
         raise CliFailure(
@@ -802,7 +830,8 @@ def _execute_canonical_request(
             })
         execution_args = argparse.Namespace(backup=backup)
         return _configure_verified_project(
-            execution_args, intent, plan, binding.apply_fn, project, binding=binding
+            execution_args, intent, plan, binding.apply_fn, project,
+            binding=binding, runtime_config=config,
         )
     finally:
         project.close()
@@ -960,9 +989,35 @@ def _configure_module(
         project.close()
 
 
+def _configured_vendor_runner(config: RuntimeConfig | None):
+    if config is None or config.s32ds_root is None:
+        return None
+
+    def validate_candidate(*, staging, document, project, bundle):
+        del document, bundle
+        outcome = run_validation(
+            project,
+            config.s32ds_root,
+            sdk_path=config.sdk_path,
+            workspace=config.workspace,
+            timeout_s=config.validation_timeout_s,
+            temp_root=config.temp_root,
+            log_root=config.log_root,
+            mex_file=staging,
+        )
+        # ConfigureTransaction consumes the shared validator protocol.  Keep
+        # compatible validator test doubles on that protocol as well.
+        if not hasattr(outcome, "status"):
+            outcome.status = "passed" if bool(outcome.passed) else "blocked"
+        return outcome
+
+    return validate_candidate
+
+
 def _configure_verified_project(
     args, intent, plan, apply_fn, project: Project,
     *, binding: ProviderBinding | None = None,
+    runtime_config: RuntimeConfig | None = None,
 ) -> int:
     try:
         transaction_result = ConfigureTransaction(
@@ -971,6 +1026,7 @@ def _configure_verified_project(
             binding=binding,
             backup=args.backup,
             static_runner=run_static_checks,
+            vendor_runner=_configured_vendor_runner(runtime_config),
         ).execute(intent, apply_fn)
         apply_result = transaction_result.apply_result
         static_result = transaction_result.static_result
@@ -990,6 +1046,19 @@ def _configure_verified_project(
         if static_result is not None:
             payload["runtime_verification"] = {
                 "static_check": static_result.to_dict(),
+            }
+        vendor_result = transaction_result.vendor_result
+        if vendor_result is not None:
+            payload.setdefault("runtime_verification", {})["vendor_validation"] = {
+                "status": getattr(vendor_result, "status", "blocked"),
+                "passed": bool(getattr(vendor_result, "passed", False)),
+                "exit_code": getattr(vendor_result, "exit_code", None),
+                "severe_problems": list(
+                    getattr(vendor_result, "severe_problems", ())
+                ),
+                "cleanup_warnings": list(
+                    getattr(vendor_result, "cleanup_warnings", ())
+                ),
             }
         return emit(payload)
     except MexWriteError as exc:
@@ -1250,13 +1319,12 @@ def _run_registered_shortcut(
     args: argparse.Namespace, module: str | None = None, cli_action: str | None = None
 ) -> int:
     binding = _shortcut_binding(args, module, cli_action)
-    config = RuntimeConfig.from_dict({
-        "project": args.project, "asset_root": DEFAULT_ASSET_ROOT,
-    })
+    config, expected_fields = _load_runtime_config(args)
     return _execute_canonical_request(
         config,
         configure=bool(getattr(args, "configure", False)),
         backup=bool(getattr(args, "backup", False)),
+        expected_fields=expected_fields,
         binding=binding,
         shortcut_args=args,
     )

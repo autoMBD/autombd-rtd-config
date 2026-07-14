@@ -75,7 +75,7 @@ def validate_runtime_config_fields(raw: dict[str, Any]) -> None:
     """Validate only the JSON object's shape before precedence is applied."""
     if not isinstance(raw, dict):
         raise _invalid_config("Runtime configuration must be a JSON object.")
-    unknown = sorted(set(raw) - _ALLOWED_FIELDS - {"data_root"})
+    unknown = sorted(set(raw) - _ALLOWED_FIELDS)
     if unknown:
         raise _invalid_config("Runtime configuration contains unknown fields.")
 
@@ -98,19 +98,10 @@ class RuntimeConfig:
     asset_root: Path = DEFAULT_ASSET_ROOT
     validation_timeout_s: int = 180
 
-    @property
-    def data_root(self) -> Path:
-        """Compatibility alias for the former runtime asset field."""
-        return self.asset_root
-
     @classmethod
     def from_dict(cls, raw: dict[str, Any]) -> "RuntimeConfig":
         validate_runtime_config_fields(raw)
         values = dict(raw)
-        if "data_root" in values:
-            if "asset_root" in values:
-                raise _invalid_config("Runtime configuration repeats the asset root.")
-            values["asset_root"] = values.pop("data_root")
         if "project" not in values:
             raise _invalid_config("Runtime configuration requires a project path.")
         for key in _STRING_FIELDS & values.keys():

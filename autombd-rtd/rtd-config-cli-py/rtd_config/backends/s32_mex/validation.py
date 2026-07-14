@@ -418,6 +418,10 @@ class ValidationOutcome:
             and not self.cleanup_warnings
         )
 
+    @property
+    def status(self) -> str:
+        return "passed" if self.passed else "blocked"
+
 
 def validation_log_path(_project: Path) -> Path:
     """Return the sanitized logical name of the controlled validation log."""
@@ -483,6 +487,8 @@ def run_validation(
     mex_file: Path | None = None,
     timeout_s: int = 180,
     runner: ProcessTreeRunner | None = None,
+    temp_root: Path | None = None,
+    log_root: Path | None = None,
 ) -> ValidationOutcome:
     """Headlessly validate a project's .mex with the standalone Flow B.
 
@@ -551,7 +557,9 @@ def run_validation(
                 "The controlled validation workspace must be outside the project.",
                 module="backend", details={"entry": controlled_root.name},
             )
-        controlled = ControlledValidationWorkspace(controlled_root, inventory)
+        controlled = ControlledValidationWorkspace(
+            controlled_root, inventory, temp_root=temp_root, log_root=log_root
+        )
         controlled.open()
         assert controlled.mex_file is not None
         assert controlled.data_dir is not None

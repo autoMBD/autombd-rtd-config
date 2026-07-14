@@ -242,9 +242,22 @@ def _reject_system_temp(path: Path) -> None:
 
 
 class ControlledValidationWorkspace:
-    def __init__(self, base: Path, inventory: ValidatorInputInventory) -> None:
+    def __init__(
+        self,
+        base: Path,
+        inventory: ValidatorInputInventory,
+        *,
+        temp_root: Path | None = None,
+        log_root: Path | None = None,
+    ) -> None:
         self.base = Path(base).absolute()
         self.inventory = inventory
+        self.configured_temp_root = (
+            None if temp_root is None else Path(temp_root).absolute()
+        )
+        self.configured_log_root = (
+            None if log_root is None else Path(log_root).absolute()
+        )
         self.created_base = False
         self.root: Path | None = None
         self.project_dir: Path | None = None
@@ -394,9 +407,30 @@ class ControlledValidationWorkspace:
         self.project_dir = self.root / "project"
         self.export_dir = self.root / "export"
         self.data_dir = self.root / "data"
-        self.temp_dir = self.root / "temp"
-        logs = self.root / "logs"
-        for name in ("project", "export", "data", "temp", "logs"):
+        self.temp_dir = self.configured_temp_root or self.root / "temp"
+        logs = self.configured_log_root or self.root / "logs"
+        for configured, label in (
+            (self.configured_temp_root, "temporary"),
+            (self.configured_log_root, "log"),
+        ):
+            if configured is None:
+                continue
+            if configured == self.configured_temp_root:
+                _reject_system_temp(configured)
+            _validate_components(configured)
+            if not configured.is_dir():
+                raise CliFailure(
+                    "validation_workspace_unsafe",
+                    f"The configured validation {label} root must be an existing directory.",
+                    module="backend", details={},
+                )
+            self._guard_directory(configured)
+        names = ["project", "export", "data"]
+        if self.configured_temp_root is None:
+            names.append("temp")
+        if self.configured_log_root is None:
+            names.append("logs")
+        for name in names:
             self._mkdir(self.root, name)
         self.log_file = logs / "validation.log"
         created_directories = {PurePosixPath(".")}
