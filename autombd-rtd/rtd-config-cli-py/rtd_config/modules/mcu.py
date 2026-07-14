@@ -129,6 +129,22 @@ class McuProvider:
                     "and Mcu config_set (McuPll_0, McuPll_Configuration, "
                     "McuPll_Parameter PLL params, McuCgm0ClockMux0 divisors)."
                 ),
+                targets=tuple(
+                    TargetSelector("Clocks/clock_settings", (setting_id,))
+                    for setting_id in (
+                        "MC_CGM_MUX_0_DIV1.scale", "MC_CGM_MUX_0_DIV2.scale",
+                        "MC_CGM_MUX_0_DIV3.scale", "MC_CGM_MUX_0_DIV4.scale",
+                        "MC_CGM_MUX_0_DIV6.scale", "PLLunderMcuControl",
+                        "CORE_PLL_PD", "CORE_PLLODIV_0_DE", "CORE_PLLODIV_1_DE",
+                        "MC_CGM_MUX_0.sel", "SXOSC_PM",
+                    )
+                ) + tuple(
+                    TargetSelector("config_set:Mcu", (name,))
+                    for name in (
+                        "McuPll_0", "McuPll_Configuration", "McuCgm0ClockMux0",
+                        "McuGeneralConfiguration", "McuControlledClocksConfiguration",
+                    )
+                ),
             ))
 
         if add_all_ref:
@@ -145,6 +161,9 @@ class McuProvider:
                     "QuadSPI_SFCK, TRACE_CLK, FIRC_CLK, SIRC_CLK) "
                     "not already present by name."
                 ),
+                targets=(TargetSelector(
+                    "config_set:Mcu", ("McuClockReferencePoint",),
+                ),),
             ))
 
         if not changes:

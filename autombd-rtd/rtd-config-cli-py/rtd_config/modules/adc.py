@@ -47,7 +47,7 @@
 from __future__ import annotations
 
 from rtd_config.intent import Intent
-from rtd_config.plan import Plan, PlannedChange
+from rtd_config.plan import Plan, PlannedChange, TargetSelector
 from rtd_config.resources.bundles import ResolvedAssetBundle
 
 
@@ -118,6 +118,14 @@ class AdcProvider:
                 owner="adc",
                 path="/Adc/Adc/AdcConfigSet/AdcHwUnit",
                 description=description,
+                targets=tuple(
+                    TargetSelector("config_set:Adc", (name,))
+                    for name in (
+                        "Adc", "AdcConfigSet", "AdcHwUnit", "AdcChannel", "AdcGroup",
+                        "AdcThresholdControl", "AdcHwTrigger", "BctuHwUnit",
+                        "AdcHwConfiguration", "AutosarExt",
+                    )
+                ),
             )
         ]
 
@@ -138,6 +146,10 @@ class AdcProvider:
                     "dmaLogicChannel_Type_0 logic channel referenced by the ADC "
                     "unit's AdcDmaChannelId or the BCTU result FIFO's "
                     "BctuFifoDmaChannelId for DMA transfer."
+                ),
+                targets=(
+                    TargetSelector("config_set:Mcl", ("MclEnableDma",)),
+                    TargetSelector("config_set:Mcl", ("dmaLogicChannel_Type",)),
                 ),
             ))
 

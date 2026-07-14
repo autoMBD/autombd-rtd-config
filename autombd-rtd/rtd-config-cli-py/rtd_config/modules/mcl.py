@@ -47,7 +47,7 @@
 from __future__ import annotations
 
 from rtd_config.intent import Intent
-from rtd_config.plan import Plan, PlannedChange
+from rtd_config.plan import Plan, PlannedChange, TargetSelector
 from rtd_config.resources.bundles import ResolvedAssetBundle
 
 
@@ -82,6 +82,10 @@ class MclProvider:
                     "Use first-unused legal CHANNEL_N/PIN_N ids from the Mcl.xdm "
                     "domains (uniqueness enforced per Mcl.xdm constraint)."
                 ),
+                targets=(
+                    TargetSelector("config_set:Mcl", ("MclEnableFlexioCommon",)),
+                    TargetSelector("config_set:Mcl", ("FlexioMclLogicChannels",)),
+                ),
             ))
         else:
             # Legacy plan path: used when called without add_flexio_logic_channel
@@ -97,6 +101,10 @@ class MclProvider:
             owner="mcl",
             path="/Mcl/Mcl/MclConfig/FlexioCommon_0/FlexioMclLogicChannels",
             description=f"Ensure FlexIO logic channel for {hw}",
+            targets=(
+                TargetSelector("config_set:Mcl", ("MclEnableFlexioCommon",)),
+                TargetSelector("config_set:Mcl", ("FlexioMclLogicChannels",)),
+            ),
         )
 
     # Keep the legacy public name for any existing callers.
@@ -124,5 +132,9 @@ class MclProvider:
                 "all activation flags=true (generates DMATCD1_IRQn). "
                 "Enable MclEnableDma=true. "
                 "Grounded in uart.json dma_channel_ref_path_pattern + fixture dmaLogicChannel_Type_0."
+            ),
+            targets=(
+                TargetSelector("config_set:Mcl", ("MclEnableDma",)),
+                TargetSelector("config_set:Mcl", ("dmaLogicChannel_Type",)),
             ),
         )

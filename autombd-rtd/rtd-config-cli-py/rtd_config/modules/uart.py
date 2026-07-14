@@ -156,6 +156,11 @@ class UartProvider:
                     "and FlexioModuleConfiguration with UartHwChannelRef to the "
                     f"corresponding MCL logic channel."
                 ),
+                targets=(
+                    TargetSelector("config_set:Uart", ("UartGlobalConfig", "UartChannel")),
+                    TargetSelector("config_set:Uart", ("GeneralConfiguration", "UartCallbackCapability")),
+                    TargetSelector("config_set:Uart", ("GeneralConfiguration", "UartCallback")),
+                ),
             ),
             PlannedChange(
                 module="mcl",
@@ -165,6 +170,10 @@ class UartProvider:
                     f"Append two FlexIO MCL logic channels ({tx_name}, {rx_name}) to "
                     "FlexioMclLogicChannels with next-available CHANNEL_N/PIN_N ids "
                     "(computed dynamically, uniqueness enforced per Mcl.xdm)."
+                ),
+                targets=(
+                    TargetSelector("config_set:Mcl", ("MclEnableFlexioCommon",)),
+                    TargetSelector("config_set:Mcl", ("FlexioMclLogicChannels",)),
                 ),
             ),
             PlannedChange(
@@ -177,6 +186,9 @@ class UartProvider:
                     "Idempotent no-op if already present (fixture has it). "
                     "Grounded in uart.json instance_irq_clock_map[FLEXIO]."
                 ),
+                targets=(TargetSelector(
+                    "config_set:Platform", ("PlatformIsrConfig",),
+                ),),
             ),
             PlannedChange(
                 module="mcu",
@@ -188,6 +200,9 @@ class UartProvider:
                     "Idempotent no-op if already present (fixture has it). "
                     "Grounded in uart.json instance_irq_clock_map[FLEXIO]."
                 ),
+                targets=(TargetSelector(
+                    "config_set:Mcu", ("McuClockReferencePoint",),
+                ),),
             ),
         ]
         return Plan(changes)

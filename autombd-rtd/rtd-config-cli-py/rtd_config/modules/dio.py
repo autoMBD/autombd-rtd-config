@@ -47,7 +47,7 @@
 from __future__ import annotations
 
 from rtd_config.intent import Intent
-from rtd_config.plan import Plan, PlannedChange
+from rtd_config.plan import Plan, PlannedChange, TargetSelector
 from rtd_config.resources.bundles import ResolvedAssetBundle
 
 
@@ -77,6 +77,12 @@ class DioProvider:
                 owner="dio",
                 path="/Dio/Dio/DioConfig",
                 description="Configure Dio channel symbol",
+                targets=(
+                    TargetSelector("config_set:Dio", ("Dio",)),
+                    TargetSelector("config_set:Dio", ("DioConfig",)),
+                    TargetSelector("config_set:Dio", ("DioPort",)),
+                    TargetSelector("config_set:Dio", ("DioChannel",)),
+                ),
             )
         ]
         if intent.payload.get("pin"):
@@ -86,6 +92,12 @@ class DioProvider:
                     owner="port",
                     path="/Port/Port/PortConfigSet",
                     description="Configure GPIO pad for Dio channel",
+                    targets=(
+                        TargetSelector("Pins/Port", ("PortContainer_0_VS_0",)),
+                        TargetSelector("config_set:Port", ("PortConfigSet",)),
+                        TargetSelector("config_set:Port", ("PortContainer",)),
+                        TargetSelector("config_set:Port", ("PortPin",)),
+                    ),
                 )
             )
         return Plan(changes)
