@@ -46,6 +46,7 @@
 
 import hashlib
 import _thread
+from dataclasses import replace
 import json
 import os
 from pathlib import Path
@@ -68,6 +69,7 @@ from rtd_config.backends.s32_mex.validation import (
     probe_which_root,
     run_validation,
 )
+from rtd_config.backends.s32_mex.metadata import ValidatorInputInventory
 from rtd_config.backends.s32_mex.process_tree import (
     ProcessOutputLimits,
     ProcessTreeRunner,
@@ -359,6 +361,13 @@ def _project_manifest(root: Path) -> dict[str, tuple[int, str]]:
 
 def test_validation_uses_controlled_copy_and_leaves_project_byte_identical(tmp_path):
     project = copy_uart_fixture(tmp_path)
+    (project / ".settings/dynamic.prefs").write_bytes(b"dynamic=true\n")
+    (project / ".settings/nested").mkdir()
+    (project / ".settings/nested/ignored.prefs").write_bytes(b"nested=true\n")
+    for relative in ("build/output.o", "logs/validation.log", "generated/code.c"):
+        source = project / relative
+        source.parent.mkdir(parents=True, exist_ok=True)
+        source.write_bytes(b"must-not-be-staged")
     control = tmp_path / "controlled-validation"
     before = _project_manifest(project)
     observed = {}
@@ -385,14 +394,11 @@ def test_validation_uses_controlled_copy_and_leaves_project_byte_identical(tmp_p
                 ".cproject",
                 *(
                     item.relative_to(project).as_posix()
-                    for item in (project / ".settings").rglob("*")
-                    if item.is_file()
+                    for item in (project / ".settings").iterdir()
+                    if item.is_file() and item.name.lower().endswith(".prefs")
                 ),
             }
-            assert required <= set(staged), (
-                "controlled validation stage lacks the S32DS project metadata "
-                f"required by the real -Load command: {sorted(required - set(staged))}"
-            )
+            assert set(staged) == required
             for relative in required:
                 assert staged[relative].read_bytes() == (project / relative).read_bytes()
             load.write_bytes(b"vendor-mutated-stage")
@@ -642,8 +648,77 @@ def test_workspace_materializes_captured_bytes_after_source_is_deleted(tmp_path)
     assert not control.exists()
 
 
-def test_inventory_capture_rejects_same_name_preference_recreation(
-    monkeypatch, tmp_path
+def test_inventory_selects_dynamic_direct_preferences_and_excludes_project_outputs(
+    tmp_path,
+):
+    root = copy_uart_fixture(tmp_path)
+    (root / ".settings/dynamic.prefs").write_bytes(b"dynamic=true\n")
+    (root / ".settings/nested").mkdir()
+    (root / ".settings/nested/ignored.prefs").write_bytes(b"nested=true\n")
+    for relative in ("build/output.o", "logs/validation.log", "generated/code.c"):
+        source = root / relative
+        source.parent.mkdir(parents=True, exist_ok=True)
+        source.write_bytes(b"excluded")
+    with Project.verified(root) as project:
+        inventory = project.capture_validator_inputs()
+    relatives = {item.relative for item in inventory.files}
+    assert inventory.mex_relative in relatives
+    assert {".project", ".cproject", ".settings/dynamic.prefs"} <= relatives
+    assert not any(
+        relative.startswith(("build/", "logs/", "generated/"))
+        or relative == ".settings/nested/ignored.prefs"
+        for relative in relatives
+    )
+
+
+@pytest.mark.parametrize(
+    "relative,expected_code",
+    [
+        ("../escape.prefs", "validation_inventory_unsafe"),
+        ("/absolute.prefs", "validation_inventory_unsafe"),
+        (".settings\\escape.prefs", "validation_inventory_unsafe"),
+        ("CASE.MEX", "validation_inventory_collision"),
+    ],
+)
+def test_inventory_rejects_escape_and_casefold_collision(
+    tmp_path, relative, expected_code
+):
+    root = copy_uart_fixture(tmp_path)
+    with Project.verified(root) as project:
+        inventory = project.capture_validator_inputs()
+    first = inventory.files[0]
+    files = (
+        inventory.files + (replace(first, relative=relative),)
+        if expected_code == "validation_inventory_unsafe"
+        else (first, replace(first, relative=first.relative.swapcase()))
+    )
+    with pytest.raises(CliFailure) as caught:
+        ValidatorInputInventory(root, inventory.mex_relative, files)
+    assert caught.value.code == expected_code
+
+
+@pytest.mark.parametrize("kind", ["link", "directory"])
+def test_inventory_rejects_linked_or_nonregular_direct_preference(tmp_path, kind):
+    root = copy_uart_fixture(tmp_path)
+    unsafe = root / ".settings/unsafe.prefs"
+    if kind == "link":
+        outside = tmp_path / "outside.prefs"
+        outside.write_bytes(b"outside=true\n")
+        try:
+            unsafe.symlink_to(outside)
+        except OSError as exc:
+            pytest.skip(f"symlink unavailable: {exc}")
+    else:
+        unsafe.mkdir()
+    with Project.verified(root) as project:
+        with pytest.raises(CliFailure) as caught:
+            project.capture_validator_inputs()
+    assert caught.value.code == "validation_source_unsafe"
+
+
+@pytest.mark.parametrize("operation", ["replace", "delete", "recreate"])
+def test_inventory_capture_rejects_preference_swap_delete_or_recreation(
+    monkeypatch, tmp_path, operation
 ):
     root = copy_uart_fixture(tmp_path)
     relative = ".settings/org.eclipse.core.resources.prefs"
@@ -653,18 +728,52 @@ def test_inventory_capture_rejects_same_name_preference_recreation(
         capture = metadata_module.snapshot_project_relative
         mutated = {"value": False}
 
-        def recreate_after_capture(target, requested, *, max_bytes):
+        def mutate_after_capture(target, requested, *, max_bytes):
             snapshot = capture(target, requested, max_bytes=max_bytes)
             if requested == relative and not mutated["value"]:
                 mutated["value"] = True
                 content = source.read_bytes()
-                source.unlink()
-                source.write_bytes(content)
+                if operation == "replace":
+                    replacement = source.with_suffix(".replacement")
+                    replacement.write_bytes(content + b"changed=true\n")
+                    os.replace(replacement, source)
+                elif operation == "delete":
+                    source.unlink()
+                else:
+                    source.unlink()
+                    source.write_bytes(content)
             return snapshot
 
         monkeypatch.setattr(
-            metadata_module, "snapshot_project_relative", recreate_after_capture
+            metadata_module, "snapshot_project_relative", mutate_after_capture
         )
+        with pytest.raises(CliFailure) as caught:
+            project.capture_validator_inputs()
+    assert caught.value.code == "validation_inventory_changed"
+
+
+@pytest.mark.parametrize("operation", ["add", "delete"])
+def test_inventory_capture_rejects_preference_set_drift(
+    monkeypatch, tmp_path, operation
+):
+    root = copy_uart_fixture(tmp_path)
+    settings = root / ".settings"
+    victim = settings / "org.eclipse.core.resources.prefs"
+    original_names = metadata_module._settings_pref_names
+    calls = {"count": 0}
+
+    def mutate_after_listing(target):
+        names = original_names(target)
+        calls["count"] += 1
+        if calls["count"] == 1:
+            if operation == "add":
+                (settings / "added-during-capture.prefs").write_bytes(b"new=true\n")
+            else:
+                victim.unlink()
+        return names
+
+    monkeypatch.setattr(metadata_module, "_settings_pref_names", mutate_after_listing)
+    with Project.verified(root) as project:
         with pytest.raises(CliFailure) as caught:
             project.capture_validator_inputs()
     assert caught.value.code == "validation_inventory_changed"
