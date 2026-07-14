@@ -56,6 +56,7 @@ class TargetSelector:
     region: str
     path: tuple[str, ...]
     identity: tuple[tuple[str, str], ...] = ()
+    access: str = "write"
 
 
 @dataclass(frozen=True)
@@ -72,6 +73,7 @@ class PlannedChange:
             "region": target.region,
             "path": list(target.path),
             "identity": [list(item) for item in target.identity],
+            "access": target.access,
         } for target in self.targets]
         return payload
 

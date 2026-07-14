@@ -314,11 +314,11 @@ def test_plan_for_different_intents():
     }))
     assert len(plan3.changes) >= 1, f"Ref-only intent: expected >=1 change, got {len(plan3.changes)}"
 
-    # Empty intent (fallback): 1 change
+    # Empty intent: no write is planned.
     plan4 = provider.plan(Intent.from_dict({
         "module": "mcu", "action": "set", "payload": {},
     }))
-    assert len(plan4.changes) == 1, f"Empty intent: expected 1 fallback change, got {len(plan4.changes)}"
+    assert plan4.changes == []
 
 
 # ---------------------------------------------------------------------------

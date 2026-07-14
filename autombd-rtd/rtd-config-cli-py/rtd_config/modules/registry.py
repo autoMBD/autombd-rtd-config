@@ -138,7 +138,7 @@ class ProviderBinding:
                 "provider_plan_invalid", "The registered provider could not produce a plan.",
                 module="backend", details={"module": self.module},
             ) from exc
-        validate_provider_plan(plan)
+        validate_provider_plan(plan, binding=self)
         return plan
 
     def _raise_invalid(self) -> None:
@@ -159,7 +159,7 @@ def _signature_accepts(callable_value, *args, **kwargs) -> bool:
     return True
 
 
-def validate_provider_plan(plan) -> None:
+def validate_provider_plan(plan, *, binding: ProviderBinding | None = None) -> None:
     if not isinstance(plan, Plan) or not isinstance(plan.changes, list):
         raise CliFailure(
             "provider_plan_invalid", "The provider must return a typed Plan.", module="backend",
@@ -167,8 +167,9 @@ def validate_provider_plan(plan) -> None:
     for change in plan.changes:
         valid_targets = isinstance(change, PlannedChange) and type(change.targets) is tuple and all(
             isinstance(target, TargetSelector)
-            and isinstance(target.region, str)
+            and isinstance(target.region, str) and bool(target.region)
             and type(target.path) is tuple
+            and bool(target.path)
             and all(isinstance(item, str) and item for item in target.path)
             and type(target.identity) is tuple
             and all(
@@ -176,6 +177,7 @@ def validate_provider_plan(plan) -> None:
                 and all(isinstance(value, str) and value for value in item)
                 for item in target.identity
             )
+            and target.access in {"write", "read"}
             for target in change.targets
         )
         if (
@@ -183,12 +185,25 @@ def validate_provider_plan(plan) -> None:
             or not all(isinstance(value, str) and value for value in (
                 change.module, change.owner, change.path, change.description
             ))
+            or not change.targets
             or not valid_targets
         ):
             raise CliFailure(
                 "provider_plan_invalid", "The provider returned an invalid planned change.",
                 module="backend",
             )
+        if binding is not None:
+            accesses = {target.access for target in change.targets}
+            if (
+                change.owner in binding.write_owners and accesses != {"write"}
+                or change.owner in binding.read_dependencies and accesses != {"read"}
+                or change.owner not in binding.write_owners | binding.read_dependencies
+            ):
+                raise CliFailure(
+                    "provider_plan_invalid",
+                    "Planned target access does not match the provider binding.",
+                    module="backend",
+                )
 
 
 class ProviderRegistry:

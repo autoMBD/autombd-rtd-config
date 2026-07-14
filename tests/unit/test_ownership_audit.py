@@ -54,10 +54,23 @@ def _binding(
     )
 
 
-def _plan(*owners):
-    return Plan([
-        PlannedChange(owner, owner, f"/{owner}", "test") for owner in owners
-    ])
+def _plan(*owners, read=()):
+    changes = []
+    for owner in owners:
+        access = "read" if owner in read else "write"
+        targets = [TargetSelector(
+            f"config_set:{owner.title()}", ("config_set", owner.title()), access=access
+        )]
+        if owner == "port":
+            targets.append(TargetSelector("Pins/Port", ("pins",), access=access))
+        if owner == "mcu":
+            targets.append(TargetSelector(
+                "Clocks/clock_settings", ("clock_settings",), access=access
+            ))
+        changes.append(PlannedChange(
+            owner, owner, f"/{owner}", "test", targets=tuple(targets)
+        ))
+    return Plan(changes)
 
 
 _XML = b"""<mex><tools>
@@ -145,7 +158,9 @@ def test_basenxp_mcu_dependency_is_read_only_and_cannot_authorize_write():
     )
     changed = _XML.replace(b'value="CORE"', b'value="FIRC"')
     with pytest.raises(CliFailure) as caught:
-        audit_candidate(_XML, changed, binding, _plan("basenxp", "mcu"))
+        audit_candidate(
+            _XML, changed, binding, _plan("basenxp", "mcu", read=("mcu",))
+        )
     assert caught.value.code == "provider_ownership_violation"
 
 
@@ -274,7 +289,7 @@ def test_transaction_blocks_unauthorized_apply_before_static_or_publish(tmp_path
     )
     with pytest.raises(CliFailure) as caught:
         ConfigureTransaction(
-            project, plan=_plan("basenxp", "mcu"), binding=binding,
+            project, plan=_plan("basenxp", "mcu", read=("mcu",)), binding=binding,
             static_runner=static, vendor_runner=vendor,
         ).execute(Intent("basenxp", "set", {}), binding.apply_fn)
     assert caught.value.code == "provider_ownership_violation"
@@ -420,3 +435,25 @@ def test_target_selector_rejects_wrong_identity_and_undeclared_sibling(candidate
             _SELECTOR_XML, candidate, binding, _identity_scoped_clock_plan()
         )
     assert caught.value.code == "provider_ownership_violation"
+
+
+def test_public_ownership_failure_redacts_values_facts_and_raw_paths():
+    secret = rb"C:\Users\Administrator\top-secret-token"
+    candidate = _XML.replace(b'value="9600"', b'value="' + secret + b'"')
+    binding = _binding()
+    plan = Plan([PlannedChange(
+        "uart", "uart", "/Uart", "bounded public failure",
+        targets=(TargetSelector("config_set:Uart", ("NoSuchTarget",)),),
+    )])
+
+    with pytest.raises(CliFailure) as caught:
+        audit_candidate(_XML, candidate, binding, plan)
+
+    assert caught.value.code == "provider_ownership_violation"
+    public = str(caught.value.details)
+    assert "top-secret-token" not in public
+    assert "C:\\Users\\Administrator" not in public
+    assert "facts" not in public
+    assert "attributes" not in public
+    assert "value" not in public.lower()
+    assert "http://mcuxpresso.nxp.com" not in public

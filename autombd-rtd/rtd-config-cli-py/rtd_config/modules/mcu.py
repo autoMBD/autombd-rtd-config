@@ -166,15 +166,6 @@ class McuProvider:
                 ),),
             ))
 
-        if not changes:
-            # Fallback: general clock reference ensure (used by Uart dependency)
-            changes.append(PlannedChange(
-                module="mcu",
-                owner="mcu",
-                path="/Mcu/Mcu/McuModuleConfiguration/McuClockSettingConfig_0",
-                description="Ensure Mcu clock reference is present",
-            ))
-
         return Plan(changes)
 
     def clock_dependency(self, hw: str) -> PlannedChange:

@@ -27,10 +27,12 @@ import pytest
 from rtd_config import cli
 from rtd_config.errors import CliFailure
 from rtd_config.intent import Intent
+from rtd_config.plan import Plan, PlannedChange, TargetSelector
 from rtd_config.modules.registry import (
     PhysicalRegion,
     ProviderBinding,
     ProviderRegistry,
+    validate_provider_plan,
 )
 
 
@@ -118,6 +120,20 @@ def test_registry_rejects_invalid_callable_signatures_and_runtime_field_types(ov
     with pytest.raises(CliFailure) as caught:
         ProviderRegistry((_binding(**overrides),))
     assert caught.value.code == "provider_registry_invalid"
+
+
+def test_runtime_plan_rejects_empty_or_non_concrete_write_targets():
+    binding = _binding()
+    for targets in (
+        (),
+        (TargetSelector("", ("Uart",)),),
+        (TargetSelector("config_set:Uart", ()),),
+    ):
+        with pytest.raises(CliFailure) as caught:
+            validate_provider_plan(Plan([
+                PlannedChange("uart", "uart", "/Uart", "invalid", targets=targets)
+            ]), binding=binding)
+        assert caught.value.code == "provider_plan_invalid"
 
 
 def test_registry_lookup_rejects_unknown_and_wrong_intent():

@@ -47,6 +47,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import re
 import xml.etree.ElementTree as ET
 
 from ...errors import CliFailure
@@ -183,12 +184,12 @@ def _records(raw: bytes) -> dict[str, _Record]:
         same = [item for item in siblings if _qname(item) == qname]
         index = same.index(element) + 1
         path = f"{parent_path}/{qname}[{index}]"
-        values = tuple(
+        local = qname.rsplit("}", 1)[-1]
+        values = (local,) + tuple(
             str(element.attrib[key]) for key in ("name", "id", "key", "type")
             if key in element.attrib
         ) if element.tag is not ET.Comment else ()
         own_logical = logical + values
-        local = qname.rsplit("}", 1)[-1]
         if local in {"array", "struct", "pin", "setting"}:
             fact_scope = _merge_facts(fact_scope, _scope_facts(element))
         result[path] = _Record(
@@ -233,40 +234,69 @@ def _in_order(needles: tuple[str, ...], values: tuple[str, ...]) -> bool:
     return all(any(value == needle for value in iterator) for needle in needles)
 
 
-def _inferred_target(change: PlannedChange) -> TargetSelector:
-    parts = tuple(item for item in change.path.split("/") if item)
-    while parts and parts[0].lower() == change.owner.lower():
-        parts = parts[1:]
-    return TargetSelector("" if not parts else f"config_set:{change.owner.title()}", parts)
-
-
 def _matches(entry: DeltaEntry, change: PlannedChange) -> bool:
-    targets = change.targets or (_inferred_target(change),)
     return entry.owner == change.owner and any(
-        (not target.region or entry.region == target.region)
+        target.access == "write"
+        and entry.region == target.region
         and _in_order(target.path, entry.logical_path)
         and set(target.identity) <= set(entry.facts)
-        for target in targets
+        for target in change.targets
     )
+
+
+_SAFE_NAME = re.compile(r"^[A-Za-z][A-Za-z0-9_.:-]{0,63}$")
+_SAFE_ELEMENTS = frozenset({
+    "configuration", "mex", "tools", "pins", "clocks", "clock_settings",
+    "periphs", "functional_groups", "functional_group", "instances", "instance",
+    "config_set", "struct", "array", "setting", "function", "functions_list",
+    "pin", "pin_features", "pin_feature",
+})
+_SAFE_SELECTOR_KEYS = frozenset({"name", "id", "key", "type"})
+
+
+def _safe_label(value: str, fallback: str = "unknown") -> str:
+    return value if _SAFE_NAME.fullmatch(value) else fallback
+
+
+def _safe_region(value: str) -> str:
+    if value in {"Pins/Port", "Clocks/clock_settings"}:
+        return value
+    return _safe_label(value)
+
+
+def _public_delta(entry: DeltaEntry) -> dict:
+    elements = []
+    for raw in re.findall(r"/([^/]+?)\[\d+\]", entry.path)[-8:]:
+        local = raw.rsplit("}", 1)[-1]
+        elements.append(local if local in _SAFE_ELEMENTS else "unknown")
+    keys = sorted({key for key, _value in entry.attributes if key in _SAFE_SELECTOR_KEYS})
+    return {
+        "owner": _safe_label(entry.owner),
+        "region": _safe_region(entry.region),
+        "delta_kind": entry.kind if entry.kind in {"added", "removed", "modified"} else "unknown",
+        "locator": {"elements": elements, "selector_keys": keys[:4]},
+    }
 
 
 def audit_candidate(before: bytes, candidate: bytes, binding: ProviderBinding, plan) -> OwnershipAudit:
     binding.validate_ownership()
-    validate_provider_plan(plan)
+    validate_provider_plan(plan, binding=binding)
     changes = tuple(plan.changes)
     declared = {change.owner for change in changes}
     permitted = binding.write_owners | binding.read_dependencies
     if not declared <= permitted:
         raise CliFailure(
             "provider_plan_invalid", "The plan declares an owner outside its binding.",
-            module="backend", details={"owners": sorted(declared - permitted)},
+            module="backend", details={
+                "owners": sorted(_safe_label(item) for item in declared - permitted)
+            },
         )
     entries = collect_actual_deltas(before, candidate)
-    unknown = sorted(entry.path for entry in entries if entry.owner == "unknown")
+    unknown = [entry for entry in entries if entry.owner == "unknown"]
     if unknown:
         raise CliFailure(
             "ownership_unknown", "An XML delta has no safe physical ownership mapping.",
-            module="backend", details={"paths": unknown},
+            module="backend", details={"deltas": [_public_delta(item) for item in unknown]},
         )
     invalid_owners = sorted({
         entry.owner for entry in entries if entry.owner not in binding.write_owners
@@ -274,17 +304,20 @@ def audit_candidate(before: bytes, candidate: bytes, binding: ProviderBinding, p
     if invalid_owners:
         raise CliFailure(
             "provider_ownership_violation", "The candidate changes an unauthorized owner.",
-            module="backend", details={"owners": invalid_owners},
+            module="backend", details={"owners": [_safe_label(item) for item in invalid_owners]},
         )
     allowed_regions = {(item.owner, item.name) for item in binding.allowed_regions}
     invalid_regions = sorted({
-        f"{entry.owner}:{entry.region}" for entry in entries
+        (entry.owner, entry.region) for entry in entries
         if (entry.owner, entry.region) not in allowed_regions
     })
     if invalid_regions:
         raise CliFailure(
             "provider_region_violation", "The candidate changes an undeclared XML region.",
-            module="backend", details={"regions": invalid_regions},
+            module="backend", details={"regions": [
+                {"owner": _safe_label(owner), "region": _safe_region(region)}
+                for owner, region in invalid_regions
+            ]},
         )
     unauthorized = [
         entry for entry in entries
@@ -295,11 +328,7 @@ def audit_candidate(before: bytes, candidate: bytes, binding: ProviderBinding, p
             "provider_ownership_violation",
             "The candidate delta does not match a planned target selector.",
             module="backend", details={
-                "paths": sorted(item.path for item in unauthorized),
-                "facts": {
-                    item.path: [list(fact) for fact in item.facts]
-                    for item in unauthorized
-                },
+                "deltas": [_public_delta(item) for item in unauthorized],
             },
         )
     actual = {entry.owner for entry in entries}

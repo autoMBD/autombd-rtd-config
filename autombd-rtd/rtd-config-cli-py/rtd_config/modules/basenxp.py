@@ -159,12 +159,9 @@ class BaseNxpProvider:
                     "McuClockReferencePoint to populate OsIfSystemTimerClockRef "
                     "(CORE_CLK preferred, else first available)"
                 ),
-            ))
-        if not changes:
-            changes.append(PlannedChange(
-                module="basenxp",
-                owner="basenxp",
-                path="/BaseNXP/BaseNXP/OsIfGeneral",
-                description="Preserve OsIf configuration used by Uart timeout",
+                targets=(TargetSelector(
+                    "config_set:Mcu", ("config_set", "Mcu", "McuClockReferencePoint"),
+                    access="read",
+                ),),
             ))
         return Plan(changes)
