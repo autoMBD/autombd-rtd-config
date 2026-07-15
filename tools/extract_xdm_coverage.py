@@ -516,7 +516,17 @@ def _contains_coverage(value) -> bool:
 
 def validate_repository(repo_root: Path) -> None:
     coverage_root = repo_root / "docs/specs/rtd-config-module-coverage"
-    for path in sorted(coverage_root.glob("*.json")):
+    paths = sorted(coverage_root.glob("*.json"))
+    expected_modules = {"adc", "basenxp", "dio", "mcl", "mcu", "platform", "port", "uart"}
+    actual_modules = {path.stem for path in paths}
+    if actual_modules != expected_modules:
+        missing = sorted(expected_modules - actual_modules)
+        unexpected = sorted(actual_modules - expected_modules)
+        raise InventoryError(
+            f"coverage sidecar set differs from shipped modules; "
+            f"missing={missing}, unexpected={unexpected}"
+        )
+    for path in paths:
         validate_sidecar(json.loads(path.read_text(encoding="utf-8")), repo_root=repo_root)
     for path in sorted((repo_root / "autombd-rtd/assets").rglob("*.json")):
         if _contains_coverage(json.loads(path.read_text(encoding="utf-8"))):

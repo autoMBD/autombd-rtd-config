@@ -1,0 +1,3098 @@
+{
+  "format_version": 1,
+  "source": {
+    "module": "Uart",
+    "descriptor": "Uart.xdm",
+    "package": "TS_T40D34M70I1R0",
+    "rtd_release": "7.0.1",
+    "sha256": "0B5064AA0DCBE90048C1DBC2D49C540887D941D39B04962785FB7F98789FEED5"
+  },
+  "items": [
+    {
+      "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]",
+      "kind": "container",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]",
+      "name": "CommonPublishedInformation",
+      "type": "IDENTIFIABLE",
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Uart provider.",
+      "dependency": "A descriptor-forward Uart implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]",
+      "kind": "container",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]",
+      "name": "GeneralConfiguration",
+      "type": "IDENTIFIABLE",
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Uart provider.",
+      "dependency": "A descriptor-forward Uart implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]",
+      "kind": "container",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]",
+      "name": "UartGlobalConfig",
+      "type": "IDENTIFIABLE",
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Uart provider.",
+      "dependency": "A descriptor-forward Uart implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]/lst[UartChannel]/ctr[UartChannel]",
+      "kind": "container",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]/lst[UartChannel]/ctr[UartChannel]",
+      "name": "UartChannel",
+      "type": "IDENTIFIABLE",
+      "classification": "configurable",
+      "trace": {
+        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/uart.py:UartProvider",
+        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_uart_set",
+        "asset": "autombd-rtd/assets/nxp/s32k3/uart/uart.json#/enum_domains",
+        "tests": [
+          "tests/unit/test_uart_apply.py::TestChannelFieldEdits::test_baud_921600_set",
+          "tests/unit/test_uart_apply.py::TestChannelFieldEdits::test_interrupt_method_set"
+        ]
+      }
+    },
+    {
+      "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]/lst[UartChannel]/ctr[UartChannel]/ctr[DetailModuleConfiguration]",
+      "kind": "container",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]/lst[UartChannel]/ctr[UartChannel]/ctr[DetailModuleConfiguration]",
+      "name": "DetailModuleConfiguration",
+      "type": "IDENTIFIABLE",
+      "enable": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "contains(., substring-after(string(node:fallback(../UartHwUsing,'FLEXIO_IP')),'FLEXIO'))"
+          }
+        ]
+      },
+      "fact_sources": {
+        "enable": [
+          {
+            "source_tag": "a",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "contains(., substring-after(string(node:fallback(../UartHwUsing,'FLEXIO_IP')),'FLEXIO'))"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "configurable",
+      "trace": {
+        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/uart.py:UartProvider",
+        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_uart_set",
+        "asset": "autombd-rtd/assets/nxp/s32k3/uart/uart.json#/enum_domains",
+        "tests": [
+          "tests/unit/test_uart_apply.py::TestChannelFieldEdits::test_baud_921600_set",
+          "tests/unit/test_uart_apply.py::TestChannelFieldEdits::test_interrupt_method_set"
+        ]
+      }
+    },
+    {
+      "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]/lst[UartChannel]/ctr[UartChannel]/ctr[FlexioModuleConfiguration]",
+      "kind": "container",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]/lst[UartChannel]/ctr[UartChannel]/ctr[FlexioModuleConfiguration]",
+      "name": "FlexioModuleConfiguration",
+      "type": "IDENTIFIABLE",
+      "enable": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "contains(., substring-after(string(node:fallback(../UartHwUsing,'LPUART_IP')),'LPUART'))"
+          }
+        ]
+      },
+      "fact_sources": {
+        "enable": [
+          {
+            "source_tag": "a",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "contains(., substring-after(string(node:fallback(../UartHwUsing,'LPUART_IP')),'LPUART'))"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "configurable",
+      "trace": {
+        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/uart.py:UartProvider",
+        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_uart_set",
+        "asset": "autombd-rtd/assets/nxp/s32k3/uart/uart.json#/enum_domains",
+        "tests": [
+          "tests/unit/test_uart_apply.py::TestChannelFieldEdits::test_baud_921600_set",
+          "tests/unit/test_uart_apply.py::TestChannelFieldEdits::test_interrupt_method_set"
+        ]
+      }
+    },
+    {
+      "key": "list:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/lst[UartEcucPartitionRef]",
+      "kind": "list",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/lst[UartEcucPartitionRef]",
+      "name": "UartEcucPartitionRef",
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "(count(./*) = 0) and (../UartMultipartitionSupport = 'true')",
+            "true": "This list must refer at least one ECUC partition when UartMultipartitionSupport = 'true'"
+          },
+          {
+            "expr": "(count(./*) > 0) and (../UartMultipartitionSupport = 'false')",
+            "true": "This list must not refer any ECUC partition when UartMultipartitionSupport = 'false'"
+          }
+        ]
+      },
+      "fact_sources": {
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "(count(./*) = 0) and (../UartMultipartitionSupport = 'true')",
+                  "true": "This list must refer at least one ECUC partition when UartMultipartitionSupport = 'true'"
+                },
+                {
+                  "expr": "(count(./*) > 0) and (../UartMultipartitionSupport = 'false')",
+                  "true": "This list must not refer any ECUC partition when UartMultipartitionSupport = 'false'"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Uart provider.",
+      "dependency": "A descriptor-forward Uart implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "list:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]/lst[UartChannel]",
+      "kind": "list",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]/lst[UartChannel]",
+      "name": "UartChannel",
+      "type": "MAP",
+      "min": {
+        "kind": "literal",
+        "value": "1"
+      },
+      "max": {
+        "kind": "xpath",
+        "expr": "ecu:get('Uart.UartGlobalConfig.UartChannel')"
+      },
+      "fact_sources": {
+        "min": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "1"
+            }
+          }
+        ],
+        "max": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "expr": "ecu:get('Uart.UartGlobalConfig.UartChannel')"
+            }
+          }
+        ]
+      },
+      "classification": "configurable",
+      "trace": {
+        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/uart.py:UartProvider",
+        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_uart_set",
+        "asset": "autombd-rtd/assets/nxp/s32k3/uart/uart.json#/enum_domains",
+        "tests": [
+          "tests/unit/test_uart_apply.py::TestChannelFieldEdits::test_baud_921600_set",
+          "tests/unit/test_uart_apply.py::TestChannelFieldEdits::test_interrupt_method_set"
+        ]
+      }
+    },
+    {
+      "key": "reference:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/lst[UartEcucPartitionRef]/ref[UartEcucPartitionRef]",
+      "kind": "reference",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/lst[UartEcucPartitionRef]/ref[UartEcucPartitionRef]",
+      "name": "UartEcucPartitionRef",
+      "type": "REFERENCE",
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "count(text:grep(../../../UartGlobalConfig/UartChannel/*/UartChannelEcucPartitionRef, .)) = 0",
+            "true": "The partition need to be mapped to at least one UART hardware channel."
+          },
+          {
+            "expr": "node:refvalid(.)",
+            "false": "Invalid or empty reference."
+          },
+          {
+            "expr": "text:uniq(../*, .)",
+            "false": "The referenced ECUC partition must be unique within the UartEcucPartitionRef list."
+          },
+          {
+            "expr": "node:containsValue(as:modconf('Os')[1]/OsApplication/*/OsAppEcucPartitionRef, .)",
+            "false": "The referenced ECUC partition isn't used by any OsApplication (i.e. Os/OsApplication/*/OsAppEcucPartitionRef)"
+          }
+        ]
+      },
+      "fact_sources": {
+        "invalid": [
+          {
+            "source_tag": "a",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "count(text:grep(../../../UartGlobalConfig/UartChannel/*/UartChannelEcucPartitionRef, .)) = 0",
+                  "true": "The partition need to be mapped to at least one UART hardware channel."
+                },
+                {
+                  "expr": "node:refvalid(.)",
+                  "false": "Invalid or empty reference."
+                },
+                {
+                  "expr": "text:uniq(../*, .)",
+                  "false": "The referenced ECUC partition must be unique within the UartEcucPartitionRef list."
+                },
+                {
+                  "expr": "node:containsValue(as:modconf('Os')[1]/OsApplication/*/OsAppEcucPartitionRef, .)",
+                  "false": "The referenced ECUC partition isn't used by any OsApplication (i.e. Os/OsApplication/*/OsAppEcucPartitionRef)"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "reference": "ASPathDataOfSchema:/AUTOSAR/EcucDefs/EcuC/EcucPartitionCollection/EcucPartition",
+      "cross_references": [
+        "EcuC"
+      ],
+      "cross_modules": [
+        "EcuC"
+      ],
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Uart provider.",
+      "dependency": "A descriptor-forward Uart implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "reference:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]/lst[UartChannel]/ctr[UartChannel]/ctr[DetailModuleConfiguration]/ref[UartDmaRxChannelRef]",
+      "kind": "reference",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]/lst[UartChannel]/ctr[UartChannel]/ctr[DetailModuleConfiguration]/ref[UartDmaRxChannelRef]",
+      "name": "UartDmaRxChannelRef",
+      "type": "REFERENCE",
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "node:empty(.) and (node:fallback(../UartInteruptDmaMethod, 'LPUART_UART_IP_USING_INTERRUPTS') = 'LPUART_UART_IP_USING_DMA')",
+            "true": "Field is empty (Suggestion: select a DMAChannel reference)."
+          },
+          {
+            "expr": "not(node:refvalid(.)) and (node:fallback(../UartInteruptDmaMethod, 'LPUART_UART_IP_USING_INTERRUPTS') = 'LPUART_UART_IP_USING_DMA')",
+            "true": "Invalid DMAChannel reference (Suggestion: select a DMAChannel reference)."
+          }
+        ]
+      },
+      "editable": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "(node:fallback(../UartInteruptDmaMethod, 'LPUART_UART_IP_USING_INTERRUPTS') = 'LPUART_UART_IP_USING_DMA')"
+          }
+        ]
+      },
+      "fact_sources": {
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "node:empty(.) and (node:fallback(../UartInteruptDmaMethod, 'LPUART_UART_IP_USING_INTERRUPTS') = 'LPUART_UART_IP_USING_DMA')",
+                  "true": "Field is empty (Suggestion: select a DMAChannel reference)."
+                },
+                {
+                  "expr": "not(node:refvalid(.)) and (node:fallback(../UartInteruptDmaMethod, 'LPUART_UART_IP_USING_INTERRUPTS') = 'LPUART_UART_IP_USING_DMA')",
+                  "true": "Invalid DMAChannel reference (Suggestion: select a DMAChannel reference)."
+                }
+              ]
+            }
+          }
+        ],
+        "editable": [
+          {
+            "source_tag": "a",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "(node:fallback(../UartInteruptDmaMethod, 'LPUART_UART_IP_USING_INTERRUPTS') = 'LPUART_UART_IP_USING_DMA')"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "reference": "ASPathDataOfSchema:/TS_T40D34M70I1R0/Mcl/MclConfig/dmaLogicChannel_Type",
+      "cross_references": [
+        "Mcl"
+      ],
+      "cross_modules": [
+        "Mcl"
+      ],
+      "classification": "configurable",
+      "trace": {
+        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/uart.py:UartProvider",
+        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_uart_set",
+        "asset": "autombd-rtd/assets/nxp/s32k3/uart/uart.json#/enum_domains",
+        "tests": [
+          "tests/unit/test_uart_apply.py::TestChannelFieldEdits::test_baud_921600_set",
+          "tests/unit/test_uart_apply.py::TestChannelFieldEdits::test_interrupt_method_set"
+        ]
+      }
+    },
+    {
+      "key": "reference:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]/lst[UartChannel]/ctr[UartChannel]/ctr[DetailModuleConfiguration]/ref[UartDmaTxChannelRef]",
+      "kind": "reference",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]/lst[UartChannel]/ctr[UartChannel]/ctr[DetailModuleConfiguration]/ref[UartDmaTxChannelRef]",
+      "name": "UartDmaTxChannelRef",
+      "type": "REFERENCE",
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "node:empty(.) and (node:fallback(../UartInteruptDmaMethod, 'LPUART_UART_IP_USING_INTERRUPTS') = 'LPUART_UART_IP_USING_DMA')",
+            "true": "Field is empty (Suggestion: select a DMAChannel reference)."
+          },
+          {
+            "expr": "not(node:refvalid(.)) and (node:fallback(../UartInteruptDmaMethod, 'LPUART_UART_IP_USING_INTERRUPTS') = 'LPUART_UART_IP_USING_DMA')",
+            "true": "Invalid DMAChannel reference (Suggestion: select a DMAChannel reference)."
+          }
+        ]
+      },
+      "editable": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "(node:fallback(../UartInteruptDmaMethod, 'LPUART_UART_IP_USING_INTERRUPTS') = 'LPUART_UART_IP_USING_DMA')"
+          }
+        ]
+      },
+      "fact_sources": {
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "node:empty(.) and (node:fallback(../UartInteruptDmaMethod, 'LPUART_UART_IP_USING_INTERRUPTS') = 'LPUART_UART_IP_USING_DMA')",
+                  "true": "Field is empty (Suggestion: select a DMAChannel reference)."
+                },
+                {
+                  "expr": "not(node:refvalid(.)) and (node:fallback(../UartInteruptDmaMethod, 'LPUART_UART_IP_USING_INTERRUPTS') = 'LPUART_UART_IP_USING_DMA')",
+                  "true": "Invalid DMAChannel reference (Suggestion: select a DMAChannel reference)."
+                }
+              ]
+            }
+          }
+        ],
+        "editable": [
+          {
+            "source_tag": "a",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "(node:fallback(../UartInteruptDmaMethod, 'LPUART_UART_IP_USING_INTERRUPTS') = 'LPUART_UART_IP_USING_DMA')"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "reference": "ASPathDataOfSchema:/TS_T40D34M70I1R0/Mcl/MclConfig/dmaLogicChannel_Type",
+      "cross_references": [
+        "Mcl"
+      ],
+      "cross_modules": [
+        "Mcl"
+      ],
+      "classification": "configurable",
+      "trace": {
+        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/uart.py:UartProvider",
+        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_uart_set",
+        "asset": "autombd-rtd/assets/nxp/s32k3/uart/uart.json#/enum_domains",
+        "tests": [
+          "tests/unit/test_uart_apply.py::TestChannelFieldEdits::test_baud_921600_set",
+          "tests/unit/test_uart_apply.py::TestChannelFieldEdits::test_interrupt_method_set"
+        ]
+      }
+    },
+    {
+      "key": "reference:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]/lst[UartChannel]/ctr[UartChannel]/ctr[FlexioModuleConfiguration]/ref[FlexioDmaChannelRef]",
+      "kind": "reference",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]/lst[UartChannel]/ctr[UartChannel]/ctr[FlexioModuleConfiguration]/ref[FlexioDmaChannelRef]",
+      "name": "FlexioDmaChannelRef",
+      "type": "REFERENCE",
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "node:empty(.) and (node:fallback(../FlexioUartInteruptDmaMethod, 'FLEXIO_UART_IP_DRIVER_TYPE_INTERRUPTS') = 'FLEXIO_UART_IP_DRIVER_TYPE_DMA')",
+            "true": "Field is empty (Suggestion: select a DMAChannel reference)."
+          },
+          {
+            "expr": "not(node:refvalid(.)) and (node:fallback(../FlexioUartInteruptDmaMethod, 'FLEXIO_UART_IP_DRIVER_TYPE_INTERRUPTS') = 'FLEXIO_UART_IP_DRIVER_TYPE_DMA')",
+            "true": "Invalid DMAChannel reference (Suggestion: select a DMAChannel reference)."
+          }
+        ]
+      },
+      "editable": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "(node:fallback(../FlexioUartInteruptDmaMethod, 'FLEXIO_UART_IP_DRIVER_TYPE_INTERRUPTS') = 'FLEXIO_UART_IP_DRIVER_TYPE_DMA')"
+          }
+        ]
+      },
+      "fact_sources": {
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "node:empty(.) and (node:fallback(../FlexioUartInteruptDmaMethod, 'FLEXIO_UART_IP_DRIVER_TYPE_INTERRUPTS') = 'FLEXIO_UART_IP_DRIVER_TYPE_DMA')",
+                  "true": "Field is empty (Suggestion: select a DMAChannel reference)."
+                },
+                {
+                  "expr": "not(node:refvalid(.)) and (node:fallback(../FlexioUartInteruptDmaMethod, 'FLEXIO_UART_IP_DRIVER_TYPE_INTERRUPTS') = 'FLEXIO_UART_IP_DRIVER_TYPE_DMA')",
+                  "true": "Invalid DMAChannel reference (Suggestion: select a DMAChannel reference)."
+                }
+              ]
+            }
+          }
+        ],
+        "editable": [
+          {
+            "source_tag": "a",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "(node:fallback(../FlexioUartInteruptDmaMethod, 'FLEXIO_UART_IP_DRIVER_TYPE_INTERRUPTS') = 'FLEXIO_UART_IP_DRIVER_TYPE_DMA')"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "reference": "ASPathDataOfSchema:/TS_T40D34M70I1R0/Mcl/MclConfig/dmaLogicChannel_Type",
+      "cross_references": [
+        "Mcl"
+      ],
+      "cross_modules": [
+        "Mcl"
+      ],
+      "classification": "configurable",
+      "trace": {
+        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/uart.py:UartProvider",
+        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_uart_set",
+        "asset": "autombd-rtd/assets/nxp/s32k3/uart/uart.json#/enum_domains",
+        "tests": [
+          "tests/unit/test_uart_apply.py::TestChannelFieldEdits::test_baud_921600_set",
+          "tests/unit/test_uart_apply.py::TestChannelFieldEdits::test_interrupt_method_set"
+        ]
+      }
+    },
+    {
+      "key": "reference:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]/lst[UartChannel]/ctr[UartChannel]/ctr[FlexioModuleConfiguration]/ref[UartHwChannelRef]",
+      "kind": "reference",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]/lst[UartChannel]/ctr[UartChannel]/ctr[FlexioModuleConfiguration]/ref[UartHwChannelRef]",
+      "name": "UartHwChannelRef",
+      "type": "CHOICE-REFERENCE",
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "text:uniq(node:fallback(../../../*/FlexioModuleConfiguration/UartHwChannelRef, 0 ), node:fallback( ., 1 ))",
+            "false": "Duplicate physical Uart channel: UartHwChannelRef must be unique across all Uart channels."
+          },
+          {
+            "expr": "not(node:refvalid(.))",
+            "true": "Invalid Flexio Channel reference (Suggestion: select a FlexioMclLogicChannels reference)."
+          }
+        ]
+      },
+      "fact_sources": {
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "text:uniq(node:fallback(../../../*/FlexioModuleConfiguration/UartHwChannelRef, 0 ), node:fallback( ., 1 ))",
+                  "false": "Duplicate physical Uart channel: UartHwChannelRef must be unique across all Uart channels."
+                },
+                {
+                  "expr": "not(node:refvalid(.))",
+                  "true": "Invalid Flexio Channel reference (Suggestion: select a FlexioMclLogicChannels reference)."
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "reference": "ASPathDataOfSchema:/TS_T40D34M70I1R0/Mcl/MclConfig/FlexioCommon/FlexioMclLogicChannels",
+      "cross_references": [
+        "Mcl"
+      ],
+      "cross_modules": [
+        "Mcl"
+      ],
+      "classification": "configurable",
+      "trace": {
+        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/uart.py:UartProvider",
+        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_uart_set",
+        "asset": "autombd-rtd/assets/nxp/s32k3/uart/uart.json#/enum_domains",
+        "tests": [
+          "tests/unit/test_uart_apply.py::TestChannelFieldEdits::test_baud_921600_set",
+          "tests/unit/test_uart_apply.py::TestChannelFieldEdits::test_interrupt_method_set"
+        ]
+      }
+    },
+    {
+      "key": "reference:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]/lst[UartChannel]/ctr[UartChannel]/ref[UartChannelEcucPartitionRef]",
+      "kind": "reference",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]/lst[UartChannel]/ctr[UartChannel]/ref[UartChannelEcucPartitionRef]",
+      "name": "UartChannelEcucPartitionRef",
+      "type": "REFERENCE",
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "not(node:refvalid(.)) and (../../../../GeneralConfiguration/UartMultipartitionSupport ='true')",
+            "true": "When UartMultipartitionSupport enabled, The ECUC Partition for UartChannels must be configured."
+          },
+          {
+            "expr": "not(node:containsValue(../../../../GeneralConfiguration/UartEcucPartitionRef/*, node:value(.))) and (../../../../GeneralConfiguration/UartMultipartitionSupport ='true') and (node:refvalid(.))",
+            "true": "The ECUC partitions referenced by UartChannelEcucPartitionRef shall be a subset of the ECUC partitions referenced by UartEcucPartitionRef."
+          }
+        ]
+      },
+      "editable": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "../../../../GeneralConfiguration/UartMultipartitionSupport ='true'"
+          }
+        ]
+      },
+      "fact_sources": {
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "not(node:refvalid(.)) and (../../../../GeneralConfiguration/UartMultipartitionSupport ='true')",
+                  "true": "When UartMultipartitionSupport enabled, The ECUC Partition for UartChannels must be configured."
+                },
+                {
+                  "expr": "not(node:containsValue(../../../../GeneralConfiguration/UartEcucPartitionRef/*, node:value(.))) and (../../../../GeneralConfiguration/UartMultipartitionSupport ='true') and (node:refvalid(.))",
+                  "true": "The ECUC partitions referenced by UartChannelEcucPartitionRef shall be a subset of the ECUC partitions referenced by UartEcucPartitionRef."
+                }
+              ]
+            }
+          }
+        ],
+        "editable": [
+          {
+            "source_tag": "a",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "../../../../GeneralConfiguration/UartMultipartitionSupport ='true'"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "reference": "ASPathDataOfSchema:/AUTOSAR/EcucDefs/EcuC/EcucPartitionCollection/EcucPartition",
+      "cross_references": [
+        "EcuC"
+      ],
+      "cross_modules": [
+        "EcuC"
+      ],
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Uart provider.",
+      "dependency": "A descriptor-forward Uart implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "reference:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]/lst[UartChannel]/ctr[UartChannel]/ref[UartClockRef]",
+      "kind": "reference",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]/lst[UartChannel]/ctr[UartChannel]/ref[UartClockRef]",
+      "name": "UartClockRef",
+      "type": "REFERENCE",
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "node:refvalid(.)",
+            "false": "Invalid or empty reference."
+          }
+        ]
+      },
+      "fact_sources": {
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "node:refvalid(.)",
+                  "false": "Invalid or empty reference."
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "reference": "ASPathDataOfSchema:/AUTOSAR/EcucDefs/Mcu/McuModuleConfiguration/McuClockSettingConfig/McuClockReferencePoint",
+      "cross_references": [
+        "Mcu"
+      ],
+      "cross_modules": [
+        "Mcu"
+      ],
+      "classification": "configurable",
+      "trace": {
+        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/uart.py:UartProvider",
+        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_uart_set",
+        "asset": "autombd-rtd/assets/nxp/s32k3/uart/uart.json#/enum_domains",
+        "tests": [
+          "tests/unit/test_uart_apply.py::TestChannelFieldEdits::test_baud_921600_set",
+          "tests/unit/test_uart_apply.py::TestChannelFieldEdits::test_interrupt_method_set"
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[ArReleaseMajorVersion]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[ArReleaseMajorVersion]",
+      "name": "ArReleaseMajorVersion",
+      "type": "INTEGER_LABEL",
+      "default": {
+        "kind": "literal",
+        "value": "4"
+      },
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": ">=4"
+          },
+          {
+            "expr": "<=4"
+          }
+        ]
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "4"
+            }
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": ">=4"
+                },
+                {
+                  "expr": "<=4"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Uart provider.",
+      "dependency": "A descriptor-forward Uart implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[ArReleaseMinorVersion]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[ArReleaseMinorVersion]",
+      "name": "ArReleaseMinorVersion",
+      "type": "INTEGER_LABEL",
+      "default": {
+        "kind": "literal",
+        "value": "9"
+      },
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": ">=9"
+          },
+          {
+            "expr": "<=9"
+          }
+        ]
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "9"
+            }
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": ">=9"
+                },
+                {
+                  "expr": "<=9"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Uart provider.",
+      "dependency": "A descriptor-forward Uart implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[ArReleaseRevisionVersion]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[ArReleaseRevisionVersion]",
+      "name": "ArReleaseRevisionVersion",
+      "type": "INTEGER_LABEL",
+      "default": {
+        "kind": "literal",
+        "value": "0"
+      },
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": ">=0"
+          },
+          {
+            "expr": "<=0"
+          }
+        ]
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "0"
+            }
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": ">=0"
+                },
+                {
+                  "expr": "<=0"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Uart provider.",
+      "dependency": "A descriptor-forward Uart implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[ModuleId]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[ModuleId]",
+      "name": "ModuleId",
+      "type": "INTEGER_LABEL",
+      "default": {
+        "kind": "literal",
+        "value": "255"
+      },
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": ">=255"
+          },
+          {
+            "expr": "<=255"
+          }
+        ]
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "255"
+            }
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": ">=255"
+                },
+                {
+                  "expr": "<=255"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Uart provider.",
+      "dependency": "A descriptor-forward Uart implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[SwMajorVersion]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[SwMajorVersion]",
+      "name": "SwMajorVersion",
+      "type": "INTEGER_LABEL",
+      "default": {
+        "kind": "literal",
+        "value": "7"
+      },
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": ">=7"
+          },
+          {
+            "expr": "<=7"
+          }
+        ]
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "7"
+            }
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": ">=7"
+                },
+                {
+                  "expr": "<=7"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Uart provider.",
+      "dependency": "A descriptor-forward Uart implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[SwMinorVersion]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[SwMinorVersion]",
+      "name": "SwMinorVersion",
+      "type": "INTEGER_LABEL",
+      "default": {
+        "kind": "literal",
+        "value": "0"
+      },
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": ">=0"
+          },
+          {
+            "expr": "<=0"
+          }
+        ]
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "0"
+            }
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": ">=0"
+                },
+                {
+                  "expr": "<=0"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Uart provider.",
+      "dependency": "A descriptor-forward Uart implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[SwPatchVersion]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[SwPatchVersion]",
+      "name": "SwPatchVersion",
+      "type": "INTEGER_LABEL",
+      "default": {
+        "kind": "literal",
+        "value": "1"
+      },
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": ">=1"
+          },
+          {
+            "expr": "<=1"
+          }
+        ]
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "1"
+            }
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": ">=1"
+                },
+                {
+                  "expr": "<=1"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Uart provider.",
+      "dependency": "A descriptor-forward Uart implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[VendorApiInfix]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[VendorApiInfix]",
+      "name": "VendorApiInfix",
+      "type": "STRING_LABEL",
+      "default": {
+        "kind": "literal",
+        "value": ""
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": ""
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Uart provider.",
+      "dependency": "A descriptor-forward Uart implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[VendorId]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[VendorId]",
+      "name": "VendorId",
+      "type": "INTEGER_LABEL",
+      "default": {
+        "kind": "literal",
+        "value": "43"
+      },
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": ">=43"
+          },
+          {
+            "expr": "<=43"
+          }
+        ]
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "43"
+            }
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": ">=43"
+                },
+                {
+                  "expr": "<=43"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Uart provider.",
+      "dependency": "A descriptor-forward Uart implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/var[DisableUartRuntimeErrorDetect]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/var[DisableUartRuntimeErrorDetect]",
+      "name": "DisableUartRuntimeErrorDetect",
+      "type": "BOOLEAN",
+      "default": {
+        "kind": "literal",
+        "value": "false"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "false"
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Uart provider.",
+      "dependency": "A descriptor-forward Uart implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/var[UartCallbackCapability]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/var[UartCallbackCapability]",
+      "name": "UartCallbackCapability",
+      "type": "BOOLEAN",
+      "default": {
+        "kind": "literal",
+        "value": "false"
+      },
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "(((node:fallback(., 'false') = 'true')) and (not(node:exists(../UartCallback))))",
+            "true": "UartCallback field must be enabled"
+          }
+        ]
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "false"
+            }
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "(((node:fallback(., 'false') = 'true')) and (not(node:exists(../UartCallback))))",
+                  "true": "UartCallback field must be enabled"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Uart provider.",
+      "dependency": "A descriptor-forward Uart implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/var[UartCallback]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/var[UartCallback]",
+      "name": "UartCallback",
+      "type": "FUNCTION-NAME",
+      "default": {
+        "kind": "literal",
+        "value": "NULL_PTR"
+      },
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "(                                                   (                                                           (text:toupper(normalize-space(node:fallback(., ''))) = '\"NULL_PTR\"') or                                                               (text:toupper(normalize-space(node:fallback(., ''))) = 'NULL_PTR') or                                                               (text:toupper(normalize-space(node:fallback(., ''))) = '\"NULL\"') or                                                               (text:toupper(normalize-space(node:fallback(., ''))) = 'NULL') or not                                                               (text:match(normalize-space(.),'^[_a-zA-Z]+[_0-9a-zA-Z]*$'))                                                           ) and (../UartCallbackCapability = 'true')                                                      )",
+            "true": "Invalid identifier. The field must specify a valid C function identifier (i.e. an arbitrarily long sequence of digits, underspartitions, lowercase and uppercase Latin letters, that must begin with a non-digit character)"
+          }
+        ]
+      },
+      "editable": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "(../UartCallbackCapability = 'true')"
+          }
+        ]
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "NULL_PTR"
+            }
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "(                                                   (                                                           (text:toupper(normalize-space(node:fallback(., ''))) = '\"NULL_PTR\"') or                                                               (text:toupper(normalize-space(node:fallback(., ''))) = 'NULL_PTR') or                                                               (text:toupper(normalize-space(node:fallback(., ''))) = '\"NULL\"') or                                                               (text:toupper(normalize-space(node:fallback(., ''))) = 'NULL') or not                                                               (text:match(normalize-space(.),'^[_a-zA-Z]+[_0-9a-zA-Z]*$'))                                                           ) and (../UartCallbackCapability = 'true')                                                      )",
+                  "true": "Invalid identifier. The field must specify a valid C function identifier (i.e. an arbitrarily long sequence of digits, underspartitions, lowercase and uppercase Latin letters, that must begin with a non-digit character)"
+                }
+              ]
+            }
+          }
+        ],
+        "editable": [
+          {
+            "source_tag": "a",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "(../UartCallbackCapability = 'true')"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Uart provider.",
+      "dependency": "A descriptor-forward Uart implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/var[UartDevErrorDetect]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/var[UartDevErrorDetect]",
+      "name": "UartDevErrorDetect",
+      "type": "BOOLEAN",
+      "default": {
+        "kind": "literal",
+        "value": "true"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "true"
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Uart provider.",
+      "dependency": "A descriptor-forward Uart implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/var[UartDmaEnable]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/var[UartDmaEnable]",
+      "name": "UartDmaEnable",
+      "type": "BOOLEAN",
+      "default": {
+        "kind": "literal",
+        "value": "false"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "false"
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Uart provider.",
+      "dependency": "A descriptor-forward Uart implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/var[UartEnableUserModeSupport]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/var[UartEnableUserModeSupport]",
+      "name": "UartEnableUserModeSupport",
+      "type": "BOOLEAN",
+      "default": {
+        "kind": "literal",
+        "value": "false"
+      },
+      "readonly": {
+        "kind": "literal",
+        "value": "true"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "false"
+            }
+          }
+        ],
+        "readonly": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "true"
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Uart provider.",
+      "dependency": "A descriptor-forward Uart implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/var[UartMultipartitionSupport]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/var[UartMultipartitionSupport]",
+      "name": "UartMultipartitionSupport",
+      "type": "BOOLEAN",
+      "default": {
+        "kind": "literal",
+        "value": "false"
+      },
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "(ecu:get('Uart.UartGlobalConfig.UartMultiPartitionSupport')='FALSE') and (.='true')",
+            "true": "This derivative is not supported multipartition. Please uncheck this node."
+          }
+        ]
+      },
+      "editable": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "(ecu:get('Uart.UartGlobalConfig.UartMultiPartitionSupport')='TRUE') or                                               ((ecu:get('Uart.UartGlobalConfig.UartMultiPartitionSupport')='FALSE') and (.='true'))"
+          }
+        ]
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "false"
+            }
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "(ecu:get('Uart.UartGlobalConfig.UartMultiPartitionSupport')='FALSE') and (.='true')",
+                  "true": "This derivative is not supported multipartition. Please uncheck this node."
+                }
+              ]
+            }
+          }
+        ],
+        "editable": [
+          {
+            "source_tag": "a",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "(ecu:get('Uart.UartGlobalConfig.UartMultiPartitionSupport')='TRUE') or                                               ((ecu:get('Uart.UartGlobalConfig.UartMultiPartitionSupport')='FALSE') and (.='true'))"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Uart provider.",
+      "dependency": "A descriptor-forward Uart implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/var[UartTimeoutDuration]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/var[UartTimeoutDuration]",
+      "name": "UartTimeoutDuration",
+      "type": "INTEGER",
+      "default": {
+        "kind": "literal",
+        "value": "1000"
+      },
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "<=4294967295"
+          },
+          {
+            "expr": ">=0"
+          }
+        ]
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "1000"
+            }
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "<=4294967295"
+                },
+                {
+                  "expr": ">=0"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Uart provider.",
+      "dependency": "A descriptor-forward Uart implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/var[UartTimeoutMethod]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/var[UartTimeoutMethod]",
+      "name": "UartTimeoutMethod",
+      "type": "ENUMERATION",
+      "default": {
+        "kind": "literal",
+        "value": "OSIF_COUNTER_DUMMY"
+      },
+      "range": {
+        "kind": "literal",
+        "values": [
+          "OSIF_COUNTER_DUMMY",
+          "OSIF_COUNTER_SYSTEM",
+          "OSIF_COUNTER_CUSTOM"
+        ]
+      },
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "node:refs('ASPathDataOfSchema:/TS_T40D34M70I1R0/BaseNXP/OsIfGeneral/OsIfUseCustomTimer') = 'false' and node:fallback(.,'DummyTimer') = 'OSIF_COUNTER_CUSTOM'",
+            "true": "Custom Timer is not enabled in OsIf (OsIfGeneral/OsIfUseCustomTimer checkbox)"
+          },
+          {
+            "expr": "node:refs('ASPathDataOfSchema:/TS_T40D34M70I1R0/BaseNXP/OsIfGeneral/OsIfUseSystemTimer') = 'false' and node:fallback(.,'DummyTimer') = 'OSIF_COUNTER_SYSTEM'",
+            "true": "System Timer is not enabled in OsIf (OsIfGeneral/OsIfUseSystemTimer checkbox)"
+          }
+        ]
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "OSIF_COUNTER_DUMMY"
+            }
+          }
+        ],
+        "range": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "values": [
+                "OSIF_COUNTER_DUMMY",
+                "OSIF_COUNTER_SYSTEM",
+                "OSIF_COUNTER_CUSTOM"
+              ]
+            }
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "node:refs('ASPathDataOfSchema:/TS_T40D34M70I1R0/BaseNXP/OsIfGeneral/OsIfUseCustomTimer') = 'false' and node:fallback(.,'DummyTimer') = 'OSIF_COUNTER_CUSTOM'",
+                  "true": "Custom Timer is not enabled in OsIf (OsIfGeneral/OsIfUseCustomTimer checkbox)"
+                },
+                {
+                  "expr": "node:refs('ASPathDataOfSchema:/TS_T40D34M70I1R0/BaseNXP/OsIfGeneral/OsIfUseSystemTimer') = 'false' and node:fallback(.,'DummyTimer') = 'OSIF_COUNTER_SYSTEM'",
+                  "true": "System Timer is not enabled in OsIf (OsIfGeneral/OsIfUseSystemTimer checkbox)"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Uart provider.",
+      "dependency": "A descriptor-forward Uart implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/var[UartVersionInfoApi]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/var[UartVersionInfoApi]",
+      "name": "UartVersionInfoApi",
+      "type": "BOOLEAN",
+      "default": {
+        "kind": "literal",
+        "value": "true"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "true"
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Uart provider.",
+      "dependency": "A descriptor-forward Uart implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]/lst[UartChannel]/ctr[UartChannel]/ctr[DetailModuleConfiguration]/var[CustomBaudrateDivisor]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]/lst[UartChannel]/ctr[UartChannel]/ctr[DetailModuleConfiguration]/var[CustomBaudrateDivisor]",
+      "name": "CustomBaudrateDivisor",
+      "type": "INTEGER",
+      "default": {
+        "kind": "literal",
+        "value": "4"
+      },
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "<=32"
+          },
+          {
+            "expr": ">=4"
+          }
+        ]
+      },
+      "editable": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "(node:fallback(../DesireBaudrate, 'false') = 'LPUART_UART_BAUDRATE_CUSTOM')"
+          }
+        ]
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "4"
+            }
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "<=32"
+                },
+                {
+                  "expr": ">=4"
+                }
+              ]
+            }
+          }
+        ],
+        "editable": [
+          {
+            "source_tag": "a",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "(node:fallback(../DesireBaudrate, 'false') = 'LPUART_UART_BAUDRATE_CUSTOM')"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_uart_set",
+        "inputs": [
+          "intent.payload",
+          "uart.json#/enum_domains"
+        ],
+        "tests": [
+          "tests/unit/test_uart_apply.py::TestChannelFieldEdits::test_baud_921600_set"
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]/lst[UartChannel]/ctr[UartChannel]/ctr[DetailModuleConfiguration]/var[CustomBaudrateMantissa]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]/lst[UartChannel]/ctr[UartChannel]/ctr[DetailModuleConfiguration]/var[CustomBaudrateMantissa]",
+      "name": "CustomBaudrateMantissa",
+      "type": "INTEGER",
+      "default": {
+        "kind": "literal",
+        "value": "1"
+      },
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "<=8191"
+          },
+          {
+            "expr": ">=1"
+          }
+        ]
+      },
+      "editable": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "(node:fallback(../DesireBaudrate, 'false') = 'LPUART_UART_BAUDRATE_CUSTOM')"
+          }
+        ]
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "1"
+            }
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "<=8191"
+                },
+                {
+                  "expr": ">=1"
+                }
+              ]
+            }
+          }
+        ],
+        "editable": [
+          {
+            "source_tag": "a",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "(node:fallback(../DesireBaudrate, 'false') = 'LPUART_UART_BAUDRATE_CUSTOM')"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_uart_set",
+        "inputs": [
+          "intent.payload",
+          "uart.json#/enum_domains"
+        ],
+        "tests": [
+          "tests/unit/test_uart_apply.py::TestChannelFieldEdits::test_baud_921600_set"
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]/lst[UartChannel]/ctr[UartChannel]/ctr[DetailModuleConfiguration]/var[CustomBaudrateValue]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]/lst[UartChannel]/ctr[UartChannel]/ctr[DetailModuleConfiguration]/var[CustomBaudrateValue]",
+      "name": "CustomBaudrateValue",
+      "type": "INTEGER",
+      "default": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "node:fallback('->num:i(num:i(node:ref(../../UartClockRef)/McuClockReferencePointFrequency) div (num:i(node:fallback(../CustomBaudrateMantissa, 0 )) * num:i(node:fallback(../CustomBaudrateDivisor, 0 ))))', num:i(0))"
+          }
+        ]
+      },
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "(((node:fallback(., 'false') != num:i(num:i(node:ref(../../UartClockRef)/McuClockReferencePointFrequency) div (num:i(node:fallback(../CustomBaudrateMantissa, 0 )) * num:i(node:fallback(../CustomBaudrateDivisor, 0 ))))))) and (node:fallback(../DesireBaudrate, 'false') = 'LPUART_UART_BAUDRATE_CUSTOM')",
+            "true": "is out of range. Please press the button to automatically calculate the correct value"
+          }
+        ]
+      },
+      "editable": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "(node:fallback(../DesireBaudrate, 'false') = 'LPUART_UART_BAUDRATE_CUSTOM')"
+          }
+        ]
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "node:fallback('->num:i(num:i(node:ref(../../UartClockRef)/McuClockReferencePointFrequency) div (num:i(node:fallback(../CustomBaudrateMantissa, 0 )) * num:i(node:fallback(../CustomBaudrateDivisor, 0 ))))', num:i(0))"
+                }
+              ]
+            }
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "(((node:fallback(., 'false') != num:i(num:i(node:ref(../../UartClockRef)/McuClockReferencePointFrequency) div (num:i(node:fallback(../CustomBaudrateMantissa, 0 )) * num:i(node:fallback(../CustomBaudrateDivisor, 0 ))))))) and (node:fallback(../DesireBaudrate, 'false') = 'LPUART_UART_BAUDRATE_CUSTOM')",
+                  "true": "is out of range. Please press the button to automatically calculate the correct value"
+                }
+              ]
+            }
+          }
+        ],
+        "editable": [
+          {
+            "source_tag": "a",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "(node:fallback(../DesireBaudrate, 'false') = 'LPUART_UART_BAUDRATE_CUSTOM')"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_uart_set",
+        "inputs": [
+          "intent.payload",
+          "uart.json#/enum_domains"
+        ],
+        "tests": [
+          "tests/unit/test_uart_apply.py::TestChannelFieldEdits::test_baud_921600_set"
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]/lst[UartChannel]/ctr[UartChannel]/ctr[DetailModuleConfiguration]/var[DesireBaudrate]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]/lst[UartChannel]/ctr[UartChannel]/ctr[DetailModuleConfiguration]/var[DesireBaudrate]",
+      "name": "DesireBaudrate",
+      "type": "ENUMERATION",
+      "default": {
+        "kind": "literal",
+        "value": "LPUART_UART_BAUDRATE_9600"
+      },
+      "range": {
+        "kind": "literal",
+        "values": [
+          "LPUART_UART_BAUDRATE_CUSTOM",
+          "LPUART_UART_BAUDRATE_1200",
+          "LPUART_UART_BAUDRATE_2400",
+          "LPUART_UART_BAUDRATE_4800",
+          "LPUART_UART_BAUDRATE_7200",
+          "LPUART_UART_BAUDRATE_9600",
+          "LPUART_UART_BAUDRATE_14400",
+          "LPUART_UART_BAUDRATE_19200",
+          "LPUART_UART_BAUDRATE_28800",
+          "LPUART_UART_BAUDRATE_38400",
+          "LPUART_UART_BAUDRATE_57600",
+          "LPUART_UART_BAUDRATE_115200",
+          "LPUART_UART_BAUDRATE_230400",
+          "LPUART_UART_BAUDRATE_460800",
+          "LPUART_UART_BAUDRATE_921600",
+          "LPUART_UART_BAUDRATE_1843200"
+        ]
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "LPUART_UART_BAUDRATE_9600"
+            }
+          }
+        ],
+        "range": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "values": [
+                "LPUART_UART_BAUDRATE_CUSTOM",
+                "LPUART_UART_BAUDRATE_1200",
+                "LPUART_UART_BAUDRATE_2400",
+                "LPUART_UART_BAUDRATE_4800",
+                "LPUART_UART_BAUDRATE_7200",
+                "LPUART_UART_BAUDRATE_9600",
+                "LPUART_UART_BAUDRATE_14400",
+                "LPUART_UART_BAUDRATE_19200",
+                "LPUART_UART_BAUDRATE_28800",
+                "LPUART_UART_BAUDRATE_38400",
+                "LPUART_UART_BAUDRATE_57600",
+                "LPUART_UART_BAUDRATE_115200",
+                "LPUART_UART_BAUDRATE_230400",
+                "LPUART_UART_BAUDRATE_460800",
+                "LPUART_UART_BAUDRATE_921600",
+                "LPUART_UART_BAUDRATE_1843200"
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "configurable",
+      "trace": {
+        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/uart.py:UartProvider",
+        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_uart_set",
+        "asset": "autombd-rtd/assets/nxp/s32k3/uart/uart.json#/enum_domains",
+        "tests": [
+          "tests/unit/test_uart_apply.py::TestChannelFieldEdits::test_baud_921600_set",
+          "tests/unit/test_uart_apply.py::TestChannelFieldEdits::test_interrupt_method_set"
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]/lst[UartChannel]/ctr[UartChannel]/ctr[DetailModuleConfiguration]/var[UartHwChannel]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]/lst[UartChannel]/ctr[UartChannel]/ctr[DetailModuleConfiguration]/var[UartHwChannel]",
+      "name": "UartHwChannel",
+      "type": "ENUMERATION",
+      "default": {
+        "kind": "xpath",
+        "expr": "(ecu:list('Uart.UartGlobalConfig.UartChannel.LpuartHWChannelList'))[position()-1=node:fallback( node:current()/../../@index, '0')]"
+      },
+      "range": {
+        "kind": "xpath",
+        "expr": "ecu:list('Uart.UartGlobalConfig.UartChannel.LpuartHWChannelList')"
+      },
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "text:uniq(node:fallback(../../../*/DetailModuleConfiguration/UartHwChannel, 0 ), node:fallback( ., 1 ))",
+            "false": "Duplicate physical Uart channel: UartHwChannel must be unique across all Uart channels. Use the 'Calculate Value' button to calculate correct default value."
+          },
+          {
+            "expr": "node:fallback(node:refs('ASPathDataOfSchema:/AUTOSAR/EcucDefs/Lin')/LinGlobalConfig/LinChannel/*/LinHwChannel, 0 ) = node:fallback(concat('LPUART_IP_', substring-after(string(.), 'LPUART_')), 1 )",
+            "true": "Duplicate physical Uart channel: UartHwChannel is being used by other drivers. It must be unique across all drivers."
+          }
+        ]
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "expr": "(ecu:list('Uart.UartGlobalConfig.UartChannel.LpuartHWChannelList'))[position()-1=node:fallback( node:current()/../../@index, '0')]"
+            }
+          }
+        ],
+        "range": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "expr": "ecu:list('Uart.UartGlobalConfig.UartChannel.LpuartHWChannelList')"
+            }
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "text:uniq(node:fallback(../../../*/DetailModuleConfiguration/UartHwChannel, 0 ), node:fallback( ., 1 ))",
+                  "false": "Duplicate physical Uart channel: UartHwChannel must be unique across all Uart channels. Use the 'Calculate Value' button to calculate correct default value."
+                },
+                {
+                  "expr": "node:fallback(node:refs('ASPathDataOfSchema:/AUTOSAR/EcucDefs/Lin')/LinGlobalConfig/LinChannel/*/LinHwChannel, 0 ) = node:fallback(concat('LPUART_IP_', substring-after(string(.), 'LPUART_')), 1 )",
+                  "true": "Duplicate physical Uart channel: UartHwChannel is being used by other drivers. It must be unique across all drivers."
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "configurable",
+      "trace": {
+        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/uart.py:UartProvider",
+        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_uart_set",
+        "asset": "autombd-rtd/assets/nxp/s32k3/uart/uart.json#/enum_domains",
+        "tests": [
+          "tests/unit/test_uart_apply.py::TestChannelFieldEdits::test_baud_921600_set",
+          "tests/unit/test_uart_apply.py::TestChannelFieldEdits::test_interrupt_method_set"
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]/lst[UartChannel]/ctr[UartChannel]/ctr[DetailModuleConfiguration]/var[UartInternalLoopbackEnable]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]/lst[UartChannel]/ctr[UartChannel]/ctr[DetailModuleConfiguration]/var[UartInternalLoopbackEnable]",
+      "name": "UartInternalLoopbackEnable",
+      "type": "BOOLEAN",
+      "default": {
+        "kind": "literal",
+        "value": "false"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "false"
+            }
+          }
+        ]
+      },
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_uart_set",
+        "inputs": [
+          "intent.payload",
+          "uart.json#/enum_domains"
+        ],
+        "tests": [
+          "tests/unit/test_uart_apply.py::TestChannelFieldEdits::test_baud_921600_set"
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]/lst[UartChannel]/ctr[UartChannel]/ctr[DetailModuleConfiguration]/var[UartInteruptDmaMethod]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]/lst[UartChannel]/ctr[UartChannel]/ctr[DetailModuleConfiguration]/var[UartInteruptDmaMethod]",
+      "name": "UartInteruptDmaMethod",
+      "type": "ENUMERATION",
+      "default": {
+        "kind": "literal",
+        "value": "LPUART_UART_IP_USING_INTERRUPTS"
+      },
+      "range": {
+        "kind": "literal",
+        "values": [
+          "LPUART_UART_IP_USING_INTERRUPTS",
+          "LPUART_UART_IP_USING_DMA"
+        ]
+      },
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "(node:fallback(../UartInteruptDmaMethod, 'LPUART_UART_IP_USING_INTERRUPTS') = 'LPUART_UART_IP_USING_DMA') and                                         (node:fallback(../../../../../GeneralConfiguration/UartDmaEnable,'false') = 'false')",
+            "true": "The UartDmaEnable checkbox in GeneralConfiguration must be checked in order to use DMA as an asynchronous method."
+          },
+          {
+            "expr": "(                                                         (node:fallback(../UartInteruptDmaMethod,'LPUART_UART_IP_USING_INTERRUPTS') = 'LPUART_UART_IP_USING_DMA') and                                                         (not(node:exists(../UartDmaTxChannelRef))) and                                                         (not(node:exists(../UartDmaRxChannelRef)))                                                      )",
+            "true": "At least one DMA transmit or receive channel reference must be configured. Refer to DetailModuleConfiguration/UartDmaTxChannelRef or DetailModuleConfiguration/UartDmaRxChannelRef."
+          }
+        ]
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "LPUART_UART_IP_USING_INTERRUPTS"
+            }
+          }
+        ],
+        "range": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "values": [
+                "LPUART_UART_IP_USING_INTERRUPTS",
+                "LPUART_UART_IP_USING_DMA"
+              ]
+            }
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "(node:fallback(../UartInteruptDmaMethod, 'LPUART_UART_IP_USING_INTERRUPTS') = 'LPUART_UART_IP_USING_DMA') and                                         (node:fallback(../../../../../GeneralConfiguration/UartDmaEnable,'false') = 'false')",
+                  "true": "The UartDmaEnable checkbox in GeneralConfiguration must be checked in order to use DMA as an asynchronous method."
+                },
+                {
+                  "expr": "(                                                         (node:fallback(../UartInteruptDmaMethod,'LPUART_UART_IP_USING_INTERRUPTS') = 'LPUART_UART_IP_USING_DMA') and                                                         (not(node:exists(../UartDmaTxChannelRef))) and                                                         (not(node:exists(../UartDmaRxChannelRef)))                                                      )",
+                  "true": "At least one DMA transmit or receive channel reference must be configured. Refer to DetailModuleConfiguration/UartDmaTxChannelRef or DetailModuleConfiguration/UartDmaRxChannelRef."
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "configurable",
+      "trace": {
+        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/uart.py:UartProvider",
+        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_uart_set",
+        "asset": "autombd-rtd/assets/nxp/s32k3/uart/uart.json#/enum_domains",
+        "tests": [
+          "tests/unit/test_uart_apply.py::TestChannelFieldEdits::test_baud_921600_set",
+          "tests/unit/test_uart_apply.py::TestChannelFieldEdits::test_interrupt_method_set"
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]/lst[UartChannel]/ctr[UartChannel]/ctr[DetailModuleConfiguration]/var[UartParityType]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]/lst[UartChannel]/ctr[UartChannel]/ctr[DetailModuleConfiguration]/var[UartParityType]",
+      "name": "UartParityType",
+      "type": "ENUMERATION",
+      "default": {
+        "kind": "literal",
+        "value": "LPUART_UART_IP_PARITY_DISABLED"
+      },
+      "range": {
+        "kind": "literal",
+        "values": [
+          "LPUART_UART_IP_PARITY_DISABLED",
+          "LPUART_UART_IP_PARITY_EVEN",
+          "LPUART_UART_IP_PARITY_ODD"
+        ]
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "LPUART_UART_IP_PARITY_DISABLED"
+            }
+          }
+        ],
+        "range": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "values": [
+                "LPUART_UART_IP_PARITY_DISABLED",
+                "LPUART_UART_IP_PARITY_EVEN",
+                "LPUART_UART_IP_PARITY_ODD"
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "configurable",
+      "trace": {
+        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/uart.py:UartProvider",
+        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_uart_set",
+        "asset": "autombd-rtd/assets/nxp/s32k3/uart/uart.json#/enum_domains",
+        "tests": [
+          "tests/unit/test_uart_apply.py::TestChannelFieldEdits::test_baud_921600_set",
+          "tests/unit/test_uart_apply.py::TestChannelFieldEdits::test_interrupt_method_set"
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]/lst[UartChannel]/ctr[UartChannel]/ctr[DetailModuleConfiguration]/var[UartStopBitNumber]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]/lst[UartChannel]/ctr[UartChannel]/ctr[DetailModuleConfiguration]/var[UartStopBitNumber]",
+      "name": "UartStopBitNumber",
+      "type": "ENUMERATION",
+      "default": {
+        "kind": "literal",
+        "value": "LPUART_UART_IP_ONE_STOP_BIT"
+      },
+      "range": {
+        "kind": "literal",
+        "values": [
+          "LPUART_UART_IP_ONE_STOP_BIT",
+          "LPUART_UART_IP_TWO_STOP_BIT"
+        ]
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "LPUART_UART_IP_ONE_STOP_BIT"
+            }
+          }
+        ],
+        "range": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "values": [
+                "LPUART_UART_IP_ONE_STOP_BIT",
+                "LPUART_UART_IP_TWO_STOP_BIT"
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "configurable",
+      "trace": {
+        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/uart.py:UartProvider",
+        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_uart_set",
+        "asset": "autombd-rtd/assets/nxp/s32k3/uart/uart.json#/enum_domains",
+        "tests": [
+          "tests/unit/test_uart_apply.py::TestChannelFieldEdits::test_baud_921600_set",
+          "tests/unit/test_uart_apply.py::TestChannelFieldEdits::test_interrupt_method_set"
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]/lst[UartChannel]/ctr[UartChannel]/ctr[DetailModuleConfiguration]/var[UartTimeoutEnable]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]/lst[UartChannel]/ctr[UartChannel]/ctr[DetailModuleConfiguration]/var[UartTimeoutEnable]",
+      "name": "UartTimeoutEnable",
+      "type": "BOOLEAN",
+      "default": {
+        "kind": "literal",
+        "value": "false"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "false"
+            }
+          }
+        ]
+      },
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_uart_set",
+        "inputs": [
+          "intent.payload",
+          "uart.json#/enum_domains"
+        ],
+        "tests": [
+          "tests/unit/test_uart_apply.py::TestChannelFieldEdits::test_baud_921600_set"
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]/lst[UartChannel]/ctr[UartChannel]/ctr[DetailModuleConfiguration]/var[UartWordLength]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]/lst[UartChannel]/ctr[UartChannel]/ctr[DetailModuleConfiguration]/var[UartWordLength]",
+      "name": "UartWordLength",
+      "type": "ENUMERATION",
+      "default": {
+        "kind": "literal",
+        "value": "LPUART_UART_IP_8_BITS_PER_CHAR"
+      },
+      "range": {
+        "kind": "literal",
+        "values": [
+          "LPUART_UART_IP_7_BITS_PER_CHAR",
+          "LPUART_UART_IP_8_BITS_PER_CHAR",
+          "LPUART_UART_IP_9_BITS_PER_CHAR",
+          "LPUART_UART_IP_10_BITS_PER_CHAR"
+        ]
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "LPUART_UART_IP_8_BITS_PER_CHAR"
+            }
+          }
+        ],
+        "range": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "values": [
+                "LPUART_UART_IP_7_BITS_PER_CHAR",
+                "LPUART_UART_IP_8_BITS_PER_CHAR",
+                "LPUART_UART_IP_9_BITS_PER_CHAR",
+                "LPUART_UART_IP_10_BITS_PER_CHAR"
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "configurable",
+      "trace": {
+        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/uart.py:UartProvider",
+        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_uart_set",
+        "asset": "autombd-rtd/assets/nxp/s32k3/uart/uart.json#/enum_domains",
+        "tests": [
+          "tests/unit/test_uart_apply.py::TestChannelFieldEdits::test_baud_921600_set",
+          "tests/unit/test_uart_apply.py::TestChannelFieldEdits::test_interrupt_method_set"
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]/lst[UartChannel]/ctr[UartChannel]/ctr[FlexioModuleConfiguration]/var[CustomBaudrateDivider]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]/lst[UartChannel]/ctr[UartChannel]/ctr[FlexioModuleConfiguration]/var[CustomBaudrateDivider]",
+      "name": "CustomBaudrateDivider",
+      "type": "INTEGER",
+      "default": {
+        "kind": "literal",
+        "value": "32"
+      },
+      "invalid": [
+        {
+          "source_tag": "da",
+          "kind": "xpath",
+          "tests": [
+            {
+              "expr": "<=512"
+            },
+            {
+              "expr": ">=2"
+            }
+          ]
+        },
+        {
+          "source_tag": "da",
+          "kind": "xpath",
+          "tests": [
+            {
+              "expr": "(node:fallback(., 0) mod 2) != 0",
+              "true": "The Custom Baudrate Divider should be even when the CMP bit is equal to (Divider/2 - 1)"
+            }
+          ]
+        }
+      ],
+      "editable": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "(node:fallback(../DesireBaudrate, 'false') = 'FLEXIO_UART_BAUDRATE_CUSTOM')"
+          }
+        ]
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "32"
+            }
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "<=512"
+                },
+                {
+                  "expr": ">=2"
+                }
+              ]
+            }
+          },
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "(node:fallback(., 0) mod 2) != 0",
+                  "true": "The Custom Baudrate Divider should be even when the CMP bit is equal to (Divider/2 - 1)"
+                }
+              ]
+            }
+          }
+        ],
+        "editable": [
+          {
+            "source_tag": "a",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "(node:fallback(../DesireBaudrate, 'false') = 'FLEXIO_UART_BAUDRATE_CUSTOM')"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_uart_set",
+        "inputs": [
+          "intent.payload",
+          "uart.json#/enum_domains"
+        ],
+        "tests": [
+          "tests/unit/test_uart_apply.py::TestChannelFieldEdits::test_baud_921600_set"
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]/lst[UartChannel]/ctr[UartChannel]/ctr[FlexioModuleConfiguration]/var[CustomBaudrateValue]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]/lst[UartChannel]/ctr[UartChannel]/ctr[FlexioModuleConfiguration]/var[CustomBaudrateValue]",
+      "name": "CustomBaudrateValue",
+      "type": "INTEGER",
+      "default": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "node:fallback('->num:i(num:i(node:ref(../../UartClockRef)/McuClockReferencePointFrequency) div (node:when(node:fallback(../CustomTimerDecrement, 0) = \"FLEXIO_TIMER_DECREMENT_FXIO_CLK_SHIFT_TMR\" , 1, node:when(node:fallback(../CustomTimerDecrement, 0) = \"FLEXIO_TIMER_DECREMENT_FXIO_CLK_DIV_16\" ,16 , 256)) * num:i(node:fallback(../CustomBaudrateDivider, 0))))', num:i(0))"
+          }
+        ]
+      },
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "(((node:fallback(., 'false') != num:i(num:i(node:ref(../../UartClockRef)/McuClockReferencePointFrequency) div (                                           node:when(node:fallback(../CustomTimerDecrement, 0) = 'FLEXIO_TIMER_DECREMENT_FXIO_CLK_SHIFT_TMR' ,                                           1,                                           node:when(node:fallback(../CustomTimerDecrement, 0) = 'FLEXIO_TIMER_DECREMENT_FXIO_CLK_DIV_16' ,                                           16,                                           256                                           )) * num:i(node:fallback(../CustomBaudrateDivider, 0))))))) and (node:fallback(../DesireBaudrate, 'false') = 'FLEXIO_UART_BAUDRATE_CUSTOM')",
+            "true": "is out of range. Please press the button to automatically calculate the correct value"
+          }
+        ]
+      },
+      "editable": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "(node:fallback(../DesireBaudrate, 'false') = 'FLEXIO_UART_BAUDRATE_CUSTOM')"
+          }
+        ]
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "node:fallback('->num:i(num:i(node:ref(../../UartClockRef)/McuClockReferencePointFrequency) div (node:when(node:fallback(../CustomTimerDecrement, 0) = \"FLEXIO_TIMER_DECREMENT_FXIO_CLK_SHIFT_TMR\" , 1, node:when(node:fallback(../CustomTimerDecrement, 0) = \"FLEXIO_TIMER_DECREMENT_FXIO_CLK_DIV_16\" ,16 , 256)) * num:i(node:fallback(../CustomBaudrateDivider, 0))))', num:i(0))"
+                }
+              ]
+            }
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "(((node:fallback(., 'false') != num:i(num:i(node:ref(../../UartClockRef)/McuClockReferencePointFrequency) div (                                           node:when(node:fallback(../CustomTimerDecrement, 0) = 'FLEXIO_TIMER_DECREMENT_FXIO_CLK_SHIFT_TMR' ,                                           1,                                           node:when(node:fallback(../CustomTimerDecrement, 0) = 'FLEXIO_TIMER_DECREMENT_FXIO_CLK_DIV_16' ,                                           16,                                           256                                           )) * num:i(node:fallback(../CustomBaudrateDivider, 0))))))) and (node:fallback(../DesireBaudrate, 'false') = 'FLEXIO_UART_BAUDRATE_CUSTOM')",
+                  "true": "is out of range. Please press the button to automatically calculate the correct value"
+                }
+              ]
+            }
+          }
+        ],
+        "editable": [
+          {
+            "source_tag": "a",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "(node:fallback(../DesireBaudrate, 'false') = 'FLEXIO_UART_BAUDRATE_CUSTOM')"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_uart_set",
+        "inputs": [
+          "intent.payload",
+          "uart.json#/enum_domains"
+        ],
+        "tests": [
+          "tests/unit/test_uart_apply.py::TestChannelFieldEdits::test_baud_921600_set"
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]/lst[UartChannel]/ctr[UartChannel]/ctr[FlexioModuleConfiguration]/var[CustomTimerDecrement]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]/lst[UartChannel]/ctr[UartChannel]/ctr[FlexioModuleConfiguration]/var[CustomTimerDecrement]",
+      "name": "CustomTimerDecrement",
+      "type": "ENUMERATION",
+      "default": {
+        "kind": "literal",
+        "value": "FLEXIO_TIMER_DECREMENT_FXIO_CLK_SHIFT_TMR"
+      },
+      "range": {
+        "kind": "literal",
+        "values": [
+          "FLEXIO_TIMER_DECREMENT_FXIO_CLK_SHIFT_TMR",
+          "FLEXIO_TIMER_DECREMENT_FXIO_CLK_DIV_16",
+          "FLEXIO_TIMER_DECREMENT_FXIO_CLK_DIV_256"
+        ]
+      },
+      "editable": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "(node:fallback(../DesireBaudrate, 'false') = 'FLEXIO_UART_BAUDRATE_CUSTOM')"
+          }
+        ]
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "FLEXIO_TIMER_DECREMENT_FXIO_CLK_SHIFT_TMR"
+            }
+          }
+        ],
+        "range": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "values": [
+                "FLEXIO_TIMER_DECREMENT_FXIO_CLK_SHIFT_TMR",
+                "FLEXIO_TIMER_DECREMENT_FXIO_CLK_DIV_16",
+                "FLEXIO_TIMER_DECREMENT_FXIO_CLK_DIV_256"
+              ]
+            }
+          }
+        ],
+        "editable": [
+          {
+            "source_tag": "a",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "(node:fallback(../DesireBaudrate, 'false') = 'FLEXIO_UART_BAUDRATE_CUSTOM')"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_uart_set",
+        "inputs": [
+          "intent.payload",
+          "uart.json#/enum_domains"
+        ],
+        "tests": [
+          "tests/unit/test_uart_apply.py::TestChannelFieldEdits::test_baud_921600_set"
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]/lst[UartChannel]/ctr[UartChannel]/ctr[FlexioModuleConfiguration]/var[DesireBaudrate]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]/lst[UartChannel]/ctr[UartChannel]/ctr[FlexioModuleConfiguration]/var[DesireBaudrate]",
+      "name": "DesireBaudrate",
+      "type": "ENUMERATION",
+      "default": {
+        "kind": "literal",
+        "value": "FLEXIO_UART_BAUDRATE_9600"
+      },
+      "range": {
+        "kind": "literal",
+        "values": [
+          "FLEXIO_UART_BAUDRATE_CUSTOM",
+          "FLEXIO_UART_BAUDRATE_1200",
+          "FLEXIO_UART_BAUDRATE_2400",
+          "FLEXIO_UART_BAUDRATE_4800",
+          "FLEXIO_UART_BAUDRATE_7200",
+          "FLEXIO_UART_BAUDRATE_9600",
+          "FLEXIO_UART_BAUDRATE_14400",
+          "FLEXIO_UART_BAUDRATE_19200",
+          "FLEXIO_UART_BAUDRATE_28800",
+          "FLEXIO_UART_BAUDRATE_38400",
+          "FLEXIO_UART_BAUDRATE_57600",
+          "FLEXIO_UART_BAUDRATE_115200",
+          "FLEXIO_UART_BAUDRATE_230400",
+          "FLEXIO_UART_BAUDRATE_460800",
+          "FLEXIO_UART_BAUDRATE_921600",
+          "FLEXIO_UART_BAUDRATE_1843200"
+        ]
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "FLEXIO_UART_BAUDRATE_9600"
+            }
+          }
+        ],
+        "range": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "values": [
+                "FLEXIO_UART_BAUDRATE_CUSTOM",
+                "FLEXIO_UART_BAUDRATE_1200",
+                "FLEXIO_UART_BAUDRATE_2400",
+                "FLEXIO_UART_BAUDRATE_4800",
+                "FLEXIO_UART_BAUDRATE_7200",
+                "FLEXIO_UART_BAUDRATE_9600",
+                "FLEXIO_UART_BAUDRATE_14400",
+                "FLEXIO_UART_BAUDRATE_19200",
+                "FLEXIO_UART_BAUDRATE_28800",
+                "FLEXIO_UART_BAUDRATE_38400",
+                "FLEXIO_UART_BAUDRATE_57600",
+                "FLEXIO_UART_BAUDRATE_115200",
+                "FLEXIO_UART_BAUDRATE_230400",
+                "FLEXIO_UART_BAUDRATE_460800",
+                "FLEXIO_UART_BAUDRATE_921600",
+                "FLEXIO_UART_BAUDRATE_1843200"
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "configurable",
+      "trace": {
+        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/uart.py:UartProvider",
+        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_uart_set",
+        "asset": "autombd-rtd/assets/nxp/s32k3/uart/uart.json#/enum_domains",
+        "tests": [
+          "tests/unit/test_uart_apply.py::TestChannelFieldEdits::test_baud_921600_set",
+          "tests/unit/test_uart_apply.py::TestChannelFieldEdits::test_interrupt_method_set"
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]/lst[UartChannel]/ctr[UartChannel]/ctr[FlexioModuleConfiguration]/var[FlexioUartInteruptDmaMethod]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]/lst[UartChannel]/ctr[UartChannel]/ctr[FlexioModuleConfiguration]/var[FlexioUartInteruptDmaMethod]",
+      "name": "FlexioUartInteruptDmaMethod",
+      "type": "ENUMERATION",
+      "default": {
+        "kind": "literal",
+        "value": "FLEXIO_UART_IP_DRIVER_TYPE_INTERRUPTS"
+      },
+      "range": {
+        "kind": "literal",
+        "values": [
+          "FLEXIO_UART_IP_DRIVER_TYPE_INTERRUPTS",
+          "FLEXIO_UART_IP_DRIVER_TYPE_DMA"
+        ]
+      },
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "(node:fallback(../FlexioUartInteruptDmaMethod, 'FLEXIO_UART_IP_DRIVER_TYPE_INTERRUPTS') = 'FLEXIO_UART_IP_DRIVER_TYPE_DMA') and                                         (node:fallback(../../../../../GeneralConfiguration/UartDmaEnable,'false') = 'false')",
+            "true": "The UartDmaEnable checkbox in GeneralConfiguration must be checked in order to use DMA as an asynchronous method."
+          },
+          {
+            "expr": "(                                                         (node:fallback(.,'FLEXIO_UART_IP_DRIVER_TYPE_INTERRUPTS') = 'FLEXIO_UART_IP_DRIVER_TYPE_DMA') and                                                         (not(node:exists(../FlexioDmaChannelRef)))                                                      )",
+            "true": "At least one DMA transmit or receive channel reference must be configured. Refer to DetailModuleConfiguration/UartDmaChannelRef or DetailModuleConfiguration/FlexioDmaChannelRef."
+          }
+        ]
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "FLEXIO_UART_IP_DRIVER_TYPE_INTERRUPTS"
+            }
+          }
+        ],
+        "range": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "values": [
+                "FLEXIO_UART_IP_DRIVER_TYPE_INTERRUPTS",
+                "FLEXIO_UART_IP_DRIVER_TYPE_DMA"
+              ]
+            }
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "(node:fallback(../FlexioUartInteruptDmaMethod, 'FLEXIO_UART_IP_DRIVER_TYPE_INTERRUPTS') = 'FLEXIO_UART_IP_DRIVER_TYPE_DMA') and                                         (node:fallback(../../../../../GeneralConfiguration/UartDmaEnable,'false') = 'false')",
+                  "true": "The UartDmaEnable checkbox in GeneralConfiguration must be checked in order to use DMA as an asynchronous method."
+                },
+                {
+                  "expr": "(                                                         (node:fallback(.,'FLEXIO_UART_IP_DRIVER_TYPE_INTERRUPTS') = 'FLEXIO_UART_IP_DRIVER_TYPE_DMA') and                                                         (not(node:exists(../FlexioDmaChannelRef)))                                                      )",
+                  "true": "At least one DMA transmit or receive channel reference must be configured. Refer to DetailModuleConfiguration/UartDmaChannelRef or DetailModuleConfiguration/FlexioDmaChannelRef."
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "configurable",
+      "trace": {
+        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/uart.py:UartProvider",
+        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_uart_set",
+        "asset": "autombd-rtd/assets/nxp/s32k3/uart/uart.json#/enum_domains",
+        "tests": [
+          "tests/unit/test_uart_apply.py::TestChannelFieldEdits::test_baud_921600_set",
+          "tests/unit/test_uart_apply.py::TestChannelFieldEdits::test_interrupt_method_set"
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]/lst[UartChannel]/ctr[UartChannel]/ctr[FlexioModuleConfiguration]/var[bitCount]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]/lst[UartChannel]/ctr[UartChannel]/ctr[FlexioModuleConfiguration]/var[bitCount]",
+      "name": "bitCount",
+      "type": "ENUMERATION",
+      "default": {
+        "kind": "literal",
+        "value": "FLEXIO_UART_IP_8_BITS_PER_CHAR"
+      },
+      "range": {
+        "kind": "literal",
+        "values": [
+          "FLEXIO_UART_IP_8_BITS_PER_CHAR"
+        ]
+      },
+      "readonly": {
+        "kind": "literal",
+        "value": "true"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "FLEXIO_UART_IP_8_BITS_PER_CHAR"
+            }
+          }
+        ],
+        "range": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "values": [
+                "FLEXIO_UART_IP_8_BITS_PER_CHAR"
+              ]
+            }
+          }
+        ],
+        "readonly": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "true"
+            }
+          }
+        ]
+      },
+      "classification": "configurable",
+      "trace": {
+        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/uart.py:UartProvider",
+        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_uart_set",
+        "asset": "autombd-rtd/assets/nxp/s32k3/uart/uart.json#/enum_domains",
+        "tests": [
+          "tests/unit/test_uart_apply.py::TestChannelFieldEdits::test_baud_921600_set",
+          "tests/unit/test_uart_apply.py::TestChannelFieldEdits::test_interrupt_method_set"
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]/lst[UartChannel]/ctr[UartChannel]/ctr[FlexioModuleConfiguration]/var[driverDirection]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]/lst[UartChannel]/ctr[UartChannel]/ctr[FlexioModuleConfiguration]/var[driverDirection]",
+      "name": "driverDirection",
+      "type": "ENUMERATION",
+      "default": {
+        "kind": "literal",
+        "value": "FLEXIO_UART_IP_DIRECTION_TX"
+      },
+      "range": {
+        "kind": "literal",
+        "values": [
+          "FLEXIO_UART_IP_DIRECTION_TX",
+          "FLEXIO_UART_IP_DIRECTION_RX"
+        ]
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "FLEXIO_UART_IP_DIRECTION_TX"
+            }
+          }
+        ],
+        "range": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "values": [
+                "FLEXIO_UART_IP_DIRECTION_TX",
+                "FLEXIO_UART_IP_DIRECTION_RX"
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "configurable",
+      "trace": {
+        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/uart.py:UartProvider",
+        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_uart_set",
+        "asset": "autombd-rtd/assets/nxp/s32k3/uart/uart.json#/enum_domains",
+        "tests": [
+          "tests/unit/test_uart_apply.py::TestChannelFieldEdits::test_baud_921600_set",
+          "tests/unit/test_uart_apply.py::TestChannelFieldEdits::test_interrupt_method_set"
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]/lst[UartChannel]/ctr[UartChannel]/var[UartChannelId]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]/lst[UartChannel]/ctr[UartChannel]/var[UartChannelId]",
+      "name": "UartChannelId",
+      "type": "INTEGER",
+      "default": {
+        "kind": "xpath",
+        "expr": "node:fallback(node:current()/../@index, num:i(1))"
+      },
+      "range": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "(. >= 0) and (.< num:i(count(node:current()/../../*)))",
+            "false": "Value out of range: must be in range 0 to N-1 (N is number of configured channels). Use the 'Calculate Value' button to calculate correct default value."
+          },
+          {
+            "expr": "text:uniq(../../*/UartChannelId, .)",
+            "false": "Duplicated value: UartChannelId must be unique across all Uart channels. Use the 'Calculate Value' button to calculate correct default value."
+          },
+          {
+            "expr": "num:i(node:fallback(.,0)) = num:i(../@index)",
+            "false": "Invalid value: The ID should correspond to the position of the element within the configuration list."
+          }
+        ]
+      },
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "<=ecu:get('Uart.UartGlobalConfig.UartChannel')"
+          },
+          {
+            "expr": ">=0"
+          }
+        ]
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "expr": "node:fallback(node:current()/../@index, num:i(1))"
+            }
+          }
+        ],
+        "range": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "(. >= 0) and (.< num:i(count(node:current()/../../*)))",
+                  "false": "Value out of range: must be in range 0 to N-1 (N is number of configured channels). Use the 'Calculate Value' button to calculate correct default value."
+                },
+                {
+                  "expr": "text:uniq(../../*/UartChannelId, .)",
+                  "false": "Duplicated value: UartChannelId must be unique across all Uart channels. Use the 'Calculate Value' button to calculate correct default value."
+                },
+                {
+                  "expr": "num:i(node:fallback(.,0)) = num:i(../@index)",
+                  "false": "Invalid value: The ID should correspond to the position of the element within the configuration list."
+                }
+              ]
+            }
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "<=ecu:get('Uart.UartGlobalConfig.UartChannel')"
+                },
+                {
+                  "expr": ">=0"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "configurable",
+      "trace": {
+        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/uart.py:UartProvider",
+        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_uart_set",
+        "asset": "autombd-rtd/assets/nxp/s32k3/uart/uart.json#/enum_domains",
+        "tests": [
+          "tests/unit/test_uart_apply.py::TestChannelFieldEdits::test_baud_921600_set",
+          "tests/unit/test_uart_apply.py::TestChannelFieldEdits::test_interrupt_method_set"
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]/lst[UartChannel]/ctr[UartChannel]/var[UartHwUsing]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]/lst[UartChannel]/ctr[UartChannel]/var[UartHwUsing]",
+      "name": "UartHwUsing",
+      "type": "ENUMERATION",
+      "default": {
+        "kind": "literal",
+        "value": "LPUART_IP"
+      },
+      "range": {
+        "kind": "literal",
+        "values": [
+          "LPUART_IP",
+          "FLEXIO_IP"
+        ]
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "LPUART_IP"
+            }
+          }
+        ],
+        "range": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "values": [
+                "LPUART_IP",
+                "FLEXIO_IP"
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "configurable",
+      "trace": {
+        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/uart.py:UartProvider",
+        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_uart_set",
+        "asset": "autombd-rtd/assets/nxp/s32k3/uart/uart.json#/enum_domains",
+        "tests": [
+          "tests/unit/test_uart_apply.py::TestChannelFieldEdits::test_baud_921600_set",
+          "tests/unit/test_uart_apply.py::TestChannelFieldEdits::test_interrupt_method_set"
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/var[IMPLEMENTATION_CONFIG_VARIANT]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/var[IMPLEMENTATION_CONFIG_VARIANT]",
+      "name": "IMPLEMENTATION_CONFIG_VARIANT",
+      "type": "ENUMERATION",
+      "default": {
+        "kind": "literal",
+        "value": "VariantPostBuild"
+      },
+      "range": {
+        "kind": "literal",
+        "values": [
+          "VariantPostBuild",
+          "VariantPreCompile"
+        ]
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "VariantPostBuild"
+            }
+          }
+        ],
+        "range": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "values": [
+                "VariantPostBuild",
+                "VariantPreCompile"
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Uart provider.",
+      "dependency": "A descriptor-forward Uart implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/var[POST_BUILD_VARIANT_USED]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/var[POST_BUILD_VARIANT_USED]",
+      "name": "POST_BUILD_VARIANT_USED",
+      "type": "BOOLEAN",
+      "default": {
+        "kind": "literal",
+        "value": "true"
+      },
+      "readonly": {
+        "kind": "literal",
+        "value": "FALSE"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "true"
+            }
+          }
+        ],
+        "readonly": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "FALSE"
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Uart provider.",
+      "dependency": "A descriptor-forward Uart implementation and generality tests are required before exposure."
+    }
+  ],
+  "cross_module_index": {
+    "EcuC": [
+      "reference:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/lst[UartEcucPartitionRef]/ref[UartEcucPartitionRef]",
+      "reference:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]/lst[UartChannel]/ctr[UartChannel]/ref[UartChannelEcucPartitionRef]"
+    ],
+    "Mcl": [
+      "reference:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]/lst[UartChannel]/ctr[UartChannel]/ctr[DetailModuleConfiguration]/ref[UartDmaRxChannelRef]",
+      "reference:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]/lst[UartChannel]/ctr[UartChannel]/ctr[DetailModuleConfiguration]/ref[UartDmaTxChannelRef]",
+      "reference:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]/lst[UartChannel]/ctr[UartChannel]/ctr[FlexioModuleConfiguration]/ref[FlexioDmaChannelRef]",
+      "reference:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]/lst[UartChannel]/ctr[UartChannel]/ctr[FlexioModuleConfiguration]/ref[UartHwChannelRef]"
+    ],
+    "Mcu": [
+      "reference:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]/lst[UartChannel]/ctr[UartChannel]/ref[UartClockRef]"
+    ]
+  },
+  "summary": {
+    "total": 56,
+    "configurable": 21,
+    "deferred": 27,
+    "derived": 8
+  }
+}

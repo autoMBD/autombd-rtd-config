@@ -1,0 +1,1867 @@
+{
+  "format_version": 1,
+  "source": {
+    "module": "Dio",
+    "descriptor": "Dio.xdm",
+    "package": "TS_T40D34M70I1R0",
+    "rtd_release": "7.0.1",
+    "sha256": "E3F8FDF2BACED5D8014FA9FE1A4B0C5AB527B9C1C665C8FC1E6A15768BC63278"
+  },
+  "items": [
+    {
+      "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]",
+      "kind": "container",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]",
+      "name": "CommonPublishedInformation",
+      "type": "IDENTIFIABLE",
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Dio provider.",
+      "dependency": "A descriptor-forward Dio implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]",
+      "kind": "container",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]",
+      "name": "DioConfig",
+      "type": "IDENTIFIABLE",
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Dio provider.",
+      "dependency": "A descriptor-forward Dio implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]",
+      "kind": "container",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]",
+      "name": "DioPort",
+      "type": "IDENTIFIABLE",
+      "classification": "configurable",
+      "trace": {
+        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/dio.py:DioProvider",
+        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_dio_set",
+        "asset": "autombd-rtd/assets/nxp/s32k3/dio/dio.json#/channel_fields",
+        "tests": [
+          "tests/unit/test_dio_apply.py::test_dio_channel_inserted_into_dioport_0",
+          "tests/unit/test_dio_apply.py::test_dio_port_autocreated_for_port1_pin_pta16"
+        ]
+      }
+    },
+    {
+      "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioChannelGroup]/ctr[DioChannelGroup]",
+      "kind": "container",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioChannelGroup]/ctr[DioChannelGroup]",
+      "name": "DioChannelGroup",
+      "type": "IDENTIFIABLE",
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "text:uniq(../../../../*/DioChannelGroup/*, .)",
+            "false": "ChannelGroup name duplicated. Channel group names must be unique even across ports and configurations."
+          }
+        ]
+      },
+      "fact_sources": {
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "text:uniq(../../../../*/DioChannelGroup/*, .)",
+                  "false": "ChannelGroup name duplicated. Channel group names must be unique even across ports and configurations."
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Dio provider.",
+      "dependency": "A descriptor-forward Dio implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioChannel]/ctr[DioChannel]",
+      "kind": "container",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioChannel]/ctr[DioChannel]",
+      "name": "DioChannel",
+      "type": "IDENTIFIABLE",
+      "classification": "configurable",
+      "trace": {
+        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/dio.py:DioProvider",
+        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_dio_set",
+        "asset": "autombd-rtd/assets/nxp/s32k3/dio/dio.json#/channel_fields",
+        "tests": [
+          "tests/unit/test_dio_apply.py::test_dio_channel_inserted_into_dioport_0",
+          "tests/unit/test_dio_apply.py::test_dio_port_autocreated_for_port1_pin_pta16"
+        ]
+      }
+    },
+    {
+      "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioGeneral]",
+      "kind": "container",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioGeneral]",
+      "name": "DioGeneral",
+      "type": "IDENTIFIABLE",
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Dio provider.",
+      "dependency": "A descriptor-forward Dio implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "list:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]",
+      "kind": "list",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]",
+      "name": "DioPort",
+      "type": "MAP",
+      "min": {
+        "kind": "literal",
+        "value": "1"
+      },
+      "fact_sources": {
+        "min": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "1"
+            }
+          }
+        ]
+      },
+      "classification": "configurable",
+      "trace": {
+        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/dio.py:DioProvider",
+        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_dio_set",
+        "asset": "autombd-rtd/assets/nxp/s32k3/dio/dio.json#/channel_fields",
+        "tests": [
+          "tests/unit/test_dio_apply.py::test_dio_channel_inserted_into_dioport_0",
+          "tests/unit/test_dio_apply.py::test_dio_port_autocreated_for_port1_pin_pta16"
+        ]
+      }
+    },
+    {
+      "key": "list:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioChannelGroup]",
+      "kind": "list",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioChannelGroup]",
+      "name": "DioChannelGroup",
+      "type": "MAP",
+      "max": {
+        "kind": "literal",
+        "value": "255"
+      },
+      "fact_sources": {
+        "max": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "255"
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Dio provider.",
+      "dependency": "A descriptor-forward Dio implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "list:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioChannelGroup]/ctr[DioChannelGroup]/lst[DioChannelGroupEcucPartitionRef]",
+      "kind": "list",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioChannelGroup]/ctr[DioChannelGroup]/lst[DioChannelGroupEcucPartitionRef]",
+      "name": "DioChannelGroupEcucPartitionRef",
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "(num:i(count(./*)) = 0) and (num:i(count(../../../DioPortEcucPartitionRef/*)) > 0)",
+            "true": "At least one partition need to be defined in DioChannelGroupEcucPartitionRef"
+          }
+        ]
+      },
+      "fact_sources": {
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "(num:i(count(./*)) = 0) and (num:i(count(../../../DioPortEcucPartitionRef/*)) > 0)",
+                  "true": "At least one partition need to be defined in DioChannelGroupEcucPartitionRef"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Dio provider.",
+      "dependency": "A descriptor-forward Dio implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "list:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioChannel]",
+      "kind": "list",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioChannel]",
+      "name": "DioChannel",
+      "type": "MAP",
+      "classification": "configurable",
+      "trace": {
+        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/dio.py:DioProvider",
+        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_dio_set",
+        "asset": "autombd-rtd/assets/nxp/s32k3/dio/dio.json#/channel_fields",
+        "tests": [
+          "tests/unit/test_dio_apply.py::test_dio_channel_inserted_into_dioport_0",
+          "tests/unit/test_dio_apply.py::test_dio_port_autocreated_for_port1_pin_pta16"
+        ]
+      }
+    },
+    {
+      "key": "list:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioChannel]/ctr[DioChannel]/lst[DioChannelEcucPartitionRef]",
+      "kind": "list",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioChannel]/ctr[DioChannel]/lst[DioChannelEcucPartitionRef]",
+      "name": "DioChannelEcucPartitionRef",
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "(num:i(count(./*)) = 0) and (num:i(count(../../../DioPortEcucPartitionRef/*)) > 0)",
+            "true": "At least one partition need to be defined in DioChannelEcucPartitionRef"
+          }
+        ]
+      },
+      "fact_sources": {
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "(num:i(count(./*)) = 0) and (num:i(count(../../../DioPortEcucPartitionRef/*)) > 0)",
+                  "true": "At least one partition need to be defined in DioChannelEcucPartitionRef"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Dio provider.",
+      "dependency": "A descriptor-forward Dio implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "list:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioPortEcucPartitionRef]",
+      "kind": "list",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioPortEcucPartitionRef]",
+      "name": "DioPortEcucPartitionRef",
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "(num:i(count(./*)) = 0) and (num:i(count(../../../../DioGeneral/DioEcucPartitionRef/*)) > 0)",
+            "true": "At least one partition need to be defined in DioPortEcucPartitionRef"
+          }
+        ]
+      },
+      "fact_sources": {
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "(num:i(count(./*)) = 0) and (num:i(count(../../../../DioGeneral/DioEcucPartitionRef/*)) > 0)",
+                  "true": "At least one partition need to be defined in DioPortEcucPartitionRef"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Dio provider.",
+      "dependency": "A descriptor-forward Dio implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "list:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioGeneral]/lst[DioEcucPartitionRef]",
+      "kind": "list",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioGeneral]/lst[DioEcucPartitionRef]",
+      "name": "DioEcucPartitionRef",
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Dio provider.",
+      "dependency": "A descriptor-forward Dio implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "reference:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioChannelGroup]/ctr[DioChannelGroup]/lst[DioChannelGroupEcucPartitionRef]/ref[DioChannelGroupEcucPartitionRef]",
+      "kind": "reference",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioChannelGroup]/ctr[DioChannelGroup]/lst[DioChannelGroupEcucPartitionRef]/ref[DioChannelGroupEcucPartitionRef]",
+      "name": "DioChannelGroupEcucPartitionRef",
+      "type": "REFERENCE",
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "text:uniq(../*, .)",
+            "false": "Duplicate Partition."
+          },
+          {
+            "expr": "count(text:grep(../../../../DioPortEcucPartitionRef/*,.)) > 0",
+            "false": "The ECUC partition must be defined on the DioPortEcucPartitionRef."
+          },
+          {
+            "expr": "(num:i(count(../*)) > 1) and (../../../../../../../DioGeneral/DioVirtWrapperSupport = 'true')",
+            "true": "When VirtWrapper Support is enabled, just only one partition is allowed"
+          }
+        ]
+      },
+      "fact_sources": {
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "text:uniq(../*, .)",
+                  "false": "Duplicate Partition."
+                },
+                {
+                  "expr": "count(text:grep(../../../../DioPortEcucPartitionRef/*,.)) > 0",
+                  "false": "The ECUC partition must be defined on the DioPortEcucPartitionRef."
+                },
+                {
+                  "expr": "(num:i(count(../*)) > 1) and (../../../../../../../DioGeneral/DioVirtWrapperSupport = 'true')",
+                  "true": "When VirtWrapper Support is enabled, just only one partition is allowed"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "reference": "ASPathDataOfSchema:/AUTOSAR/EcucDefs/EcuC/EcucPartitionCollection/EcucPartition",
+      "cross_references": [
+        "EcuC"
+      ],
+      "cross_modules": [
+        "EcuC"
+      ],
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Dio provider.",
+      "dependency": "A descriptor-forward Dio implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "reference:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioChannel]/ctr[DioChannel]/lst[DioChannelEcucPartitionRef]/ref[DioChannelEcucPartitionRef]",
+      "kind": "reference",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioChannel]/ctr[DioChannel]/lst[DioChannelEcucPartitionRef]/ref[DioChannelEcucPartitionRef]",
+      "name": "DioChannelEcucPartitionRef",
+      "type": "REFERENCE",
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "text:uniq(../*, .)",
+            "false": "Duplicate Partition."
+          },
+          {
+            "expr": "count(text:grep(../../../../DioPortEcucPartitionRef/*,.)) > 0",
+            "false": "The ECUC partition must be defined on the DioPortEcucPartitionRef."
+          },
+          {
+            "expr": "(num:i(count(../*)) > 1) and (../../../../../../../DioGeneral/DioVirtWrapperSupport = 'true')",
+            "true": "When VirtWrapper Support is enabled, just only one partition is allowed"
+          }
+        ]
+      },
+      "fact_sources": {
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "text:uniq(../*, .)",
+                  "false": "Duplicate Partition."
+                },
+                {
+                  "expr": "count(text:grep(../../../../DioPortEcucPartitionRef/*,.)) > 0",
+                  "false": "The ECUC partition must be defined on the DioPortEcucPartitionRef."
+                },
+                {
+                  "expr": "(num:i(count(../*)) > 1) and (../../../../../../../DioGeneral/DioVirtWrapperSupport = 'true')",
+                  "true": "When VirtWrapper Support is enabled, just only one partition is allowed"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "reference": "ASPathDataOfSchema:/AUTOSAR/EcucDefs/EcuC/EcucPartitionCollection/EcucPartition",
+      "cross_references": [
+        "EcuC"
+      ],
+      "cross_modules": [
+        "EcuC"
+      ],
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Dio provider.",
+      "dependency": "A descriptor-forward Dio implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "reference:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioPortEcucPartitionRef]/ref[DioPortEcucPartitionRef]",
+      "kind": "reference",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioPortEcucPartitionRef]/ref[DioPortEcucPartitionRef]",
+      "name": "DioPortEcucPartitionRef",
+      "type": "REFERENCE",
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "text:uniq(../*, .)",
+            "false": "Duplicate Partition."
+          },
+          {
+            "expr": "count(text:grep(../../../../../DioGeneral/DioEcucPartitionRef/*,.)) > 0",
+            "false": "The ECUC partition must be defined on the DioEcucPartitionRef."
+          },
+          {
+            "expr": "(num:i(count(../*)) > 1) and (../../../../../DioGeneral/DioVirtWrapperSupport = 'true')",
+            "true": "When VirtWrapper Support is enabled, just only one partition is allowed"
+          }
+        ]
+      },
+      "fact_sources": {
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "text:uniq(../*, .)",
+                  "false": "Duplicate Partition."
+                },
+                {
+                  "expr": "count(text:grep(../../../../../DioGeneral/DioEcucPartitionRef/*,.)) > 0",
+                  "false": "The ECUC partition must be defined on the DioEcucPartitionRef."
+                },
+                {
+                  "expr": "(num:i(count(../*)) > 1) and (../../../../../DioGeneral/DioVirtWrapperSupport = 'true')",
+                  "true": "When VirtWrapper Support is enabled, just only one partition is allowed"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "reference": "ASPathDataOfSchema:/AUTOSAR/EcucDefs/EcuC/EcucPartitionCollection/EcucPartition",
+      "cross_references": [
+        "EcuC"
+      ],
+      "cross_modules": [
+        "EcuC"
+      ],
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Dio provider.",
+      "dependency": "A descriptor-forward Dio implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "reference:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioGeneral]/lst[DioEcucPartitionRef]/ref[DioEcucPartitionRef]",
+      "kind": "reference",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioGeneral]/lst[DioEcucPartitionRef]/ref[DioEcucPartitionRef]",
+      "name": "DioEcucPartitionRef",
+      "type": "REFERENCE",
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "text:uniq(../*, .)",
+            "false": "Duplicate Partition."
+          },
+          {
+            "expr": "node:containsValue(as:modconf('Os')[1]/OsApplication/*/OsAppEcucPartitionRef, .)",
+            "false": "The referenced ECUC partition isn't used by any OsApplication (i.e. Os/OsApplication/*/OsAppEcucPartitionRef)"
+          },
+          {
+            "expr": "../../../DioGeneral/DioMultiPartitionSupport",
+            "false": "The Dio MultiPartition Support parameter is not enabled"
+          }
+        ]
+      },
+      "fact_sources": {
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "text:uniq(../*, .)",
+                  "false": "Duplicate Partition."
+                },
+                {
+                  "expr": "node:containsValue(as:modconf('Os')[1]/OsApplication/*/OsAppEcucPartitionRef, .)",
+                  "false": "The referenced ECUC partition isn't used by any OsApplication (i.e. Os/OsApplication/*/OsAppEcucPartitionRef)"
+                },
+                {
+                  "expr": "../../../DioGeneral/DioMultiPartitionSupport",
+                  "false": "The Dio MultiPartition Support parameter is not enabled"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "reference": "ASPathDataOfSchema:/AUTOSAR/EcucDefs/EcuC/EcucPartitionCollection/EcucPartition",
+      "cross_references": [
+        "EcuC"
+      ],
+      "cross_modules": [
+        "EcuC"
+      ],
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Dio provider.",
+      "dependency": "A descriptor-forward Dio implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[ArReleaseMajorVersion]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[ArReleaseMajorVersion]",
+      "name": "ArReleaseMajorVersion",
+      "type": "INTEGER_LABEL",
+      "default": {
+        "kind": "literal",
+        "value": "4"
+      },
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": ">=4"
+          },
+          {
+            "expr": "<=4"
+          }
+        ]
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "4"
+            }
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": ">=4"
+                },
+                {
+                  "expr": "<=4"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Dio provider.",
+      "dependency": "A descriptor-forward Dio implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[ArReleaseMinorVersion]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[ArReleaseMinorVersion]",
+      "name": "ArReleaseMinorVersion",
+      "type": "INTEGER_LABEL",
+      "default": {
+        "kind": "literal",
+        "value": "9"
+      },
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": ">=9"
+          },
+          {
+            "expr": "<=9"
+          }
+        ]
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "9"
+            }
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": ">=9"
+                },
+                {
+                  "expr": "<=9"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Dio provider.",
+      "dependency": "A descriptor-forward Dio implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[ArReleaseRevisionVersion]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[ArReleaseRevisionVersion]",
+      "name": "ArReleaseRevisionVersion",
+      "type": "INTEGER_LABEL",
+      "default": {
+        "kind": "literal",
+        "value": "0"
+      },
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": ">=0"
+          },
+          {
+            "expr": "<=0"
+          }
+        ]
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "0"
+            }
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": ">=0"
+                },
+                {
+                  "expr": "<=0"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Dio provider.",
+      "dependency": "A descriptor-forward Dio implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[ModuleId]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[ModuleId]",
+      "name": "ModuleId",
+      "type": "INTEGER_LABEL",
+      "default": {
+        "kind": "literal",
+        "value": "120"
+      },
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": ">=120"
+          },
+          {
+            "expr": "<=120"
+          }
+        ]
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "120"
+            }
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": ">=120"
+                },
+                {
+                  "expr": "<=120"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Dio provider.",
+      "dependency": "A descriptor-forward Dio implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[SwMajorVersion]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[SwMajorVersion]",
+      "name": "SwMajorVersion",
+      "type": "INTEGER_LABEL",
+      "default": {
+        "kind": "literal",
+        "value": "7"
+      },
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": ">=7"
+          },
+          {
+            "expr": "<=7"
+          }
+        ]
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "7"
+            }
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": ">=7"
+                },
+                {
+                  "expr": "<=7"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Dio provider.",
+      "dependency": "A descriptor-forward Dio implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[SwMinorVersion]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[SwMinorVersion]",
+      "name": "SwMinorVersion",
+      "type": "INTEGER_LABEL",
+      "default": {
+        "kind": "literal",
+        "value": "0"
+      },
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": ">=0"
+          },
+          {
+            "expr": "<=0"
+          }
+        ]
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "0"
+            }
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": ">=0"
+                },
+                {
+                  "expr": "<=0"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Dio provider.",
+      "dependency": "A descriptor-forward Dio implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[SwPatchVersion]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[SwPatchVersion]",
+      "name": "SwPatchVersion",
+      "type": "INTEGER_LABEL",
+      "default": {
+        "kind": "literal",
+        "value": "1"
+      },
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": ">=1"
+          },
+          {
+            "expr": "<=1"
+          }
+        ]
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "1"
+            }
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": ">=1"
+                },
+                {
+                  "expr": "<=1"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Dio provider.",
+      "dependency": "A descriptor-forward Dio implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[VendorApiInfix]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[VendorApiInfix]",
+      "name": "VendorApiInfix",
+      "type": "STRING_LABEL",
+      "default": {
+        "kind": "literal",
+        "value": ""
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": ""
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Dio provider.",
+      "dependency": "A descriptor-forward Dio implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[VendorId]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[VendorId]",
+      "name": "VendorId",
+      "type": "INTEGER_LABEL",
+      "default": {
+        "kind": "literal",
+        "value": "43"
+      },
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": ">=43"
+          },
+          {
+            "expr": "<=43"
+          }
+        ]
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "43"
+            }
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": ">=43"
+                },
+                {
+                  "expr": "<=43"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Dio provider.",
+      "dependency": "A descriptor-forward Dio implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioChannelGroup]/ctr[DioChannelGroup]/var[DioChannelGroupIdentification]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioChannelGroup]/ctr[DioChannelGroup]/var[DioChannelGroupIdentification]",
+      "name": "DioChannelGroupIdentification",
+      "type": "STRING",
+      "default": {
+        "kind": "literal",
+        "value": "DioChannelGroup"
+      },
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "text:match(normalize-space(.),'^[_a-zA-Z]+[_0-9a-zA-Z]*$') or normalize-space(.) = ' ' ",
+            "false": "DioChannelGroupIdentification name should be entered as string."
+          },
+          {
+            "expr": "text:uniq(../../../../*/DioChannelGroup/*/DioChannelGroupIdentification, .)",
+            "false": "DioChannelGroupIdentification is repeated for two or more channel groups. Please enter different symbolic name."
+          }
+        ]
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "DioChannelGroup"
+            }
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "text:match(normalize-space(.),'^[_a-zA-Z]+[_0-9a-zA-Z]*$') or normalize-space(.) = ' ' ",
+                  "false": "DioChannelGroupIdentification name should be entered as string."
+                },
+                {
+                  "expr": "text:uniq(../../../../*/DioChannelGroup/*/DioChannelGroupIdentification, .)",
+                  "false": "DioChannelGroupIdentification is repeated for two or more channel groups. Please enter different symbolic name."
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Dio provider.",
+      "dependency": "A descriptor-forward Dio implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioChannelGroup]/ctr[DioChannelGroup]/var[DioPortBitNumber]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioChannelGroup]/ctr[DioChannelGroup]/var[DioPortBitNumber]",
+      "name": "DioPortBitNumber",
+      "type": "INTEGER",
+      "default": {
+        "kind": "literal",
+        "value": "1"
+      },
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": ">=1"
+          },
+          {
+            "expr": "<=16"
+          }
+        ]
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "1"
+            }
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": ">=1"
+                },
+                {
+                  "expr": "<=16"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Dio provider.",
+      "dependency": "A descriptor-forward Dio implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioChannelGroup]/ctr[DioChannelGroup]/var[DioPortMask]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioChannelGroup]/ctr[DioChannelGroup]/var[DioPortMask]",
+      "name": "DioPortMask",
+      "type": "INTEGER",
+      "default": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "(bit:shl((bit:shl(1,node:fallback(../DioPortBitNumber,0)) - 1), node:fallback(../DioPortOffset,1)))"
+          }
+        ]
+      },
+      "invalid": {
+        "kind": "literal",
+        "value": ""
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "(bit:shl((bit:shl(1,node:fallback(../DioPortBitNumber,0)) - 1), node:fallback(../DioPortOffset,1)))"
+                }
+              ]
+            }
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "a",
+            "evidence": {
+              "kind": "literal",
+              "value": ""
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Dio provider.",
+      "dependency": "A descriptor-forward Dio implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioChannelGroup]/ctr[DioChannelGroup]/var[DioPortOffset]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioChannelGroup]/ctr[DioChannelGroup]/var[DioPortOffset]",
+      "name": "DioPortOffset",
+      "type": "INTEGER",
+      "default": {
+        "kind": "literal",
+        "value": "0"
+      },
+      "invalid": {
+        "kind": "literal",
+        "value": ""
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "0"
+            }
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": ""
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Dio provider.",
+      "dependency": "A descriptor-forward Dio implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioChannel]/ctr[DioChannel]/var[DioChannelId]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioChannel]/ctr[DioChannel]/var[DioChannelId]",
+      "name": "DioChannelId",
+      "type": "INTEGER",
+      "default": {
+        "kind": "literal",
+        "value": "0"
+      },
+      "range": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "text:uniq(../../*/DioChannelId, .)",
+            "false": "DioChannelId is repeated for two or more channels."
+          },
+          {
+            "expr": "(bit:and(num:hextoint(ecu:list('Dio.AvailablePortPinsForWrite')[num:dectoint((node:current())/../../../DioPortId)+1]),bit:shl( num:i(1),num:dectoint ( node:current() ) )) != '0') or (bit:and(num:hextoint(ecu:list('Dio.AvailablePortPinsForRead')[num:dectoint((node:current())/../../../DioPortId)+1]),bit:shl( num:i(1),num:dectoint ( node:current() ) )) != '0')",
+            "false": "This channel is not available in the selected package. Please see RM for a list of available channels for selected package."
+          }
+        ]
+      },
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "<=15"
+          },
+          {
+            "expr": ">=0"
+          }
+        ]
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "0"
+            }
+          }
+        ],
+        "range": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "text:uniq(../../*/DioChannelId, .)",
+                  "false": "DioChannelId is repeated for two or more channels."
+                },
+                {
+                  "expr": "(bit:and(num:hextoint(ecu:list('Dio.AvailablePortPinsForWrite')[num:dectoint((node:current())/../../../DioPortId)+1]),bit:shl( num:i(1),num:dectoint ( node:current() ) )) != '0') or (bit:and(num:hextoint(ecu:list('Dio.AvailablePortPinsForRead')[num:dectoint((node:current())/../../../DioPortId)+1]),bit:shl( num:i(1),num:dectoint ( node:current() ) )) != '0')",
+                  "false": "This channel is not available in the selected package. Please see RM for a list of available channels for selected package."
+                }
+              ]
+            }
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "<=15"
+                },
+                {
+                  "expr": ">=0"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_dio_set",
+        "inputs": [
+          "intent.payload.pin",
+          "dio.json#/dio_channel_id_rule"
+        ],
+        "tests": [
+          "tests/unit/test_dio_apply.py::test_dio_channel_id_pta6_anti_hardcode",
+          "tests/unit/test_dio_apply.py::test_anti_hardcode_port_id_vs_array_index"
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioChannel]/ctr[DioChannel]/var[PDACSlot]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioChannel]/ctr[DioChannel]/var[PDACSlot]",
+      "name": "PDACSlot",
+      "type": "ENUMERATION",
+      "default": {
+        "kind": "literal",
+        "value": "VIRTUAL_WRAPPER_PDAC0"
+      },
+      "range": {
+        "kind": "xpath",
+        "expr": "ecu:list('Dio.PdacSlot')"
+      },
+      "editable": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "(../../../../../../DioGeneral/DioVirtWrapperSupport = 'true') and (not(node:exists('ASPathDataOfSchema:/AUTOSAR/EcucDefs/Rm/')))"
+          }
+        ]
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "VIRTUAL_WRAPPER_PDAC0"
+            }
+          }
+        ],
+        "range": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "expr": "ecu:list('Dio.PdacSlot')"
+            }
+          }
+        ],
+        "editable": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "(../../../../../../DioGeneral/DioVirtWrapperSupport = 'true') and (not(node:exists('ASPathDataOfSchema:/AUTOSAR/EcucDefs/Rm/')))"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_dio_set",
+        "inputs": [
+          "intent.payload.pin",
+          "dio.json#/dio_channel_id_rule"
+        ],
+        "tests": [
+          "tests/unit/test_dio_apply.py::test_dio_channel_id_pta6_anti_hardcode",
+          "tests/unit/test_dio_apply.py::test_anti_hardcode_port_id_vs_array_index"
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/var[DioPortId]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/var[DioPortId]",
+      "name": "DioPortId",
+      "type": "INTEGER",
+      "default": {
+        "kind": "literal",
+        "value": "0"
+      },
+      "range": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "text:uniq(../../*/DioPortId, .)",
+            "false": "DioPortId is repeated for two or more ports."
+          },
+          {
+            "expr": "(num:hextoint(ecu:list('Dio.AvailablePortPinsForWrite')[num:dectoint(node:current())+1]) != num:i('0')) or (num:hextoint(ecu:list('Dio.AvailablePortPinsForRead')[num:dectoint(node:current())+1]) != num:i('0'))",
+            "false": "This port is not available for the selected package. Please see RM for a list of available ports for selected package."
+          }
+        ]
+      },
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "<=num:i(count(ecu:list('Dio.AvailablePortPinsForRead')) - 1)"
+          },
+          {
+            "expr": ">=0"
+          }
+        ]
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "0"
+            }
+          }
+        ],
+        "range": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "text:uniq(../../*/DioPortId, .)",
+                  "false": "DioPortId is repeated for two or more ports."
+                },
+                {
+                  "expr": "(num:hextoint(ecu:list('Dio.AvailablePortPinsForWrite')[num:dectoint(node:current())+1]) != num:i('0')) or (num:hextoint(ecu:list('Dio.AvailablePortPinsForRead')[num:dectoint(node:current())+1]) != num:i('0'))",
+                  "false": "This port is not available for the selected package. Please see RM for a list of available ports for selected package."
+                }
+              ]
+            }
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "<=num:i(count(ecu:list('Dio.AvailablePortPinsForRead')) - 1)"
+                },
+                {
+                  "expr": ">=0"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_dio_set",
+        "inputs": [
+          "intent.payload.pin",
+          "dio.json#/dio_channel_id_rule"
+        ],
+        "tests": [
+          "tests/unit/test_dio_apply.py::test_dio_channel_id_pta6_anti_hardcode",
+          "tests/unit/test_dio_apply.py::test_anti_hardcode_port_id_vs_array_index"
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioGeneral]/var[DioDevErrorDetect]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioGeneral]/var[DioDevErrorDetect]",
+      "name": "DioDevErrorDetect",
+      "type": "BOOLEAN",
+      "default": {
+        "kind": "literal",
+        "value": "false"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "false"
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Dio provider.",
+      "dependency": "A descriptor-forward Dio implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioGeneral]/var[DioEnableUserModeSupport]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioGeneral]/var[DioEnableUserModeSupport]",
+      "name": "DioEnableUserModeSupport",
+      "type": "BOOLEAN",
+      "default": {
+        "kind": "literal",
+        "value": "false"
+      },
+      "readonly": {
+        "kind": "literal",
+        "value": "true"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "false"
+            }
+          }
+        ],
+        "readonly": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "true"
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Dio provider.",
+      "dependency": "A descriptor-forward Dio implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioGeneral]/var[DioFlipChannelApi]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioGeneral]/var[DioFlipChannelApi]",
+      "name": "DioFlipChannelApi",
+      "type": "BOOLEAN",
+      "default": {
+        "kind": "literal",
+        "value": "false"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "false"
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Dio provider.",
+      "dependency": "A descriptor-forward Dio implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioGeneral]/var[DioMaskedWritePortApi]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioGeneral]/var[DioMaskedWritePortApi]",
+      "name": "DioMaskedWritePortApi",
+      "type": "BOOLEAN",
+      "default": {
+        "kind": "literal",
+        "value": "false"
+      },
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "(. = 'true') and (../DioVirtWrapperSupport = 'true')",
+            "true": "This API will be unavailable when one channel or group channel from the port is allocated to another domain. To use this API, please disable Dio VirtWrapper Support"
+          }
+        ]
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "false"
+            }
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "(. = 'true') and (../DioVirtWrapperSupport = 'true')",
+                  "true": "This API will be unavailable when one channel or group channel from the port is allocated to another domain. To use this API, please disable Dio VirtWrapper Support"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Dio provider.",
+      "dependency": "A descriptor-forward Dio implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioGeneral]/var[DioMultiPartitionSupport]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioGeneral]/var[DioMultiPartitionSupport]",
+      "name": "DioMultiPartitionSupport",
+      "type": "BOOLEAN",
+      "default": {
+        "kind": "literal",
+        "value": "false"
+      },
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "(. = 'true') and not(num:i(count(../../DioGeneral/DioEcucPartitionRef/*) > 0))",
+            "true": "Dio MultiPartition Support is only enabled when at least one EcucPartition needs to be defined (in all variants)."
+          }
+        ]
+      },
+      "editable": {
+        "kind": "literal",
+        "value": "true"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "false"
+            }
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "a",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "(. = 'true') and not(num:i(count(../../DioGeneral/DioEcucPartitionRef/*) > 0))",
+                  "true": "Dio MultiPartition Support is only enabled when at least one EcucPartition needs to be defined (in all variants)."
+                }
+              ]
+            }
+          }
+        ],
+        "editable": [
+          {
+            "source_tag": "a",
+            "evidence": {
+              "kind": "literal",
+              "value": "true"
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Dio provider.",
+      "dependency": "A descriptor-forward Dio implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioGeneral]/var[DioReadZeroForUndefinedPortPins]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioGeneral]/var[DioReadZeroForUndefinedPortPins]",
+      "name": "DioReadZeroForUndefinedPortPins",
+      "type": "BOOLEAN",
+      "default": {
+        "kind": "literal",
+        "value": "false"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "false"
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Dio provider.",
+      "dependency": "A descriptor-forward Dio implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioGeneral]/var[DioReversePortBits]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioGeneral]/var[DioReversePortBits]",
+      "name": "DioReversePortBits",
+      "type": "BOOLEAN",
+      "default": {
+        "kind": "literal",
+        "value": "false"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "false"
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Dio provider.",
+      "dependency": "A descriptor-forward Dio implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioGeneral]/var[DioVersionInfoApi]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioGeneral]/var[DioVersionInfoApi]",
+      "name": "DioVersionInfoApi",
+      "type": "BOOLEAN",
+      "default": {
+        "kind": "literal",
+        "value": "false"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "false"
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Dio provider.",
+      "dependency": "A descriptor-forward Dio implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioGeneral]/var[DioVirtWrapperSupport]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioGeneral]/var[DioVirtWrapperSupport]",
+      "name": "DioVirtWrapperSupport",
+      "type": "BOOLEAN",
+      "default": {
+        "kind": "literal",
+        "value": "false"
+      },
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "(. = 'true') and (node:exists('ASPathDataOfSchema:/AUTOSAR/EcucDefs/Rm/')) and (node:refs('ASPathDataOfSchema:/AUTOSAR/EcucDefs/Rm/RmGeneral/RmVirtWrapperConfigurable/') = 'false')",
+            "true": "The RM Enable Virtual Wrapper feature is required to enabled when Dio Virtual Wrapper Support is enabled"
+          }
+        ]
+      },
+      "editable": {
+        "kind": "literal",
+        "value": "true"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "false"
+            }
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "a",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "(. = 'true') and (node:exists('ASPathDataOfSchema:/AUTOSAR/EcucDefs/Rm/')) and (node:refs('ASPathDataOfSchema:/AUTOSAR/EcucDefs/Rm/RmGeneral/RmVirtWrapperConfigurable/') = 'false')",
+                  "true": "The RM Enable Virtual Wrapper feature is required to enabled when Dio Virtual Wrapper Support is enabled"
+                }
+              ]
+            }
+          }
+        ],
+        "editable": [
+          {
+            "source_tag": "a",
+            "evidence": {
+              "kind": "literal",
+              "value": "true"
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Dio provider.",
+      "dependency": "A descriptor-forward Dio implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioGeneral]/var[SIUL2DioIPDevErrorDetect]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioGeneral]/var[SIUL2DioIPDevErrorDetect]",
+      "name": "SIUL2DioIPDevErrorDetect",
+      "type": "BOOLEAN",
+      "default": {
+        "kind": "literal",
+        "value": "false"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "false"
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Dio provider.",
+      "dependency": "A descriptor-forward Dio implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/var[IMPLEMENTATION_CONFIG_VARIANT]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/var[IMPLEMENTATION_CONFIG_VARIANT]",
+      "name": "IMPLEMENTATION_CONFIG_VARIANT",
+      "type": "ENUMERATION",
+      "default": {
+        "kind": "literal",
+        "value": "VariantPreCompile"
+      },
+      "range": {
+        "kind": "literal",
+        "values": [
+          "VariantLinkTime",
+          "VariantPreCompile"
+        ]
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "VariantPreCompile"
+            }
+          }
+        ],
+        "range": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "values": [
+                "VariantLinkTime",
+                "VariantPreCompile"
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Dio provider.",
+      "dependency": "A descriptor-forward Dio implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/var[POST_BUILD_VARIANT_USED]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/var[POST_BUILD_VARIANT_USED]",
+      "name": "POST_BUILD_VARIANT_USED",
+      "type": "BOOLEAN",
+      "default": {
+        "kind": "literal",
+        "value": "false"
+      },
+      "readonly": {
+        "kind": "literal",
+        "value": "TRUE"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "false"
+            }
+          }
+        ],
+        "readonly": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "TRUE"
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Dio provider.",
+      "dependency": "A descriptor-forward Dio implementation and generality tests are required before exposure."
+    }
+  ],
+  "cross_module_index": {
+    "EcuC": [
+      "reference:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioChannelGroup]/ctr[DioChannelGroup]/lst[DioChannelGroupEcucPartitionRef]/ref[DioChannelGroupEcucPartitionRef]",
+      "reference:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioChannel]/ctr[DioChannel]/lst[DioChannelEcucPartitionRef]/ref[DioChannelEcucPartitionRef]",
+      "reference:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioPortEcucPartitionRef]/ref[DioPortEcucPartitionRef]",
+      "reference:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioGeneral]/lst[DioEcucPartitionRef]/ref[DioEcucPartitionRef]"
+    ]
+  },
+  "summary": {
+    "total": 45,
+    "configurable": 4,
+    "deferred": 38,
+    "derived": 3
+  }
+}

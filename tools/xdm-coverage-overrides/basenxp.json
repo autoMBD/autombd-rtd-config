@@ -1,0 +1,7 @@
+{
+  "default":{"classification":"deferred","reason":"The descriptor item is not caller-controlled by the current BaseNXP provider.","dependency":"A descriptor-forward BaseNXP implementation and generality tests are required before exposure."},
+  "rules":[
+    {"match":{"path_prefixes":["/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]"],"names":["OsIfGeneral","OsIfDevErrorDetect","OsIfEnableUserModeSupport","OsIfGetPhysicalCoreIdEnable","OsIfInstanceId","OsIfSoftwareSemaphoredEnable","OsIfUseCustomTimer","OsIfUseGetUserId"]},"classification":"configurable","trace":{"provider":"autombd-rtd/rtd-config-cli-py/rtd_config/modules/basenxp.py:BaseNxpProvider","apply":"autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_basenxp_set","asset":"autombd-rtd/assets/nxp/s32k3/basenxp/osif.json#/OsIfGeneral","tests":["tests/unit/test_basenxp_apply.py::test_apply_sets_arbitrary_valid_osif_general_values"]}},
+    {"match":{"path_prefixes":["/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]"],"names":["OsIfCounterConfig","OsIfSystemTimerClockRef","OsIfSystemTimerClockFreq","OsIfUseSystemTimer"]},"classification":"derived","trace":{"derivation":"autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_basenxp_set","inputs":["intent.payload","osif.json#/OsIfCounterConfig"],"tests":["tests/unit/test_basenxp_apply.py::test_apply_inserts_exactly_one_counter"]}}
+  ]
+}

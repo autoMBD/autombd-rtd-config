@@ -1,0 +1,3405 @@
+{
+  "format_version": 1,
+  "source": {
+    "module": "Platform",
+    "descriptor": "Platform.xdm",
+    "package": "TS_T40D34M70I1R0",
+    "rtd_release": "7.0.1",
+    "sha256": "D3BA70C932DA05DF1A952CCB5D5737DF083CAC942C9FA204E7D075B8C3C8939B"
+  },
+  "items": [
+    {
+      "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]",
+      "kind": "container",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]",
+      "name": "CommonPublishedInformation",
+      "type": "IDENTIFIABLE",
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Platform provider.",
+      "dependency": "A descriptor-forward Platform implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]",
+      "kind": "container",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]",
+      "name": "GeneralConfiguration",
+      "type": "IDENTIFIABLE",
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "                                                 ./../GeneralConfiguration/PlatformEnableIntCtrlConfiguration  = 'false'                                                 and                                                 ./../GeneralConfiguration/PlatformMcmConfigurable  = 'false'                                                 and                                                 ./../GeneralConfiguration/PlatformMpuM7Configurable  = 'false'                                                 ",
+            "true": "At least one feature configuration must be enabled when adding the Platform configuration.!"
+          }
+        ]
+      },
+      "fact_sources": {
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "                                                 ./../GeneralConfiguration/PlatformEnableIntCtrlConfiguration  = 'false'                                                 and                                                 ./../GeneralConfiguration/PlatformMcmConfigurable  = 'false'                                                 and                                                 ./../GeneralConfiguration/PlatformMpuM7Configurable  = 'false'                                                 ",
+                  "true": "At least one feature configuration must be enabled when adding the Platform configuration.!"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Platform provider.",
+      "dependency": "A descriptor-forward Platform implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[IntmConfig]",
+      "kind": "container",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[IntmConfig]",
+      "name": "IntmConfig",
+      "type": "IDENTIFIABLE",
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Platform provider.",
+      "dependency": "A descriptor-forward Platform implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[IntmConfig]/ctr[IntmGenericSettings]",
+      "kind": "container",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[IntmConfig]/ctr[IntmGenericSettings]",
+      "name": "IntmGenericSettings",
+      "type": "IDENTIFIABLE",
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "(./../../GeneralConfiguration/PlatformMulticoreSupport = 'true') and (node:exists(./PlatformIntmGenericEcucPartitionRef) = false()) ",
+            "true": "When PlatformMultiPartitionSupport = true, PlatformIntmGenericEcucPartitionRef must be configured"
+          },
+          {
+            "expr": "(./../../GeneralConfiguration/PlatformMulticoreSupport = 'false') and (node:exists(./PlatformIntmGenericEcucPartitionRef) = true()) ",
+            "true": "When PlatformMultiPartitionSupport = false, PlatformIntmGenericEcucPartitionRef must be disabled"
+          }
+        ]
+      },
+      "fact_sources": {
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "(./../../GeneralConfiguration/PlatformMulticoreSupport = 'true') and (node:exists(./PlatformIntmGenericEcucPartitionRef) = false()) ",
+                  "true": "When PlatformMultiPartitionSupport = true, PlatformIntmGenericEcucPartitionRef must be configured"
+                },
+                {
+                  "expr": "(./../../GeneralConfiguration/PlatformMulticoreSupport = 'false') and (node:exists(./PlatformIntmGenericEcucPartitionRef) = true()) ",
+                  "true": "When PlatformMultiPartitionSupport = false, PlatformIntmGenericEcucPartitionRef must be disabled"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Platform provider.",
+      "dependency": "A descriptor-forward Platform implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[IntmConfig]/lst[IntmChannel]/ctr[IntmChannel]",
+      "kind": "container",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[IntmConfig]/lst[IntmChannel]/ctr[IntmChannel]",
+      "name": "IntmChannel",
+      "type": "IDENTIFIABLE",
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "(./../../../GeneralConfiguration/PlatformMulticoreSupport = 'true') and (node:exists(./PlatformIntmChannelEcucPartitionRef) = false()) ",
+            "true": "When PlatformMultiPartitionSupport = true, PlatformIntmChannelEcucPartitionRef must be configured"
+          },
+          {
+            "expr": "(./../../../GeneralConfiguration/PlatformMulticoreSupport = 'false') and (node:exists(./PlatformIntmChannelEcucPartitionRef) = true()) ",
+            "true": "When PlatformMultiPartitionSupport = false, PlatformIntmChannelEcucPartitionRef must be disabled"
+          }
+        ]
+      },
+      "fact_sources": {
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "(./../../../GeneralConfiguration/PlatformMulticoreSupport = 'true') and (node:exists(./PlatformIntmChannelEcucPartitionRef) = false()) ",
+                  "true": "When PlatformMultiPartitionSupport = true, PlatformIntmChannelEcucPartitionRef must be configured"
+                },
+                {
+                  "expr": "(./../../../GeneralConfiguration/PlatformMulticoreSupport = 'false') and (node:exists(./PlatformIntmChannelEcucPartitionRef) = true()) ",
+                  "true": "When PlatformMultiPartitionSupport = false, PlatformIntmChannelEcucPartitionRef must be disabled"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Platform provider.",
+      "dependency": "A descriptor-forward Platform implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]",
+      "kind": "container",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]",
+      "name": "MPU_M7_Configuration",
+      "type": "IDENTIFIABLE",
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Platform provider.",
+      "dependency": "A descriptor-forward Platform implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]",
+      "kind": "container",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]",
+      "name": "MPU_M7_ModuleConfig",
+      "type": "IDENTIFIABLE",
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "(./../../../GeneralConfiguration/PlatformMulticoreSupport = 'true') and (node:exists(./Mpu_M7_EcucPartitionRef) = false()) ",
+            "true": "When PlatformMultiPartitionSupport = true, MPU M7 Partition must be configured"
+          }
+        ]
+      },
+      "fact_sources": {
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "(./../../../GeneralConfiguration/PlatformMulticoreSupport = 'true') and (node:exists(./Mpu_M7_EcucPartitionRef) = false()) ",
+                  "true": "When PlatformMultiPartitionSupport = true, MPU M7 Partition must be configured"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Platform provider.",
+      "dependency": "A descriptor-forward Platform implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/lst[RegionConfig]/ctr[RegionConfig]",
+      "kind": "container",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/lst[RegionConfig]/ctr[RegionConfig]",
+      "name": "RegionConfig",
+      "type": "IDENTIFIABLE",
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Platform provider.",
+      "dependency": "A descriptor-forward Platform implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[IntCtrlConfig]/ctr[IntCtrlConfig]",
+      "kind": "container",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[IntCtrlConfig]/ctr[IntCtrlConfig]",
+      "name": "IntCtrlConfig",
+      "type": "IDENTIFIABLE",
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "(./../../GeneralConfiguration/PlatformMulticoreSupport = 'true') and (node:exists(./PlatformNvicEcucPartitionRef) = false()) ",
+            "true": "When PlatformMultiPartitionSupport = true, PlatformNvicEcucPartitionRef must be configured"
+          },
+          {
+            "expr": "(./../../GeneralConfiguration/PlatformMulticoreSupport = 'false') and (node:exists(./PlatformNvicEcucPartitionRef) = true()) ",
+            "true": "When PlatformMultiPartitionSupport = false, PlatformNvicEcucPartitionRef must be disabled"
+          }
+        ]
+      },
+      "fact_sources": {
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "(./../../GeneralConfiguration/PlatformMulticoreSupport = 'true') and (node:exists(./PlatformNvicEcucPartitionRef) = false()) ",
+                  "true": "When PlatformMultiPartitionSupport = true, PlatformNvicEcucPartitionRef must be configured"
+                },
+                {
+                  "expr": "(./../../GeneralConfiguration/PlatformMulticoreSupport = 'false') and (node:exists(./PlatformNvicEcucPartitionRef) = true()) ",
+                  "true": "When PlatformMultiPartitionSupport = false, PlatformNvicEcucPartitionRef must be disabled"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "configurable",
+      "trace": {
+        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/platform.py:PlatformProvider",
+        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_platform_set",
+        "asset": "autombd-rtd/assets/nxp/s32k3/platform/interrupts.json#/isr_priority",
+        "tests": [
+          "tests/unit/test_platform_apply.py::test_set_priority_by_peripheral",
+          "tests/unit/test_platform_apply.py::test_other_interrupt_untouched"
+        ]
+      }
+    },
+    {
+      "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[IntCtrlConfig]/ctr[IntCtrlConfig]/lst[PlatformIsrConfig]/ctr[PlatformIsrConfig]",
+      "kind": "container",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[IntCtrlConfig]/ctr[IntCtrlConfig]/lst[PlatformIsrConfig]/ctr[PlatformIsrConfig]",
+      "name": "PlatformIsrConfig",
+      "type": "IDENTIFIABLE",
+      "classification": "configurable",
+      "trace": {
+        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/platform.py:PlatformProvider",
+        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_platform_set",
+        "asset": "autombd-rtd/assets/nxp/s32k3/platform/interrupts.json#/isr_priority",
+        "tests": [
+          "tests/unit/test_platform_apply.py::test_set_priority_by_peripheral",
+          "tests/unit/test_platform_apply.py::test_other_interrupt_untouched"
+        ]
+      }
+    },
+    {
+      "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[McmConfig]/ctr[McmConfig]",
+      "kind": "container",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[McmConfig]/ctr[McmConfig]",
+      "name": "McmConfig",
+      "type": "IDENTIFIABLE",
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "(./../../GeneralConfiguration/PlatformMulticoreSupport = 'true') and (node:exists(./PlatformMcmEcucPartitionRef) = false()) ",
+            "true": "When PlatformMultiPartitionSupport = true, PlatformMcmEcucPartitionRef must be configured"
+          },
+          {
+            "expr": "(./../../GeneralConfiguration/PlatformMulticoreSupport = 'false') and (node:exists(./PlatformMcmEcucPartitionRef) = true()) ",
+            "true": "When PlatformMultiPartitionSupport = false, PlatformMcmEcucPartitionRef must be disabled"
+          }
+        ]
+      },
+      "fact_sources": {
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "(./../../GeneralConfiguration/PlatformMulticoreSupport = 'true') and (node:exists(./PlatformMcmEcucPartitionRef) = false()) ",
+                  "true": "When PlatformMultiPartitionSupport = true, PlatformMcmEcucPartitionRef must be configured"
+                },
+                {
+                  "expr": "(./../../GeneralConfiguration/PlatformMulticoreSupport = 'false') and (node:exists(./PlatformMcmEcucPartitionRef) = true()) ",
+                  "true": "When PlatformMultiPartitionSupport = false, PlatformMcmEcucPartitionRef must be disabled"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Platform provider.",
+      "dependency": "A descriptor-forward Platform implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[McmConfig]/ctr[McmConfig]/lst[SystemIsrConfig]/ctr[SystemIsrConfig]",
+      "kind": "container",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[McmConfig]/ctr[McmConfig]/lst[SystemIsrConfig]/ctr[SystemIsrConfig]",
+      "name": "SystemIsrConfig",
+      "type": "IDENTIFIABLE",
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Platform provider.",
+      "dependency": "A descriptor-forward Platform implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "list:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/lst[PlatformEcucPartitionRef]",
+      "kind": "list",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/lst[PlatformEcucPartitionRef]",
+      "name": "PlatformEcucPartitionRef",
+      "editable": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "../../GeneralConfiguration/PlatformMulticoreSupport"
+          }
+        ]
+      },
+      "fact_sources": {
+        "editable": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "../../GeneralConfiguration/PlatformMulticoreSupport"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Platform provider.",
+      "dependency": "A descriptor-forward Platform implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "list:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[IntmConfig]/lst[IntmChannel]",
+      "kind": "list",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[IntmConfig]/lst[IntmChannel]",
+      "name": "IntmChannel",
+      "type": "MAP",
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "(./../../GeneralConfiguration/PlatformIntmConfigurable = 'true') and (count(./*) = 0) ",
+            "true": "When PlatformIntmConfigurable = true, at least one IntmChannel must be configured"
+          }
+        ]
+      },
+      "editable": {
+        "kind": "xpath",
+        "expr": "./../../GeneralConfiguration/PlatformIntmConfigurable = 'true'"
+      },
+      "max": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "ecu:get('Platform.intmCount')"
+          }
+        ]
+      },
+      "fact_sources": {
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "(./../../GeneralConfiguration/PlatformIntmConfigurable = 'true') and (count(./*) = 0) ",
+                  "true": "When PlatformIntmConfigurable = true, at least one IntmChannel must be configured"
+                }
+              ]
+            }
+          }
+        ],
+        "editable": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "expr": "./../../GeneralConfiguration/PlatformIntmConfigurable = 'true'"
+            }
+          }
+        ],
+        "max": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "ecu:get('Platform.intmCount')"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Platform provider.",
+      "dependency": "A descriptor-forward Platform implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "list:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]",
+      "kind": "list",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]",
+      "name": "MPU_M7_ModuleConfig",
+      "type": "MAP",
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "./../../GeneralConfiguration/PlatformMpuM7Configurable = 'true' and (num:i(count(*)) = 0)",
+            "true": "At least one MPU M7 configuration must be configured when Plaform Enable MPU M7 Support is checked!"
+          },
+          {
+            "expr": "./../../GeneralConfiguration/PlatformMpuM7Configurable = 'false' and (num:i(count(*)) > 1)",
+            "true": "Plaform MPU M7 only support when PlatformMpuM7Configurable is enable !"
+          },
+          {
+            "expr": "./../../GeneralConfiguration/PlatformMulticoreSupport = 'false' and (num:i(count(*)) > 1)",
+            "true": "Only one configuration element is allowed when disable MultiPartition support!"
+          }
+        ]
+      },
+      "editable": {
+        "kind": "xpath",
+        "expr": "node:fallback( node:current() /../../GeneralConfiguration/PlatformMpuM7Configurable, num:i(0))"
+      },
+      "min": {
+        "kind": "literal",
+        "value": "0"
+      },
+      "fact_sources": {
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "./../../GeneralConfiguration/PlatformMpuM7Configurable = 'true' and (num:i(count(*)) = 0)",
+                  "true": "At least one MPU M7 configuration must be configured when Plaform Enable MPU M7 Support is checked!"
+                },
+                {
+                  "expr": "./../../GeneralConfiguration/PlatformMpuM7Configurable = 'false' and (num:i(count(*)) > 1)",
+                  "true": "Plaform MPU M7 only support when PlatformMpuM7Configurable is enable !"
+                },
+                {
+                  "expr": "./../../GeneralConfiguration/PlatformMulticoreSupport = 'false' and (num:i(count(*)) > 1)",
+                  "true": "Only one configuration element is allowed when disable MultiPartition support!"
+                }
+              ]
+            }
+          }
+        ],
+        "editable": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "expr": "node:fallback( node:current() /../../GeneralConfiguration/PlatformMpuM7Configurable, num:i(0))"
+            }
+          }
+        ],
+        "min": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "0"
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Platform provider.",
+      "dependency": "A descriptor-forward Platform implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "list:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/lst[RegionConfig]",
+      "kind": "list",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/lst[RegionConfig]",
+      "name": "RegionConfig",
+      "type": "MAP",
+      "min": {
+        "kind": "xpath",
+        "expr": "ecu:get('Platform.Mpu_M7.MinimumRegionCount')"
+      },
+      "max": {
+        "kind": "xpath",
+        "expr": "ecu:get('Platform.Mpu_M7.MaximumRegionCount')"
+      },
+      "fact_sources": {
+        "min": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "expr": "ecu:get('Platform.Mpu_M7.MinimumRegionCount')"
+            }
+          }
+        ],
+        "max": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "expr": "ecu:get('Platform.Mpu_M7.MaximumRegionCount')"
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Platform provider.",
+      "dependency": "A descriptor-forward Platform implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "list:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[IntCtrlConfig]",
+      "kind": "list",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[IntCtrlConfig]",
+      "name": "IntCtrlConfig",
+      "type": "MAP",
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "(./../GeneralConfiguration/PlatformMulticoreSupport = 'false') and (count(./*) > 1)",
+            "true": "This list must have only 1 child when PlatformMultiPartitionSupport = FALSE"
+          }
+        ]
+      },
+      "editable": {
+        "kind": "xpath",
+        "expr": "node:fallback( node:current() /../GeneralConfiguration/PlatformEnableIntCtrlConfiguration, num:i(0))"
+      },
+      "min": {
+        "kind": "literal",
+        "value": "0"
+      },
+      "fact_sources": {
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "(./../GeneralConfiguration/PlatformMulticoreSupport = 'false') and (count(./*) > 1)",
+                  "true": "This list must have only 1 child when PlatformMultiPartitionSupport = FALSE"
+                }
+              ]
+            }
+          }
+        ],
+        "editable": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "expr": "node:fallback( node:current() /../GeneralConfiguration/PlatformEnableIntCtrlConfiguration, num:i(0))"
+            }
+          }
+        ],
+        "min": [
+          {
+            "source_tag": "a",
+            "evidence": {
+              "kind": "literal",
+              "value": "0"
+            }
+          }
+        ]
+      },
+      "classification": "configurable",
+      "trace": {
+        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/platform.py:PlatformProvider",
+        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_platform_set",
+        "asset": "autombd-rtd/assets/nxp/s32k3/platform/interrupts.json#/isr_priority",
+        "tests": [
+          "tests/unit/test_platform_apply.py::test_set_priority_by_peripheral",
+          "tests/unit/test_platform_apply.py::test_other_interrupt_untouched"
+        ]
+      }
+    },
+    {
+      "key": "list:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[IntCtrlConfig]/ctr[IntCtrlConfig]/lst[PlatformIsrConfig]",
+      "kind": "list",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[IntCtrlConfig]/ctr[IntCtrlConfig]/lst[PlatformIsrConfig]",
+      "name": "PlatformIsrConfig",
+      "type": "MAP",
+      "min": {
+        "kind": "xpath",
+        "expr": "num:i(0)"
+      },
+      "max": {
+        "kind": "xpath",
+        "expr": "ecu:get('Platform.irqCount')"
+      },
+      "fact_sources": {
+        "min": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "expr": "num:i(0)"
+            }
+          }
+        ],
+        "max": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "expr": "ecu:get('Platform.irqCount')"
+            }
+          }
+        ]
+      },
+      "classification": "configurable",
+      "trace": {
+        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/platform.py:PlatformProvider",
+        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_platform_set",
+        "asset": "autombd-rtd/assets/nxp/s32k3/platform/interrupts.json#/isr_priority",
+        "tests": [
+          "tests/unit/test_platform_apply.py::test_set_priority_by_peripheral",
+          "tests/unit/test_platform_apply.py::test_other_interrupt_untouched"
+        ]
+      }
+    },
+    {
+      "key": "list:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[McmConfig]",
+      "kind": "list",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[McmConfig]",
+      "name": "McmConfig",
+      "type": "MAP",
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "(./../GeneralConfiguration/PlatformMulticoreSupport = 'false') and (count(./*) >= 2) ",
+            "true": "When PlatformMultiPartitionSupport = false, only 1 McmConfig instance can be existed, for default core"
+          },
+          {
+            "expr": "(./../GeneralConfiguration/PlatformMcmConfigurable = 'false') and (count(./*) >= 1) ",
+            "true": "When PlatformMcmConfigurable = false, all McmConfig instance must to be removed"
+          },
+          {
+            "expr": "count(./*) > ecu:get('Platform.systemMcmInstList')",
+            "true": " exceed maximum System Settings allowed"
+          },
+          {
+            "expr": "node:value(../GeneralConfiguration/PlatformMcmConfigurable)='true' and (num:i(count(./*))='0')",
+            "true": "This McmConfig must have one child at least when System Settings Configurable = TRUE"
+          }
+        ]
+      },
+      "editable": {
+        "kind": "xpath",
+        "expr": "./../GeneralConfiguration/PlatformMcmConfigurable = 'true'"
+      },
+      "min": {
+        "kind": "literal",
+        "value": "0"
+      },
+      "fact_sources": {
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "(./../GeneralConfiguration/PlatformMulticoreSupport = 'false') and (count(./*) >= 2) ",
+                  "true": "When PlatformMultiPartitionSupport = false, only 1 McmConfig instance can be existed, for default core"
+                },
+                {
+                  "expr": "(./../GeneralConfiguration/PlatformMcmConfigurable = 'false') and (count(./*) >= 1) ",
+                  "true": "When PlatformMcmConfigurable = false, all McmConfig instance must to be removed"
+                },
+                {
+                  "expr": "count(./*) > ecu:get('Platform.systemMcmInstList')",
+                  "true": " exceed maximum System Settings allowed"
+                },
+                {
+                  "expr": "node:value(../GeneralConfiguration/PlatformMcmConfigurable)='true' and (num:i(count(./*))='0')",
+                  "true": "This McmConfig must have one child at least when System Settings Configurable = TRUE"
+                }
+              ]
+            }
+          }
+        ],
+        "editable": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "expr": "./../GeneralConfiguration/PlatformMcmConfigurable = 'true'"
+            }
+          }
+        ],
+        "min": [
+          {
+            "source_tag": "a",
+            "evidence": {
+              "kind": "literal",
+              "value": "0"
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Platform provider.",
+      "dependency": "A descriptor-forward Platform implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "list:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[McmConfig]/ctr[McmConfig]/lst[SystemIsrConfig]",
+      "kind": "list",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[McmConfig]/ctr[McmConfig]/lst[SystemIsrConfig]",
+      "name": "SystemIsrConfig",
+      "type": "MAP",
+      "min": {
+        "kind": "literal",
+        "value": "0"
+      },
+      "max": {
+        "kind": "xpath",
+        "expr": "ecu:get('Platform.systemIrqsCount')"
+      },
+      "fact_sources": {
+        "min": [
+          {
+            "source_tag": "a",
+            "evidence": {
+              "kind": "literal",
+              "value": "0"
+            }
+          }
+        ],
+        "max": [
+          {
+            "source_tag": "a",
+            "evidence": {
+              "kind": "xpath",
+              "expr": "ecu:get('Platform.systemIrqsCount')"
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Platform provider.",
+      "dependency": "A descriptor-forward Platform implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "reference:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/lst[PlatformEcucPartitionRef]/ref[PlatformEcucPartitionRef]",
+      "kind": "reference",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/lst[PlatformEcucPartitionRef]/ref[PlatformEcucPartitionRef]",
+      "name": "PlatformEcucPartitionRef",
+      "type": "REFERENCE",
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "text:uniq(../*, .)",
+            "false": "Duplicate Partition."
+          },
+          {
+            "expr": "(num:i(count(./../../../McmConfig/*[./PlatformMcmEcucPartitionRef = node:current()])) = 0) and                                                         (num:i(count(./../../../IntCtrlConfig/*[./PlatformNvicEcucPartitionRef = node:current()])) = 0) and                                                         ((./../../../IntmConfig/IntmGenericSettings/PlatformIntmGenericEcucPartitionRef = node:current()) = 0) and                                                         (num:i(count(./../../../IntmConfig/IntmChannel/*[./PlatformIntmChannelEcucPartitionRef = node:current()])) = 0) and                                                         (num:i(count(./../../../MPU_M7_Configuration/MPU_M7_ModuleConfig/*[./Mpu_M7_EcucPartitionRef = node:current()])) = 0) and                                                         (num:i(count(./../../../Mpu_M33_Configuration/Mpu_M33_ModuleConfig/*[./Mpu_M33_EcucPartitionRef = node:current()])) = 0) and                                                         (num:i(count(./../../../MPU_R52_Configuration/*[./MPU_R52_EcucPartitionRef = node:current()])) = 0) and                                                         (num:i(count(./../../../PlatformMruConfiguration/PlatformMruTransmittingChannel/*[./PlatformMruChannelEcucPartitionRef = node:current()])) = 0) and                                                         (num:i(count(./../../../PlatformMruConfiguration/PlatformMruReceivingChannel/*[./PlatformMruChannelEcucPartitionRef = node:current()])) = 0) and                                                         (num:i(count(./../../../PlatformMruConfiguration/PlatformMruResetInstance/*[./PlatformMruChannelEcucPartitionRef = node:current()])) = 0) and                                                         (num:i(count(./../../../Mpu_Configuration/MpuRegionConfig/*[./PlatformMpuEcucPartitionRef = node:current()])) = 0)",
+            "true": "This PlatformEcucPartitionRef is not used anywhere in Platform"
+          }
+        ]
+      },
+      "fact_sources": {
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "text:uniq(../*, .)",
+                  "false": "Duplicate Partition."
+                },
+                {
+                  "expr": "(num:i(count(./../../../McmConfig/*[./PlatformMcmEcucPartitionRef = node:current()])) = 0) and                                                         (num:i(count(./../../../IntCtrlConfig/*[./PlatformNvicEcucPartitionRef = node:current()])) = 0) and                                                         ((./../../../IntmConfig/IntmGenericSettings/PlatformIntmGenericEcucPartitionRef = node:current()) = 0) and                                                         (num:i(count(./../../../IntmConfig/IntmChannel/*[./PlatformIntmChannelEcucPartitionRef = node:current()])) = 0) and                                                         (num:i(count(./../../../MPU_M7_Configuration/MPU_M7_ModuleConfig/*[./Mpu_M7_EcucPartitionRef = node:current()])) = 0) and                                                         (num:i(count(./../../../Mpu_M33_Configuration/Mpu_M33_ModuleConfig/*[./Mpu_M33_EcucPartitionRef = node:current()])) = 0) and                                                         (num:i(count(./../../../MPU_R52_Configuration/*[./MPU_R52_EcucPartitionRef = node:current()])) = 0) and                                                         (num:i(count(./../../../PlatformMruConfiguration/PlatformMruTransmittingChannel/*[./PlatformMruChannelEcucPartitionRef = node:current()])) = 0) and                                                         (num:i(count(./../../../PlatformMruConfiguration/PlatformMruReceivingChannel/*[./PlatformMruChannelEcucPartitionRef = node:current()])) = 0) and                                                         (num:i(count(./../../../PlatformMruConfiguration/PlatformMruResetInstance/*[./PlatformMruChannelEcucPartitionRef = node:current()])) = 0) and                                                         (num:i(count(./../../../Mpu_Configuration/MpuRegionConfig/*[./PlatformMpuEcucPartitionRef = node:current()])) = 0)",
+                  "true": "This PlatformEcucPartitionRef is not used anywhere in Platform"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "reference": "ASPathDataOfSchema:/AUTOSAR/EcucDefs/EcuC/EcucPartitionCollection/EcucPartition",
+      "cross_references": [
+        "EcuC"
+      ],
+      "cross_modules": [
+        "EcuC"
+      ],
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Platform provider.",
+      "dependency": "A descriptor-forward Platform implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "reference:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[IntmConfig]/ctr[IntmGenericSettings]/ref[PlatformIntmGenericEcucPartitionRef]",
+      "kind": "reference",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[IntmConfig]/ctr[IntmGenericSettings]/ref[PlatformIntmGenericEcucPartitionRef]",
+      "name": "PlatformIntmGenericEcucPartitionRef",
+      "type": "REFERENCE",
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "count(text:grep(./../../../GeneralConfiguration/PlatformEcucPartitionRef/*,.)) > 0",
+            "false": "The ECUC partition must be defined on the PlatformEcucPartitionRef."
+          }
+        ]
+      },
+      "fact_sources": {
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "count(text:grep(./../../../GeneralConfiguration/PlatformEcucPartitionRef/*,.)) > 0",
+                  "false": "The ECUC partition must be defined on the PlatformEcucPartitionRef."
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "reference": "ASPathDataOfSchema:/AUTOSAR/EcucDefs/EcuC/EcucPartitionCollection/EcucPartition",
+      "cross_references": [
+        "EcuC"
+      ],
+      "cross_modules": [
+        "EcuC"
+      ],
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Platform provider.",
+      "dependency": "A descriptor-forward Platform implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "reference:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[IntmConfig]/lst[IntmChannel]/ctr[IntmChannel]/ref[PlatformIntmChannelEcucPartitionRef]",
+      "kind": "reference",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[IntmConfig]/lst[IntmChannel]/ctr[IntmChannel]/ref[PlatformIntmChannelEcucPartitionRef]",
+      "name": "PlatformIntmChannelEcucPartitionRef",
+      "type": "REFERENCE",
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "count(text:grep(./../../../../GeneralConfiguration/PlatformEcucPartitionRef/*,.)) > 0",
+            "false": "The ECUC partition must be defined on the PlatformEcucPartitionRef."
+          }
+        ]
+      },
+      "fact_sources": {
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "count(text:grep(./../../../../GeneralConfiguration/PlatformEcucPartitionRef/*,.)) > 0",
+                  "false": "The ECUC partition must be defined on the PlatformEcucPartitionRef."
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "reference": "ASPathDataOfSchema:/AUTOSAR/EcucDefs/EcuC/EcucPartitionCollection/EcucPartition",
+      "cross_references": [
+        "EcuC"
+      ],
+      "cross_modules": [
+        "EcuC"
+      ],
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Platform provider.",
+      "dependency": "A descriptor-forward Platform implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "reference:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/ref[Mpu_M7_EcucPartitionRef]",
+      "kind": "reference",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/ref[Mpu_M7_EcucPartitionRef]",
+      "name": "Mpu_M7_EcucPartitionRef",
+      "type": "REFERENCE",
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "count(text:grep(../../../../GeneralConfiguration/PlatformEcucPartitionRef/*,.)) > 0",
+            "false": "The ECUC partition must be defined on the PlatformEcucPartitionRef."
+          },
+          {
+            "expr": "(../../../../GeneralConfiguration/PlatformMulticoreSupport = 'true') and (count(./../../*[./Mpu_M7_EcucPartitionRef = node:current()]) >=2 )  ",
+            "true": "Mpu_M7_EcucPartitionRef refer to same value in others"
+          }
+        ]
+      },
+      "fact_sources": {
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "count(text:grep(../../../../GeneralConfiguration/PlatformEcucPartitionRef/*,.)) > 0",
+                  "false": "The ECUC partition must be defined on the PlatformEcucPartitionRef."
+                },
+                {
+                  "expr": "(../../../../GeneralConfiguration/PlatformMulticoreSupport = 'true') and (count(./../../*[./Mpu_M7_EcucPartitionRef = node:current()]) >=2 )  ",
+                  "true": "Mpu_M7_EcucPartitionRef refer to same value in others"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "reference": "ASPathDataOfSchema:/AUTOSAR/EcucDefs/EcuC/EcucPartitionCollection/EcucPartition",
+      "cross_references": [
+        "EcuC"
+      ],
+      "cross_modules": [
+        "EcuC"
+      ],
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Platform provider.",
+      "dependency": "A descriptor-forward Platform implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "reference:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[IntCtrlConfig]/ctr[IntCtrlConfig]/ref[PlatformNvicEcucPartitionRef]",
+      "kind": "reference",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[IntCtrlConfig]/ctr[IntCtrlConfig]/ref[PlatformNvicEcucPartitionRef]",
+      "name": "PlatformNvicEcucPartitionRef",
+      "type": "REFERENCE",
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "count(text:grep(./../../../GeneralConfiguration/PlatformEcucPartitionRef/*,.)) > 0",
+            "false": "The ECUC partition must be defined on the PlatformEcucPartitionRef."
+          },
+          {
+            "expr": "(./../../../GeneralConfiguration/PlatformMulticoreSupport = 'true') and (count(./../../*[./PlatformNvicEcucPartitionRef = node:current()]) >=2 )  ",
+            "true": "PlatformNvicEcucPartitionRef refer to same value in others"
+          }
+        ]
+      },
+      "fact_sources": {
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "count(text:grep(./../../../GeneralConfiguration/PlatformEcucPartitionRef/*,.)) > 0",
+                  "false": "The ECUC partition must be defined on the PlatformEcucPartitionRef."
+                },
+                {
+                  "expr": "(./../../../GeneralConfiguration/PlatformMulticoreSupport = 'true') and (count(./../../*[./PlatformNvicEcucPartitionRef = node:current()]) >=2 )  ",
+                  "true": "PlatformNvicEcucPartitionRef refer to same value in others"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "reference": "ASPathDataOfSchema:/AUTOSAR/EcucDefs/EcuC/EcucPartitionCollection/EcucPartition",
+      "cross_references": [
+        "EcuC"
+      ],
+      "cross_modules": [
+        "EcuC"
+      ],
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Platform provider.",
+      "dependency": "A descriptor-forward Platform implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "reference:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[McmConfig]/ctr[McmConfig]/ref[PlatformMcmEcucPartitionRef]",
+      "kind": "reference",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[McmConfig]/ctr[McmConfig]/ref[PlatformMcmEcucPartitionRef]",
+      "name": "PlatformMcmEcucPartitionRef",
+      "type": "REFERENCE",
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "count(text:grep(./../../../GeneralConfiguration/PlatformEcucPartitionRef/*,.)) > 0",
+            "false": "The ECUC partition must be defined on the PlatformEcucPartitionRef."
+          },
+          {
+            "expr": "(./../../../GeneralConfiguration/PlatformMulticoreSupport = 'true') and (count(./../../*[./PlatformMcmEcucPartitionRef = node:current()]) >=2 )  ",
+            "true": "PlatformMcmEcucPartitionRef refer to same value in others"
+          }
+        ]
+      },
+      "fact_sources": {
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "count(text:grep(./../../../GeneralConfiguration/PlatformEcucPartitionRef/*,.)) > 0",
+                  "false": "The ECUC partition must be defined on the PlatformEcucPartitionRef."
+                },
+                {
+                  "expr": "(./../../../GeneralConfiguration/PlatformMulticoreSupport = 'true') and (count(./../../*[./PlatformMcmEcucPartitionRef = node:current()]) >=2 )  ",
+                  "true": "PlatformMcmEcucPartitionRef refer to same value in others"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "reference": "ASPathDataOfSchema:/AUTOSAR/EcucDefs/EcuC/EcucPartitionCollection/EcucPartition",
+      "cross_references": [
+        "EcuC"
+      ],
+      "cross_modules": [
+        "EcuC"
+      ],
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Platform provider.",
+      "dependency": "A descriptor-forward Platform implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[ArReleaseMajorVersion]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[ArReleaseMajorVersion]",
+      "name": "ArReleaseMajorVersion",
+      "type": "INTEGER_LABEL",
+      "default": {
+        "kind": "literal",
+        "value": "4"
+      },
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": ">=4"
+          },
+          {
+            "expr": "<=4"
+          }
+        ]
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "4"
+            }
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": ">=4"
+                },
+                {
+                  "expr": "<=4"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Platform provider.",
+      "dependency": "A descriptor-forward Platform implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[ArReleaseMinorVersion]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[ArReleaseMinorVersion]",
+      "name": "ArReleaseMinorVersion",
+      "type": "INTEGER_LABEL",
+      "default": {
+        "kind": "literal",
+        "value": "9"
+      },
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": ">=9"
+          },
+          {
+            "expr": "<=9"
+          }
+        ]
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "9"
+            }
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": ">=9"
+                },
+                {
+                  "expr": "<=9"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Platform provider.",
+      "dependency": "A descriptor-forward Platform implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[ArReleaseRevisionVersion]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[ArReleaseRevisionVersion]",
+      "name": "ArReleaseRevisionVersion",
+      "type": "INTEGER_LABEL",
+      "default": {
+        "kind": "literal",
+        "value": "0"
+      },
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": ">=0"
+          },
+          {
+            "expr": "<=0"
+          }
+        ]
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "0"
+            }
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": ">=0"
+                },
+                {
+                  "expr": "<=0"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Platform provider.",
+      "dependency": "A descriptor-forward Platform implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[ModuleId]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[ModuleId]",
+      "name": "ModuleId",
+      "type": "INTEGER_LABEL",
+      "default": {
+        "kind": "literal",
+        "value": "255"
+      },
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": ">=255"
+          },
+          {
+            "expr": "<=255"
+          }
+        ]
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "255"
+            }
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": ">=255"
+                },
+                {
+                  "expr": "<=255"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Platform provider.",
+      "dependency": "A descriptor-forward Platform implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[SwMajorVersion]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[SwMajorVersion]",
+      "name": "SwMajorVersion",
+      "type": "INTEGER_LABEL",
+      "default": {
+        "kind": "literal",
+        "value": "7"
+      },
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": ">=7"
+          },
+          {
+            "expr": "<=7"
+          }
+        ]
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "7"
+            }
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": ">=7"
+                },
+                {
+                  "expr": "<=7"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Platform provider.",
+      "dependency": "A descriptor-forward Platform implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[SwMinorVersion]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[SwMinorVersion]",
+      "name": "SwMinorVersion",
+      "type": "INTEGER_LABEL",
+      "default": {
+        "kind": "literal",
+        "value": "0"
+      },
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": ">=0"
+          },
+          {
+            "expr": "<=0"
+          }
+        ]
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "0"
+            }
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": ">=0"
+                },
+                {
+                  "expr": "<=0"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Platform provider.",
+      "dependency": "A descriptor-forward Platform implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[SwPatchVersion]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[SwPatchVersion]",
+      "name": "SwPatchVersion",
+      "type": "INTEGER_LABEL",
+      "default": {
+        "kind": "literal",
+        "value": "1"
+      },
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": ">=1"
+          },
+          {
+            "expr": "<=1"
+          }
+        ]
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "1"
+            }
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": ">=1"
+                },
+                {
+                  "expr": "<=1"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Platform provider.",
+      "dependency": "A descriptor-forward Platform implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[VendorApiInfix]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[VendorApiInfix]",
+      "name": "VendorApiInfix",
+      "type": "STRING_LABEL",
+      "default": {
+        "kind": "literal",
+        "value": ""
+      },
+      "readonly": {
+        "kind": "literal",
+        "value": "true"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": ""
+            }
+          }
+        ],
+        "readonly": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "true"
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Platform provider.",
+      "dependency": "A descriptor-forward Platform implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[VendorId]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[VendorId]",
+      "name": "VendorId",
+      "type": "INTEGER_LABEL",
+      "default": {
+        "kind": "literal",
+        "value": "43"
+      },
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": ">=43"
+          },
+          {
+            "expr": "<=43"
+          }
+        ]
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "43"
+            }
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": ">=43"
+                },
+                {
+                  "expr": "<=43"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Platform provider.",
+      "dependency": "A descriptor-forward Platform implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/var[PlatformDevErrorDetect]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/var[PlatformDevErrorDetect]",
+      "name": "PlatformDevErrorDetect",
+      "type": "BOOLEAN",
+      "default": {
+        "kind": "literal",
+        "value": "true"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "true"
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Platform provider.",
+      "dependency": "A descriptor-forward Platform implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/var[PlatformEnableIntCtrlConfiguration]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/var[PlatformEnableIntCtrlConfiguration]",
+      "name": "PlatformEnableIntCtrlConfiguration",
+      "type": "BOOLEAN",
+      "default": {
+        "kind": "literal",
+        "value": "true"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "true"
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Platform provider.",
+      "dependency": "A descriptor-forward Platform implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/var[PlatformEnableMSIConfiguration]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/var[PlatformEnableMSIConfiguration]",
+      "name": "PlatformEnableMSIConfiguration",
+      "type": "BOOLEAN",
+      "default": {
+        "kind": "literal",
+        "value": "false"
+      },
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "(. = 'true') and not(num:i(ecu:get('Platform.msiCoresCnt')) > 1)",
+            "true": "The platform MSI configuration is only enabled when the number of cores in the derivative is greater than 1."
+          }
+        ]
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "false"
+            }
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "a",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "(. = 'true') and not(num:i(ecu:get('Platform.msiCoresCnt')) > 1)",
+                  "true": "The platform MSI configuration is only enabled when the number of cores in the derivative is greater than 1."
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Platform provider.",
+      "dependency": "A descriptor-forward Platform implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/var[PlatformEnableUserModeSupport]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/var[PlatformEnableUserModeSupport]",
+      "name": "PlatformEnableUserModeSupport",
+      "type": "BOOLEAN",
+      "default": {
+        "kind": "literal",
+        "value": "false"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "false"
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Platform provider.",
+      "dependency": "A descriptor-forward Platform implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/var[PlatformEnableVtorConfiguration]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/var[PlatformEnableVtorConfiguration]",
+      "name": "PlatformEnableVtorConfiguration",
+      "type": "BOOLEAN",
+      "default": {
+        "kind": "literal",
+        "value": "false"
+      },
+      "editable": {
+        "kind": "literal",
+        "value": "false"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "false"
+            }
+          }
+        ],
+        "editable": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "false"
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Platform provider.",
+      "dependency": "A descriptor-forward Platform implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/var[PlatformIntmConfigurable]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/var[PlatformIntmConfigurable]",
+      "name": "PlatformIntmConfigurable",
+      "type": "BOOLEAN",
+      "default": {
+        "kind": "literal",
+        "value": "false"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "false"
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Platform provider.",
+      "dependency": "A descriptor-forward Platform implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/var[PlatformIpAPIsAvailable]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/var[PlatformIpAPIsAvailable]",
+      "name": "PlatformIpAPIsAvailable",
+      "type": "BOOLEAN",
+      "default": {
+        "kind": "literal",
+        "value": "false"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "false"
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Platform provider.",
+      "dependency": "A descriptor-forward Platform implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/var[PlatformMcmConfigurable]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/var[PlatformMcmConfigurable]",
+      "name": "PlatformMcmConfigurable",
+      "type": "BOOLEAN",
+      "default": {
+        "kind": "literal",
+        "value": "false"
+      },
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "(. = 'true') and not(num:i(ecu:get('Platform.fpu')) > 0)",
+            "true": "Platform mcm configurable only enabled when fpu is supported. S32K116 and S32K118 do not support the fpu."
+          }
+        ]
+      },
+      "editable": {
+        "kind": "xpath",
+        "expr": "num:i(ecu:get('Platform.fpu')) > 0"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "false"
+            }
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "a",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "(. = 'true') and not(num:i(ecu:get('Platform.fpu')) > 0)",
+                  "true": "Platform mcm configurable only enabled when fpu is supported. S32K116 and S32K118 do not support the fpu."
+                }
+              ]
+            }
+          }
+        ],
+        "editable": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "expr": "num:i(ecu:get('Platform.fpu')) > 0"
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Platform provider.",
+      "dependency": "A descriptor-forward Platform implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/var[PlatformMpuM7Configurable]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/var[PlatformMpuM7Configurable]",
+      "name": "PlatformMpuM7Configurable",
+      "type": "BOOLEAN",
+      "default": {
+        "kind": "literal",
+        "value": "false"
+      },
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "((../ARM_Core = 'ARM_A64_ARCH') and (. = 'true'))",
+            "true": "This feature only supports on M7 core."
+          }
+        ]
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "false"
+            }
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "a",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "((../ARM_Core = 'ARM_A64_ARCH') and (. = 'true'))",
+                  "true": "This feature only supports on M7 core."
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Platform provider.",
+      "dependency": "A descriptor-forward Platform implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/var[PlatformMulticoreSupport]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/var[PlatformMulticoreSupport]",
+      "name": "PlatformMulticoreSupport",
+      "type": "BOOLEAN",
+      "default": {
+        "kind": "literal",
+        "value": "false"
+      },
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "(. = 'true') and not(num:i(count(../../GeneralConfiguration/PlatformEcucPartitionRef/*) > 0))",
+            "true": "Platform MultiPartition Support is only enabled when at least one EcucPartition needs to be defined (in all variants)."
+          }
+        ]
+      },
+      "editable": {
+        "kind": "literal",
+        "value": "true"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "false"
+            }
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "a",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "(. = 'true') and not(num:i(count(../../GeneralConfiguration/PlatformEcucPartitionRef/*) > 0))",
+                  "true": "Platform MultiPartition Support is only enabled when at least one EcucPartition needs to be defined (in all variants)."
+                }
+              ]
+            }
+          }
+        ],
+        "editable": [
+          {
+            "source_tag": "a",
+            "evidence": {
+              "kind": "literal",
+              "value": "true"
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Platform provider.",
+      "dependency": "A descriptor-forward Platform implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[IntmConfig]/ctr[IntmGenericSettings]/var[IntmEnable]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[IntmConfig]/ctr[IntmGenericSettings]/var[IntmEnable]",
+      "name": "IntmEnable",
+      "type": "BOOLEAN",
+      "default": {
+        "kind": "literal",
+        "value": "false"
+      },
+      "editable": {
+        "kind": "xpath",
+        "expr": "./../../../GeneralConfiguration/PlatformIntmConfigurable = 'true'"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "false"
+            }
+          }
+        ],
+        "editable": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "expr": "./../../../GeneralConfiguration/PlatformIntmConfigurable = 'true'"
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Platform provider.",
+      "dependency": "A descriptor-forward Platform implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[IntmConfig]/lst[IntmChannel]/ctr[IntmChannel]/var[AcceptedLatency]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[IntmConfig]/lst[IntmChannel]/ctr[IntmChannel]/var[AcceptedLatency]",
+      "name": "AcceptedLatency",
+      "type": "INTEGER",
+      "default": {
+        "kind": "literal",
+        "value": "0"
+      },
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "<=ecu:get('Platform.intmMaxLatency')"
+          },
+          {
+            "expr": ">=0"
+          }
+        ]
+      },
+      "editable": {
+        "kind": "literal",
+        "value": "true"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "0"
+            }
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "<=ecu:get('Platform.intmMaxLatency')"
+                },
+                {
+                  "expr": ">=0"
+                }
+              ]
+            }
+          }
+        ],
+        "editable": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "true"
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Platform provider.",
+      "dependency": "A descriptor-forward Platform implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[IntmConfig]/lst[IntmChannel]/ctr[IntmChannel]/var[InterruptMonitor]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[IntmConfig]/lst[IntmChannel]/ctr[IntmChannel]/var[InterruptMonitor]",
+      "name": "InterruptMonitor",
+      "type": "ENUMERATION",
+      "default": {
+        "kind": "xpath",
+        "expr": "(ecu:list('Platform.intMonitorsList'))[position()-1=node:fallback(node:current()/../@index,'0')]"
+      },
+      "range": {
+        "kind": "xpath",
+        "expr": "ecu:list('Platform.intMonitorsList')"
+      },
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "text:uniq(../../*/InterruptMonitor, .)",
+            "false": "Same interrupt monitor configured twice"
+          }
+        ]
+      },
+      "editable": {
+        "kind": "literal",
+        "value": "true"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "expr": "(ecu:list('Platform.intMonitorsList'))[position()-1=node:fallback(node:current()/../@index,'0')]"
+            }
+          }
+        ],
+        "range": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "expr": "ecu:list('Platform.intMonitorsList')"
+            }
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "text:uniq(../../*/InterruptMonitor, .)",
+                  "false": "Same interrupt monitor configured twice"
+                }
+              ]
+            }
+          }
+        ],
+        "editable": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "true"
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Platform provider.",
+      "dependency": "A descriptor-forward Platform implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[IntmConfig]/lst[IntmChannel]/ctr[IntmChannel]/var[MonitoredIrq]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[IntmConfig]/lst[IntmChannel]/ctr[IntmChannel]/var[MonitoredIrq]",
+      "name": "MonitoredIrq",
+      "type": "ENUMERATION",
+      "default": {
+        "kind": "xpath",
+        "expr": "(ecu:list('Platform.irqsMonitorList'))[position()-1=node:fallback(node:current()/../@index,'0')]"
+      },
+      "range": {
+        "kind": "xpath",
+        "expr": "ecu:list('Platform.irqsMonitorList')"
+      },
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "(text:uniq(../../*/MonitoredIrq, .)) or (./../../../../GeneralConfiguration/PlatformMulticoreSupport = 'true')",
+            "false": "Same interrupt source should not configured twice in the case single core"
+          }
+        ]
+      },
+      "editable": {
+        "kind": "literal",
+        "value": "true"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "expr": "(ecu:list('Platform.irqsMonitorList'))[position()-1=node:fallback(node:current()/../@index,'0')]"
+            }
+          }
+        ],
+        "range": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "expr": "ecu:list('Platform.irqsMonitorList')"
+            }
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "(text:uniq(../../*/MonitoredIrq, .)) or (./../../../../GeneralConfiguration/PlatformMulticoreSupport = 'true')",
+                  "false": "Same interrupt source should not configured twice in the case single core"
+                }
+              ]
+            }
+          }
+        ],
+        "editable": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "true"
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Platform provider.",
+      "dependency": "A descriptor-forward Platform implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[IntmConfig]/lst[IntmChannel]/ctr[IntmChannel]/var[PlatformIntmChannelId]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[IntmConfig]/lst[IntmChannel]/ctr[IntmChannel]/var[PlatformIntmChannelId]",
+      "name": "PlatformIntmChannelId",
+      "type": "INTEGER",
+      "default": {
+        "kind": "xpath",
+        "expr": "node:fallback(node:current()/../@index, num:i(1))"
+      },
+      "range": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "(node:fallback(.,1) >= 0) and (node:fallback(.,1) < num:i(count(node:fallback(node:current()/../../*, num:i(50)))) )",
+            "false": "Value out of range: must be in range 0 to N-1 (N is number of configured channels). Use the Calc button to calculate correct default value."
+          },
+          {
+            "expr": "text:uniq(node:fallback(../../*/PlatformIntmChannelId, text:split('1 2 3')), node:fallback(.,1))",
+            "false": "Duplicated value, PlatformIntmChannelId must be unique across all channels. Use the Calc button to calculate correct default value."
+          }
+        ]
+      },
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": ">=0"
+          },
+          {
+            "expr": "<num:i(ecu:get('Platform.intmCount'))"
+          }
+        ]
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "expr": "node:fallback(node:current()/../@index, num:i(1))"
+            }
+          }
+        ],
+        "range": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "(node:fallback(.,1) >= 0) and (node:fallback(.,1) < num:i(count(node:fallback(node:current()/../../*, num:i(50)))) )",
+                  "false": "Value out of range: must be in range 0 to N-1 (N is number of configured channels). Use the Calc button to calculate correct default value."
+                },
+                {
+                  "expr": "text:uniq(node:fallback(../../*/PlatformIntmChannelId, text:split('1 2 3')), node:fallback(.,1))",
+                  "false": "Duplicated value, PlatformIntmChannelId must be unique across all channels. Use the Calc button to calculate correct default value."
+                }
+              ]
+            }
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": ">=0"
+                },
+                {
+                  "expr": "<num:i(ecu:get('Platform.intmCount'))"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Platform provider.",
+      "dependency": "A descriptor-forward Platform implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/lst[RegionConfig]/ctr[RegionConfig]/var[AccessRights]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/lst[RegionConfig]/ctr[RegionConfig]/var[AccessRights]",
+      "name": "AccessRights",
+      "type": "ENUMERATION",
+      "default": {
+        "kind": "xpath",
+        "expr": "(ecu:list('Platform.Mpu_M7.RegionAccessRights'))[num:i( node:fallback( node:current()/../@index, num:i(0))) + 1]"
+      },
+      "range": {
+        "kind": "xpath",
+        "expr": "ecu:list('Platform.Mpu_M7.AccessRightsType')"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "expr": "(ecu:list('Platform.Mpu_M7.RegionAccessRights'))[num:i( node:fallback( node:current()/../@index, num:i(0))) + 1]"
+            }
+          }
+        ],
+        "range": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "expr": "ecu:list('Platform.Mpu_M7.AccessRightsType')"
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Platform provider.",
+      "dependency": "A descriptor-forward Platform implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/lst[RegionConfig]/ctr[RegionConfig]/var[EndAddress]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/lst[RegionConfig]/ctr[RegionConfig]/var[EndAddress]",
+      "name": "EndAddress",
+      "type": "INTEGER",
+      "default": {
+        "kind": "xpath",
+        "expr": "num:i(ecu:list('Platform.Mpu_M7.RegionEndAddress')[num:i( node:fallback( node:current()/../@index, num:i(0))) + 1])"
+      },
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "<=i(0xFFFFFFFF)"
+          },
+          {
+            "expr": ">=num:i(num:i(ecu:get('Platform.Mpu_M7.MinRegionSize'))-1)"
+          }
+        ]
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "expr": "num:i(ecu:list('Platform.Mpu_M7.RegionEndAddress')[num:i( node:fallback( node:current()/../@index, num:i(0))) + 1])"
+            }
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "<=i(0xFFFFFFFF)"
+                },
+                {
+                  "expr": ">=num:i(num:i(ecu:get('Platform.Mpu_M7.MinRegionSize'))-1)"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Platform provider.",
+      "dependency": "A descriptor-forward Platform implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/lst[RegionConfig]/ctr[RegionConfig]/var[InnerCachePolicy]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/lst[RegionConfig]/ctr[RegionConfig]/var[InnerCachePolicy]",
+      "name": "InnerCachePolicy",
+      "type": "ENUMERATION",
+      "default": {
+        "kind": "xpath",
+        "expr": "(ecu:list('Platform.Mpu_M7.RegionInnerCachePolicy'))[num:i( node:fallback( node:current()/../@index, num:i(0))) + 1]"
+      },
+      "range": {
+        "kind": "xpath",
+        "expr": "ecu:list('Platform.Mpu_M7.CachePolicyType')"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "expr": "(ecu:list('Platform.Mpu_M7.RegionInnerCachePolicy'))[num:i( node:fallback( node:current()/../@index, num:i(0))) + 1]"
+            }
+          }
+        ],
+        "range": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "expr": "ecu:list('Platform.Mpu_M7.CachePolicyType')"
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Platform provider.",
+      "dependency": "A descriptor-forward Platform implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/lst[RegionConfig]/ctr[RegionConfig]/var[MemoryType]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/lst[RegionConfig]/ctr[RegionConfig]/var[MemoryType]",
+      "name": "MemoryType",
+      "type": "ENUMERATION",
+      "default": {
+        "kind": "xpath",
+        "expr": "(ecu:list('Platform.Mpu_M7.RegionMemoryType'))[num:i( node:fallback( node:current()/../@index, num:i(0))) + 1]"
+      },
+      "range": {
+        "kind": "xpath",
+        "expr": "ecu:list('Platform.Mpu_M7.MemoryType')"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "expr": "(ecu:list('Platform.Mpu_M7.RegionMemoryType'))[num:i( node:fallback( node:current()/../@index, num:i(0))) + 1]"
+            }
+          }
+        ],
+        "range": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "expr": "ecu:list('Platform.Mpu_M7.MemoryType')"
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Platform provider.",
+      "dependency": "A descriptor-forward Platform implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/lst[RegionConfig]/ctr[RegionConfig]/var[OuterCachePolicy]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/lst[RegionConfig]/ctr[RegionConfig]/var[OuterCachePolicy]",
+      "name": "OuterCachePolicy",
+      "type": "ENUMERATION",
+      "default": {
+        "kind": "xpath",
+        "expr": "(ecu:list('Platform.Mpu_M7.RegionOuterCachePolicy'))[num:i( node:fallback( node:current()/../@index, num:i(0))) + 1]"
+      },
+      "range": {
+        "kind": "xpath",
+        "expr": "ecu:list('Platform.Mpu_M7.CachePolicyType')"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "expr": "(ecu:list('Platform.Mpu_M7.RegionOuterCachePolicy'))[num:i( node:fallback( node:current()/../@index, num:i(0))) + 1]"
+            }
+          }
+        ],
+        "range": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "expr": "ecu:list('Platform.Mpu_M7.CachePolicyType')"
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Platform provider.",
+      "dependency": "A descriptor-forward Platform implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/lst[RegionConfig]/ctr[RegionConfig]/var[RegionNumber]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/lst[RegionConfig]/ctr[RegionConfig]/var[RegionNumber]",
+      "name": "RegionNumber",
+      "type": "INTEGER",
+      "default": {
+        "kind": "xpath",
+        "expr": "num:i( node:fallback( node:current()/../@index, num:i(0)))"
+      },
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "<num:i(ecu:get('Platform.Mpu_M7.MaximumRegionCount'))",
+            "false": "Value must be lower than ecu:get('Platform.Mpu_M7.MaximumRegionCount')"
+          },
+          {
+            "expr": ">=0",
+            "false": "Value must be higher or equal than ecu:get('Platform.Mpu_M7.MinimumRegionCount')"
+          }
+        ]
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "expr": "num:i( node:fallback( node:current()/../@index, num:i(0)))"
+            }
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "<num:i(ecu:get('Platform.Mpu_M7.MaximumRegionCount'))",
+                  "false": "Value must be lower than ecu:get('Platform.Mpu_M7.MaximumRegionCount')"
+                },
+                {
+                  "expr": ">=0",
+                  "false": "Value must be higher or equal than ecu:get('Platform.Mpu_M7.MinimumRegionCount')"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Platform provider.",
+      "dependency": "A descriptor-forward Platform implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/lst[RegionConfig]/ctr[RegionConfig]/var[RegionSize]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/lst[RegionConfig]/ctr[RegionConfig]/var[RegionSize]",
+      "name": "RegionSize",
+      "type": "INTEGER",
+      "default": {
+        "kind": "xpath",
+        "expr": "num:i(num:i(node:fallback(node:current()/../EndAddress, num:i(0))) - num:i(node:fallback(node:current()/../StartAddress, num:i(0))) + num:i(1))"
+      },
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "num:i(num:i(node:fallback(node:current()/../EndAddress, num:i(0))) - num:i(node:fallback(node:current()/../StartAddress, num:i(0))) + num:i(1)) = num:i(node:value(.))",
+            "false": "Please recalculate value"
+          },
+          {
+            "expr": "(num:i(node:fallback(node:current()/../StartAddress, num:i(0))) mod num:i(node:value(.))) = 0",
+            "false": "The StartAddress is aligned to the size of the region. For example, a 64KB region must be aligned on a multiple of 64KB, for example, at 0x00010000 or 0x00020000"
+          },
+          {
+            "expr": "(num:i(node:value(.))>= 32 )",
+            "false": "The RegionSize must than 32"
+          },
+          {
+            "expr": "(num:i(node:value(.)) mod 32) = 0",
+            "false": " RegionSize mod 32 == 0"
+          }
+        ]
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "expr": "num:i(num:i(node:fallback(node:current()/../EndAddress, num:i(0))) - num:i(node:fallback(node:current()/../StartAddress, num:i(0))) + num:i(1))"
+            }
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "num:i(num:i(node:fallback(node:current()/../EndAddress, num:i(0))) - num:i(node:fallback(node:current()/../StartAddress, num:i(0))) + num:i(1)) = num:i(node:value(.))",
+                  "false": "Please recalculate value"
+                },
+                {
+                  "expr": "(num:i(node:fallback(node:current()/../StartAddress, num:i(0))) mod num:i(node:value(.))) = 0",
+                  "false": "The StartAddress is aligned to the size of the region. For example, a 64KB region must be aligned on a multiple of 64KB, for example, at 0x00010000 or 0x00020000"
+                },
+                {
+                  "expr": "(num:i(node:value(.))>= 32 )",
+                  "false": "The RegionSize must than 32"
+                },
+                {
+                  "expr": "(num:i(node:value(.)) mod 32) = 0",
+                  "false": " RegionSize mod 32 == 0"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Platform provider.",
+      "dependency": "A descriptor-forward Platform implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/lst[RegionConfig]/ctr[RegionConfig]/var[Shareable]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/lst[RegionConfig]/ctr[RegionConfig]/var[Shareable]",
+      "name": "Shareable",
+      "type": "BOOLEAN",
+      "default": {
+        "kind": "xpath",
+        "expr": "ecu:list('Platform.Mpu_M7.RegionShareable')[num:i( node:fallback( node:current()/../@index, num:i(0))) + 1]"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "expr": "ecu:list('Platform.Mpu_M7.RegionShareable')[num:i( node:fallback( node:current()/../@index, num:i(0))) + 1]"
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Platform provider.",
+      "dependency": "A descriptor-forward Platform implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/lst[RegionConfig]/ctr[RegionConfig]/var[StartAddress]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/lst[RegionConfig]/ctr[RegionConfig]/var[StartAddress]",
+      "name": "StartAddress",
+      "type": "INTEGER",
+      "default": {
+        "kind": "xpath",
+        "expr": "num:i(ecu:list('Platform.Mpu_M7.RegionStartAddress')[num:i( node:fallback( node:current()/../@index, num:i(0))) + 1])"
+      },
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "<i(0xFFFFFFFF)"
+          },
+          {
+            "expr": ">=i(0)"
+          }
+        ]
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "expr": "num:i(ecu:list('Platform.Mpu_M7.RegionStartAddress')[num:i( node:fallback( node:current()/../@index, num:i(0))) + 1])"
+            }
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "<i(0xFFFFFFFF)"
+                },
+                {
+                  "expr": ">=i(0)"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Platform provider.",
+      "dependency": "A descriptor-forward Platform implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/lst[RegionConfig]/ctr[RegionConfig]/var[SubregionMask]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/lst[RegionConfig]/ctr[RegionConfig]/var[SubregionMask]",
+      "name": "SubregionMask",
+      "type": "INTEGER",
+      "default": {
+        "kind": "xpath",
+        "expr": "ecu:list('Platform.Mpu_M7.RegionSubregionMask')[num:i(node:fallback( node:current()/../@index, num:i(0))) + 1]"
+      },
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "<i(256)"
+          },
+          {
+            "expr": ">=i(0)"
+          }
+        ]
+      },
+      "editable": {
+        "kind": "xpath",
+        "expr": "num:i(node:fallback(node:current()/../RegionSize, num:i(0))) >= num:i(ecu:get('Platform.Mpu_M7.MinRegionSizeWithSubregion'))"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "expr": "ecu:list('Platform.Mpu_M7.RegionSubregionMask')[num:i(node:fallback( node:current()/../@index, num:i(0))) + 1]"
+            }
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "<i(256)"
+                },
+                {
+                  "expr": ">=i(0)"
+                }
+              ]
+            }
+          }
+        ],
+        "editable": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "expr": "num:i(node:fallback(node:current()/../RegionSize, num:i(0))) >= num:i(ecu:get('Platform.Mpu_M7.MinRegionSizeWithSubregion'))"
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Platform provider.",
+      "dependency": "A descriptor-forward Platform implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/var[DefaultMapEnable]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/var[DefaultMapEnable]",
+      "name": "DefaultMapEnable",
+      "type": "BOOLEAN",
+      "default": {
+        "kind": "literal",
+        "value": "false"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "false"
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Platform provider.",
+      "dependency": "A descriptor-forward Platform implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/var[MemManageInterruptEnable]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/var[MemManageInterruptEnable]",
+      "name": "MemManageInterruptEnable",
+      "type": "BOOLEAN",
+      "default": {
+        "kind": "literal",
+        "value": "false"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "false"
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Platform provider.",
+      "dependency": "A descriptor-forward Platform implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/var[PhysicalCoreID]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/var[PhysicalCoreID]",
+      "name": "PhysicalCoreID",
+      "type": "ENUMERATION",
+      "default": {
+        "kind": "literal",
+        "value": "Cortex_M7_Core0"
+      },
+      "range": {
+        "kind": "xpath",
+        "expr": "(ecu:list('Platform.Mpu_M7.Core.List'))"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "Cortex_M7_Core0"
+            }
+          }
+        ],
+        "range": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "expr": "(ecu:list('Platform.Mpu_M7.Core.List'))"
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Platform provider.",
+      "dependency": "A descriptor-forward Platform implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/var[RunInHFNMIEnable]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/var[RunInHFNMIEnable]",
+      "name": "RunInHFNMIEnable",
+      "type": "BOOLEAN",
+      "default": {
+        "kind": "literal",
+        "value": "false"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "false"
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Platform provider.",
+      "dependency": "A descriptor-forward Platform implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[IntCtrlConfig]/ctr[IntCtrlConfig]/lst[PlatformIsrConfig]/ctr[PlatformIsrConfig]/var[IsrEnabled]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[IntCtrlConfig]/ctr[IntCtrlConfig]/lst[PlatformIsrConfig]/ctr[PlatformIsrConfig]/var[IsrEnabled]",
+      "name": "IsrEnabled",
+      "type": "BOOLEAN",
+      "default": {
+        "kind": "literal",
+        "value": "false"
+      },
+      "editable": {
+        "kind": "literal",
+        "value": "true"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "false"
+            }
+          }
+        ],
+        "editable": [
+          {
+            "source_tag": "a",
+            "evidence": {
+              "kind": "literal",
+              "value": "true"
+            }
+          }
+        ]
+      },
+      "classification": "configurable",
+      "trace": {
+        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/platform.py:PlatformProvider",
+        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_platform_set",
+        "asset": "autombd-rtd/assets/nxp/s32k3/platform/interrupts.json#/isr_priority",
+        "tests": [
+          "tests/unit/test_platform_apply.py::test_set_priority_by_peripheral",
+          "tests/unit/test_platform_apply.py::test_other_interrupt_untouched"
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[IntCtrlConfig]/ctr[IntCtrlConfig]/lst[PlatformIsrConfig]/ctr[PlatformIsrConfig]/var[IsrHandler]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[IntCtrlConfig]/ctr[IntCtrlConfig]/lst[PlatformIsrConfig]/ctr[PlatformIsrConfig]/var[IsrHandler]",
+      "name": "IsrHandler",
+      "type": "FUNCTION-NAME",
+      "default": {
+        "kind": "literal",
+        "value": "undefined_handler"
+      },
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "text:match(normalize-space(.),'^[_a-zA-Z]+[_0-9a-zA-Z]*$') and (node:value(.)!='NULL')",
+            "false": "Invalid name of the IsrHandler. Must be valid C function name or NULL_PTR."
+          }
+        ]
+      },
+      "editable": {
+        "kind": "literal",
+        "value": "true"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "undefined_handler"
+            }
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "text:match(normalize-space(.),'^[_a-zA-Z]+[_0-9a-zA-Z]*$') and (node:value(.)!='NULL')",
+                  "false": "Invalid name of the IsrHandler. Must be valid C function name or NULL_PTR."
+                }
+              ]
+            }
+          }
+        ],
+        "editable": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "true"
+            }
+          }
+        ]
+      },
+      "classification": "configurable",
+      "trace": {
+        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/platform.py:PlatformProvider",
+        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_platform_set",
+        "asset": "autombd-rtd/assets/nxp/s32k3/platform/interrupts.json#/isr_priority",
+        "tests": [
+          "tests/unit/test_platform_apply.py::test_set_priority_by_peripheral",
+          "tests/unit/test_platform_apply.py::test_other_interrupt_untouched"
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[IntCtrlConfig]/ctr[IntCtrlConfig]/lst[PlatformIsrConfig]/ctr[PlatformIsrConfig]/var[IsrName]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[IntCtrlConfig]/ctr[IntCtrlConfig]/lst[PlatformIsrConfig]/ctr[PlatformIsrConfig]/var[IsrName]",
+      "name": "IsrName",
+      "type": "ENUMERATION",
+      "default": {
+        "kind": "xpath",
+        "expr": "(ecu:list('Platform.irqsList'))[position()-1=node:fallback(node:current()/../@index,'0')]"
+      },
+      "range": {
+        "kind": "xpath",
+        "expr": "ecu:list('Platform.irqsList')"
+      },
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "not(text:uniq(../../*/IsrName,.))",
+            "true": "This field must be unique."
+          }
+        ]
+      },
+      "editable": {
+        "kind": "literal",
+        "value": "true"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "expr": "(ecu:list('Platform.irqsList'))[position()-1=node:fallback(node:current()/../@index,'0')]"
+            }
+          }
+        ],
+        "range": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "expr": "ecu:list('Platform.irqsList')"
+            }
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "not(text:uniq(../../*/IsrName,.))",
+                  "true": "This field must be unique."
+                }
+              ]
+            }
+          }
+        ],
+        "editable": [
+          {
+            "source_tag": "a",
+            "evidence": {
+              "kind": "literal",
+              "value": "true"
+            }
+          }
+        ]
+      },
+      "classification": "configurable",
+      "trace": {
+        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/platform.py:PlatformProvider",
+        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_platform_set",
+        "asset": "autombd-rtd/assets/nxp/s32k3/platform/interrupts.json#/isr_priority",
+        "tests": [
+          "tests/unit/test_platform_apply.py::test_set_priority_by_peripheral",
+          "tests/unit/test_platform_apply.py::test_other_interrupt_untouched"
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[IntCtrlConfig]/ctr[IntCtrlConfig]/lst[PlatformIsrConfig]/ctr[PlatformIsrConfig]/var[IsrPriority]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[IntCtrlConfig]/ctr[IntCtrlConfig]/lst[PlatformIsrConfig]/ctr[PlatformIsrConfig]/var[IsrPriority]",
+      "name": "IsrPriority",
+      "type": "INTEGER",
+      "default": {
+        "kind": "literal",
+        "value": "0"
+      },
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "<= ecu:get('Platform.irqMaxPrio')"
+          },
+          {
+            "expr": ">=0"
+          }
+        ]
+      },
+      "editable": {
+        "kind": "literal",
+        "value": "true"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "0"
+            }
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "<= ecu:get('Platform.irqMaxPrio')"
+                },
+                {
+                  "expr": ">=0"
+                }
+              ]
+            }
+          }
+        ],
+        "editable": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "true"
+            }
+          }
+        ]
+      },
+      "classification": "configurable",
+      "trace": {
+        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/platform.py:PlatformProvider",
+        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_platform_set",
+        "asset": "autombd-rtd/assets/nxp/s32k3/platform/interrupts.json#/isr_priority",
+        "tests": [
+          "tests/unit/test_platform_apply.py::test_set_priority_by_peripheral",
+          "tests/unit/test_platform_apply.py::test_other_interrupt_untouched"
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[IntCtrlConfig]/ctr[IntCtrlConfig]/var[PlatformVtorAddressConfig]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[IntCtrlConfig]/ctr[IntCtrlConfig]/var[PlatformVtorAddressConfig]",
+      "name": "PlatformVtorAddressConfig",
+      "type": "INTEGER",
+      "default": {
+        "kind": "xpath",
+        "expr": "num:i(ecu:get('Platform.VtorAddress'))"
+      },
+      "invalid": [
+        {
+          "source_tag": "da",
+          "kind": "xpath",
+          "tests": [
+            {
+              "expr": "bit:and(num:i(.), num:hextoint(ecu:get('Platform.VtorAddressMask'))) = 0",
+              "false": "The VTOR address should be aligned by rounding up to the next power of two"
+            }
+          ]
+        },
+        {
+          "source_tag": "da",
+          "kind": "xpath",
+          "tests": [
+            {
+              "expr": ">=0"
+            },
+            {
+              "expr": "<=4294967295"
+            }
+          ]
+        }
+      ],
+      "editable": {
+        "kind": "xpath",
+        "expr": "./../../../GeneralConfiguration/PlatformEnableVtorConfiguration = 'true'"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "expr": "num:i(ecu:get('Platform.VtorAddress'))"
+            }
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "bit:and(num:i(.), num:hextoint(ecu:get('Platform.VtorAddressMask'))) = 0",
+                  "false": "The VTOR address should be aligned by rounding up to the next power of two"
+                }
+              ]
+            }
+          },
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": ">=0"
+                },
+                {
+                  "expr": "<=4294967295"
+                }
+              ]
+            }
+          }
+        ],
+        "editable": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "expr": "./../../../GeneralConfiguration/PlatformEnableVtorConfiguration = 'true'"
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Platform provider.",
+      "dependency": "A descriptor-forward Platform implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[McmConfig]/ctr[McmConfig]/lst[SystemIsrConfig]/ctr[SystemIsrConfig]/var[SystemIsrEnabled]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[McmConfig]/ctr[McmConfig]/lst[SystemIsrConfig]/ctr[SystemIsrConfig]/var[SystemIsrEnabled]",
+      "name": "SystemIsrEnabled",
+      "type": "BOOLEAN",
+      "default": {
+        "kind": "literal",
+        "value": "false"
+      },
+      "editable": {
+        "kind": "literal",
+        "value": "true"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "false"
+            }
+          }
+        ],
+        "editable": [
+          {
+            "source_tag": "a",
+            "evidence": {
+              "kind": "literal",
+              "value": "true"
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Platform provider.",
+      "dependency": "A descriptor-forward Platform implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[McmConfig]/ctr[McmConfig]/lst[SystemIsrConfig]/ctr[SystemIsrConfig]/var[SystemIsrName]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[McmConfig]/ctr[McmConfig]/lst[SystemIsrConfig]/ctr[SystemIsrConfig]/var[SystemIsrName]",
+      "name": "SystemIsrName",
+      "type": "ENUMERATION",
+      "default": {
+        "kind": "xpath",
+        "expr": "(ecu:list('Platform.systemIrqsList'))[position()-1=node:fallback(node:current()/../@index,'0')]"
+      },
+      "range": {
+        "kind": "xpath",
+        "expr": "ecu:list('Platform.systemIrqsList')"
+      },
+      "invalid": {
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "text:uniq(../../*/SystemIsrName, .)",
+            "false": "Duplicate system interrupt configuration"
+          }
+        ]
+      },
+      "editable": {
+        "kind": "literal",
+        "value": "true"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "expr": "(ecu:list('Platform.systemIrqsList'))[position()-1=node:fallback(node:current()/../@index,'0')]"
+            }
+          }
+        ],
+        "range": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "expr": "ecu:list('Platform.systemIrqsList')"
+            }
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "xpath",
+              "tests": [
+                {
+                  "expr": "text:uniq(../../*/SystemIsrName, .)",
+                  "false": "Duplicate system interrupt configuration"
+                }
+              ]
+            }
+          }
+        ],
+        "editable": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "true"
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Platform provider.",
+      "dependency": "A descriptor-forward Platform implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[McmConfig]/ctr[McmConfig]/var[SystemAhbSlavePrio]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[McmConfig]/ctr[McmConfig]/var[SystemAhbSlavePrio]",
+      "name": "SystemAhbSlavePrio",
+      "type": "ENUMERATION",
+      "default": {
+        "kind": "literal",
+        "value": "Round_robin"
+      },
+      "range": {
+        "kind": "literal",
+        "values": [
+          "Round_robin",
+          "AHB_Slave_priority"
+        ]
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "Round_robin"
+            }
+          }
+        ],
+        "range": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "values": [
+                "Round_robin",
+                "AHB_Slave_priority"
+              ]
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Platform provider.",
+      "dependency": "A descriptor-forward Platform implementation and generality tests are required before exposure."
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/var[IMPLEMENTATION_CONFIG_VARIANT]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/var[IMPLEMENTATION_CONFIG_VARIANT]",
+      "name": "IMPLEMENTATION_CONFIG_VARIANT",
+      "type": "ENUMERATION",
+      "default": {
+        "kind": "literal",
+        "value": "VariantPreCompile"
+      },
+      "range": {
+        "kind": "literal",
+        "values": [
+          "VariantPreCompile",
+          "VariantPostBuild"
+        ]
+      },
+      "readonly": {
+        "kind": "literal",
+        "value": "true"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "VariantPreCompile"
+            }
+          }
+        ],
+        "range": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "values": [
+                "VariantPreCompile",
+                "VariantPostBuild"
+              ]
+            }
+          }
+        ],
+        "readonly": [
+          {
+            "source_tag": "da",
+            "evidence": {
+              "kind": "literal",
+              "value": "true"
+            }
+          }
+        ]
+      },
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Platform provider.",
+      "dependency": "A descriptor-forward Platform implementation and generality tests are required before exposure."
+    }
+  ],
+  "cross_module_index": {
+    "EcuC": [
+      "reference:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/lst[PlatformEcucPartitionRef]/ref[PlatformEcucPartitionRef]",
+      "reference:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[IntmConfig]/ctr[IntmGenericSettings]/ref[PlatformIntmGenericEcucPartitionRef]",
+      "reference:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[IntmConfig]/lst[IntmChannel]/ctr[IntmChannel]/ref[PlatformIntmChannelEcucPartitionRef]",
+      "reference:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/ref[Mpu_M7_EcucPartitionRef]",
+      "reference:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[IntCtrlConfig]/ctr[IntCtrlConfig]/ref[PlatformNvicEcucPartitionRef]",
+      "reference:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[McmConfig]/ctr[McmConfig]/ref[PlatformMcmEcucPartitionRef]"
+    ]
+  },
+  "summary": {
+    "total": 73,
+    "configurable": 8,
+    "deferred": 65,
+    "derived": 0
+  }
+}

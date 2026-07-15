@@ -133,9 +133,10 @@ same architecture and provider model. Delivery sequencing lives in
 Assets are committed, versioned JSON/cache files shipped under the skill's
 `assets/` directory; runtime commands read nothing else. Asset kinds: module
 manifests + metadata; **per-module schema/constraint/dependency caches extracted
-from each `<Module>.xdm`** (provider-owned, domain-truth §1), including a
-**surface-coverage inventory** (`_coverage`) recording which editable items are
-configurable today vs. deferred; **pin mapping by
+from each `<Module>.xdm`** (provider-owned, domain-truth §1); a separate
+development-only **surface-coverage inventory** under
+`docs/specs/rtd-config-module-coverage/<module>.json`, recording which named
+editable items are configurable, derived, or deferred; **pin mapping by
 family/device/package/peripheral/signal/pin**; validation profiles;
 generated-file/reference patterns.
 
@@ -164,13 +165,14 @@ module is considered done:
    §1/§3). Never invent a value.
 2. **Asset.** Emit or refresh the committed per-module asset under
    `autombd-rtd/assets/<vendor>/<family>/<module>/`, each item traceable to its
-   `.xdm` source path and RTD version, and record a `_coverage` inventory of the
-   editable items configurable today vs. those deferred.
+   `.xdm` source path and RTD version. Separately regenerate the module's
+   development-only surface inventory under
+   `docs/specs/rtd-config-module-coverage/` from that exact descriptor.
 3. **Provider (TDD-first).** Implement or extend the module provider against
    that asset: ownership-bounded edits only, narrow byte-faithful `.mex` writes,
    structured diagnostics, supporting the module's full legal editable surface
-   (G10); where coverage is deferred, record it explicitly in the asset's
-   `_coverage` inventory rather than leaving an undocumented gap.
+   (G10); where coverage is deferred, record it explicitly in the module's
+   development-only surface inventory rather than leaving an undocumented gap.
 
 ## Intent and commands
 
@@ -276,6 +278,7 @@ configured installation environment internally.
 | Date | Version | Description |
 | --- | --- | --- |
 | 2026-06-23 | 0.7.1 | Made the asset-build sequence extract the module's **complete editable surface** (G10 — the descriptor defines the surface, not the subset a test case exercises) and added a per-module `_coverage` surface-coverage inventory (configurable today vs. deferred) as an asset kind and a build-sequence output, so a deferred surface is recorded rather than left an undocumented gap. |
+| 2026-07-15 | 0.7.2 | Moved descriptor surface coverage out of runtime assets into exact-source, development-only per-module sidecars and required an inventory for all eight shipped providers. |
 | 2026-06-15 | 0.7.0 | Issue #7 documentation reorganization: stripped agent-discipline content (Subagent development workflow section, Documentation map section, KPI-cap/timing sentences from Tests and acceptance and Success criteria); folded content from `rtd-cfgfile-cli-implementation-plan.md` (minimal-system definition, asset build sequence steps 1–3, engineering constraints + development release boundary); updated figures path reference to `docs/specs/figures/`; updated header Description. |
 | 2026-06-14 | 0.6.3 | Fixed in-body doc path references that omitted the `docs/` prefix (`tests/…` → `docs/tests/…`, `references/…` → `docs/references/…`) so they match the doc map. |
 | 2026-06-14 | 0.6.2 | Updated the Subagent development workflow + success criteria to the TRUE black-box E2E model: an independent third-party agent CLI (not the embedded subagent, which inherits repo context/filesystem) drives the released skill against the staged fixture, and the Tester independently re-verifies the produced `.mex`. Also dropped the dangling doc-map row + diagram node for the never-created `rtd-config-subagent-validation.md` (the black-box record now lives in the harness + the acceptance report). |
