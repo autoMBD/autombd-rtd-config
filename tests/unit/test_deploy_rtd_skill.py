@@ -796,3 +796,196 @@ def test_ci_contract_covers_supported_pythons_platforms_and_release_smoke():
     assert "release-manifest" in text or "release_manifest" in text
     assert "deploy_rtd_skill" in text
     assert "outside" in text.lower() or "smoke" in text.lower()
+
+
+# ---------------------------------------------------------------------------
+# Destination-ancestor fail-closed contract (Reviewer P1)
+# ---------------------------------------------------------------------------
+
+
+def _tree_snapshot(root: Path) -> tuple[tuple[str, ...], dict[str, bytes]]:
+    """Capture relative directory names and file bytes without following links."""
+    directories: list[str] = []
+    files: dict[str, bytes] = {}
+    if not root.exists():
+        return (), files
+    for current, directory_names, file_names in os.walk(root, followlinks=False):
+        current_path = Path(current)
+        directories.extend(
+            (current_path / name).relative_to(root).as_posix()
+            for name in directory_names
+        )
+        files.update(
+            {
+                (current_path / name).relative_to(root).as_posix():
+                    (current_path / name).read_bytes()
+                for name in file_names
+            }
+        )
+    return tuple(sorted(directories)), files
+
+
+def _assert_no_deploy_residue(root: Path) -> None:
+    names = {path.name for path in root.rglob("*")}
+    assert not any(".deploying." in name for name in names)
+    assert not any(".previous." in name for name in names)
+    assert not any(name.endswith(".deploy.lock") for name in names)
+
+
+def _seed_linked_install(outside: Path, linked_part: str) -> Path:
+    if linked_part == "target":
+        installed = outside / ".agents" / "skills" / "autombd-rtd"
+    elif linked_part == ".agents":
+        installed = outside / "skills" / "autombd-rtd"
+    else:
+        installed = outside / "autombd-rtd"
+    installed.mkdir(parents=True)
+    (installed / "sentinel.bin").write_bytes(b"existing-install-must-not-change\x00")
+    return installed
+
+
+def _make_project_link(target: Path, outside: Path, linked_part: str) -> Path:
+    if linked_part == "target":
+        link = target
+    elif linked_part == ".agents":
+        target.mkdir()
+        link = target / ".agents"
+    else:
+        (target / ".agents").mkdir(parents=True)
+        link = target / ".agents" / "skills"
+    link.symlink_to(outside, target_is_directory=True)
+    return link
+
+
+@pytest.mark.skipif(os.name == "nt", reason="real POSIX symlink coverage")
+@pytest.mark.parametrize("linked_part", ("target", ".agents", "skills"))
+def test_deploy_one_rejects_real_posix_linked_destination_ancestor_without_writes(
+    tmp_path,
+    linked_part,
+):
+    deploy = load_deploy_module()
+    target = tmp_path / "target-project"
+    outside = tmp_path / "outside-destination"
+    outside.mkdir()
+    installed = _seed_linked_install(outside, linked_part)
+    before_outside = _tree_snapshot(outside)
+    before_install = _tree_snapshot(installed)
+    try:
+        _make_project_link(target, outside, linked_part)
+    except OSError as exc:
+        pytest.skip(f"test host cannot create a directory symlink: {exc}")
+
+    with pytest.raises(RuntimeError, match="unsafe|ancestor|symlink|link|reparse"):
+        deploy.deploy_one(REPO_ROOT, target, "codex")
+
+    assert _tree_snapshot(outside) == before_outside
+    assert _tree_snapshot(installed) == before_install
+    _assert_no_deploy_residue(outside)
+
+
+class _InjectedDestinationPlatform:
+    """Delegate native checks except for explicit reparse-point observations."""
+
+    def __init__(self, deploy, *unsafe_paths: Path) -> None:
+        self._native = deploy._is_link_or_reparse
+        self._unsafe = {Path(path) for path in unsafe_paths}
+
+    def is_link_or_reparse(self, path: Path) -> bool:
+        candidate = Path(path)
+        return candidate in self._unsafe or self._native(candidate)
+
+
+@pytest.mark.parametrize("unsafe_part", ("target", ".agents", "skills"))
+def test_resolve_agent_skills_dir_rejects_injected_reparse_ancestor(
+    tmp_path,
+    unsafe_part,
+):
+    deploy = load_deploy_module()
+    target = tmp_path / "target-project"
+    (target / ".agents" / "skills").mkdir(parents=True)
+    unsafe = {
+        "target": target,
+        ".agents": target / ".agents",
+        "skills": target / ".agents" / "skills",
+    }[unsafe_part]
+    platform = _InjectedDestinationPlatform(deploy, unsafe)
+    before = _tree_snapshot(target)
+
+    with pytest.raises(RuntimeError, match="unsafe|ancestor|symlink|link|reparse"):
+        deploy.resolve_agent_skills_dir(target, "codex", platform=platform)
+
+    assert _tree_snapshot(target) == before
+    _assert_no_deploy_residue(target)
+
+
+def test_copy_released_payload_rejects_injected_reparse_parent_before_lock_or_stage(
+    tmp_path,
+):
+    deploy = load_deploy_module()
+    target = tmp_path / "target-project"
+    destination = target / ".agents" / "skills" / "autombd-rtd"
+    destination.mkdir(parents=True)
+    (destination / "sentinel.bin").write_bytes(b"existing-install")
+    unsafe_parent = target / ".agents"
+    platform = _InjectedDestinationPlatform(deploy, unsafe_parent)
+    manifest = deploy.read_release_manifest(SOURCE_SKILL_ROOT)
+    before = _tree_snapshot(target)
+    before_install = _tree_snapshot(destination)
+
+    with pytest.raises(RuntimeError, match="unsafe|ancestor|symlink|link|reparse"):
+        deploy.copy_released_payload(
+            SOURCE_SKILL_ROOT,
+            destination,
+            manifest,
+            platform=platform,
+        )
+
+    assert _tree_snapshot(target) == before
+    assert _tree_snapshot(destination) == before_install
+    _assert_no_deploy_residue(target)
+
+
+def test_deploy_one_rejects_injected_reparse_target_root_without_writes(tmp_path):
+    deploy = load_deploy_module()
+    target = tmp_path / "target-project"
+    installed = target / ".agents" / "skills" / "autombd-rtd"
+    installed.mkdir(parents=True)
+    (installed / "sentinel.bin").write_bytes(b"existing-install")
+    platform = _InjectedDestinationPlatform(deploy, target)
+    before = _tree_snapshot(target)
+
+    with pytest.raises(RuntimeError, match="unsafe|ancestor|symlink|link|reparse"):
+        deploy.deploy_one(REPO_ROOT, target, "codex", platform=platform)
+
+    assert _tree_snapshot(target) == before
+    _assert_no_deploy_residue(target)
+
+
+@pytest.mark.skipif(os.name != "nt", reason="real Windows junction coverage")
+def test_deploy_one_rejects_real_windows_junction_target_without_outside_writes(
+    tmp_path,
+):
+    deploy = load_deploy_module()
+    target = tmp_path / "target-project"
+    outside = tmp_path / "outside-destination"
+    outside.mkdir()
+    installed = _seed_linked_install(outside, "target")
+    before_outside = _tree_snapshot(outside)
+    before_install = _tree_snapshot(installed)
+    created = subprocess.run(
+        ["cmd", "/c", "mklink", "/J", str(target), str(outside)],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if created.returncode != 0:
+        pytest.skip(f"junction creation unavailable: {created.stderr or created.stdout}")
+    try:
+        with pytest.raises(RuntimeError, match="unsafe|ancestor|junction|link|reparse"):
+            deploy.deploy_one(REPO_ROOT, target, "codex")
+
+        assert _tree_snapshot(outside) == before_outside
+        assert _tree_snapshot(installed) == before_install
+        _assert_no_deploy_residue(outside)
+    finally:
+        os.rmdir(target)
