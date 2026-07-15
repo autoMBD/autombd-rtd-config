@@ -80,12 +80,12 @@ class McuProvider:
 
     The provider plans PLL clock-tree edits and McuClockReferencePoint array
     merges within McuClockSettingConfig_0. The full editable surface described
-    by Mcu.xdm is inventoried in the committed asset
+    by Mcu.xdm is inventoried in the committed development-only sidecar
     ``docs/specs/rtd-config-module-coverage/mcu.json`` during development.
     Currently only the 160/80/40 MHz recipe is supported as a fixed
     clock-tree configuration; the deferred surface (oscillators, clock monitors,
-    power modes, CGM muxes 1-20, etc.) is tracked in the asset's
-    ``not_yet_exposed`` inventory (issue #38).
+    power modes, CGM muxes 1-20, etc.) is tracked there as ``deferred``. The
+    runtime provider never reads this development evidence.
 
     Uart and FlexIO depend on valid Mcu clock references. The Mcu provider
     owns only the Mcu config region; it never edits Port (oscillator pins) or

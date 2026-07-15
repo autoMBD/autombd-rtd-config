@@ -149,8 +149,7 @@
           "uart.json#/mcl_dma_channel_template"
         ],
         "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
-          "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
+          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added"
         ]
       }
     },
@@ -183,8 +182,7 @@
           "uart.json#/mcl_dma_channel_template"
         ],
         "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
-          "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
+          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added"
         ]
       }
     },
@@ -217,7 +215,6 @@
           "uart.json#/mcl_dma_channel_template"
         ],
         "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
           "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
         ]
       }
@@ -251,7 +248,6 @@
           "uart.json#/mcl_dma_channel_template"
         ],
         "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
           "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
         ]
       }
@@ -285,7 +281,6 @@
           "uart.json#/mcl_dma_channel_template"
         ],
         "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
           "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
         ]
       }
@@ -319,7 +314,6 @@
           "uart.json#/mcl_dma_channel_template"
         ],
         "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
           "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
         ]
       }
@@ -353,7 +347,6 @@
           "uart.json#/mcl_dma_channel_template"
         ],
         "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
           "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
         ]
       }
@@ -387,8 +380,7 @@
           "uart.json#/mcl_dma_channel_template"
         ],
         "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
-          "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
+          "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_struct_name_set"
         ]
       }
     },
@@ -413,18 +405,9 @@
           }
         ]
       },
-      "classification": "derived",
-      "trace": {
-        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:_build_dma_logic_channel_struct_bytes",
-        "inputs": [
-          "intent.payload.mode",
-          "uart.json#/mcl_dma_channel_template"
-        ],
-        "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
-          "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
-        ]
-      }
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Mcl provider.",
+      "dependency": "A descriptor-forward Mcl implementation and generality tests are required before exposure."
     },
     {
       "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Mcl]/ctr[MODULE-DEF]/ctr[MclConfig]/lst[dmaLogicChannel_Type]/ctr[dmaLogicChannel_Type]/ctr[dmaLogicChannel_ConfigType]/ctr[dmaLogicChannel_ScatterGatherConfigType]/lst[dmaLogicChannelConfig_ScatterGatherArrayType]/ctr[dmaLogicChannelConfig_ScatterGatherArrayType]/ctr[dmaLogicChannelConfig_ScatterGatherElementConfigType]",
@@ -472,18 +455,9 @@
           }
         ]
       },
-      "classification": "derived",
-      "trace": {
-        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:_build_dma_logic_channel_struct_bytes",
-        "inputs": [
-          "intent.payload.mode",
-          "uart.json#/mcl_dma_channel_template"
-        ],
-        "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
-          "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
-        ]
-      }
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Mcl provider.",
+      "dependency": "A descriptor-forward Mcl implementation and generality tests are required before exposure."
     },
     {
       "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Mcl]/ctr[MODULE-DEF]/ctr[MclConfig]/lst[dmaLogicChannel_Type]/ctr[dmaLogicChannel_Type]/ctr[dmaLogicChannel_ConfigType]/ctr[dmaLogicChannel_ScatterGatherConfigType]/lst[dmaLogicChannelConfig_ScatterGatherArrayType]/ctr[dmaLogicChannelConfig_ScatterGatherArrayType]/ctr[dmaLogicChannelConfig_ScatterGatherElementConfigType]/ctr[dmaLogicChannelConfig_TransferDestinationType]",
@@ -506,18 +480,9 @@
           }
         ]
       },
-      "classification": "derived",
-      "trace": {
-        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:_build_dma_logic_channel_struct_bytes",
-        "inputs": [
-          "intent.payload.mode",
-          "uart.json#/mcl_dma_channel_template"
-        ],
-        "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
-          "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
-        ]
-      }
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Mcl provider.",
+      "dependency": "A descriptor-forward Mcl implementation and generality tests are required before exposure."
     },
     {
       "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Mcl]/ctr[MODULE-DEF]/ctr[MclConfig]/lst[dmaLogicChannel_Type]/ctr[dmaLogicChannel_Type]/ctr[dmaLogicChannel_ConfigType]/ctr[dmaLogicChannel_ScatterGatherConfigType]/lst[dmaLogicChannelConfig_ScatterGatherArrayType]/ctr[dmaLogicChannelConfig_ScatterGatherArrayType]/ctr[dmaLogicChannelConfig_ScatterGatherElementConfigType]/ctr[dmaLogicChannelConfig_TransferMajorLoopType]",
@@ -540,18 +505,9 @@
           }
         ]
       },
-      "classification": "derived",
-      "trace": {
-        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:_build_dma_logic_channel_struct_bytes",
-        "inputs": [
-          "intent.payload.mode",
-          "uart.json#/mcl_dma_channel_template"
-        ],
-        "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
-          "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
-        ]
-      }
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Mcl provider.",
+      "dependency": "A descriptor-forward Mcl implementation and generality tests are required before exposure."
     },
     {
       "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Mcl]/ctr[MODULE-DEF]/ctr[MclConfig]/lst[dmaLogicChannel_Type]/ctr[dmaLogicChannel_Type]/ctr[dmaLogicChannel_ConfigType]/ctr[dmaLogicChannel_ScatterGatherConfigType]/lst[dmaLogicChannelConfig_ScatterGatherArrayType]/ctr[dmaLogicChannelConfig_ScatterGatherArrayType]/ctr[dmaLogicChannelConfig_ScatterGatherElementConfigType]/ctr[dmaLogicChannelConfig_TransferMinorLoopType]",
@@ -574,18 +530,9 @@
           }
         ]
       },
-      "classification": "derived",
-      "trace": {
-        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:_build_dma_logic_channel_struct_bytes",
-        "inputs": [
-          "intent.payload.mode",
-          "uart.json#/mcl_dma_channel_template"
-        ],
-        "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
-          "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
-        ]
-      }
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Mcl provider.",
+      "dependency": "A descriptor-forward Mcl implementation and generality tests are required before exposure."
     },
     {
       "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Mcl]/ctr[MODULE-DEF]/ctr[MclConfig]/lst[dmaLogicChannel_Type]/ctr[dmaLogicChannel_Type]/ctr[dmaLogicChannel_ConfigType]/ctr[dmaLogicChannel_ScatterGatherConfigType]/lst[dmaLogicChannelConfig_ScatterGatherArrayType]/ctr[dmaLogicChannelConfig_ScatterGatherArrayType]/ctr[dmaLogicChannelConfig_ScatterGatherElementConfigType]/ctr[dmaLogicChannelConfig_TransferSourceType]",
@@ -608,18 +555,9 @@
           }
         ]
       },
-      "classification": "derived",
-      "trace": {
-        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:_build_dma_logic_channel_struct_bytes",
-        "inputs": [
-          "intent.payload.mode",
-          "uart.json#/mcl_dma_channel_template"
-        ],
-        "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
-          "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
-        ]
-      }
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Mcl provider.",
+      "dependency": "A descriptor-forward Mcl implementation and generality tests are required before exposure."
     },
     {
       "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Mcl]/ctr[MODULE-DEF]/ctr[MclConfig]/lst[dmaLogicChannel_Type]/ctr[dmaLogicChannel_Type]/ctr[dmaLogicChannel_ConfigType]/ctr[dmaLogicChannel_TransferConfigType]",
@@ -650,7 +588,6 @@
           "uart.json#/mcl_dma_channel_template"
         ],
         "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
           "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
         ]
       }
@@ -684,7 +621,6 @@
           "uart.json#/mcl_dma_channel_template"
         ],
         "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
           "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
         ]
       }
@@ -718,7 +654,6 @@
           "uart.json#/mcl_dma_channel_template"
         ],
         "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
           "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
         ]
       }
@@ -752,7 +687,6 @@
           "uart.json#/mcl_dma_channel_template"
         ],
         "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
           "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
         ]
       }
@@ -786,7 +720,6 @@
           "uart.json#/mcl_dma_channel_template"
         ],
         "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
           "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
         ]
       }
@@ -820,7 +753,6 @@
           "uart.json#/mcl_dma_channel_template"
         ],
         "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
           "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
         ]
       }
@@ -1583,8 +1515,7 @@
           "uart.json#/mcl_dma_channel_template"
         ],
         "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
-          "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
+          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added"
         ]
       }
     },
@@ -1666,8 +1597,7 @@
           "uart.json#/mcl_dma_channel_template"
         ],
         "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
-          "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
+          "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_struct_name_set"
         ]
       }
     },
@@ -2596,18 +2526,9 @@
       "reference": "ASPathDataOfSchema:/AUTOSAR/EcucDefs/Mcl/MclConfig/dmaLogicChannel_Type",
       "cross_references": [],
       "cross_modules": [],
-      "classification": "derived",
-      "trace": {
-        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:_build_dma_logic_channel_struct_bytes",
-        "inputs": [
-          "intent.payload.mode",
-          "uart.json#/mcl_dma_channel_template"
-        ],
-        "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
-          "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
-        ]
-      }
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Mcl provider.",
+      "dependency": "A descriptor-forward Mcl implementation and generality tests are required before exposure."
     },
     {
       "key": "reference:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Mcl]/ctr[MODULE-DEF]/ctr[MclConfig]/lst[dmaLogicChannel_Type]/ctr[dmaLogicChannel_Type]/ctr[dmaLogicChannel_ConfigType]/ctr[dmaLogicChannel_ScatterGatherConfigType]/lst[dmaLogicChannelConfig_ScatterGatherArrayType]/ctr[dmaLogicChannelConfig_ScatterGatherArrayType]/ctr[dmaLogicChannelConfig_ScatterGatherElementConfigType]/ctr[dmaLogicChannelConfig_TransferMinorLoopType]/ref[dynamic_dmaLogicChannelConfig_MinorLoopLinkChValueType]",
@@ -2656,18 +2577,9 @@
       "reference": "ASPathDataOfSchema:/AUTOSAR/EcucDefs/Mcl/MclConfig/dmaLogicChannel_Type",
       "cross_references": [],
       "cross_modules": [],
-      "classification": "derived",
-      "trace": {
-        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:_build_dma_logic_channel_struct_bytes",
-        "inputs": [
-          "intent.payload.mode",
-          "uart.json#/mcl_dma_channel_template"
-        ],
-        "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
-          "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
-        ]
-      }
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Mcl provider.",
+      "dependency": "A descriptor-forward Mcl implementation and generality tests are required before exposure."
     },
     {
       "key": "reference:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Mcl]/ctr[MODULE-DEF]/ctr[MclConfig]/lst[dmaLogicChannel_Type]/ctr[dmaLogicChannel_Type]/ctr[dmaLogicChannel_ConfigType]/ctr[dmaLogicChannel_ScatterGatherConfigType]/lst[dmaLogicChannelConfig_ScatterGatherArrayType]/ctr[dmaLogicChannelConfig_ScatterGatherArrayType]/ctr[dmaLogicChannelConfig_ScatterGatherElementConfigType]/ref[dynamic_dmaLogicChannelConfig_BasicElementLink_ScatterGatherType]",
@@ -2783,7 +2695,6 @@
           "uart.json#/mcl_dma_channel_template"
         ],
         "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
           "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
         ]
       }
@@ -2843,7 +2754,6 @@
           "uart.json#/mcl_dma_channel_template"
         ],
         "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
           "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
         ]
       }
@@ -2915,8 +2825,7 @@
           "uart.json#/mcl_dma_channel_template"
         ],
         "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
-          "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
+          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added"
         ]
       }
     },
@@ -4971,7 +4880,6 @@
           "uart.json#/mcl_dma_channel_template"
         ],
         "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
           "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
         ]
       }
@@ -5018,7 +4926,6 @@
           "uart.json#/mcl_dma_channel_template"
         ],
         "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
           "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
         ]
       }
@@ -5065,7 +4972,6 @@
           "uart.json#/mcl_dma_channel_template"
         ],
         "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
           "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
         ]
       }
@@ -5156,7 +5062,6 @@
           "uart.json#/mcl_dma_channel_template"
         ],
         "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
           "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
         ]
       }
@@ -5216,7 +5121,6 @@
           "uart.json#/mcl_dma_channel_template"
         ],
         "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
           "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
         ]
       }
@@ -5263,7 +5167,6 @@
           "uart.json#/mcl_dma_channel_template"
         ],
         "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
           "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
         ]
       }
@@ -5310,7 +5213,6 @@
           "uart.json#/mcl_dma_channel_template"
         ],
         "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
           "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
         ]
       }
@@ -5357,7 +5259,6 @@
           "uart.json#/mcl_dma_channel_template"
         ],
         "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
           "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
         ]
       }
@@ -5396,18 +5297,9 @@
           }
         ]
       },
-      "classification": "derived",
-      "trace": {
-        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:_build_dma_logic_channel_struct_bytes",
-        "inputs": [
-          "intent.payload.mode",
-          "uart.json#/mcl_dma_channel_template"
-        ],
-        "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
-          "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
-        ]
-      }
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Mcl provider.",
+      "dependency": "A descriptor-forward Mcl implementation and generality tests are required before exposure."
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Mcl]/ctr[MODULE-DEF]/ctr[MclConfig]/lst[dmaLogicChannel_Type]/ctr[dmaLogicChannel_Type]/ctr[dmaLogicChannel_ConfigType]/ctr[dmaLogicChannel_ScatterGatherConfigType]/lst[dmaLogicChannelConfig_ScatterGatherArrayType]/ctr[dmaLogicChannelConfig_ScatterGatherArrayType]/ctr[dmaLogicChannelConfig_ScatterGatherElementConfigType]/ctr[dmaLogicChannelConfig_TransferControlType]/var[dmaLogicChannelConfig_ScatterGatherAddressType]",
@@ -5494,18 +5386,9 @@
           }
         ]
       },
-      "classification": "derived",
-      "trace": {
-        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:_build_dma_logic_channel_struct_bytes",
-        "inputs": [
-          "intent.payload.mode",
-          "uart.json#/mcl_dma_channel_template"
-        ],
-        "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
-          "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
-        ]
-      }
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Mcl provider.",
+      "dependency": "A descriptor-forward Mcl implementation and generality tests are required before exposure."
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Mcl]/ctr[MODULE-DEF]/ctr[MclConfig]/lst[dmaLogicChannel_Type]/ctr[dmaLogicChannel_Type]/ctr[dmaLogicChannel_ConfigType]/ctr[dmaLogicChannel_ScatterGatherConfigType]/lst[dmaLogicChannelConfig_ScatterGatherArrayType]/ctr[dmaLogicChannelConfig_ScatterGatherArrayType]/ctr[dmaLogicChannelConfig_ScatterGatherElementConfigType]/ctr[dmaLogicChannelConfig_TransferControlType]/var[dmaLogicChannelConfig_disDmaAutoHwReq]",
@@ -5541,18 +5424,9 @@
           }
         ]
       },
-      "classification": "derived",
-      "trace": {
-        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:_build_dma_logic_channel_struct_bytes",
-        "inputs": [
-          "intent.payload.mode",
-          "uart.json#/mcl_dma_channel_template"
-        ],
-        "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
-          "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
-        ]
-      }
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Mcl provider.",
+      "dependency": "A descriptor-forward Mcl implementation and generality tests are required before exposure."
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Mcl]/ctr[MODULE-DEF]/ctr[MclConfig]/lst[dmaLogicChannel_Type]/ctr[dmaLogicChannel_Type]/ctr[dmaLogicChannel_ConfigType]/ctr[dmaLogicChannel_ScatterGatherConfigType]/lst[dmaLogicChannelConfig_ScatterGatherArrayType]/ctr[dmaLogicChannelConfig_ScatterGatherArrayType]/ctr[dmaLogicChannelConfig_ScatterGatherElementConfigType]/ctr[dmaLogicChannelConfig_TransferControlType]/var[dmaLogicChannelConfig_enDmaHalfMajorInterrupt]",
@@ -5588,18 +5462,9 @@
           }
         ]
       },
-      "classification": "derived",
-      "trace": {
-        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:_build_dma_logic_channel_struct_bytes",
-        "inputs": [
-          "intent.payload.mode",
-          "uart.json#/mcl_dma_channel_template"
-        ],
-        "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
-          "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
-        ]
-      }
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Mcl provider.",
+      "dependency": "A descriptor-forward Mcl implementation and generality tests are required before exposure."
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Mcl]/ctr[MODULE-DEF]/ctr[MclConfig]/lst[dmaLogicChannel_Type]/ctr[dmaLogicChannel_Type]/ctr[dmaLogicChannel_ConfigType]/ctr[dmaLogicChannel_ScatterGatherConfigType]/lst[dmaLogicChannelConfig_ScatterGatherArrayType]/ctr[dmaLogicChannelConfig_ScatterGatherArrayType]/ctr[dmaLogicChannelConfig_ScatterGatherElementConfigType]/ctr[dmaLogicChannelConfig_TransferControlType]/var[dmaLogicChannelConfig_enDmaMajorInterrupt]",
@@ -5635,18 +5500,9 @@
           }
         ]
       },
-      "classification": "derived",
-      "trace": {
-        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:_build_dma_logic_channel_struct_bytes",
-        "inputs": [
-          "intent.payload.mode",
-          "uart.json#/mcl_dma_channel_template"
-        ],
-        "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
-          "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
-        ]
-      }
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Mcl provider.",
+      "dependency": "A descriptor-forward Mcl implementation and generality tests are required before exposure."
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Mcl]/ctr[MODULE-DEF]/ctr[MclConfig]/lst[dmaLogicChannel_Type]/ctr[dmaLogicChannel_Type]/ctr[dmaLogicChannel_ConfigType]/ctr[dmaLogicChannel_ScatterGatherConfigType]/lst[dmaLogicChannelConfig_ScatterGatherArrayType]/ctr[dmaLogicChannelConfig_ScatterGatherArrayType]/ctr[dmaLogicChannelConfig_ScatterGatherElementConfigType]/ctr[dmaLogicChannelConfig_TransferControlType]/var[dmaLogicChannelConfig_enEndOfPacketSignal]",
@@ -5682,18 +5538,9 @@
           }
         ]
       },
-      "classification": "derived",
-      "trace": {
-        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:_build_dma_logic_channel_struct_bytes",
-        "inputs": [
-          "intent.payload.mode",
-          "uart.json#/mcl_dma_channel_template"
-        ],
-        "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
-          "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
-        ]
-      }
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Mcl provider.",
+      "dependency": "A descriptor-forward Mcl implementation and generality tests are required before exposure."
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Mcl]/ctr[MODULE-DEF]/ctr[MclConfig]/lst[dmaLogicChannel_Type]/ctr[dmaLogicChannel_Type]/ctr[dmaLogicChannel_ConfigType]/ctr[dmaLogicChannel_ScatterGatherConfigType]/lst[dmaLogicChannelConfig_ScatterGatherArrayType]/ctr[dmaLogicChannelConfig_ScatterGatherArrayType]/ctr[dmaLogicChannelConfig_ScatterGatherElementConfigType]/ctr[dmaLogicChannelConfig_TransferControlType]/var[dmaLogicChannelConfig_enStart]",
@@ -5832,18 +5679,9 @@
           }
         ]
       },
-      "classification": "derived",
-      "trace": {
-        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:_build_dma_logic_channel_struct_bytes",
-        "inputs": [
-          "intent.payload.mode",
-          "uart.json#/mcl_dma_channel_template"
-        ],
-        "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
-          "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
-        ]
-      }
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Mcl provider.",
+      "dependency": "A descriptor-forward Mcl implementation and generality tests are required before exposure."
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Mcl]/ctr[MODULE-DEF]/ctr[MclConfig]/lst[dmaLogicChannel_Type]/ctr[dmaLogicChannel_Type]/ctr[dmaLogicChannel_ConfigType]/ctr[dmaLogicChannel_ScatterGatherConfigType]/lst[dmaLogicChannelConfig_ScatterGatherArrayType]/ctr[dmaLogicChannelConfig_ScatterGatherArrayType]/ctr[dmaLogicChannelConfig_ScatterGatherElementConfigType]/ctr[dmaLogicChannelConfig_TransferDestinationType]/var[dmaLogicChannelConfig_DestinationModuloType]",
@@ -5906,18 +5744,9 @@
           }
         ]
       },
-      "classification": "derived",
-      "trace": {
-        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:_build_dma_logic_channel_struct_bytes",
-        "inputs": [
-          "intent.payload.mode",
-          "uart.json#/mcl_dma_channel_template"
-        ],
-        "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
-          "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
-        ]
-      }
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Mcl provider.",
+      "dependency": "A descriptor-forward Mcl implementation and generality tests are required before exposure."
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Mcl]/ctr[MODULE-DEF]/ctr[MclConfig]/lst[dmaLogicChannel_Type]/ctr[dmaLogicChannel_Type]/ctr[dmaLogicChannel_ConfigType]/ctr[dmaLogicChannel_ScatterGatherConfigType]/lst[dmaLogicChannelConfig_ScatterGatherArrayType]/ctr[dmaLogicChannelConfig_ScatterGatherArrayType]/ctr[dmaLogicChannelConfig_ScatterGatherElementConfigType]/ctr[dmaLogicChannelConfig_TransferDestinationType]/var[dmaLogicChannelConfig_DestinationSignedOffsetType]",
@@ -6005,18 +5834,9 @@
           }
         ]
       },
-      "classification": "derived",
-      "trace": {
-        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:_build_dma_logic_channel_struct_bytes",
-        "inputs": [
-          "intent.payload.mode",
-          "uart.json#/mcl_dma_channel_template"
-        ],
-        "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
-          "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
-        ]
-      }
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Mcl provider.",
+      "dependency": "A descriptor-forward Mcl implementation and generality tests are required before exposure."
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Mcl]/ctr[MODULE-DEF]/ctr[MclConfig]/lst[dmaLogicChannel_Type]/ctr[dmaLogicChannel_Type]/ctr[dmaLogicChannel_ConfigType]/ctr[dmaLogicChannel_ScatterGatherConfigType]/lst[dmaLogicChannelConfig_ScatterGatherArrayType]/ctr[dmaLogicChannelConfig_ScatterGatherArrayType]/ctr[dmaLogicChannelConfig_ScatterGatherElementConfigType]/ctr[dmaLogicChannelConfig_TransferDestinationType]/var[dmaTransferConfig_TransferSizeType]",
@@ -6088,18 +5908,9 @@
           }
         ]
       },
-      "classification": "derived",
-      "trace": {
-        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:_build_dma_logic_channel_struct_bytes",
-        "inputs": [
-          "intent.payload.mode",
-          "uart.json#/mcl_dma_channel_template"
-        ],
-        "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
-          "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
-        ]
-      }
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Mcl provider.",
+      "dependency": "A descriptor-forward Mcl implementation and generality tests are required before exposure."
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Mcl]/ctr[MODULE-DEF]/ctr[MclConfig]/lst[dmaLogicChannel_Type]/ctr[dmaLogicChannel_Type]/ctr[dmaLogicChannel_ConfigType]/ctr[dmaLogicChannel_ScatterGatherConfigType]/lst[dmaLogicChannelConfig_ScatterGatherArrayType]/ctr[dmaLogicChannelConfig_ScatterGatherArrayType]/ctr[dmaLogicChannelConfig_ScatterGatherElementConfigType]/ctr[dmaLogicChannelConfig_TransferMajorLoopType]/var[dmaLogicChannelConfig_MajorLoopCountType]",
@@ -6187,18 +5998,9 @@
           }
         ]
       },
-      "classification": "derived",
-      "trace": {
-        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:_build_dma_logic_channel_struct_bytes",
-        "inputs": [
-          "intent.payload.mode",
-          "uart.json#/mcl_dma_channel_template"
-        ],
-        "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
-          "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
-        ]
-      }
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Mcl provider.",
+      "dependency": "A descriptor-forward Mcl implementation and generality tests are required before exposure."
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Mcl]/ctr[MODULE-DEF]/ctr[MclConfig]/lst[dmaLogicChannel_Type]/ctr[dmaLogicChannel_Type]/ctr[dmaLogicChannel_ConfigType]/ctr[dmaLogicChannel_ScatterGatherConfigType]/lst[dmaLogicChannelConfig_ScatterGatherArrayType]/ctr[dmaLogicChannelConfig_ScatterGatherArrayType]/ctr[dmaLogicChannelConfig_ScatterGatherElementConfigType]/ctr[dmaLogicChannelConfig_TransferMajorLoopType]/var[dmaLogicChannelConfig_enMajorLoopLinkCh]",
@@ -6234,18 +6036,9 @@
           }
         ]
       },
-      "classification": "derived",
-      "trace": {
-        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:_build_dma_logic_channel_struct_bytes",
-        "inputs": [
-          "intent.payload.mode",
-          "uart.json#/mcl_dma_channel_template"
-        ],
-        "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
-          "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
-        ]
-      }
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Mcl provider.",
+      "dependency": "A descriptor-forward Mcl implementation and generality tests are required before exposure."
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Mcl]/ctr[MODULE-DEF]/ctr[MclConfig]/lst[dmaLogicChannel_Type]/ctr[dmaLogicChannel_Type]/ctr[dmaLogicChannel_ConfigType]/ctr[dmaLogicChannel_ScatterGatherConfigType]/lst[dmaLogicChannelConfig_ScatterGatherArrayType]/ctr[dmaLogicChannelConfig_ScatterGatherArrayType]/ctr[dmaLogicChannelConfig_ScatterGatherElementConfigType]/ctr[dmaLogicChannelConfig_TransferMinorLoopType]/var[dmaLogicChannelConfig_MinorLoopSizeType]",
@@ -6341,18 +6134,9 @@
           }
         ]
       },
-      "classification": "derived",
-      "trace": {
-        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:_build_dma_logic_channel_struct_bytes",
-        "inputs": [
-          "intent.payload.mode",
-          "uart.json#/mcl_dma_channel_template"
-        ],
-        "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
-          "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
-        ]
-      }
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Mcl provider.",
+      "dependency": "A descriptor-forward Mcl implementation and generality tests are required before exposure."
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Mcl]/ctr[MODULE-DEF]/ctr[MclConfig]/lst[dmaLogicChannel_Type]/ctr[dmaLogicChannel_Type]/ctr[dmaLogicChannel_ConfigType]/ctr[dmaLogicChannel_ScatterGatherConfigType]/lst[dmaLogicChannelConfig_ScatterGatherArrayType]/ctr[dmaLogicChannelConfig_ScatterGatherArrayType]/ctr[dmaLogicChannelConfig_ScatterGatherElementConfigType]/ctr[dmaLogicChannelConfig_TransferMinorLoopType]/var[dmaLogicChannelConfig_OffsetValueType]",
@@ -6415,18 +6199,9 @@
           }
         ]
       },
-      "classification": "derived",
-      "trace": {
-        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:_build_dma_logic_channel_struct_bytes",
-        "inputs": [
-          "intent.payload.mode",
-          "uart.json#/mcl_dma_channel_template"
-        ],
-        "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
-          "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
-        ]
-      }
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Mcl provider.",
+      "dependency": "A descriptor-forward Mcl implementation and generality tests are required before exposure."
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Mcl]/ctr[MODULE-DEF]/ctr[MclConfig]/lst[dmaLogicChannel_Type]/ctr[dmaLogicChannel_Type]/ctr[dmaLogicChannel_ConfigType]/ctr[dmaLogicChannel_ScatterGatherConfigType]/lst[dmaLogicChannelConfig_ScatterGatherArrayType]/ctr[dmaLogicChannelConfig_ScatterGatherArrayType]/ctr[dmaLogicChannelConfig_ScatterGatherElementConfigType]/ctr[dmaLogicChannelConfig_TransferMinorLoopType]/var[dmaLogicChannelConfig_enDestinationOffset]",
@@ -6462,18 +6237,9 @@
           }
         ]
       },
-      "classification": "derived",
-      "trace": {
-        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:_build_dma_logic_channel_struct_bytes",
-        "inputs": [
-          "intent.payload.mode",
-          "uart.json#/mcl_dma_channel_template"
-        ],
-        "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
-          "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
-        ]
-      }
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Mcl provider.",
+      "dependency": "A descriptor-forward Mcl implementation and generality tests are required before exposure."
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Mcl]/ctr[MODULE-DEF]/ctr[MclConfig]/lst[dmaLogicChannel_Type]/ctr[dmaLogicChannel_Type]/ctr[dmaLogicChannel_ConfigType]/ctr[dmaLogicChannel_ScatterGatherConfigType]/lst[dmaLogicChannelConfig_ScatterGatherArrayType]/ctr[dmaLogicChannelConfig_ScatterGatherArrayType]/ctr[dmaLogicChannelConfig_ScatterGatherElementConfigType]/ctr[dmaLogicChannelConfig_TransferMinorLoopType]/var[dmaLogicChannelConfig_enMinorLoopLinkCh]",
@@ -6509,18 +6275,9 @@
           }
         ]
       },
-      "classification": "derived",
-      "trace": {
-        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:_build_dma_logic_channel_struct_bytes",
-        "inputs": [
-          "intent.payload.mode",
-          "uart.json#/mcl_dma_channel_template"
-        ],
-        "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
-          "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
-        ]
-      }
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Mcl provider.",
+      "dependency": "A descriptor-forward Mcl implementation and generality tests are required before exposure."
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Mcl]/ctr[MODULE-DEF]/ctr[MclConfig]/lst[dmaLogicChannel_Type]/ctr[dmaLogicChannel_Type]/ctr[dmaLogicChannel_ConfigType]/ctr[dmaLogicChannel_ScatterGatherConfigType]/lst[dmaLogicChannelConfig_ScatterGatherArrayType]/ctr[dmaLogicChannelConfig_ScatterGatherArrayType]/ctr[dmaLogicChannelConfig_ScatterGatherElementConfigType]/ctr[dmaLogicChannelConfig_TransferMinorLoopType]/var[dmaLogicChannelConfig_enSourceOffset]",
@@ -6556,18 +6313,9 @@
           }
         ]
       },
-      "classification": "derived",
-      "trace": {
-        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:_build_dma_logic_channel_struct_bytes",
-        "inputs": [
-          "intent.payload.mode",
-          "uart.json#/mcl_dma_channel_template"
-        ],
-        "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
-          "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
-        ]
-      }
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Mcl provider.",
+      "dependency": "A descriptor-forward Mcl implementation and generality tests are required before exposure."
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Mcl]/ctr[MODULE-DEF]/ctr[MclConfig]/lst[dmaLogicChannel_Type]/ctr[dmaLogicChannel_Type]/ctr[dmaLogicChannel_ConfigType]/ctr[dmaLogicChannel_ScatterGatherConfigType]/lst[dmaLogicChannelConfig_ScatterGatherArrayType]/ctr[dmaLogicChannelConfig_ScatterGatherArrayType]/ctr[dmaLogicChannelConfig_ScatterGatherElementConfigType]/ctr[dmaLogicChannelConfig_TransferSourceType]/var[dmaLogicChannelConfig_SourceAddressType]",
@@ -6668,18 +6416,9 @@
           }
         ]
       },
-      "classification": "derived",
-      "trace": {
-        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:_build_dma_logic_channel_struct_bytes",
-        "inputs": [
-          "intent.payload.mode",
-          "uart.json#/mcl_dma_channel_template"
-        ],
-        "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
-          "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
-        ]
-      }
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Mcl provider.",
+      "dependency": "A descriptor-forward Mcl implementation and generality tests are required before exposure."
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Mcl]/ctr[MODULE-DEF]/ctr[MclConfig]/lst[dmaLogicChannel_Type]/ctr[dmaLogicChannel_Type]/ctr[dmaLogicChannel_ConfigType]/ctr[dmaLogicChannel_ScatterGatherConfigType]/lst[dmaLogicChannelConfig_ScatterGatherArrayType]/ctr[dmaLogicChannelConfig_ScatterGatherArrayType]/ctr[dmaLogicChannelConfig_ScatterGatherElementConfigType]/ctr[dmaLogicChannelConfig_TransferSourceType]/var[dmaLogicChannelConfig_SourceModuloType]",
@@ -6742,18 +6481,9 @@
           }
         ]
       },
-      "classification": "derived",
-      "trace": {
-        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:_build_dma_logic_channel_struct_bytes",
-        "inputs": [
-          "intent.payload.mode",
-          "uart.json#/mcl_dma_channel_template"
-        ],
-        "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
-          "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
-        ]
-      }
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Mcl provider.",
+      "dependency": "A descriptor-forward Mcl implementation and generality tests are required before exposure."
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Mcl]/ctr[MODULE-DEF]/ctr[MclConfig]/lst[dmaLogicChannel_Type]/ctr[dmaLogicChannel_Type]/ctr[dmaLogicChannel_ConfigType]/ctr[dmaLogicChannel_ScatterGatherConfigType]/lst[dmaLogicChannelConfig_ScatterGatherArrayType]/ctr[dmaLogicChannelConfig_ScatterGatherArrayType]/ctr[dmaLogicChannelConfig_ScatterGatherElementConfigType]/ctr[dmaLogicChannelConfig_TransferSourceType]/var[dmaLogicChannelConfig_SourceSignedOffsetType]",
@@ -6841,18 +6571,9 @@
           }
         ]
       },
-      "classification": "derived",
-      "trace": {
-        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:_build_dma_logic_channel_struct_bytes",
-        "inputs": [
-          "intent.payload.mode",
-          "uart.json#/mcl_dma_channel_template"
-        ],
-        "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
-          "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
-        ]
-      }
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Mcl provider.",
+      "dependency": "A descriptor-forward Mcl implementation and generality tests are required before exposure."
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Mcl]/ctr[MODULE-DEF]/ctr[MclConfig]/lst[dmaLogicChannel_Type]/ctr[dmaLogicChannel_Type]/ctr[dmaLogicChannel_ConfigType]/ctr[dmaLogicChannel_ScatterGatherConfigType]/lst[dmaLogicChannelConfig_ScatterGatherArrayType]/ctr[dmaLogicChannelConfig_ScatterGatherArrayType]/ctr[dmaLogicChannelConfig_ScatterGatherElementConfigType]/ctr[dmaLogicChannelConfig_TransferSourceType]/var[dmaTransferConfig_TransferSizeType]",
@@ -6924,18 +6645,9 @@
           }
         ]
       },
-      "classification": "derived",
-      "trace": {
-        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:_build_dma_logic_channel_struct_bytes",
-        "inputs": [
-          "intent.payload.mode",
-          "uart.json#/mcl_dma_channel_template"
-        ],
-        "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
-          "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
-        ]
-      }
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Mcl provider.",
+      "dependency": "A descriptor-forward Mcl implementation and generality tests are required before exposure."
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Mcl]/ctr[MODULE-DEF]/ctr[MclConfig]/lst[dmaLogicChannel_Type]/ctr[dmaLogicChannel_Type]/ctr[dmaLogicChannel_ConfigType]/ctr[dmaLogicChannel_ScatterGatherConfigType]/lst[dmaLogicChannelConfig_ScatterGatherArrayType]/ctr[dmaLogicChannelConfig_ScatterGatherArrayType]/ctr[dmaLogicChannelConfig_ScatterGatherElementConfigType]/var[dmaLogicChannelConfig_LastElementLink_ScatterGatherType]",
@@ -7116,7 +6828,6 @@
           "uart.json#/mcl_dma_channel_template"
         ],
         "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
           "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
         ]
       }
@@ -7214,7 +6925,6 @@
           "uart.json#/mcl_dma_channel_template"
         ],
         "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
           "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
         ]
       }
@@ -7261,7 +6971,6 @@
           "uart.json#/mcl_dma_channel_template"
         ],
         "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
           "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
         ]
       }
@@ -7308,7 +7017,6 @@
           "uart.json#/mcl_dma_channel_template"
         ],
         "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
           "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
         ]
       }
@@ -7355,7 +7063,6 @@
           "uart.json#/mcl_dma_channel_template"
         ],
         "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
           "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
         ]
       }
@@ -7402,7 +7109,6 @@
           "uart.json#/mcl_dma_channel_template"
         ],
         "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
           "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
         ]
       }
@@ -7514,7 +7220,6 @@
           "uart.json#/mcl_dma_channel_template"
         ],
         "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
           "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
         ]
       }
@@ -7588,7 +7293,6 @@
           "uart.json#/mcl_dma_channel_template"
         ],
         "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
           "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
         ]
       }
@@ -7687,7 +7391,6 @@
           "uart.json#/mcl_dma_channel_template"
         ],
         "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
           "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
         ]
       }
@@ -7770,7 +7473,6 @@
           "uart.json#/mcl_dma_channel_template"
         ],
         "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
           "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
         ]
       }
@@ -7869,7 +7571,6 @@
           "uart.json#/mcl_dma_channel_template"
         ],
         "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
           "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
         ]
       }
@@ -7916,7 +7617,6 @@
           "uart.json#/mcl_dma_channel_template"
         ],
         "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
           "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
         ]
       }
@@ -8023,7 +7723,6 @@
           "uart.json#/mcl_dma_channel_template"
         ],
         "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
           "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
         ]
       }
@@ -8097,7 +7796,6 @@
           "uart.json#/mcl_dma_channel_template"
         ],
         "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
           "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
         ]
       }
@@ -8144,7 +7842,6 @@
           "uart.json#/mcl_dma_channel_template"
         ],
         "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
           "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
         ]
       }
@@ -8191,7 +7888,6 @@
           "uart.json#/mcl_dma_channel_template"
         ],
         "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
           "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
         ]
       }
@@ -8238,7 +7934,6 @@
           "uart.json#/mcl_dma_channel_template"
         ],
         "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
           "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
         ]
       }
@@ -8350,7 +8045,6 @@
           "uart.json#/mcl_dma_channel_template"
         ],
         "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
           "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
         ]
       }
@@ -8424,7 +8118,6 @@
           "uart.json#/mcl_dma_channel_template"
         ],
         "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
           "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
         ]
       }
@@ -8523,7 +8216,6 @@
           "uart.json#/mcl_dma_channel_template"
         ],
         "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
           "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
         ]
       }
@@ -8606,7 +8298,6 @@
           "uart.json#/mcl_dma_channel_template"
         ],
         "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
           "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
         ]
       }
@@ -8661,8 +8352,7 @@
           "uart.json#/mcl_dma_channel_template"
         ],
         "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
-          "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
+          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added"
         ]
       }
     },
@@ -8708,8 +8398,7 @@
           "uart.json#/mcl_dma_channel_template"
         ],
         "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
-          "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
+          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added"
         ]
       }
     },
@@ -8755,8 +8444,7 @@
           "uart.json#/mcl_dma_channel_template"
         ],
         "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
-          "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
+          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added"
         ]
       }
     },
@@ -8825,8 +8513,7 @@
           "uart.json#/mcl_dma_channel_template"
         ],
         "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
-          "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
+          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added"
         ]
       }
     },
@@ -8924,8 +8611,7 @@
           "uart.json#/mcl_dma_channel_template"
         ],
         "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
-          "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
+          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added"
         ]
       }
     },
@@ -8984,8 +8670,7 @@
           "uart.json#/mcl_dma_channel_template"
         ],
         "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
-          "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
+          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added"
         ]
       }
     },
@@ -9054,8 +8739,7 @@
           "uart.json#/mcl_dma_channel_template"
         ],
         "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
-          "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
+          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added"
         ]
       }
     },
@@ -9124,8 +8808,7 @@
           "uart.json#/mcl_dma_channel_template"
         ],
         "tests": [
-          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added",
-          "tests/unit/test_uart_dma.py::TestDmaLogicChannelStructuralEquivalence::test_ch1_and_ch0_have_identical_setting_name_set"
+          "tests/unit/test_uart_dma.py::TestMclDmaChannelAdd::test_mcl_ch1_added"
         ]
       }
     },
@@ -12609,7 +12292,7 @@
   "summary": {
     "total": 245,
     "configurable": 4,
-    "deferred": 148,
-    "derived": 93
+    "deferred": 177,
+    "derived": 64
   }
 }

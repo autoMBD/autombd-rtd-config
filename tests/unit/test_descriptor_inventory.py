@@ -377,6 +377,7 @@ def test_adc_created_parent_structures_are_coverage_accounted():
 )
 def test_shipped_module_override_names_are_grounded_under_the_exact_ancestor(module):
     """A basename in a broad rule must not silently classify the wrong branch."""
+    tool = _tool_module()
     overrides = json.loads(
         (ROOT / f"tools/xdm-coverage-overrides/{module}.json").read_text(
             encoding="utf-8"
@@ -394,7 +395,7 @@ def test_shipped_module_override_names_are_grounded_under_the_exact_ancestor(mod
             matched = [
                 item for item in sidecar["items"]
                 if item["name"] == name
-                and any(item["path"].startswith(prefix) for prefix in prefixes)
+                and tool._matches(item, match)
             ]
             assert matched, f"{module}:{name} is a dead or wrong-ancestor selector"
             assert all(
@@ -448,14 +449,25 @@ def test_every_literal_xdm_parent_and_leaf_emitted_by_writers_is_accounted(
     module, ancestor, writers, additional_names
 ):
     """The coverage sidecar must not defer structures the implementation emits."""
+    tool = _tool_module()
     sidecar = json.loads(
         (COVERAGE_ROOT / f"{module}.json").read_text(encoding="utf-8")
+    )
+    overrides = json.loads(
+        (ROOT / f"tools/xdm-coverage-overrides/{module}.json").read_text(
+            encoding="utf-8"
+        )
     )
     written_names = _literal_xml_names_written_by(*writers) | additional_names
     for name in sorted(written_names):
         matched = [
             item for item in sidecar["items"]
             if item["name"] == name and ancestor in item["path"]
+            and any(
+                rule["classification"] != "deferred"
+                and tool._matches(item, rule["match"])
+                for rule in overrides["rules"]
+            )
         ]
         assert matched, f"{module}:{name} writer output is absent from its XDM inventory"
         assert all(item["classification"] != "deferred" for item in matched), (
@@ -537,3 +549,33 @@ def test_fixed_or_derived_writer_fields_are_not_claimed_caller_configurable(
         ]
         assert matched, f"{module}:{name} is absent under {ancestor}"
         assert all(item["classification"] == classification for item in matched)
+
+
+def test_mcl_empty_scatter_gather_array_does_not_claim_its_element_subtree():
+    """The writer emits only a self-closing array, never an element template."""
+    sidecar = json.loads((COVERAGE_ROOT / "mcl.json").read_text(encoding="utf-8"))
+    element_prefix = (
+        "/lst[dmaLogicChannelConfig_ScatterGatherArrayType]"
+        "/ctr[dmaLogicChannelConfig_ScatterGatherArrayType]"
+    )
+    element_subtree = [
+        item for item in sidecar["items"] if element_prefix in item["path"]
+    ]
+    assert len(element_subtree) == 38
+    assert all(item["classification"] == "deferred" for item in element_subtree)
+
+    overrides = json.loads(
+        (ROOT / "tools/xdm-coverage-overrides/mcl.json").read_text(encoding="utf-8")
+    )
+    scatter_rules = [
+        rule for rule in overrides["rules"]
+        if "dmaLogicChannelConfig_ScatterGatherArrayType"
+        in rule["match"].get("names", [])
+    ]
+    assert len(scatter_rules) == 1
+    exact_paths = scatter_rules[0]["match"].get("paths")
+    assert exact_paths and len(exact_paths) == 2
+    assert not any(
+        element_prefix in path
+        for path in exact_paths
+    )
