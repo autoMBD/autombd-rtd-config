@@ -1,0 +1,4 @@
+# Keep released Skill bytes identical on every checkout.  The release manifest
+# hashes the bytes copied by the deployer, so platform-native EOL conversion is
+# not permitted inside the published payload.
+/autombd-rtd/** text eol=lf

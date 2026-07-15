@@ -1,6 +1,6 @@
 ---
 name: autombd-rtd
-version: 0.1.7
+version: 0.1.8
 description: >-
   Configure NXP S32K3 RTD 7.0.1 .mex automotive projects through the bundled RTD
   CfgFile CLI. Use when a user asks to inspect a project, query pin options,

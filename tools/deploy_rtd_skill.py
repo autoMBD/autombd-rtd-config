@@ -49,16 +49,23 @@ from __future__ import annotations
 
 import argparse
 from contextlib import contextmanager
+import hashlib
+import json
 import os
 import re
 import shutil
+import stat
 import sys
 import time
+import tomllib
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
+from pathlib import PurePosixPath
 
 SKILL_NAME = "autombd-rtd"
+RELEASE_MANIFEST_NAME = "release-manifest.json"
+RELEASE_MANIFEST_FORMAT_VERSION = 1
 SKILL_PAYLOAD_ITEMS = (
     "SKILL.md",
     "__main__.py",
@@ -96,9 +103,25 @@ AGENT_SKILL_DIRS = {
 
 @dataclass(frozen=True)
 class ProjectVersions:
+    project: str
     skill: str
     launcher_header: str
+    package_header: str
     package: str
+    manifest: str
+
+
+@dataclass(frozen=True)
+class ReleaseFile:
+    path: str
+    sha256: str
+
+
+@dataclass(frozen=True)
+class ReleaseManifest:
+    format_version: int
+    release_version: str
+    files: tuple[ReleaseFile, ...]
 
 
 @dataclass(frozen=True)
@@ -150,31 +173,123 @@ def read_package_version(package_init: Path) -> str:
     return match.group(1)
 
 
+def read_project_version(pyproject_file: Path) -> str:
+    with pyproject_file.open("rb") as stream:
+        document = tomllib.load(stream)
+    try:
+        version = document["project"]["version"]
+    except (KeyError, TypeError) as exc:
+        raise RuntimeError(f"missing [project].version in {pyproject_file}") from exc
+    if not isinstance(version, str):
+        raise RuntimeError(f"invalid [project].version in {pyproject_file}")
+    parse_version_tuple(version)
+    return version
+
+
+def _canonical_manifest_path(value: object) -> str:
+    if not isinstance(value, str) or not value:
+        raise RuntimeError("manifest path must be a non-empty relative POSIX path")
+    if (
+        "\\" in value
+        or "//" in value
+        or value.startswith("/")
+        or re.match(r"^[A-Za-z]:", value)
+    ):
+        raise RuntimeError(f"manifest path is not canonical: {value!r}")
+    path = PurePosixPath(value)
+    if any(part in ("", ".", "..") for part in path.parts):
+        raise RuntimeError(f"manifest path is not a safe relative path: {value!r}")
+    if path.as_posix() != value or value == RELEASE_MANIFEST_NAME:
+        raise RuntimeError(f"manifest path is not canonical: {value!r}")
+    return value
+
+
+def read_release_manifest(skill_root: Path) -> ReleaseManifest:
+    manifest_file = skill_root / RELEASE_MANIFEST_NAME
+    try:
+        document = json.loads(manifest_file.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise RuntimeError(f"cannot read release manifest: {manifest_file}") from exc
+    if not isinstance(document, dict) or set(document) != {
+        "format_version",
+        "release_version",
+        "files",
+    }:
+        raise RuntimeError("release manifest schema has unexpected fields")
+    if document["format_version"] != RELEASE_MANIFEST_FORMAT_VERSION:
+        raise RuntimeError("unsupported release manifest format version")
+    release_version = document["release_version"]
+    if not isinstance(release_version, str):
+        raise RuntimeError("release manifest version must be a string")
+    try:
+        parse_version_tuple(release_version)
+    except ValueError as exc:
+        raise RuntimeError("invalid release manifest version") from exc
+    raw_files = document["files"]
+    if not isinstance(raw_files, list):
+        raise RuntimeError("release manifest files must be a list")
+    files: list[ReleaseFile] = []
+    paths: list[str] = []
+    folded_paths: set[str] = set()
+    for raw_entry in raw_files:
+        if not isinstance(raw_entry, dict) or set(raw_entry) != {"path", "sha256"}:
+            raise RuntimeError("release manifest file schema has unexpected fields")
+        path = _canonical_manifest_path(raw_entry["path"])
+        digest = raw_entry["sha256"]
+        if not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{64}", digest):
+            raise RuntimeError(f"invalid SHA-256 hash for manifest path {path!r}")
+        folded = path.casefold()
+        if path in paths or folded in folded_paths:
+            raise RuntimeError(f"duplicate or case-colliding manifest path: {path!r}")
+        paths.append(path)
+        folded_paths.add(folded)
+        files.append(ReleaseFile(path=path, sha256=digest))
+    if paths != sorted(paths):
+        raise RuntimeError("release manifest paths are not in sorted order")
+    return ReleaseManifest(
+        format_version=RELEASE_MANIFEST_FORMAT_VERSION,
+        release_version=release_version,
+        files=tuple(files),
+    )
+
+
 def read_project_versions(repo_root: Path) -> ProjectVersions:
     skill_root = repo_root / SKILL_NAME
     skill_version = read_skill_version(skill_root / "SKILL.md")
     if skill_version is None:
         raise RuntimeError(f"missing version in {skill_root / 'SKILL.md'}")
+    package_init = skill_root / "rtd-config-cli-py" / "rtd_config" / "__init__.py"
     return ProjectVersions(
+        project=read_project_version(repo_root / "pyproject.toml"),
         skill=skill_version,
         launcher_header=read_launcher_header_version(skill_root / "__main__.py"),
-        package=read_package_version(
-            skill_root / "rtd-config-cli-py" / "rtd_config" / "__init__.py"
-        ),
+        package_header=read_launcher_header_version(package_init),
+        package=read_package_version(package_init),
+        manifest=read_release_manifest(skill_root).release_version,
     )
 
 
 def require_consistent_project_versions(versions: ProjectVersions) -> str:
-    unique_versions = {versions.skill, versions.launcher_header, versions.package}
+    unique_versions = {
+        versions.project,
+        versions.skill,
+        versions.launcher_header,
+        versions.package_header,
+        versions.package,
+        versions.manifest,
+    }
     if len(unique_versions) != 1:
         raise RuntimeError(
             "project version mismatch: "
+            f"pyproject.toml={versions.project}, "
             f"SKILL.md={versions.skill}, "
             f"launcher={versions.launcher_header}, "
-            f"package={versions.package}"
+            f"package_header={versions.package_header}, "
+            f"package={versions.package}, "
+            f"manifest={versions.manifest}"
         )
-    parse_version_tuple(versions.skill)
-    return versions.skill
+    parse_version_tuple(versions.project)
+    return versions.project
 
 
 def normalize_agents(agents: tuple[str, ...] | list[str]) -> tuple[str, ...]:
@@ -203,6 +318,119 @@ def resolve_agent_skills_dir(target_project: Path, agent: str) -> Path:
     return target_project.expanduser() / AGENT_SKILL_DIRS[agent]
 
 
+def _is_ignored_runtime_artifact(relative: PurePosixPath) -> bool:
+    return (
+        "__pycache__" in relative.parts
+        or relative.suffix in {".pyc", ".pyo"}
+    )
+
+
+def _is_link_or_reparse(path: Path) -> bool:
+    try:
+        metadata = path.lstat()
+    except OSError:
+        return path.is_symlink()
+    reparse_flag = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0)
+    attributes = getattr(metadata, "st_file_attributes", 0)
+    return path.is_symlink() or bool(reparse_flag and attributes & reparse_flag)
+
+
+def _payload_files(root: Path) -> set[str]:
+    if _is_link_or_reparse(root):
+        raise RuntimeError(f"release payload root is a symlink or reparse point: {root}")
+    files: set[str] = set()
+    for current, directory_names, file_names in os.walk(root, followlinks=False):
+        current_path = Path(current)
+        for name in (*directory_names, *file_names):
+            candidate = current_path / name
+            if _is_link_or_reparse(candidate):
+                raise RuntimeError(
+                    f"release payload contains a symlink or reparse point: {candidate}"
+                )
+        for name in file_names:
+            relative = (current_path / name).relative_to(root)
+            posix = PurePosixPath(*relative.parts)
+            if posix.as_posix() == RELEASE_MANIFEST_NAME:
+                continue
+            if _is_ignored_runtime_artifact(posix):
+                continue
+            files.add(posix.as_posix())
+    return files
+
+
+def verify_release_payload(root: Path, manifest: ReleaseManifest) -> None:
+    manifest_file = root / RELEASE_MANIFEST_NAME
+    if not manifest_file.is_file() or _is_link_or_reparse(manifest_file):
+        raise RuntimeError(f"release manifest is missing or linked: {manifest_file}")
+    declared = {entry.path for entry in manifest.files}
+    actual = _payload_files(root)
+    missing = sorted(declared - actual)
+    extra = sorted(actual - declared)
+    if missing or extra:
+        raise RuntimeError(
+            "release payload file-set drift: "
+            f"missing={missing or 'none'}, extra={extra or 'none'}"
+        )
+    for entry in manifest.files:
+        candidate = root.joinpath(*PurePosixPath(entry.path).parts)
+        if not candidate.is_file() or _is_link_or_reparse(candidate):
+            raise RuntimeError(f"manifest file is missing or linked: {entry.path}")
+        actual_digest = hashlib.sha256(candidate.read_bytes()).hexdigest()
+        if actual_digest != entry.sha256:
+            raise RuntimeError(
+                f"release payload hash mismatch for {entry.path}: "
+                f"expected {entry.sha256}, got {actual_digest}"
+            )
+
+
+def build_release_manifest(
+    skill_root: Path,
+    release_version: str,
+    paths: tuple[str, ...] | list[str] | None = None,
+) -> ReleaseManifest:
+    parse_version_tuple(release_version)
+    actual = _payload_files(skill_root)
+    selected = sorted(actual if paths is None else paths)
+    if set(selected) != actual or len(selected) != len(set(selected)):
+        raise RuntimeError(
+            "release boundary differs from the eligible source payload: "
+            f"missing={sorted(actual - set(selected)) or 'none'}, "
+            f"extra={sorted(set(selected) - actual) or 'none'}"
+        )
+    files = tuple(
+        ReleaseFile(
+            path=_canonical_manifest_path(relative),
+            sha256=hashlib.sha256(
+                skill_root.joinpath(*PurePosixPath(relative).parts).read_bytes()
+            ).hexdigest(),
+        )
+        for relative in selected
+    )
+    return ReleaseManifest(
+        format_version=RELEASE_MANIFEST_FORMAT_VERSION,
+        release_version=release_version,
+        files=files,
+    )
+
+
+def release_manifest_bytes(manifest: ReleaseManifest) -> bytes:
+    document = {
+        "format_version": manifest.format_version,
+        "release_version": manifest.release_version,
+        "files": [
+            {"path": entry.path, "sha256": entry.sha256}
+            for entry in manifest.files
+        ],
+    }
+    return (json.dumps(document, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
+
+
+def write_release_manifest(skill_root: Path, manifest: ReleaseManifest) -> Path:
+    destination = skill_root / RELEASE_MANIFEST_NAME
+    destination.write_bytes(release_manifest_bytes(manifest))
+    return destination
+
+
 def installed_payload_complete(destination: Path) -> bool:
     return all((destination / item).exists() for item in SKILL_PAYLOAD_ITEMS) and all(
         (destination / required_file).is_file()
@@ -210,7 +438,11 @@ def installed_payload_complete(destination: Path) -> bool:
     )
 
 
-def should_deploy(source_version: str, destination: Path) -> tuple[bool, str]:
+def should_deploy(
+    source_version: str,
+    destination: Path,
+    source_manifest: ReleaseManifest | None = None,
+) -> tuple[bool, str]:
     installed_version = read_skill_version(destination / "SKILL.md")
     if installed_version is None:
         return True, "installed_skill_or_version_missing"
@@ -218,6 +450,15 @@ def should_deploy(source_version: str, destination: Path) -> tuple[bool, str]:
         return True, "installed_payload_incomplete"
     if parse_version_tuple(installed_version) < parse_version_tuple(source_version):
         return True, "installed_version_is_older"
+    if parse_version_tuple(installed_version) == parse_version_tuple(source_version):
+        if source_manifest is not None:
+            try:
+                installed_manifest = read_release_manifest(destination)
+                if installed_manifest != source_manifest:
+                    return True, "installed_payload_drift"
+                verify_release_payload(destination, installed_manifest)
+            except RuntimeError:
+                return True, "installed_payload_drift"
     return False, "installed_version_is_current_or_newer"
 
 
@@ -335,7 +576,13 @@ def recover_interrupted_publish(destination: Path) -> None:
     _retry_fs(lambda: candidates[0].rename(destination))
 
 
-def copy_released_payload(source_skill_root: Path, destination: Path) -> None:
+def copy_released_payload(
+    source_skill_root: Path,
+    destination: Path,
+    manifest: ReleaseManifest | None = None,
+) -> None:
+    if manifest is not None:
+        verify_release_payload(source_skill_root, manifest)
     with deployment_lock(destination):
         recover_interrupted_publish(destination)
         staging = transaction_path(destination, "deploying")
@@ -344,18 +591,36 @@ def copy_released_payload(source_skill_root: Path, destination: Path) -> None:
 
         moved_previous = False
         try:
-            for item in SKILL_PAYLOAD_ITEMS:
-                source = source_skill_root / item
-                target = staging / item
-                if source.is_dir():
-                    shutil.copytree(source, target)
-                else:
+            if manifest is None:
+                # Kept for transaction-focused callers that construct a minimal
+                # synthetic payload. Production deployment always supplies the
+                # committed manifest and therefore uses the strict allowlist.
+                for item in SKILL_PAYLOAD_ITEMS:
+                    source = source_skill_root / item
+                    target = staging / item
+                    if source.is_dir():
+                        shutil.copytree(source, target)
+                    else:
+                        shutil.copy2(source, target)
+                if not installed_payload_complete(staging):
+                    raise RuntimeError(
+                        f"staged Skill payload is incomplete: {source_skill_root}"
+                    )
+            else:
+                for entry in manifest.files:
+                    relative = PurePosixPath(entry.path)
+                    source = source_skill_root.joinpath(*relative.parts)
+                    target = staging.joinpath(*relative.parts)
+                    target.parent.mkdir(parents=True, exist_ok=True)
                     shutil.copy2(source, target)
-
-            if not installed_payload_complete(staging):
-                raise RuntimeError(
-                    f"staged Skill payload is incomplete: {source_skill_root}"
+                shutil.copy2(
+                    source_skill_root / RELEASE_MANIFEST_NAME,
+                    staging / RELEASE_MANIFEST_NAME,
                 )
+                staged_manifest = read_release_manifest(staging)
+                if staged_manifest != manifest:
+                    raise RuntimeError("staged Skill release manifest drifted during copy")
+                verify_release_payload(staging, staged_manifest)
 
             if path_present(destination):
                 _retry_fs(lambda: destination.rename(previous))
@@ -412,9 +677,11 @@ def deploy_canonical(repo_root: Path, target_project: Path) -> DeployResult:
         raise RuntimeError(f"source skill not found: {source_skill_root}")
 
     source_version = require_consistent_project_versions(read_project_versions(repo_root))
+    source_manifest = read_release_manifest(source_skill_root)
+    verify_release_payload(source_skill_root, source_manifest)
     skills_dir = resolve_agent_skills_dir(target_project, CANONICAL_AGENT)
     destination = skills_dir / SKILL_NAME
-    should_copy, reason = should_deploy(source_version, destination)
+    should_copy, reason = should_deploy(source_version, destination, source_manifest)
     if not should_copy:
         return DeployResult(
             agent=CANONICAL_AGENT,
@@ -424,7 +691,7 @@ def deploy_canonical(repo_root: Path, target_project: Path) -> DeployResult:
             reason=reason,
         )
 
-    copy_released_payload(source_skill_root, destination)
+    copy_released_payload(source_skill_root, destination, source_manifest)
     return DeployResult(
         agent=CANONICAL_AGENT,
         action="deployed",
