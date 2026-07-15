@@ -52,6 +52,7 @@ import hashlib
 import importlib.util
 import json
 from pathlib import Path
+import re
 
 import pytest
 
@@ -369,3 +370,170 @@ def test_adc_created_parent_structures_are_coverage_accounted():
         if item["name"] in required and item["classification"] != "deferred"
     }
     assert observed == required
+
+
+@pytest.mark.parametrize(
+    "module", ["uart", "platform", "basenxp", "mcl", "port", "dio"]
+)
+def test_shipped_module_override_names_are_grounded_under_the_exact_ancestor(module):
+    """A basename in a broad rule must not silently classify the wrong branch."""
+    overrides = json.loads(
+        (ROOT / f"tools/xdm-coverage-overrides/{module}.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    sidecar = json.loads(
+        (COVERAGE_ROOT / f"{module}.json").read_text(encoding="utf-8")
+    )
+    for rule in overrides["rules"]:
+        match = rule["match"]
+        prefixes = match.get("path_prefixes")
+        names = match.get("names")
+        assert prefixes and names, f"{module} classification is not ancestor-qualified"
+        for name in names:
+            matched = [
+                item for item in sidecar["items"]
+                if item["name"] == name
+                and any(item["path"].startswith(prefix) for prefix in prefixes)
+            ]
+            assert matched, f"{module}:{name} is a dead or wrong-ancestor selector"
+            assert all(
+                item["classification"] == rule["classification"] for item in matched
+            )
+
+
+def _literal_xml_names_written_by(*function_names: str) -> set[str]:
+    source_path = RUNTIME_ROOT / "rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py"
+    source = source_path.read_text(encoding="utf-8")
+    tree = ast.parse(source, filename=str(source_path))
+    functions = {
+        node.name: node for node in tree.body if isinstance(node, ast.FunctionDef)
+    }
+    written: set[str] = set()
+    for function_name in function_names:
+        segment = ast.get_source_segment(source, functions[function_name])
+        assert segment is not None
+        written.update(re.findall(r'name=\\?"([A-Za-z][A-Za-z0-9_]*)', segment))
+    return written - {"Name"}
+
+
+@pytest.mark.parametrize(
+    ("module", "ancestor", "writers", "additional_names"),
+    [
+        (
+            "platform", "/lst[IntCtrlConfig]",
+            ("_build_platform_isr_struct_bytes",), {"PlatformIsrConfig"},
+        ),
+        (
+            "basenxp", "/lst[OsIfCounterConfig]",
+            ("_build_counter_array_bytes",), set(),
+        ),
+        (
+            "mcl", "/lst[dmaLogicChannel_Type]",
+            ("_build_dma_logic_channel_struct_bytes",), {"dmaLogicChannel_Type"},
+        ),
+        (
+            "port", "/lst[PortPin]",
+            ("_build_portpin_struct_bytes", "_build_gpio_portpin_struct_bytes"),
+            {"PortPin"},
+        ),
+        (
+            "dio", "/lst[DioPort]",
+            ("_build_dio_channel_array_bytes", "_build_dio_port_struct_bytes"),
+            {"DioPort"},
+        ),
+    ],
+)
+def test_every_literal_xdm_parent_and_leaf_emitted_by_writers_is_accounted(
+    module, ancestor, writers, additional_names
+):
+    """The coverage sidecar must not defer structures the implementation emits."""
+    sidecar = json.loads(
+        (COVERAGE_ROOT / f"{module}.json").read_text(encoding="utf-8")
+    )
+    written_names = _literal_xml_names_written_by(*writers) | additional_names
+    for name in sorted(written_names):
+        matched = [
+            item for item in sidecar["items"]
+            if item["name"] == name and ancestor in item["path"]
+        ]
+        assert matched, f"{module}:{name} writer output is absent from its XDM inventory"
+        assert all(item["classification"] != "deferred" for item in matched), (
+            f"{module}:{name} is written by {writers} but remains deferred"
+        )
+
+
+@pytest.mark.parametrize(
+    ("module", "ancestor", "names"),
+    [
+        (
+            "uart",
+            "/ctr[GeneralConfiguration]",
+            {
+                "GeneralConfiguration": "configurable",
+                "UartCallback": "configurable",
+                "UartCallbackCapability": "derived",
+                "UartDmaEnable": "derived",
+            },
+        ),
+        (
+            "mcl",
+            "/ctr[MclDma]",
+            {"MclDma": "derived", "MclEnableDma": "derived"},
+        ),
+    ],
+)
+def test_attribute_mutations_and_their_exact_parents_are_coverage_accounted(
+    module, ancestor, names
+):
+    sidecar = json.loads(
+        (COVERAGE_ROOT / f"{module}.json").read_text(encoding="utf-8")
+    )
+    for name, classification in names.items():
+        matched = [
+            item for item in sidecar["items"]
+            if item["name"] == name and ancestor in item["path"]
+        ]
+        assert matched, f"{module}:{name} is absent under {ancestor}"
+        assert all(item["classification"] == classification for item in matched)
+
+
+@pytest.mark.parametrize(
+    ("module", "ancestor", "names"),
+    [
+        (
+            "platform",
+            "/lst[IntCtrlConfig]",
+            {
+                "IsrPriority": "configurable",
+                "IsrEnabled": "derived",
+                "IsrName": "derived",
+                "IsrHandler": "derived",
+            },
+        ),
+        (
+            "port",
+            "/lst[PortPin]",
+            {
+                "PortPinPue": "derived",
+                "PortPinPus": "derived",
+                "PortPinDirection": "deferred",
+                "PortPinLevelValue": "deferred",
+                "PortPinMode": "deferred",
+            },
+        ),
+    ],
+)
+def test_fixed_or_derived_writer_fields_are_not_claimed_caller_configurable(
+    module, ancestor, names
+):
+    sidecar = json.loads(
+        (COVERAGE_ROOT / f"{module}.json").read_text(encoding="utf-8")
+    )
+    for name, classification in names.items():
+        matched = [
+            item for item in sidecar["items"]
+            if item["name"] == name and ancestor in item["path"]
+        ]
+        assert matched, f"{module}:{name} is absent under {ancestor}"
+        assert all(item["classification"] == classification for item in matched)
