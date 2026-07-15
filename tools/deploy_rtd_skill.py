@@ -49,6 +49,7 @@ from __future__ import annotations
 
 import argparse
 from contextlib import contextmanager
+import ctypes
 import hashlib
 import json
 import os
@@ -59,7 +60,7 @@ import sys
 import time
 import tomllib
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from pathlib import PurePosixPath
 
@@ -351,6 +352,112 @@ class _DirectoryIdentity:
     path: Path
     device: int
     inode: int
+    handle: int | None = field(default=None, compare=False, repr=False)
+
+
+def _open_windows_directory(path: Path) -> tuple[int, int, int]:
+    from ctypes import wintypes
+
+    class _ByHandleFileInformation(ctypes.Structure):
+        _fields_ = (
+            ("attributes", wintypes.DWORD),
+            ("creation_time", wintypes.FILETIME),
+            ("last_access_time", wintypes.FILETIME),
+            ("last_write_time", wintypes.FILETIME),
+            ("volume_serial", wintypes.DWORD),
+            ("file_size_high", wintypes.DWORD),
+            ("file_size_low", wintypes.DWORD),
+            ("number_of_links", wintypes.DWORD),
+            ("file_index_high", wintypes.DWORD),
+            ("file_index_low", wintypes.DWORD),
+        )
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    create_file = kernel32.CreateFileW
+    create_file.argtypes = (
+        wintypes.LPCWSTR,
+        wintypes.DWORD,
+        wintypes.DWORD,
+        wintypes.LPVOID,
+        wintypes.DWORD,
+        wintypes.DWORD,
+        wintypes.HANDLE,
+    )
+    create_file.restype = wintypes.HANDLE
+    handle = create_file(
+        str(path),
+        0x80000000,  # GENERIC_READ; participates in delete-share arbitration
+        0x1 | 0x2,  # share read/write, deliberately deny FILE_SHARE_DELETE
+        None,
+        3,  # OPEN_EXISTING
+        0x02000000 | 0x00200000,  # BACKUP_SEMANTICS | OPEN_REPARSE_POINT
+        None,
+    )
+    invalid = ctypes.c_void_p(-1).value
+    if handle == invalid:
+        error = ctypes.get_last_error()
+        raise RuntimeError(
+            f"cannot open protected destination ancestor {path}: WinError {error}"
+        )
+    information = _ByHandleFileInformation()
+    get_information = kernel32.GetFileInformationByHandle
+    get_information.argtypes = (wintypes.HANDLE, ctypes.POINTER(_ByHandleFileInformation))
+    get_information.restype = wintypes.BOOL
+    if not get_information(handle, ctypes.byref(information)):
+        error = ctypes.get_last_error()
+        kernel32.CloseHandle(handle)
+        raise RuntimeError(
+            f"cannot identify protected destination ancestor {path}: WinError {error}"
+        )
+    if not information.attributes & 0x10 or information.attributes & 0x400:
+        kernel32.CloseHandle(handle)
+        raise RuntimeError(
+            f"unsafe destination ancestor is not a real directory: {path}"
+        )
+    file_id = (information.file_index_high << 32) | information.file_index_low
+    return int(handle), int(information.volume_serial), int(file_id)
+
+
+def _close_directory_handle(handle: int) -> None:
+    if os.name == "nt":
+        from ctypes import wintypes
+
+        close_handle = ctypes.WinDLL("kernel32", use_last_error=True).CloseHandle
+        close_handle.argtypes = (wintypes.HANDLE,)
+        close_handle.restype = wintypes.BOOL
+        close_handle(handle)
+    else:
+        os.close(handle)
+
+
+def _open_directory_identity(path: Path, platform=None) -> _DirectoryIdentity:
+    observed = _directory_identity(path, platform)
+    if os.name == "nt":
+        handle, volume, file_id = _open_windows_directory(path)
+        return _DirectoryIdentity(path, volume, file_id, handle)
+    flags = _posix_directory_open_flags()
+    try:
+        descriptor = os.open(path, flags)
+    except OSError as exc:
+        raise RuntimeError(
+            f"cannot open protected destination ancestor {path}: {exc}"
+        ) from exc
+    metadata = os.fstat(descriptor)
+    if not stat.S_ISDIR(metadata.st_mode):
+        os.close(descriptor)
+        raise RuntimeError(f"unsafe destination ancestor is not a directory: {path}")
+    if (metadata.st_dev, metadata.st_ino) != (observed.device, observed.inode):
+        os.close(descriptor)
+        raise RuntimeError(f"destination ancestor changed while opening: {path}")
+    return _DirectoryIdentity(path, metadata.st_dev, metadata.st_ino, descriptor)
+
+
+def _posix_directory_open_flags() -> int:
+    directory = getattr(os, "O_DIRECTORY", None)
+    no_follow = getattr(os, "O_NOFOLLOW", None)
+    if directory is None or no_follow is None:
+        raise RuntimeError("platform lacks required POSIX no-follow directory opens")
+    return os.O_RDONLY | directory | no_follow
 
 
 def _directory_identity(path: Path, platform=None) -> _DirectoryIdentity:
@@ -368,14 +475,51 @@ def _directory_identity(path: Path, platform=None) -> _DirectoryIdentity:
     return _DirectoryIdentity(path, metadata.st_dev, metadata.st_ino)
 
 
-@dataclass(frozen=True)
+@dataclass
 class _DestinationAncestorGuard:
     identities: tuple[_DirectoryIdentity, ...]
     platform: object | None = None
+    closed: bool = field(default=False, init=False)
+
+    def close(self) -> None:
+        if self.closed:
+            return
+        for identity in reversed(self.identities):
+            if identity.handle is None:
+                continue
+            _close_directory_handle(identity.handle)
+        self.closed = True
+
+    def __enter__(self):
+        try:
+            self.verify()
+        except BaseException:
+            self.close()
+            raise
+        return self
+
+    def __exit__(self, _type, _value, _traceback):
+        self.close()
 
     def verify(self) -> None:
         for expected in self.identities:
-            observed = _directory_identity(expected.path, self.platform)
+            if os.name == "nt" and expected.handle is not None:
+                if _platform_is_link_or_reparse(self.platform, expected.path):
+                    raise RuntimeError(
+                        f"unsafe destination ancestor is linked: {expected.path}"
+                    )
+                handle, device, inode = _open_windows_directory(expected.path)
+                _close_directory_handle(handle)
+                observed = _DirectoryIdentity(expected.path, device, inode)
+            elif expected.handle is not None:
+                metadata = os.fstat(expected.handle)
+                observed = _DirectoryIdentity(
+                    expected.path,
+                    metadata.st_dev,
+                    metadata.st_ino,
+                )
+            else:
+                observed = _directory_identity(expected.path, self.platform)
             if (observed.device, observed.inode) != (expected.device, expected.inode):
                 raise RuntimeError(
                     f"unsafe destination ancestor identity changed: {expected.path}"
@@ -385,15 +529,193 @@ class _DestinationAncestorGuard:
         self.verify()
         try:
             return operation()
+        except OSError as exc:
+            if self.platform is None:
+                raise
+            raise RuntimeError(f"protected destination mutation failed: {exc}") from exc
         finally:
             self.verify()
 
+    def _atomic_mutation(self, mutation_kind: str | None, operation):
+        cleanup = lambda: None
+        hook = getattr(self.platform, "before_mutation", None)
+        if mutation_kind is not None and hook is not None:
+            cleanup = hook(mutation_kind, self.parent)
+        try:
+            return self.mutate(operation)
+        finally:
+            cleanup()
+            self.verify()
+
+    @property
+    def parent(self) -> Path:
+        return self.identities[-1].path
+
+    @property
+    def parent_handle(self) -> int:
+        handle = self.identities[-1].handle
+        if handle is None:
+            raise RuntimeError("destination capability is closed")
+        return handle
+
+    def mkdir(self, path: Path, *, mutation_kind: str | None = None) -> None:
+        path = Path(path)
+        if path.parent != self.parent:
+            raise RuntimeError("mkdir escapes protected destination namespace")
+        if os.name == "nt":
+            self._atomic_mutation(mutation_kind, path.mkdir)
+        else:
+            self._atomic_mutation(
+                mutation_kind,
+                lambda: os.mkdir(path.name, dir_fd=self.parent_handle),
+            )
+
+    def rename(
+        self,
+        source: Path,
+        destination: Path,
+        *,
+        mutation_kind: str | None = None,
+    ) -> None:
+        source = Path(source)
+        destination = Path(destination)
+        if source.parent != self.parent or destination.parent != self.parent:
+            raise RuntimeError("rename escapes protected destination namespace")
+        if os.name == "nt":
+            self._atomic_mutation(
+                mutation_kind,
+                lambda: source.rename(destination),
+            )
+        else:
+            self._atomic_mutation(
+                mutation_kind,
+                lambda: os.rename(
+                    source.name,
+                    destination.name,
+                    src_dir_fd=self.parent_handle,
+                    dst_dir_fd=self.parent_handle,
+                )
+            )
+
+    def entry_present(self, path: Path) -> bool:
+        path = Path(path)
+        if path.parent != self.parent:
+            raise RuntimeError("entry lookup escapes protected destination namespace")
+        try:
+            if os.name == "nt":
+                path.lstat()
+            else:
+                os.stat(path.name, dir_fd=self.parent_handle, follow_symlinks=False)
+        except FileNotFoundError:
+            return False
+        return True
+
+    def entry_metadata(self, path: Path):
+        path = Path(path)
+        if path.parent != self.parent:
+            raise RuntimeError("entry stat escapes protected destination namespace")
+        if os.name == "nt":
+            return path.lstat()
+        return os.stat(path.name, dir_fd=self.parent_handle, follow_symlinks=False)
+
+    def entry_identity(self, path: Path) -> _DirectoryIdentity:
+        path = Path(path)
+        if os.name == "nt":
+            return _directory_identity(path, self.platform)
+        if _platform_is_link_or_reparse(self.platform, path):
+            raise RuntimeError(f"unsafe transaction entry is linked: {path}")
+        metadata = self.entry_metadata(path)
+        if not stat.S_ISDIR(metadata.st_mode):
+            raise RuntimeError(f"unsafe transaction entry is not a directory: {path}")
+        return _DirectoryIdentity(path, metadata.st_dev, metadata.st_ino)
+
+    def entry_names(self) -> tuple[str, ...]:
+        if os.name == "nt":
+            return tuple(os.listdir(self.parent))
+        return tuple(os.listdir(self.parent_handle))
+
+    def write_child_file(self, directory: Path, name: str, content: str) -> None:
+        directory = Path(directory)
+        if directory.parent != self.parent or Path(name).name != name:
+            raise RuntimeError("file write escapes protected destination namespace")
+        if os.name == "nt":
+            self.mutate(
+                lambda: (directory / name).write_text(content, encoding="utf-8")
+            )
+            return
+        flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+
+        def write_relative() -> None:
+            child = os.open(
+                directory.name,
+                _posix_directory_open_flags(),
+                dir_fd=self.parent_handle,
+            )
+            try:
+                descriptor = os.open(name, flags, 0o600, dir_fd=child)
+                try:
+                    os.write(descriptor, content.encode("utf-8"))
+                finally:
+                    os.close(descriptor)
+            finally:
+                os.close(child)
+
+        self.mutate(write_relative)
+
+    def symlink(self, source: Path, destination: Path) -> None:
+        destination = Path(destination)
+        if destination.parent != self.parent:
+            raise RuntimeError("symlink escapes protected destination namespace")
+        if os.name == "nt":
+            self.mutate(
+                lambda: destination.symlink_to(source, target_is_directory=True)
+            )
+        else:
+            self.mutate(
+                lambda: os.symlink(
+                    source,
+                    destination.name,
+                    target_is_directory=True,
+                    dir_fd=self.parent_handle,
+                )
+            )
+
+    def remove(self, path: Path) -> None:
+        path = Path(path)
+        if path.parent != self.parent:
+            raise RuntimeError("remove escapes protected destination namespace")
+        if os.name == "nt":
+            if _platform_is_link_or_reparse(self.platform, path):
+                raise RuntimeError(f"refusing to remove linked transaction entry: {path}")
+            self.mutate(lambda: remove_path(path))
+        else:
+            self.mutate(lambda: _remove_at(self.parent_handle, path.name))
+
+
+def _remove_at(parent_fd: int, name: str) -> None:
+    metadata = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+    if stat.S_ISDIR(metadata.st_mode) and not stat.S_ISLNK(metadata.st_mode):
+        flags = _posix_directory_open_flags()
+        child_fd = os.open(name, flags, dir_fd=parent_fd)
+        try:
+            for child_name in os.listdir(child_fd):
+                _remove_at(child_fd, child_name)
+        finally:
+            os.close(child_fd)
+        os.rmdir(name, dir_fd=parent_fd)
+    else:
+        os.unlink(name, dir_fd=parent_fd)
+
 
 def _guard_for_paths(paths: list[Path], platform=None) -> _DestinationAncestorGuard:
-    return _DestinationAncestorGuard(
-        tuple(_directory_identity(path, platform) for path in paths),
-        platform,
-    )
+    identities: list[_DirectoryIdentity] = []
+    try:
+        for path in paths:
+            identities.append(_open_directory_identity(path, platform))
+    except BaseException:
+        _DestinationAncestorGuard(tuple(identities), platform).close()
+        raise
+    return _DestinationAncestorGuard(tuple(identities), platform)
 
 
 def _ensure_safe_directory_chain(
@@ -402,25 +724,33 @@ def _ensure_safe_directory_chain(
     platform=None,
 ) -> Path:
     target = Path(os.path.abspath(target))
-    if _platform_is_link_or_reparse(platform, target):
-        raise RuntimeError(
-            f"unsafe target root is a symlink or reparse point: {target}"
-        )
-    if not path_present(target):
-        target.mkdir()
+    missing: list[Path] = []
+    existing = target
+    while not path_present(existing):
+        if existing == existing.parent:
+            raise RuntimeError(f"cannot find a trusted parent for target: {target}")
+        missing.append(existing)
+        existing = existing.parent
+    for directory in reversed(missing):
+        with _capture_destination_guard(existing, platform) as parent_guard:
+            parent_guard.mkdir(directory)
+        existing = directory
+    parent_chain_guard = _capture_destination_guard(target, platform)
+    parent_chain_guard.close()
     identities = [_directory_identity(target, platform)]
     current = target
     for component in relative.parts:
-        guard = _DestinationAncestorGuard(tuple(identities), platform)
         current = current / component
         if _platform_is_link_or_reparse(platform, current):
             raise RuntimeError(
                 f"unsafe destination ancestor is a symlink or reparse point: {current}"
             )
         if not path_present(current):
-            guard.mutate(current.mkdir)
+            with _guard_for_paths([identity.path for identity in identities], platform) as guard:
+                guard.mkdir(current)
         identities.append(_directory_identity(current, platform))
-    _DestinationAncestorGuard(tuple(identities), platform).verify()
+    final_guard = _guard_for_paths([identity.path for identity in identities], platform)
+    final_guard.close()
     return current
 
 
@@ -622,13 +952,6 @@ def transaction_path(destination: Path, role: str) -> Path:
     return destination.parent / f".{destination.name}.{role}.{uuid.uuid4().hex}"
 
 
-def remove_path_best_effort(path: Path) -> None:
-    try:
-        remove_path(path)
-    except OSError:
-        pass
-
-
 @contextmanager
 def deployment_lock(
     destination: Path,
@@ -645,30 +968,32 @@ def deployment_lock(
 
     while True:
         try:
-            guard.mutate(lock.mkdir)
-            owned_lock = _directory_identity(lock, platform)
-            (lock / "owner.txt").write_text(
+            guard.mkdir(lock, mutation_kind="lock")
+            owned_lock = guard.entry_identity(lock)
+            guard.write_child_file(
+                lock,
+                "owner.txt",
                 f"pid={os.getpid()}\nstarted={time.time():.6f}\n",
-                encoding="utf-8",
             )
             guard.verify()
-            if _directory_identity(lock, platform) != owned_lock:
+            if guard.entry_identity(lock) != owned_lock:
                 raise RuntimeError("deployment lock identity changed during acquisition")
             break
         except FileExistsError:
             guard.verify()
-            lock_identity = _directory_identity(lock, platform)
+            lock_identity = guard.entry_identity(lock)
             try:
                 stale = (
-                    time.time() - lock.lstat().st_mtime > _DEPLOYMENT_LOCK_STALE_S
+                    time.time() - guard.entry_metadata(lock).st_mtime
+                    > _DEPLOYMENT_LOCK_STALE_S
                 )
             except OSError:
                 stale = False
             if stale:
                 guard.verify()
-                if _directory_identity(lock, platform) != lock_identity:
+                if guard.entry_identity(lock) != lock_identity:
                     raise RuntimeError("stale deployment lock identity changed")
-                guard.mutate(lambda: remove_path(lock))
+                guard.remove(lock)
                 continue
             if time.monotonic() >= deadline:
                 raise RuntimeError(
@@ -680,28 +1005,29 @@ def deployment_lock(
         yield
     finally:
         guard.verify()
-        if path_present(lock):
-            if owned_lock is None or _directory_identity(lock, platform) != owned_lock:
+        if guard.entry_present(lock):
+            if owned_lock is None or guard.entry_identity(lock) != owned_lock:
                 raise RuntimeError("refusing to remove a replaced deployment lock")
-            guard.mutate(lambda: remove_path(lock))
+            guard.remove(lock)
 
 
 def recover_interrupted_publish(
     destination: Path,
     guard: _DestinationAncestorGuard,
 ) -> None:
-    if path_present(destination):
+    if guard.entry_present(destination):
         return
 
     parent = destination.parent
     legacy_previous = parent / f".{destination.name}.previous"
+    names = guard.entry_names()
     candidates = []
-    if path_present(legacy_previous):
+    if legacy_previous.name in names:
         candidates.append(legacy_previous)
     candidates.extend(
-        candidate
-        for candidate in parent.glob(f".{destination.name}.previous.*")
-        if path_present(candidate)
+        parent / name
+        for name in names
+        if name.startswith(f".{destination.name}.previous.")
     )
     if not candidates:
         return
@@ -710,7 +1036,7 @@ def recover_interrupted_publish(
             f"cannot recover interrupted deployment for {destination}; "
             f"multiple rollback candidates exist"
         )
-    guard.mutate(lambda: _retry_fs(lambda: candidates[0].rename(destination)))
+    _retry_fs(lambda: guard.rename(candidates[0], destination))
 
 
 def copy_released_payload(
@@ -729,12 +1055,12 @@ def copy_released_payload(
         platform,
         trusted_root=trusted_root,
     )
-    with deployment_lock(destination, platform=platform, guard=guard):
+    with guard, deployment_lock(destination, platform=platform, guard=guard):
         guard.verify()
         recover_interrupted_publish(destination, guard)
         staging = transaction_path(destination, "deploying")
         previous = transaction_path(destination, "previous")
-        guard.mutate(staging.mkdir)
+        guard.mkdir(staging, mutation_kind="staging")
 
         moved_previous = False
         try:
@@ -769,22 +1095,28 @@ def copy_released_payload(
                     raise RuntimeError("staged Skill release manifest drifted during copy")
                 verify_release_payload(staging, staged_manifest)
 
-            if path_present(destination):
-                guard.mutate(
-                    lambda: _retry_fs(lambda: destination.rename(previous))
-                )
+            if guard.entry_present(destination):
+                _retry_fs(lambda: guard.rename(destination, previous))
                 moved_previous = True
-            guard.mutate(lambda: _retry_fs(lambda: staging.rename(destination)))
-        except BaseException:
-            if moved_previous and path_present(previous) and not path_present(destination):
-                guard.mutate(
-                    lambda: _retry_fs(lambda: previous.rename(destination))
+            _retry_fs(
+                lambda: guard.rename(
+                    staging,
+                    destination,
+                    mutation_kind="publish",
                 )
-            if path_present(staging):
-                guard.mutate(lambda: remove_path(staging))
+            )
+        except BaseException:
+            if (
+                moved_previous
+                and guard.entry_present(previous)
+                and not guard.entry_present(destination)
+            ):
+                _retry_fs(lambda: guard.rename(previous, destination))
+            if guard.entry_present(staging):
+                guard.remove(staging)
             raise
-        if path_present(previous):
-            guard.mutate(lambda: remove_path(previous))
+        if guard.entry_present(previous):
+            guard.remove(previous)
 
 
 def remove_path(path: Path) -> None:
@@ -800,35 +1132,33 @@ def ensure_link(source: Path, destination: Path, *, platform=None) -> str:
     source = source.resolve()
     if destination.exists() and destination.resolve() == source:
         return "installed_link_is_current"
-    with deployment_lock(destination, platform=platform, guard=guard):
+    with guard, deployment_lock(destination, platform=platform, guard=guard):
         if destination.exists() and destination.resolve() == source:
             return "installed_link_is_current"
         candidate = transaction_path(destination, "linking")
         previous = transaction_path(destination, "previous")
         moved_previous = False
         try:
-            guard.mutate(
-                lambda: candidate.symlink_to(source, target_is_directory=True)
-            )
-            if path_present(destination):
-                guard.mutate(
-                    lambda: _retry_fs(lambda: destination.rename(previous))
-                )
+            guard.symlink(source, candidate)
+            if guard.entry_present(destination):
+                _retry_fs(lambda: guard.rename(destination, previous))
                 moved_previous = True
-            guard.mutate(lambda: _retry_fs(lambda: candidate.rename(destination)))
+            _retry_fs(lambda: guard.rename(candidate, destination))
         except OSError as exc:
-            if moved_previous and path_present(previous) and not path_present(destination):
-                guard.mutate(
-                    lambda: _retry_fs(lambda: previous.rename(destination))
-                )
-            if path_present(candidate):
-                guard.mutate(lambda: remove_path(candidate))
+            if (
+                moved_previous
+                and guard.entry_present(previous)
+                and not guard.entry_present(destination)
+            ):
+                _retry_fs(lambda: guard.rename(previous, destination))
+            if guard.entry_present(candidate):
+                guard.remove(candidate)
             message = "failed to create directory symlink"
             if sys.platform == "win32":
                 message += "; enable Developer Mode or run from an elevated shell"
             raise RuntimeError(message) from exc
-        if path_present(previous):
-            guard.mutate(lambda: remove_path(previous))
+        if guard.entry_present(previous):
+            guard.remove(previous)
         return "symlink_to_canonical_skill"
 
 
@@ -847,23 +1177,34 @@ def deploy_canonical(repo_root: Path, target_project: Path, *, platform=None) ->
         platform=platform,
     )
     destination = skills_dir / SKILL_NAME
-    should_copy, reason = should_deploy(source_version, destination, source_manifest)
-    if not should_copy:
-        return DeployResult(
-            agent=CANONICAL_AGENT,
-            action="skipped",
-            version=source_version,
-            destination=destination,
-            reason=reason,
-        )
-
-    copy_released_payload(
-        source_skill_root,
-        destination,
-        source_manifest,
-        platform=platform,
-        trusted_root=Path(os.path.abspath(target_project.expanduser())),
+    trusted_root = Path(os.path.abspath(target_project.expanduser()))
+    transaction_guard = _capture_destination_guard(
+        skills_dir,
+        platform,
+        trusted_root=trusted_root,
     )
+    with transaction_guard:
+        should_copy, reason = should_deploy(
+            source_version,
+            destination,
+            source_manifest,
+        )
+        if not should_copy:
+            return DeployResult(
+                agent=CANONICAL_AGENT,
+                action="skipped",
+                version=source_version,
+                destination=destination,
+                reason=reason,
+            )
+
+        copy_released_payload(
+            source_skill_root,
+            destination,
+            source_manifest,
+            platform=platform,
+            trusted_root=trusted_root,
+        )
     return DeployResult(
         agent=CANONICAL_AGENT,
         action="deployed",
