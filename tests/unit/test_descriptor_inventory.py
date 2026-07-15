@@ -175,14 +175,27 @@ def test_exact_module_extraction_retains_named_cross_module_references(tmp_path,
     [
         ("mcu", 489, "956DDD8BAB138AD6D9C8454F0F3CC6A1233CF200FE7E9864C4AF7FADF97D282D"),
         ("adc", 279, "D9601D143375F7D0BC2582F1B4BF9C1B93DC50CE975E736140A64F72FDA12BE8"),
+        ("uart", 57, "0B5064AA0DCBE90048C1DBC2D49C540887D941D39B04962785FB7F98789FEED5"),
+        ("platform", 74, "D3BA70C932DA05DF1A952CCB5D5737DF083CAC942C9FA204E7D075B8C3C8939B"),
+        ("basenxp", 35, "8CD7DE06F69CADC997E8BA240E36C3EF7A67AAC6B520E04789AE0DC9B610C754"),
+        ("mcl", 246, "264610E47D335A127E398B753AF6CA320CC176DF68FF288F06B26001BA0B9DE9"),
+        ("port", 83, "59C1552C2B083929132115546AA2196BCE7E1A5B73A537AC5A10A825744C2A68"),
+        ("dio", 46, "E3F8FDF2BACED5D8014FA9FE1A4B0C5AB527B9C1C665C8FC1E6A15768BC63278"),
     ],
 )
 def test_committed_descriptor_inventory_has_golden_count_and_identity(module, count, sha256):
     sidecar = json.loads((COVERAGE_ROOT / f"{module}.json").read_text(encoding="utf-8"))
     assert sidecar["source"]["sha256"] == sha256
     assert sidecar["summary"]["total"] == count == len(sidecar["items"])
-    assert sidecar["source"]["descriptor"] == f"{module.title()}.xdm"
+    descriptor = "BaseNXP.xdm" if module == "basenxp" else f"{module.title()}.xdm"
+    assert sidecar["source"]["descriptor"] == descriptor
     assert not any(":" in str(value) and "\\" in str(value) for value in sidecar["source"].values())
+
+
+def test_repository_gate_contains_every_shipped_module_sidecar():
+    assert {path.stem for path in COVERAGE_ROOT.glob("*.json")} == {
+        "uart", "platform", "basenxp", "mcl", "port", "dio", "mcu", "adc",
+    }
 
 
 @pytest.mark.parametrize(
