@@ -1132,3 +1132,168 @@ def test_deploy_mutation_is_bound_to_guarded_directory_across_ancestor_swap(
     deploy.verify_release_payload(installed, installed_manifest)
     _assert_no_deploy_residue(target)
     _assert_no_deploy_residue(outside)
+
+
+# ---------------------------------------------------------------------------
+# Chained and child capability capture (Reviewer P1, round 3)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX dirfd capture semantics")
+def test_posix_destination_capture_opens_each_child_relative_to_parent_capability(
+    tmp_path,
+    monkeypatch,
+):
+    """Replacing target after its open cannot redirect later child captures."""
+    deploy = load_deploy_module()
+    target = tmp_path / "unique-target-root"
+    (target / ".agents" / "skills").mkdir(parents=True)
+    outside = tmp_path / "outside-capture"
+    (outside / ".agents" / "skills").mkdir(parents=True)
+    before_outside = _tree_snapshot(outside)
+    displaced = tmp_path / "displaced-target-root"
+    real_open = deploy.os.open
+    records: list[tuple[object, int | None]] = []
+    swapped = False
+    restored = False
+
+    def recording_open(path, flags, mode=0o777, *, dir_fd=None):
+        nonlocal swapped, restored
+        records.append((path, dir_fd))
+        if dir_fd is None:
+            descriptor = real_open(path, flags, mode)
+        else:
+            descriptor = real_open(path, flags, mode, dir_fd=dir_fd)
+        path_text = os.fspath(path)
+        opened_target = (
+            Path(path_text) == target
+            if os.path.isabs(path_text)
+            else path_text == target.name
+        )
+        if opened_target and not swapped:
+            target.rename(displaced)
+            target.symlink_to(outside, target_is_directory=True)
+            swapped = True
+        elif swapped and not restored and path_text == "skills" and dir_fd is not None:
+            target.unlink()
+            displaced.rename(target)
+            restored = True
+        return descriptor
+
+    monkeypatch.setattr(deploy.os, "open", recording_open)
+    try:
+        resolved = deploy.resolve_agent_skills_dir(
+            target,
+            "codex",
+            platform=_InjectedDestinationPlatform(deploy),
+        )
+    finally:
+        if swapped and not restored:
+            target.unlink()
+            displaced.rename(target)
+
+    assert resolved == target / ".agents" / "skills"
+    assert swapped and restored
+    child_paths = {target / ".agents", target / ".agents" / "skills"}
+    assert not any(
+        dir_fd is None and Path(os.fspath(path)) in child_paths
+        for path, dir_fd in records
+    ), "child capabilities must never be opened from complete paths"
+    assert any(os.fspath(path) == ".agents" and dir_fd is not None
+               for path, dir_fd in records)
+    assert any(os.fspath(path) == "skills" and dir_fd is not None
+               for path, dir_fd in records)
+    assert _tree_snapshot(outside) == before_outside
+
+
+class _ChildCapabilityRacePlatform(_InjectedDestinationPlatform):
+    """Swap a newly created child after it is pinned but before its first write."""
+
+    def __init__(self, deploy, race_point: str, child: Path, outside: Path) -> None:
+        super().__init__(deploy)
+        self.race_point = race_point
+        self.child = child
+        self.outside = outside
+        self.attempted = False
+        self.swap_succeeded = False
+        self.swap_blocked = False
+        self.restored = False
+
+    def before_mutation(self, mutation_kind: str, guarded_directory: Path):
+        if self.attempted or mutation_kind != self.race_point:
+            return lambda: None
+        assert Path(guarded_directory) == self.child
+        self.attempted = True
+        displaced = self.child.with_name(f"{self.child.name}.displaced-child")
+        try:
+            self.child.rename(displaced)
+        except OSError:
+            self.swap_blocked = True
+            return lambda: None
+        self.swap_succeeded = True
+        _create_directory_redirect(self.child, self.outside)
+
+        def restore() -> None:
+            _remove_directory_redirect(self.child)
+            displaced.rename(self.child)
+            self.restored = True
+
+        return restore
+
+
+@pytest.mark.parametrize("race_point", ("lock-owner", "stage-copy"))
+def test_new_child_capability_pins_owner_and_payload_writes(
+    tmp_path,
+    race_point,
+):
+    deploy = load_deploy_module()
+    target = tmp_path / "target-project"
+    skills = target / ".agents" / "skills"
+    installed = skills / "autombd-rtd"
+    installed.mkdir(parents=True)
+    (installed / "sentinel.bin").write_bytes(b"old-install")
+    before_install = _tree_snapshot(installed)
+    outside = tmp_path / "outside-child-race"
+    outside.mkdir()
+    before_outside = _tree_snapshot(outside)
+    if race_point == "lock-owner":
+        child = skills / ".autombd-rtd.deploy.lock"
+    else:
+        # transaction_path uses a random suffix; the capability supplies the
+        # actual created staging child path to the hook, so match by role below.
+        child = skills / ".autombd-rtd.deploying.expected-dynamic-suffix"
+
+    class MatchingChildPlatform(_ChildCapabilityRacePlatform):
+        def before_mutation(self, mutation_kind: str, guarded_directory: Path):
+            if mutation_kind == self.race_point and not self.attempted:
+                self.child = Path(guarded_directory)
+            return super().before_mutation(mutation_kind, guarded_directory)
+
+    platform = MatchingChildPlatform(deploy, race_point, child, outside)
+    failure: RuntimeError | None = None
+    result = None
+    try:
+        result = deploy.deploy_one(REPO_ROOT, target, "codex", platform=platform)
+    except RuntimeError as exc:
+        failure = exc
+
+    assert platform.attempted, (
+        f"the pinned child capability did not invoke the {race_point} hook"
+    )
+    if os.name == "nt":
+        assert platform.swap_blocked, (
+            "the pinned Windows child handle allowed a directory rename"
+        )
+    else:
+        assert platform.swap_succeeded
+        assert platform.restored
+    assert _tree_snapshot(outside) == before_outside
+    if failure is None:
+        assert result is not None and result.action == "deployed"
+        assert not (installed / "sentinel.bin").exists()
+        manifest = deploy.read_release_manifest(installed)
+        deploy.verify_release_payload(installed, manifest)
+    else:
+        assert _tree_snapshot(installed) == before_install
+    _assert_no_deploy_residue(target)
+    _assert_no_deploy_residue(outside)
