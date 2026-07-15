@@ -1022,21 +1022,6 @@ def _remove_directory_redirect(link: Path) -> None:
         link.unlink()
 
 
-def _swap_directory_during_mutation(
-    guarded_directory: Path,
-    outside: Path,
-    operation,
-):
-    displaced = guarded_directory.with_name(f"{guarded_directory.name}.displaced")
-    guarded_directory.rename(displaced)
-    _create_directory_redirect(guarded_directory, outside)
-    try:
-        return operation()
-    finally:
-        _remove_directory_redirect(guarded_directory)
-        displaced.rename(guarded_directory)
-
-
 @pytest.mark.parametrize("target_state", ("missing", "existing"))
 def test_deploy_rejects_linked_parent_chain_before_creating_target_or_children(
     tmp_path,
@@ -1067,13 +1052,51 @@ def test_deploy_rejects_linked_parent_chain_before_creating_target_or_children(
         _remove_directory_redirect(linked_parent)
 
 
+class _AtomicMutationRacePlatform(_InjectedDestinationPlatform):
+    """Attempt one ancestor swap from inside the public mutation capability."""
+
+    def __init__(self, deploy, race_point: str, skills: Path, outside: Path) -> None:
+        super().__init__(deploy)
+        self.race_point = race_point
+        self.skills = skills
+        self.outside = outside
+        self.attempted = False
+        self.swap_succeeded = False
+        self.swap_blocked = False
+        self.restored = False
+
+    def before_mutation(self, mutation_kind: str, guarded_directory: Path):
+        """Return cleanup for a test-only race attempted before atomic mutation."""
+        if self.attempted or mutation_kind != self.race_point:
+            return lambda: None
+        assert Path(guarded_directory) == self.skills
+        self.attempted = True
+        displaced = self.skills.with_name(f"{self.skills.name}.displaced")
+        try:
+            self.skills.rename(displaced)
+        except OSError:
+            # Windows safety relies on a pinned directory handle opened without
+            # FILE_SHARE_DELETE, so the rename must be denied by the OS.
+            self.swap_blocked = True
+            return lambda: None
+
+        self.swap_succeeded = True
+        _create_directory_redirect(self.skills, self.outside)
+
+        def restore() -> None:
+            _remove_directory_redirect(self.skills)
+            displaced.rename(self.skills)
+            self.restored = True
+
+        return restore
+
+
 @pytest.mark.parametrize("race_point", ("lock", "staging", "publish"))
 def test_deploy_mutation_is_bound_to_guarded_directory_across_ancestor_swap(
     tmp_path,
-    monkeypatch,
     race_point,
 ):
-    """A verified path swap must neither publish outside nor consume old install."""
+    """Atomic mutation stays in its pinned directory while an ancestor is swapped."""
     deploy = load_deploy_module()
     target = tmp_path / "target-project"
     skills = target / ".agents" / "skills"
@@ -1083,54 +1106,29 @@ def test_deploy_mutation_is_bound_to_guarded_directory_across_ancestor_swap(
     outside = tmp_path / "outside-race-target"
     outside.mkdir()
     before_outside = _tree_snapshot(outside)
-    before_install = _tree_snapshot(installed)
-    platform = _InjectedDestinationPlatform(deploy)
-    triggered = False
-    real_mkdir = Path.mkdir
-    real_rename = Path.rename
+    platform = _AtomicMutationRacePlatform(
+        deploy,
+        race_point,
+        skills,
+        outside,
+    )
 
-    def race_once(operation):
-        nonlocal triggered
-        assert not triggered
-        triggered = True
-        return _swap_directory_during_mutation(skills, outside, operation)
+    result = deploy.deploy_one(REPO_ROOT, target, "codex", platform=platform)
 
-    def racing_mkdir(self, *args, **kwargs):
-        if (
-            not triggered
-            and (
-                (race_point == "lock" and self.name.endswith(".deploy.lock"))
-                or (race_point == "staging" and ".deploying." in self.name)
-            )
-        ):
-            return race_once(lambda: real_mkdir(self, *args, **kwargs))
-        return real_mkdir(self, *args, **kwargs)
-
-    def racing_rename(self, target_path):
-        target_path = Path(target_path)
-        if (
-            not triggered
-            and race_point == "publish"
-            and ".deploying." in self.name
-            and target_path == installed
-        ):
-            outside_staging = outside / self.name
-            real_mkdir(outside_staging)
-            (outside_staging / "attacker.bin").write_bytes(b"outside")
-            return race_once(lambda: real_rename(self, target_path))
-        return real_rename(self, target_path)
-
-    monkeypatch.setattr(Path, "mkdir", racing_mkdir)
-    monkeypatch.setattr(Path, "rename", racing_rename)
-
-    with pytest.raises(
-        RuntimeError,
-        match="unsafe|identity|ancestor|changed|race|protected|rename",
-    ):
-        deploy.deploy_one(REPO_ROOT, target, "codex", platform=platform)
-
-    assert triggered, f"the deterministic {race_point} mutation hook did not run"
+    assert result.action == "deployed"
+    assert platform.attempted, (
+        f"the atomic mutation capability did not invoke the {race_point} race hook"
+    )
+    if os.name == "nt":
+        assert platform.swap_blocked, (
+            "the pinned Windows directory handle allowed an ancestor rename"
+        )
+    else:
+        assert platform.swap_succeeded
+        assert platform.restored
     assert _tree_snapshot(outside) == before_outside
-    assert _tree_snapshot(installed) == before_install
+    assert not (installed / "sentinel.bin").exists()
+    installed_manifest = deploy.read_release_manifest(installed)
+    deploy.verify_release_payload(installed, installed_manifest)
     _assert_no_deploy_residue(target)
     _assert_no_deploy_residue(outside)
