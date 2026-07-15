@@ -302,3 +302,57 @@ def test_runtime_python_never_reads_development_coverage_sidecars():
         assert not any(
             token in literal for token in forbidden for literal in call_literals
         ), path
+
+
+@pytest.mark.parametrize("module", ["mcu", "adc"])
+def test_module_overrides_never_classify_by_unqualified_basename(module):
+    overrides = json.loads(
+        (ROOT / f"tools/xdm-coverage-overrides/{module}.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    selectors = [rule["match"] for rule in overrides["rules"]]
+    selectors.extend(
+        selector
+        for group in overrides.get("known_gap_rules", {}).values()
+        for selector in group
+    )
+    assert all("name" not in selector and "key_regex" not in selector for selector in selectors)
+    assert all(
+        set(selector) & {"key", "keys", "path", "paths", "path_prefixes"}
+        for selector in selectors
+    )
+
+
+def test_mcu_coverage_is_pll0_exact_and_traces_every_actual_edit():
+    sidecar = json.loads((COVERAGE_ROOT / "mcu.json").read_text(encoding="utf-8"))
+    items = sidecar["items"]
+    actual = {
+        "McuNoPll", "McuPll0UnderMcuControl", "McuPLLUnderMcuControl",
+        "McuPLLEnabled", "McuPllOdiv0_En", "McuPllOdiv1_En",
+        "McuClkMux0_Source", "McuClockReferencePoint", "McuClockFrequencySelect",
+    }
+    assert all(
+        item["classification"] != "deferred"
+        for item in items if item["name"] in actual and "ctr[McuPll_1]" not in item["path"]
+    )
+    assert all(
+        item["classification"] == "deferred"
+        for item in items
+        if "ctr[McuPll_1]" in item["path"] or "ctr[McuPll_Parameter]" in item["path"]
+    )
+
+
+def test_adc_created_parent_structures_are_coverage_accounted():
+    sidecar = json.loads((COVERAGE_ROOT / "adc.json").read_text(encoding="utf-8"))
+    required = {
+        "AdcHwUnit", "AdcChannel", "AdcGroup", "AdcGroupConversionConfiguration",
+        "AdcThresholdControl", "AdcHwTrigger", "AdcHwConfiguration", "BctuHwUnit",
+        "BctuInternalTrigger", "BctuListItems", "BctuResultFifos",
+        "BctuAdcNotifications",
+    }
+    observed = {
+        item["name"] for item in sidecar["items"]
+        if item["name"] in required and item["classification"] != "deferred"
+    }
+    assert observed == required
