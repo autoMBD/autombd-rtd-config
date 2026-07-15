@@ -5,18 +5,45 @@
     "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
   },
   "known_gap_rules": {
-    "adc_dspss": [{"key_regex": "Dspss|DSPSS", "name_not": "SdadcDspssInitDmaChannelId"}],
-    "adc_self_test": [{"key_regex": "SelfTest|Self_Test"}],
-    "adc_timing": [{"key_regex": "ConvTimings|SamplingDuration"}],
-    "adc_general": [{"name": "AdcGeneral"}],
-    "adc_power": [{"key_regex": "Power|LowPower"}],
-    "adc_published_information": [{"key_regex": "PublishedInformation"}],
-    "adc_autosar_extension": [{"key_regex": "AutosarExt", "name_not": "SdadcDspssInitDmaChannelId"}]
+    "adc_dspss": [{
+      "path_prefixes": ["/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/"],
+      "names": ["SdAdcDspssBufferOutputLength", "SdAdcDspssCalibrationGain", "SdAdcDspssCalibrationOffset", "SdAdcDspssCalibrationUse", "SdAdcDspssFIRCoefficients", "SdAdcDspssFIRDownsamplingFactor", "SdAdcDspssFIRTaps", "SdAdcDspssFIRUpsamplingFactor", "SdAdcDspssFilterConfiguration", "SdAdcDspssIIRCoefficients", "SdAdcDspssIIROrder", "SdAdcDspssIIRShift", "SdAdcDspssIIRTaps", "SdAdcDspssInputThreshold", "SdAdcDspssNumberSkippedSamples", "SdAdcDspssOptimizationLevel", "SdAdcDspssOutputThreshold", "SdAdcDspssSchedMode", "SdAdcDspssScheduleOrder", "SdAdcDspssSpecificConfiguration", "SdadcDspssEnable", "SdadcDspssErrorNotif", "SdadcDspssErrorNotifCapability"]
+    }],
+    "adc_self_test": [{
+      "path_prefixes": ["/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/"],
+      "names": ["AdcEnableSelfTest", "AdcSTAW0RSelfTestHighThresholdValue", "AdcSTAW0RSelfTestLowThresholdValue", "AdcSTAW1RSelfTestLowThresholdValue", "AdcSTAW2RSelfTestLowThresholdValue", "AdcSTAW4RSelfTestHighThresholdValue", "AdcSTAW5RSelfTestHighThresholdValue", "AdcSelfTestThresholdConfiguration"]
+    }],
+    "adc_timing": [{
+      "path_prefixes": ["/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/"],
+      "names": ["AdcAltGroupSamplingDuration0", "AdcAltGroupSamplingDuration1", "AdcAltGroupSamplingDuration2", "AdcAlternateConvTimings", "AdcAlternateGroupConvTimings", "AdcGroupAltHardwareAverageEnable", "AdcGroupAltHardwareAverageSelect", "AdcHardwareAverageEnable", "AdcHardwareAverageEnableAlternate", "AdcHardwareAverageSelect", "AdcHardwareAverageSelectAlternate", "AdcNormalConvTimings", "AdcSamplingDurationAlt0", "AdcSamplingDurationAlt1", "AdcSamplingDurationAlt2", "AdcSamplingDurationNormal0", "AdcSamplingDurationNormal1", "AdcSamplingDurationNormal2"]
+    }],
+    "adc_general": [{
+      "paths": ["/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcGeneral]"]
+    }],
+    "adc_power": [{
+      "path_prefixes": ["/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/"],
+      "names": ["AdcAltPowerDownDelay", "AdcLowPowerStatesSupport", "AdcPowerDownDelay", "AdcPowerState", "AdcPowerStateAsynchTransitionMode", "AdcPowerStateConfig", "AdcPowerStateReadyCbkRef", "AdcSarPowerOnTempSense", "AdcSetHwUnitPowerModeApi", "BctuLowPowerMode"]
+    }],
+    "adc_published_information": [{
+      "path_prefixes": ["/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/"],
+      "names": ["AdcChannelValueSigned", "AdcGroupFirstChannelFixed", "AdcMaxChannelResolution", "AdcPublishedInformation", "ArReleaseMajorVersion", "ArReleaseMinorVersion", "ArReleaseRevisionVersion", "CommonPublishedInformation", "ModuleId", "SwMajorVersion", "SwMinorVersion", "SwPatchVersion", "VendorApiInfix", "VendorId"]
+    }],
+    "adc_autosar_extension": [{
+      "path_prefixes": ["/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AutosarExt]"],
+      "names": ["AdcBypassAbortChainCheck", "AdcConvTimeOnce", "AdcCtuHardwareTriggerOptimization", "AdcEnableApplyCalibration", "AdcEnableAsyncCalibration", "AdcEnableCalibration", "AdcEnableChDisableChApi", "AdcEnableCtuControlModeApi", "AdcEnableCtuTrigAutosarExtApi", "AdcEnableDmaErrorNotification", "AdcEnableDmaTransferMode", "AdcEnableDualClockMode", "AdcEnableGroupDependentChannelNames", "AdcEnableGroupStreamingResultReorder", "AdcEnableInitialNotification", "AdcEnableReadRawDataApi", "AdcEnableSelfTest", "AdcEnableSetChannel", "AdcEnableThresholdConfigurationApi", "AdcEnableUserModeSupport", "AdcGetInjectedConvStatusApi", "AdcMaxPartitions", "AdcMultiPartitionSupport", "AdcOptimizeDmaStreamingGroups", "AdcOptimizeOneShotHwTriggerConversions", "AdcPreSamplingOnce", "AdcSarEnable", "AdcSarEnableTempsenseApi", "AdcSarIpDevErrorDetect", "AdcSarPowerOnTempSense", "AdcSarTempSenseVsupply", "AdcSetHwUnitPowerModeApi", "AdcSetUserGainAndOffset", "AdcTimeoutMethod", "AdcTimeoutVal", "AdcUseHardwareNormalGroups", "AdcUseSoftwareInjectedGroups", "AutosarExt", "BctuIpDevErrorDetect", "CtuEnableDmaTransferMode", "SdAdcDspssSchedMode", "SdadcDspssEnable", "SdadcDspssErrorNotifCapability", "SdadcEnable", "SdadcIpDevErrorDetect"]
+    }]
   },
   "rules": [
     {
       "match": {
-        "key_regex": "\\[(AdcHwUnitId|AdcTransferType|AdcGroupAccessMode|AdcGroupConversionMode|AdcGroupTriggSrc|AdcStreamingNumSamples|AdcNotification|AdcGroupDefinition|AdcChannelName|AdcChannelId|AdcEnableThresholds|AdcThresholdRegister|AdcWdogNotification|AdcThresholdControlRegister|AdcHighThreshold|AdcLowThreshold|AdcHwTrigger|AdcHwTrigSrc|BctuInternalTrigger|BctuDataDestination|BctuTriggerConversionMode|BctuAdcChannelSingle|BctuListItems|BctuResultFifos|BctuFifoDmaEnable|BctuFifoDmaChannelId|BctuAdcNewDataNotification|BctuWatermarkNotification)\\]$"
+        "path_prefixes": [
+          "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]",
+          "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/lst[AdcHwConfiguration]"
+        ],
+        "names": [
+          "AdcHwUnit", "AdcChannel", "AdcGroup", "AdcGroupConversionConfiguration", "AdcThresholdControl", "AdcHwTrigger", "AdcHwConfiguration", "BctuHwUnit", "BctuInternalTrigger", "BctuListItems", "BctuResultFifos", "BctuAdcNotifications", "AdcGroupDefinition",
+          "AdcHwUnitId", "AdcTransferType", "AdcGroupAccessMode", "AdcGroupConversionMode", "AdcGroupTriggSrc", "AdcStreamingNumSamples", "AdcNotification", "AdcChannelName", "AdcEnableThresholds", "AdcThresholdRegister", "AdcWdogNotification", "AdcThresholdControlRegister", "AdcHighThreshold", "AdcLowThreshold", "AdcHwTrigSrc", "BctuDataDestination", "BctuTriggerConversionMode", "BctuAdcChannelSingle", "BctuResultFifoIndex", "BctuFifoDmaEnable", "BctuFifoDmaChannelId", "BctuAdcNewDataNotification", "BctuWatermarkNotification"
+        ]
       },
       "classification": "configurable",
       "trace": {
@@ -32,17 +59,22 @@
     },
     {
       "match": {
-        "key_regex": "\\[(AdcEnableWatchdogApi|WdgThresholdEnable|AdcPrescale|AdcSamplingDuration0|AdcSamplingDuration1|AdcSamplingDuration2|AdcGroupConversionType|AdcGroupHwTriggerSource|BctuTriggerSource|BctuAdcTargetMask|BctuLastChannel|BctuWatermarkValue)\\]$"
+        "path_prefixes": [
+          "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]",
+          "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/lst[AdcHwConfiguration]",
+          "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AutosarExt]"
+        ],
+        "names": [
+          "AdcLogicalChannelId", "AdcChannelId", "AdcEnablePresampling", "AdcGroupId", "AdcGroupHwTriggerSource", "AdcGroupConversionType", "AdcExtraNotification", "AdcDmaErrorNotification", "AdcStreamingBufferMode", "AdcEnableOptimizeDmaStreamingGroups", "AdcEnableHalfInterrupt", "AdcStreamResultGroup", "AdcEnableChDisableChGroup", "AdcWithoutInterrupts", "AdcWithoutDma", "AdcExtDMAChanEnable", "AdcGroupHardwareAverageEnable", "AdcGroupHardwareAverageSelect", "AdcSamplingDuration0", "AdcSamplingDuration1", "AdcSamplingDuration2", "AdcAlternateGroupConvTimings", "AdcGroupAltHardwareAverageEnable", "AdcGroupAltHardwareAverageSelect", "AdcAltGroupSamplingDuration0", "AdcAltGroupSamplingDuration1", "AdcAltGroupSamplingDuration2",
+          "AdcLogicalUnitId", "AdcPrescale", "AdcAltPrescale", "AdcCalibrationPrescale", "AdcHighSpeedEnable", "AdcAltHighSpeedEnable", "AdcPowerDownDelay", "AdcAltPowerDownDelay", "AdcMuxDelay", "AdcAutoClockOff", "AdcBypassSampling", "AdcHwUnitOverwriteEn", "AdcPresamplingInternalSignal0", "AdcPresamplingInternalSignal1", "AdcPresamplingInternalSignal2", "AdcHwUnitUsrOffset", "AdcHwUnitUsrGain", "AdcHwUnitResolution", "AdcHwUnitBypassResolution", "AdcHwUnitDmaClearSource", "AdcSarHwUnitVref",
+          "AdcHwConfiguredId", "AdcNormalInterruptEnable", "AdcInjectedInterruptEnable", "AdcFifoFullInterruptEnable", "CtuFifoOfInterruptEnable", "WdgThresholdEnable", "DmaTransferEnable", "AdcHwTriggerApi", "AdcEnableCtuControlModeApi", "AdcEnableDmaTransferMode", "AdcEnableWatchdogApi",
+          "BctuTriggerSource", "BctuTriggerLoop", "BctuHwTriggerEnable", "BctuAdcTargetMask", "BctuConversionListStartIndex", "BctuAdcChannelList", "BctuNextChannelWaitOnTrig", "BctuLastChannel", "BctuWatermarkValue", "BctuFifoNotificationsEnable", "BctuUnderrunNotification", "BctuOverrunNotification", "BctuFifoDmaBuffer", "BctuHwUnitId", "BctuLogicalUnitId", "BctuLowPowerMode", "BctuGlobalHwTriggers", "BctuNewDataDMAEnableMask", "BctuFifoDmaRawData", "BctuTriggerNotification", "BctuAdcNotificationsAdcIndex", "BctuDataOverrunNotification", "BctuListLastConversionNotification"
+        ]
       },
       "classification": "derived",
       "trace": {
         "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
-        "inputs": [
-          "intent.payload.sampling_time_us",
-          "intent.payload.watchdog",
-          "intent.payload.bctu",
-          "adc.json#/sampling_derivation"
-        ],
+        "inputs": ["intent.payload", "adc.json#/sampling_derivation"],
         "tests": [
           "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
           "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",

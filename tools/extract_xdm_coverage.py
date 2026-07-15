@@ -280,6 +280,18 @@ def extract_descriptor(path: Path | str, *, module: str) -> dict:
 
 
 def _matches(item: dict, match: dict) -> bool:
+    if "names" in match and item.get("name") not in match["names"]:
+        return False
+    if "keys" in match and item.get("key") not in match["keys"]:
+        return False
+    if "path" in match and item.get("path") != match["path"]:
+        return False
+    if "paths" in match and item.get("path") not in match["paths"]:
+        return False
+    if "path_prefixes" in match and not any(
+        item.get("path", "").startswith(prefix) for prefix in match["path_prefixes"]
+    ):
+        return False
     if "name" in match and item.get("name") != match["name"]:
         return False
     if "name_not" in match and item.get("name") == match["name_not"]:

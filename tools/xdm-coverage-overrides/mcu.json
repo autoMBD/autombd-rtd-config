@@ -7,21 +7,26 @@
   "known_gap_rules": {
     "mcu_reset": [
       {
-        "kind": "variable",
-        "key_regex": "\\[McuResetConfig\\]"
+        "paths": [
+          "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Mcu]/ctr[MODULE-DEF]/ctr[McuModuleConfiguration]/ctr[McuResetConfig]",
+          "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Mcu]/ctr[MODULE-DEF]/ctr[McuModuleConfiguration]/ctr[McuResetConfig]/ctr[McuResetSourcesConfig]"
+        ]
       },
       {
-        "name": "McuResetConfig"
-      },
-      {
-        "name": "McuResetSourcesConfig"
+        "path_prefixes": [
+          "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Mcu]/ctr[MODULE-DEF]/ctr[McuModuleConfiguration]/ctr[McuResetConfig]/"
+        ],
+        "kind": "variable"
       }
     ]
   },
   "rules": [
     {
       "match": {
-        "key_regex": "\\[(McuClockReferencePoint|McuClockFrequencySelect)\\]$"
+        "path_prefixes": [
+          "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Mcu]/ctr[MODULE-DEF]/ctr[McuModuleConfiguration]/lst[McuClockSettingConfig]/ctr[McuClockSettingConfig]/lst[McuClockReferencePoint]"
+        ],
+        "names": ["McuClockReferencePoint", "McuClockFrequencySelect"]
       },
       "classification": "configurable",
       "trace": {
@@ -36,7 +41,16 @@
     },
     {
       "match": {
-        "key_regex": "\\[(McuNoPll|McuPll0UnderMcuControl|McuPLLUnderMcuControl|McuPllOdiv0_En|McuPllOdiv1_En|McuPll_Parameter|PLL_PHI0_Frequency|PLL_PHI1_Frequency|PLL_PHI2_Frequency|VCO_Frequency|clock_output)\\]$"
+        "path_prefixes": [
+          "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Mcu]/ctr[MODULE-DEF]/ctr[McuGeneralConfiguration]",
+          "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Mcu]/ctr[MODULE-DEF]/ctr[McuModuleConfiguration]/lst[McuClockSettingConfig]/ctr[McuClockSettingConfig]/ctr[McuPll_0]",
+          "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Mcu]/ctr[MODULE-DEF]/ctr[McuModuleConfiguration]/lst[McuClockSettingConfig]/ctr[McuClockSettingConfig]/ctr[McuCgm0SettingConfig]/ctr[McuCgm0ClockMux0]"
+        ],
+        "names": [
+          "McuNoPll", "McuPll0UnderMcuControl", "McuPLLUnderMcuControl",
+          "McuPLLEnabled", "McuPllOdiv0_En", "McuPllOdiv1_En",
+          "McuClkMux0_Source"
+        ]
       },
       "classification": "derived",
       "trace": {
@@ -48,12 +62,13 @@
           "clock.json#/recipes"
         ],
         "tests": [
-          "tests/unit/test_mcu_generality.py::test_recipe_still_pinned_after_forward_harden",
           "tests/unit/test_mcu_apply.py::test_mcu_no_pll_set_false_when_pll_enabled",
           "tests/unit/test_mcu_apply.py::test_mcu_pll0_under_mcu_control_in_general_config",
           "tests/unit/test_mcu_apply.py::test_mcu_pll_under_mcu_control_true",
+          "tests/unit/test_mcu_apply.py::test_mcu_pll_enabled_true",
           "tests/unit/test_mcu_apply.py::test_mcu_pll_odiv0_en_true",
-          "tests/unit/test_mcu_apply.py::test_mcu_pll_odiv1_en_true"
+          "tests/unit/test_mcu_apply.py::test_mcu_pll_odiv1_en_true",
+          "tests/unit/test_mcu_apply.py::test_mcu_cgm_mux0_source_pll_phi0"
         ]
       }
     }

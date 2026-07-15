@@ -586,6 +586,28 @@ def test_mcu_pll_parameter_quick_selection_preserved(tmp_path):
     )
 
 
+def test_mcu_pll1_and_both_parameter_subtrees_are_untouched(tmp_path):
+    project = copy_uart_fixture(tmp_path)
+    mex = project / "Uart_Example.mex"
+    doc = MexDocument.load(mex)
+
+    def snapshots(document, name):
+        return [
+            ET.tostring(element, encoding="utf-8")
+            for element in document.root.iter()
+            if element.tag.endswith("struct") and element.attrib.get("name") == name
+        ]
+
+    before_pll1 = snapshots(doc, "McuPll_1")
+    before_parameters = snapshots(doc, "McuPll_Parameter")
+    assert before_pll1 == [] and len(before_parameters) == 1
+
+    apply_mcu_set(doc, _std_intent())
+
+    assert snapshots(doc, "McuPll_1") == before_pll1
+    assert snapshots(doc, "McuPll_Parameter") == before_parameters
+
+
 # Test B7: McuClkMux0_Source changed to PLL_PHI0_CLK
 def test_mcu_cgm_mux0_source_pll_phi0(tmp_path):
     project = copy_uart_fixture(tmp_path)

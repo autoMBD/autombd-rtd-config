@@ -67,9 +67,17 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "configurable",
+      "trace": {
+        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/adc.py:AdcProvider",
+        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "asset": "autombd-rtd/assets/nxp/s32k3/adc/adc.json#/unit",
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_single_interrupt_on_s15",
+          "tests/unit/test_adc_generality.py::test_bctu_list_partition_4_4_fifo2",
+          "tests/unit/test_adc_generality.py::test_generality_configs_reapply_byte_stable"
+        ]
+      }
     },
     {
       "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/ctr[AdcAlternateConvTimings]",
@@ -292,9 +300,17 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "configurable",
+      "trace": {
+        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/adc.py:AdcProvider",
+        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "asset": "autombd-rtd/assets/nxp/s32k3/adc/adc.json#/unit",
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_single_interrupt_on_s15",
+          "tests/unit/test_adc_generality.py::test_bctu_list_partition_4_4_fifo2",
+          "tests/unit/test_adc_generality.py::test_generality_configs_reapply_byte_stable"
+        ]
+      }
     },
     {
       "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/lst[AdcGroup]/ctr[AdcGroup]",
@@ -327,9 +343,17 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "configurable",
+      "trace": {
+        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/adc.py:AdcProvider",
+        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "asset": "autombd-rtd/assets/nxp/s32k3/adc/adc.json#/unit",
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_single_interrupt_on_s15",
+          "tests/unit/test_adc_generality.py::test_bctu_list_partition_4_4_fifo2",
+          "tests/unit/test_adc_generality.py::test_generality_configs_reapply_byte_stable"
+        ]
+      }
     },
     {
       "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/lst[AdcGroup]/ctr[AdcGroup]/ctr[AdcAlternateGroupConvTimings]",
@@ -337,9 +361,20 @@
       "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/lst[AdcGroup]/ctr[AdcGroup]/ctr[AdcAlternateGroupConvTimings]",
       "name": "AdcAlternateGroupConvTimings",
       "type": "IDENTIFIABLE",
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/lst[AdcGroup]/ctr[AdcGroup]/ctr[AdcGroupConversionConfiguration]",
@@ -347,9 +382,17 @@
       "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/lst[AdcGroup]/ctr[AdcGroup]/ctr[AdcGroupConversionConfiguration]",
       "name": "AdcGroupConversionConfiguration",
       "type": "IDENTIFIABLE",
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "configurable",
+      "trace": {
+        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/adc.py:AdcProvider",
+        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "asset": "autombd-rtd/assets/nxp/s32k3/adc/adc.json#/unit",
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_single_interrupt_on_s15",
+          "tests/unit/test_adc_generality.py::test_bctu_list_partition_4_4_fifo2",
+          "tests/unit/test_adc_generality.py::test_generality_configs_reapply_byte_stable"
+        ]
+      }
     },
     {
       "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/lst[AdcThresholdControl]/ctr[AdcThresholdControl]",
@@ -382,9 +425,17 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "configurable",
+      "trace": {
+        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/adc.py:AdcProvider",
+        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "asset": "autombd-rtd/assets/nxp/s32k3/adc/adc.json#/unit",
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_single_interrupt_on_s15",
+          "tests/unit/test_adc_generality.py::test_bctu_list_partition_4_4_fifo2",
+          "tests/unit/test_adc_generality.py::test_generality_configs_reapply_byte_stable"
+        ]
+      }
     },
     {
       "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[BctuHwUnit]/ctr[BctuHwUnit]",
@@ -415,9 +466,17 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "configurable",
+      "trace": {
+        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/adc.py:AdcProvider",
+        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "asset": "autombd-rtd/assets/nxp/s32k3/adc/adc.json#/unit",
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_single_interrupt_on_s15",
+          "tests/unit/test_adc_generality.py::test_bctu_list_partition_4_4_fifo2",
+          "tests/unit/test_adc_generality.py::test_generality_configs_reapply_byte_stable"
+        ]
+      }
     },
     {
       "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[BctuHwUnit]/ctr[BctuHwUnit]/lst[BctuAdcNotifications]/ctr[BctuAdcNotifications]",
@@ -425,9 +484,17 @@
       "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[BctuHwUnit]/ctr[BctuHwUnit]/lst[BctuAdcNotifications]/ctr[BctuAdcNotifications]",
       "name": "BctuAdcNotifications",
       "type": "IDENTIFIABLE",
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "configurable",
+      "trace": {
+        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/adc.py:AdcProvider",
+        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "asset": "autombd-rtd/assets/nxp/s32k3/adc/adc.json#/unit",
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_single_interrupt_on_s15",
+          "tests/unit/test_adc_generality.py::test_bctu_list_partition_4_4_fifo2",
+          "tests/unit/test_adc_generality.py::test_generality_configs_reapply_byte_stable"
+        ]
+      }
     },
     {
       "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[BctuHwUnit]/ctr[BctuHwUnit]/lst[BctuInternalTrigger]/ctr[BctuInternalTrigger]",
@@ -539,9 +606,17 @@
       "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/lst[AdcHwConfiguration]/ctr[AdcHwConfiguration]",
       "name": "AdcHwConfiguration",
       "type": "IDENTIFIABLE",
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "configurable",
+      "trace": {
+        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/adc.py:AdcProvider",
+        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "asset": "autombd-rtd/assets/nxp/s32k3/adc/adc.json#/unit",
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_single_interrupt_on_s15",
+          "tests/unit/test_adc_generality.py::test_bctu_list_partition_4_4_fifo2",
+          "tests/unit/test_adc_generality.py::test_generality_configs_reapply_byte_stable"
+        ]
+      }
     },
     {
       "key": "list:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwTrigger]",
@@ -656,9 +731,17 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "configurable",
+      "trace": {
+        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/adc.py:AdcProvider",
+        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "asset": "autombd-rtd/assets/nxp/s32k3/adc/adc.json#/unit",
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_single_interrupt_on_s15",
+          "tests/unit/test_adc_generality.py::test_bctu_list_partition_4_4_fifo2",
+          "tests/unit/test_adc_generality.py::test_generality_configs_reapply_byte_stable"
+        ]
+      }
     },
     {
       "key": "list:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/ctr[SdAdcHwUnitSpecificConfiguration]/ctr[SdAdcDspssSpecificConfiguration]/lst[SdAdcDspssFIRTaps]",
@@ -845,9 +928,17 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "configurable",
+      "trace": {
+        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/adc.py:AdcProvider",
+        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "asset": "autombd-rtd/assets/nxp/s32k3/adc/adc.json#/unit",
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_single_interrupt_on_s15",
+          "tests/unit/test_adc_generality.py::test_bctu_list_partition_4_4_fifo2",
+          "tests/unit/test_adc_generality.py::test_generality_configs_reapply_byte_stable"
+        ]
+      }
     },
     {
       "key": "list:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/lst[AdcGroup]",
@@ -870,9 +961,17 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "configurable",
+      "trace": {
+        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/adc.py:AdcProvider",
+        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "asset": "autombd-rtd/assets/nxp/s32k3/adc/adc.json#/unit",
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_single_interrupt_on_s15",
+          "tests/unit/test_adc_generality.py::test_bctu_list_partition_4_4_fifo2",
+          "tests/unit/test_adc_generality.py::test_generality_configs_reapply_byte_stable"
+        ]
+      }
     },
     {
       "key": "list:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/lst[AdcGroup]/ctr[AdcGroup]/lst[AdcGroupDefinition]",
@@ -1102,9 +1201,17 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "configurable",
+      "trace": {
+        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/adc.py:AdcProvider",
+        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "asset": "autombd-rtd/assets/nxp/s32k3/adc/adc.json#/unit",
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_single_interrupt_on_s15",
+          "tests/unit/test_adc_generality.py::test_bctu_list_partition_4_4_fifo2",
+          "tests/unit/test_adc_generality.py::test_generality_configs_reapply_byte_stable"
+        ]
+      }
     },
     {
       "key": "list:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[BctuHwUnit]",
@@ -1166,9 +1273,17 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "configurable",
+      "trace": {
+        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/adc.py:AdcProvider",
+        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "asset": "autombd-rtd/assets/nxp/s32k3/adc/adc.json#/unit",
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_single_interrupt_on_s15",
+          "tests/unit/test_adc_generality.py::test_bctu_list_partition_4_4_fifo2",
+          "tests/unit/test_adc_generality.py::test_generality_configs_reapply_byte_stable"
+        ]
+      }
     },
     {
       "key": "list:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[BctuHwUnit]/ctr[BctuHwUnit]/lst[BctuAdcNotifications]",
@@ -1214,9 +1329,17 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "configurable",
+      "trace": {
+        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/adc.py:AdcProvider",
+        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "asset": "autombd-rtd/assets/nxp/s32k3/adc/adc.json#/unit",
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_single_interrupt_on_s15",
+          "tests/unit/test_adc_generality.py::test_bctu_list_partition_4_4_fifo2",
+          "tests/unit/test_adc_generality.py::test_generality_configs_reapply_byte_stable"
+        ]
+      }
     },
     {
       "key": "list:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[BctuHwUnit]/ctr[BctuHwUnit]/lst[BctuInternalTrigger]",
@@ -1472,9 +1595,17 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "configurable",
+      "trace": {
+        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/adc.py:AdcProvider",
+        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "asset": "autombd-rtd/assets/nxp/s32k3/adc/adc.json#/unit",
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_single_interrupt_on_s15",
+          "tests/unit/test_adc_generality.py::test_bctu_list_partition_4_4_fifo2",
+          "tests/unit/test_adc_generality.py::test_generality_configs_reapply_byte_stable"
+        ]
+      }
     },
     {
       "key": "reference:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/lst[AdcChannel]/ctr[AdcChannel]/ref[AdcThresholdRegister]",
@@ -1729,9 +1860,7 @@
       "trace": {
         "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
         "inputs": [
-          "intent.payload.sampling_time_us",
-          "intent.payload.watchdog",
-          "intent.payload.bctu",
+          "intent.payload",
           "adc.json#/sampling_derivation"
         ],
         "tests": [
@@ -1952,9 +2081,20 @@
       "reference": "ASPathDataOfSchema:/AUTOSAR/EcucDefs/Adc/AdcConfigSet/AdcHwUnit",
       "cross_references": [],
       "cross_modules": [],
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "reference:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[BctuHwUnit]/ctr[BctuHwUnit]/lst[BctuInternalTrigger]/ctr[BctuInternalTrigger]/ref[BctuAdcChannelSingle]",
@@ -2069,9 +2209,7 @@
       "trace": {
         "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
         "inputs": [
-          "intent.payload.sampling_time_us",
-          "intent.payload.watchdog",
-          "intent.payload.bctu",
+          "intent.payload",
           "adc.json#/sampling_derivation"
         ],
         "tests": [
@@ -5401,15 +5539,18 @@
           }
         ]
       },
-      "classification": "configurable",
+      "classification": "derived",
       "trace": {
-        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/adc.py:AdcProvider",
-        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
-        "asset": "autombd-rtd/assets/nxp/s32k3/adc/adc.json#/unit",
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
         "tests": [
-          "tests/unit/test_adc_generality.py::test_adc0_single_interrupt_on_s15",
-          "tests/unit/test_adc_generality.py::test_bctu_list_partition_4_4_fifo2",
-          "tests/unit/test_adc_generality.py::test_generality_configs_reapply_byte_stable"
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
         ]
       }
     },
@@ -6052,9 +6193,20 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/lst[AdcChannel]/ctr[AdcChannel]/var[AdcEnableThresholds]",
@@ -6215,9 +6367,20 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/lst[AdcChannel]/ctr[AdcChannel]/var[AdcWdogNotification]",
@@ -6365,9 +6528,20 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/lst[AdcGroup]/ctr[AdcGroup]/ctr[AdcAlternateGroupConvTimings]/var[AdcAltGroupSamplingDuration1]",
@@ -6438,9 +6612,20 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/lst[AdcGroup]/ctr[AdcGroup]/ctr[AdcAlternateGroupConvTimings]/var[AdcAltGroupSamplingDuration2]",
@@ -6511,9 +6696,20 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/lst[AdcGroup]/ctr[AdcGroup]/ctr[AdcAlternateGroupConvTimings]/var[AdcGroupAltHardwareAverageEnable]",
@@ -6557,9 +6753,20 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/lst[AdcGroup]/ctr[AdcGroup]/ctr[AdcAlternateGroupConvTimings]/var[AdcGroupAltHardwareAverageSelect]",
@@ -6626,9 +6833,20 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/lst[AdcGroup]/ctr[AdcGroup]/ctr[AdcGroupConversionConfiguration]/var[AdcGroupHardwareAverageEnable]",
@@ -6672,9 +6890,20 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/lst[AdcGroup]/ctr[AdcGroup]/ctr[AdcGroupConversionConfiguration]/var[AdcGroupHardwareAverageSelect]",
@@ -6741,9 +6970,20 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/lst[AdcGroup]/ctr[AdcGroup]/ctr[AdcGroupConversionConfiguration]/var[AdcSamplingDuration0]",
@@ -6818,9 +7058,7 @@
       "trace": {
         "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
         "inputs": [
-          "intent.payload.sampling_time_us",
-          "intent.payload.watchdog",
-          "intent.payload.bctu",
+          "intent.payload",
           "adc.json#/sampling_derivation"
         ],
         "tests": [
@@ -6904,9 +7142,7 @@
       "trace": {
         "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
         "inputs": [
-          "intent.payload.sampling_time_us",
-          "intent.payload.watchdog",
-          "intent.payload.bctu",
+          "intent.payload",
           "adc.json#/sampling_derivation"
         ],
         "tests": [
@@ -6990,9 +7226,7 @@
       "trace": {
         "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
         "inputs": [
-          "intent.payload.sampling_time_us",
-          "intent.payload.watchdog",
-          "intent.payload.bctu",
+          "intent.payload",
           "adc.json#/sampling_derivation"
         ],
         "tests": [
@@ -7045,9 +7279,20 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/lst[AdcGroup]/ctr[AdcGroup]/var[AdcEnableChDisableChGroup]",
@@ -7106,9 +7351,20 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/lst[AdcGroup]/ctr[AdcGroup]/var[AdcEnableHalfInterrupt]",
@@ -7180,9 +7436,20 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/lst[AdcGroup]/ctr[AdcGroup]/var[AdcEnableOptimizeDmaStreamingGroups]",
@@ -7286,9 +7553,20 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/lst[AdcGroup]/ctr[AdcGroup]/var[AdcExtDMAChanEnable]",
@@ -7334,9 +7612,20 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/lst[AdcGroup]/ctr[AdcGroup]/var[AdcExtraNotification]",
@@ -7380,9 +7669,20 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/lst[AdcGroup]/ctr[AdcGroup]/var[AdcGroupAccessMode]",
@@ -7705,9 +8005,7 @@
       "trace": {
         "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
         "inputs": [
-          "intent.payload.sampling_time_us",
-          "intent.payload.watchdog",
-          "intent.payload.bctu",
+          "intent.payload",
           "adc.json#/sampling_derivation"
         ],
         "tests": [
@@ -7822,9 +8120,20 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/lst[AdcGroup]/ctr[AdcGroup]/var[AdcGroupPriority]",
@@ -8321,9 +8630,20 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/lst[AdcGroup]/ctr[AdcGroup]/var[AdcStreamingBufferMode]",
@@ -8409,9 +8729,20 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/lst[AdcGroup]/ctr[AdcGroup]/var[AdcStreamingNumSamples]",
@@ -8577,9 +8908,20 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/lst[AdcGroup]/ctr[AdcGroup]/var[AdcWithoutInterrupts]",
@@ -8602,9 +8944,20 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/lst[AdcThresholdControl]/ctr[AdcThresholdControl]/var[AdcHighThreshold]",
@@ -8949,9 +9302,20 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/var[AdcAltPowerDownDelay]",
@@ -9022,9 +9386,20 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/var[AdcAltPrescale]",
@@ -9126,9 +9501,20 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/var[AdcAutoClockOff]",
@@ -9151,9 +9537,20 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/var[AdcBypassSampling]",
@@ -9197,9 +9594,20 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/var[AdcCalibrationPrescale]",
@@ -9293,9 +9701,20 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/var[AdcClockSource]",
@@ -9373,9 +9792,20 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/var[AdcHwUnitBypassResolution]",
@@ -9398,9 +9828,20 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/var[AdcHwUnitDmaClearSource]",
@@ -9478,9 +9919,20 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/var[AdcHwUnitId]",
@@ -9676,9 +10128,20 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/var[AdcHwUnitResolution]",
@@ -9728,9 +10191,20 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/var[AdcHwUnitUsrGain]",
@@ -9803,9 +10277,20 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/var[AdcHwUnitUsrOffset]",
@@ -9855,9 +10340,20 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/var[AdcLogicalUnitId]",
@@ -9938,9 +10434,20 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/var[AdcMuxDelay]",
@@ -9990,9 +10497,20 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/var[AdcPowerDownDelay]",
@@ -10042,9 +10560,20 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/var[AdcPresamplingInternalSignal0]",
@@ -10099,9 +10628,20 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/var[AdcPresamplingInternalSignal1]",
@@ -10156,9 +10696,20 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/var[AdcPresamplingInternalSignal2]",
@@ -10213,9 +10764,20 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/var[AdcPrescale]",
@@ -10321,9 +10883,7 @@
       "trace": {
         "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
         "inputs": [
-          "intent.payload.sampling_time_us",
-          "intent.payload.watchdog",
-          "intent.payload.bctu",
+          "intent.payload",
           "adc.json#/sampling_derivation"
         ],
         "tests": [
@@ -10403,9 +10963,20 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/var[AdcTransferType]",
@@ -10583,9 +11154,20 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[BctuHwUnit]/ctr[BctuHwUnit]/lst[BctuAdcNotifications]/ctr[BctuAdcNotifications]/var[BctuListLastConversionNotification]",
@@ -10621,9 +11203,20 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[BctuHwUnit]/ctr[BctuHwUnit]/lst[BctuInternalTrigger]/ctr[BctuInternalTrigger]/var[BctuAdcTargetMask]",
@@ -10718,9 +11311,7 @@
       "trace": {
         "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
         "inputs": [
-          "intent.payload.sampling_time_us",
-          "intent.payload.watchdog",
-          "intent.payload.bctu",
+          "intent.payload",
           "adc.json#/sampling_derivation"
         ],
         "tests": [
@@ -10817,9 +11408,20 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[BctuHwUnit]/ctr[BctuHwUnit]/lst[BctuInternalTrigger]/ctr[BctuInternalTrigger]/var[BctuDataDestination]",
@@ -10901,9 +11503,20 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[BctuHwUnit]/ctr[BctuHwUnit]/lst[BctuInternalTrigger]/ctr[BctuInternalTrigger]/var[BctuTriggerConversionMode]",
@@ -10991,9 +11604,20 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[BctuHwUnit]/ctr[BctuHwUnit]/lst[BctuListItems]/ctr[BctuListItems]/var[BctuAdcChannelList]",
@@ -11029,9 +11653,20 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[BctuHwUnit]/ctr[BctuHwUnit]/lst[BctuListItems]/ctr[BctuListItems]/var[BctuLastChannel]",
@@ -11071,9 +11706,7 @@
       "trace": {
         "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
         "inputs": [
-          "intent.payload.sampling_time_us",
-          "intent.payload.watchdog",
-          "intent.payload.bctu",
+          "intent.payload",
           "adc.json#/sampling_derivation"
         ],
         "tests": [
@@ -11118,9 +11751,20 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[BctuHwUnit]/ctr[BctuHwUnit]/lst[BctuResultFifos]/ctr[BctuResultFifos]/var[BctuFifoDmaBuffer]",
@@ -11187,9 +11831,20 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[BctuHwUnit]/ctr[BctuHwUnit]/lst[BctuResultFifos]/ctr[BctuResultFifos]/var[BctuFifoDmaEnable]",
@@ -11302,9 +11957,20 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[BctuHwUnit]/ctr[BctuHwUnit]/lst[BctuResultFifos]/ctr[BctuResultFifos]/var[BctuOverrunNotification]",
@@ -11340,9 +12006,20 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[BctuHwUnit]/ctr[BctuHwUnit]/lst[BctuResultFifos]/ctr[BctuResultFifos]/var[BctuResultFifoIndex]",
@@ -11401,9 +12078,17 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "configurable",
+      "trace": {
+        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/adc.py:AdcProvider",
+        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "asset": "autombd-rtd/assets/nxp/s32k3/adc/adc.json#/unit",
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_single_interrupt_on_s15",
+          "tests/unit/test_adc_generality.py::test_bctu_list_partition_4_4_fifo2",
+          "tests/unit/test_adc_generality.py::test_generality_configs_reapply_byte_stable"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[BctuHwUnit]/ctr[BctuHwUnit]/lst[BctuResultFifos]/ctr[BctuResultFifos]/var[BctuUnderrunNotification]",
@@ -11439,9 +12124,20 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[BctuHwUnit]/ctr[BctuHwUnit]/lst[BctuResultFifos]/ctr[BctuResultFifos]/var[BctuWatermarkNotification]",
@@ -11574,9 +12270,7 @@
       "trace": {
         "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
         "inputs": [
-          "intent.payload.sampling_time_us",
-          "intent.payload.watchdog",
-          "intent.payload.bctu",
+          "intent.payload",
           "adc.json#/sampling_derivation"
         ],
         "tests": [
@@ -11608,9 +12302,20 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[BctuHwUnit]/ctr[BctuHwUnit]/var[BctuGlobalHwTriggers]",
@@ -11646,9 +12351,20 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[BctuHwUnit]/ctr[BctuHwUnit]/var[BctuHwUnitId]",
@@ -11729,9 +12445,20 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[BctuHwUnit]/ctr[BctuHwUnit]/var[BctuLogicalUnitId]",
@@ -11812,9 +12539,20 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[BctuHwUnit]/ctr[BctuHwUnit]/var[BctuLowPowerMode]",
@@ -11850,9 +12588,20 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[BctuHwUnit]/ctr[BctuHwUnit]/var[BctuNewDataDMAEnableMask]",
@@ -11915,9 +12664,20 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[BctuHwUnit]/ctr[BctuHwUnit]/var[BctuTriggerNotification]",
@@ -11953,9 +12713,20 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcGeneral]/lst[AdcPowerStateConfig]/ctr[AdcPowerStateConfig]/var[AdcPowerStateReadyCbkRef]",
@@ -13100,9 +13871,20 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AutosarExt]/var[AdcEnableCtuTrigAutosarExtApi]",
@@ -13265,9 +14047,20 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AutosarExt]/var[AdcEnableDualClockMode]",
@@ -13715,9 +14508,7 @@
       "trace": {
         "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
         "inputs": [
-          "intent.payload.sampling_time_us",
-          "intent.payload.watchdog",
-          "intent.payload.bctu",
+          "intent.payload",
           "adc.json#/sampling_derivation"
         ],
         "tests": [
@@ -15432,9 +16223,20 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/lst[AdcHwConfiguration]/ctr[AdcHwConfiguration]/var[AdcHwConfiguredId]",
@@ -15493,9 +16295,20 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/lst[AdcHwConfiguration]/ctr[AdcHwConfiguration]/var[AdcInjectedInterruptEnable]",
@@ -15531,9 +16344,20 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/lst[AdcHwConfiguration]/ctr[AdcHwConfiguration]/var[AdcNormalInterruptEnable]",
@@ -15569,9 +16393,20 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/lst[AdcHwConfiguration]/ctr[AdcHwConfiguration]/var[CtuFifoOfInterruptEnable]",
@@ -15607,9 +16442,20 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/lst[AdcHwConfiguration]/ctr[AdcHwConfiguration]/var[DmaTransferEnable]",
@@ -15632,9 +16478,20 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "adc.json#/sampling_derivation"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/lst[AdcHwConfiguration]/ctr[AdcHwConfiguration]/var[WdgThresholdEnable]",
@@ -15661,9 +16518,7 @@
       "trace": {
         "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
         "inputs": [
-          "intent.payload.sampling_time_us",
-          "intent.payload.watchdog",
-          "intent.payload.bctu",
+          "intent.payload",
           "adc.json#/sampling_derivation"
         ],
         "tests": [
@@ -15773,9 +16628,9 @@
   },
   "summary": {
     "total": 279,
-    "configurable": 33,
-    "deferred": 234,
-    "derived": 12
+    "configurable": 48,
+    "deferred": 150,
+    "derived": 81
   },
   "known_gaps": {
     "adc_dspss": [
@@ -15818,7 +16673,6 @@
     "adc_timing": [
       "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/ctr[AdcAlternateConvTimings]",
       "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/ctr[AdcNormalConvTimings]",
-      "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/lst[AdcGroup]/ctr[AdcGroup]/ctr[AdcAlternateGroupConvTimings]",
       "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/ctr[AdcAlternateConvTimings]/var[AdcHardwareAverageEnableAlternate]",
       "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/ctr[AdcAlternateConvTimings]/var[AdcHardwareAverageSelectAlternate]",
       "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/ctr[AdcAlternateConvTimings]/var[AdcSamplingDurationAlt0]",
@@ -15828,12 +16682,7 @@
       "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/ctr[AdcNormalConvTimings]/var[AdcHardwareAverageSelect]",
       "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/ctr[AdcNormalConvTimings]/var[AdcSamplingDurationNormal0]",
       "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/ctr[AdcNormalConvTimings]/var[AdcSamplingDurationNormal1]",
-      "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/ctr[AdcNormalConvTimings]/var[AdcSamplingDurationNormal2]",
-      "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/lst[AdcGroup]/ctr[AdcGroup]/ctr[AdcAlternateGroupConvTimings]/var[AdcAltGroupSamplingDuration0]",
-      "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/lst[AdcGroup]/ctr[AdcGroup]/ctr[AdcAlternateGroupConvTimings]/var[AdcAltGroupSamplingDuration1]",
-      "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/lst[AdcGroup]/ctr[AdcGroup]/ctr[AdcAlternateGroupConvTimings]/var[AdcAltGroupSamplingDuration2]",
-      "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/lst[AdcGroup]/ctr[AdcGroup]/ctr[AdcAlternateGroupConvTimings]/var[AdcGroupAltHardwareAverageEnable]",
-      "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/lst[AdcGroup]/ctr[AdcGroup]/ctr[AdcAlternateGroupConvTimings]/var[AdcGroupAltHardwareAverageSelect]"
+      "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/ctr[AdcNormalConvTimings]/var[AdcSamplingDurationNormal2]"
     ],
     "adc_general": [
       "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcGeneral]"
@@ -15841,9 +16690,6 @@
     "adc_power": [
       "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcGeneral]/lst[AdcPowerStateConfig]/ctr[AdcPowerStateConfig]",
       "list:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcGeneral]/lst[AdcPowerStateConfig]",
-      "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/var[AdcAltPowerDownDelay]",
-      "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[AdcHwUnit]/ctr[AdcHwUnit]/var[AdcPowerDownDelay]",
-      "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[BctuHwUnit]/ctr[BctuHwUnit]/var[BctuLowPowerMode]",
       "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcGeneral]/lst[AdcPowerStateConfig]/ctr[AdcPowerStateConfig]/var[AdcPowerStateReadyCbkRef]",
       "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcGeneral]/lst[AdcPowerStateConfig]/ctr[AdcPowerStateConfig]/var[AdcPowerState]",
       "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcGeneral]/var[AdcLowPowerStatesSupport]",
@@ -15876,10 +16722,8 @@
       "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AutosarExt]/var[AdcEnableAsyncCalibration]",
       "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AutosarExt]/var[AdcEnableCalibration]",
       "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AutosarExt]/var[AdcEnableChDisableChApi]",
-      "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AutosarExt]/var[AdcEnableCtuControlModeApi]",
       "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AutosarExt]/var[AdcEnableCtuTrigAutosarExtApi]",
       "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AutosarExt]/var[AdcEnableDmaErrorNotification]",
-      "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AutosarExt]/var[AdcEnableDmaTransferMode]",
       "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AutosarExt]/var[AdcEnableDualClockMode]",
       "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AutosarExt]/var[AdcEnableGroupDependentChannelNames]",
       "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AutosarExt]/var[AdcEnableGroupStreamingResultReorder]",

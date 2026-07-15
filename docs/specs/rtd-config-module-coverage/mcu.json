@@ -560,24 +560,9 @@
       "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Mcu]/ctr[MODULE-DEF]/ctr[McuModuleConfiguration]/lst[McuClockSettingConfig]/ctr[McuClockSettingConfig]/ctr[McuPll_0]/ctr[McuPll_Parameter]",
       "name": "McuPll_Parameter",
       "type": "IDENTIFIABLE",
-      "classification": "derived",
-      "trace": {
-        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_mcu_set",
-        "inputs": [
-          "intent.payload.core_clk",
-          "intent.payload.aips_plat_clk",
-          "intent.payload.aips_slow_clk",
-          "clock.json#/recipes"
-        ],
-        "tests": [
-          "tests/unit/test_mcu_generality.py::test_recipe_still_pinned_after_forward_harden",
-          "tests/unit/test_mcu_apply.py::test_mcu_no_pll_set_false_when_pll_enabled",
-          "tests/unit/test_mcu_apply.py::test_mcu_pll0_under_mcu_control_in_general_config",
-          "tests/unit/test_mcu_apply.py::test_mcu_pll_under_mcu_control_true",
-          "tests/unit/test_mcu_apply.py::test_mcu_pll_odiv0_en_true",
-          "tests/unit/test_mcu_apply.py::test_mcu_pll_odiv1_en_true"
-        ]
-      }
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Mcu provider and is retained at the verified project or descriptor default.",
+      "dependency": "A future descriptor-forward Mcu intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
     },
     {
       "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Mcu]/ctr[MODULE-DEF]/ctr[McuModuleConfiguration]/lst[McuClockSettingConfig]/ctr[McuClockSettingConfig]/ctr[McuPll_1]",
@@ -605,24 +590,9 @@
       "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Mcu]/ctr[MODULE-DEF]/ctr[McuModuleConfiguration]/lst[McuClockSettingConfig]/ctr[McuClockSettingConfig]/ctr[McuPll_1]/ctr[McuPll_Parameter]",
       "name": "McuPll_Parameter",
       "type": "IDENTIFIABLE",
-      "classification": "derived",
-      "trace": {
-        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_mcu_set",
-        "inputs": [
-          "intent.payload.core_clk",
-          "intent.payload.aips_plat_clk",
-          "intent.payload.aips_slow_clk",
-          "clock.json#/recipes"
-        ],
-        "tests": [
-          "tests/unit/test_mcu_generality.py::test_recipe_still_pinned_after_forward_harden",
-          "tests/unit/test_mcu_apply.py::test_mcu_no_pll_set_false_when_pll_enabled",
-          "tests/unit/test_mcu_apply.py::test_mcu_pll0_under_mcu_control_in_general_config",
-          "tests/unit/test_mcu_apply.py::test_mcu_pll_under_mcu_control_true",
-          "tests/unit/test_mcu_apply.py::test_mcu_pll_odiv0_en_true",
-          "tests/unit/test_mcu_apply.py::test_mcu_pll_odiv1_en_true"
-        ]
-      }
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Mcu provider and is retained at the verified project or descriptor default.",
+      "dependency": "A future descriptor-forward Mcu intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
     },
     {
       "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Mcu]/ctr[MODULE-DEF]/ctr[McuModuleConfiguration]/lst[McuClockSettingConfig]/ctr[McuClockSettingConfig]/ctr[McuRtcClockSelect]",
@@ -2586,12 +2556,13 @@
           "clock.json#/recipes"
         ],
         "tests": [
-          "tests/unit/test_mcu_generality.py::test_recipe_still_pinned_after_forward_harden",
           "tests/unit/test_mcu_apply.py::test_mcu_no_pll_set_false_when_pll_enabled",
           "tests/unit/test_mcu_apply.py::test_mcu_pll0_under_mcu_control_in_general_config",
           "tests/unit/test_mcu_apply.py::test_mcu_pll_under_mcu_control_true",
+          "tests/unit/test_mcu_apply.py::test_mcu_pll_enabled_true",
           "tests/unit/test_mcu_apply.py::test_mcu_pll_odiv0_en_true",
-          "tests/unit/test_mcu_apply.py::test_mcu_pll_odiv1_en_true"
+          "tests/unit/test_mcu_apply.py::test_mcu_pll_odiv1_en_true",
+          "tests/unit/test_mcu_apply.py::test_mcu_cgm_mux0_source_pll_phi0"
         ]
       }
     },
@@ -3270,12 +3241,13 @@
           "clock.json#/recipes"
         ],
         "tests": [
-          "tests/unit/test_mcu_generality.py::test_recipe_still_pinned_after_forward_harden",
           "tests/unit/test_mcu_apply.py::test_mcu_no_pll_set_false_when_pll_enabled",
           "tests/unit/test_mcu_apply.py::test_mcu_pll0_under_mcu_control_in_general_config",
           "tests/unit/test_mcu_apply.py::test_mcu_pll_under_mcu_control_true",
+          "tests/unit/test_mcu_apply.py::test_mcu_pll_enabled_true",
           "tests/unit/test_mcu_apply.py::test_mcu_pll_odiv0_en_true",
-          "tests/unit/test_mcu_apply.py::test_mcu_pll_odiv1_en_true"
+          "tests/unit/test_mcu_apply.py::test_mcu_pll_odiv1_en_true",
+          "tests/unit/test_mcu_apply.py::test_mcu_cgm_mux0_source_pll_phi0"
         ]
       }
     },
@@ -7253,9 +7225,25 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Mcu provider and is retained at the verified project or descriptor default.",
-      "dependency": "A future descriptor-forward Mcu intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_mcu_set",
+        "inputs": [
+          "intent.payload.core_clk",
+          "intent.payload.aips_plat_clk",
+          "intent.payload.aips_slow_clk",
+          "clock.json#/recipes"
+        ],
+        "tests": [
+          "tests/unit/test_mcu_apply.py::test_mcu_no_pll_set_false_when_pll_enabled",
+          "tests/unit/test_mcu_apply.py::test_mcu_pll0_under_mcu_control_in_general_config",
+          "tests/unit/test_mcu_apply.py::test_mcu_pll_under_mcu_control_true",
+          "tests/unit/test_mcu_apply.py::test_mcu_pll_enabled_true",
+          "tests/unit/test_mcu_apply.py::test_mcu_pll_odiv0_en_true",
+          "tests/unit/test_mcu_apply.py::test_mcu_pll_odiv1_en_true",
+          "tests/unit/test_mcu_apply.py::test_mcu_cgm_mux0_source_pll_phi0"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Mcu]/ctr[MODULE-DEF]/ctr[McuModuleConfiguration]/lst[McuClockSettingConfig]/ctr[McuClockSettingConfig]/ctr[McuCgm0SettingConfig]/ctr[McuCgm0ClockMux0]/var[McuClockMux0Divider0_Frequency]",
@@ -16564,12 +16552,13 @@
           "clock.json#/recipes"
         ],
         "tests": [
-          "tests/unit/test_mcu_generality.py::test_recipe_still_pinned_after_forward_harden",
           "tests/unit/test_mcu_apply.py::test_mcu_no_pll_set_false_when_pll_enabled",
           "tests/unit/test_mcu_apply.py::test_mcu_pll0_under_mcu_control_in_general_config",
           "tests/unit/test_mcu_apply.py::test_mcu_pll_under_mcu_control_true",
+          "tests/unit/test_mcu_apply.py::test_mcu_pll_enabled_true",
           "tests/unit/test_mcu_apply.py::test_mcu_pll_odiv0_en_true",
-          "tests/unit/test_mcu_apply.py::test_mcu_pll_odiv1_en_true"
+          "tests/unit/test_mcu_apply.py::test_mcu_pll_odiv1_en_true",
+          "tests/unit/test_mcu_apply.py::test_mcu_cgm_mux0_source_pll_phi0"
         ]
       }
     },
@@ -16729,12 +16718,13 @@
           "clock.json#/recipes"
         ],
         "tests": [
-          "tests/unit/test_mcu_generality.py::test_recipe_still_pinned_after_forward_harden",
           "tests/unit/test_mcu_apply.py::test_mcu_no_pll_set_false_when_pll_enabled",
           "tests/unit/test_mcu_apply.py::test_mcu_pll0_under_mcu_control_in_general_config",
           "tests/unit/test_mcu_apply.py::test_mcu_pll_under_mcu_control_true",
+          "tests/unit/test_mcu_apply.py::test_mcu_pll_enabled_true",
           "tests/unit/test_mcu_apply.py::test_mcu_pll_odiv0_en_true",
-          "tests/unit/test_mcu_apply.py::test_mcu_pll_odiv1_en_true"
+          "tests/unit/test_mcu_apply.py::test_mcu_pll_odiv1_en_true",
+          "tests/unit/test_mcu_apply.py::test_mcu_cgm_mux0_source_pll_phi0"
         ]
       }
     },
@@ -16838,24 +16828,9 @@
           }
         ]
       },
-      "classification": "derived",
-      "trace": {
-        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_mcu_set",
-        "inputs": [
-          "intent.payload.core_clk",
-          "intent.payload.aips_plat_clk",
-          "intent.payload.aips_slow_clk",
-          "clock.json#/recipes"
-        ],
-        "tests": [
-          "tests/unit/test_mcu_generality.py::test_recipe_still_pinned_after_forward_harden",
-          "tests/unit/test_mcu_apply.py::test_mcu_no_pll_set_false_when_pll_enabled",
-          "tests/unit/test_mcu_apply.py::test_mcu_pll0_under_mcu_control_in_general_config",
-          "tests/unit/test_mcu_apply.py::test_mcu_pll_under_mcu_control_true",
-          "tests/unit/test_mcu_apply.py::test_mcu_pll_odiv0_en_true",
-          "tests/unit/test_mcu_apply.py::test_mcu_pll_odiv1_en_true"
-        ]
-      }
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Mcu provider and is retained at the verified project or descriptor default.",
+      "dependency": "A future descriptor-forward Mcu intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Mcu]/ctr[MODULE-DEF]/ctr[McuModuleConfiguration]/lst[McuClockSettingConfig]/ctr[McuClockSettingConfig]/ctr[McuPll_0]/ctr[McuPll_Parameter]/var[PLL_PHI1_Frequency]",
@@ -16957,24 +16932,9 @@
           }
         ]
       },
-      "classification": "derived",
-      "trace": {
-        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_mcu_set",
-        "inputs": [
-          "intent.payload.core_clk",
-          "intent.payload.aips_plat_clk",
-          "intent.payload.aips_slow_clk",
-          "clock.json#/recipes"
-        ],
-        "tests": [
-          "tests/unit/test_mcu_generality.py::test_recipe_still_pinned_after_forward_harden",
-          "tests/unit/test_mcu_apply.py::test_mcu_no_pll_set_false_when_pll_enabled",
-          "tests/unit/test_mcu_apply.py::test_mcu_pll0_under_mcu_control_in_general_config",
-          "tests/unit/test_mcu_apply.py::test_mcu_pll_under_mcu_control_true",
-          "tests/unit/test_mcu_apply.py::test_mcu_pll_odiv0_en_true",
-          "tests/unit/test_mcu_apply.py::test_mcu_pll_odiv1_en_true"
-        ]
-      }
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Mcu provider and is retained at the verified project or descriptor default.",
+      "dependency": "A future descriptor-forward Mcu intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Mcu]/ctr[MODULE-DEF]/ctr[McuModuleConfiguration]/lst[McuClockSettingConfig]/ctr[McuClockSettingConfig]/ctr[McuPll_0]/ctr[McuPll_Parameter]/var[PLL_VCO_Frequency]",
@@ -17140,9 +17100,25 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Mcu provider and is retained at the verified project or descriptor default.",
-      "dependency": "A future descriptor-forward Mcu intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_mcu_set",
+        "inputs": [
+          "intent.payload.core_clk",
+          "intent.payload.aips_plat_clk",
+          "intent.payload.aips_slow_clk",
+          "clock.json#/recipes"
+        ],
+        "tests": [
+          "tests/unit/test_mcu_apply.py::test_mcu_no_pll_set_false_when_pll_enabled",
+          "tests/unit/test_mcu_apply.py::test_mcu_pll0_under_mcu_control_in_general_config",
+          "tests/unit/test_mcu_apply.py::test_mcu_pll_under_mcu_control_true",
+          "tests/unit/test_mcu_apply.py::test_mcu_pll_enabled_true",
+          "tests/unit/test_mcu_apply.py::test_mcu_pll_odiv0_en_true",
+          "tests/unit/test_mcu_apply.py::test_mcu_pll_odiv1_en_true",
+          "tests/unit/test_mcu_apply.py::test_mcu_cgm_mux0_source_pll_phi0"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Mcu]/ctr[MODULE-DEF]/ctr[McuModuleConfiguration]/lst[McuClockSettingConfig]/ctr[McuClockSettingConfig]/ctr[McuPll_0]/var[McuPLLUnderMcuControl]",
@@ -17214,12 +17190,13 @@
           "clock.json#/recipes"
         ],
         "tests": [
-          "tests/unit/test_mcu_generality.py::test_recipe_still_pinned_after_forward_harden",
           "tests/unit/test_mcu_apply.py::test_mcu_no_pll_set_false_when_pll_enabled",
           "tests/unit/test_mcu_apply.py::test_mcu_pll0_under_mcu_control_in_general_config",
           "tests/unit/test_mcu_apply.py::test_mcu_pll_under_mcu_control_true",
+          "tests/unit/test_mcu_apply.py::test_mcu_pll_enabled_true",
           "tests/unit/test_mcu_apply.py::test_mcu_pll_odiv0_en_true",
-          "tests/unit/test_mcu_apply.py::test_mcu_pll_odiv1_en_true"
+          "tests/unit/test_mcu_apply.py::test_mcu_pll_odiv1_en_true",
+          "tests/unit/test_mcu_apply.py::test_mcu_cgm_mux0_source_pll_phi0"
         ]
       }
     },
@@ -17632,24 +17609,9 @@
           }
         ]
       },
-      "classification": "derived",
-      "trace": {
-        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_mcu_set",
-        "inputs": [
-          "intent.payload.core_clk",
-          "intent.payload.aips_plat_clk",
-          "intent.payload.aips_slow_clk",
-          "clock.json#/recipes"
-        ],
-        "tests": [
-          "tests/unit/test_mcu_generality.py::test_recipe_still_pinned_after_forward_harden",
-          "tests/unit/test_mcu_apply.py::test_mcu_no_pll_set_false_when_pll_enabled",
-          "tests/unit/test_mcu_apply.py::test_mcu_pll0_under_mcu_control_in_general_config",
-          "tests/unit/test_mcu_apply.py::test_mcu_pll_under_mcu_control_true",
-          "tests/unit/test_mcu_apply.py::test_mcu_pll_odiv0_en_true",
-          "tests/unit/test_mcu_apply.py::test_mcu_pll_odiv1_en_true"
-        ]
-      }
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Mcu provider and is retained at the verified project or descriptor default.",
+      "dependency": "A future descriptor-forward Mcu intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Mcu]/ctr[MODULE-DEF]/ctr[McuModuleConfiguration]/lst[McuClockSettingConfig]/ctr[McuClockSettingConfig]/ctr[McuPll_1]/ctr[McuPll_Configuration]/var[McuPllOdiv1_Div]",
@@ -17797,24 +17759,9 @@
           }
         ]
       },
-      "classification": "derived",
-      "trace": {
-        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_mcu_set",
-        "inputs": [
-          "intent.payload.core_clk",
-          "intent.payload.aips_plat_clk",
-          "intent.payload.aips_slow_clk",
-          "clock.json#/recipes"
-        ],
-        "tests": [
-          "tests/unit/test_mcu_generality.py::test_recipe_still_pinned_after_forward_harden",
-          "tests/unit/test_mcu_apply.py::test_mcu_no_pll_set_false_when_pll_enabled",
-          "tests/unit/test_mcu_apply.py::test_mcu_pll0_under_mcu_control_in_general_config",
-          "tests/unit/test_mcu_apply.py::test_mcu_pll_under_mcu_control_true",
-          "tests/unit/test_mcu_apply.py::test_mcu_pll_odiv0_en_true",
-          "tests/unit/test_mcu_apply.py::test_mcu_pll_odiv1_en_true"
-        ]
-      }
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Mcu provider and is retained at the verified project or descriptor default.",
+      "dependency": "A future descriptor-forward Mcu intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Mcu]/ctr[MODULE-DEF]/ctr[McuModuleConfiguration]/lst[McuClockSettingConfig]/ctr[McuClockSettingConfig]/ctr[McuPll_1]/ctr[McuPll_Configuration]/var[McuPllOdiv2_Div]",
@@ -18066,24 +18013,9 @@
           }
         ]
       },
-      "classification": "derived",
-      "trace": {
-        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_mcu_set",
-        "inputs": [
-          "intent.payload.core_clk",
-          "intent.payload.aips_plat_clk",
-          "intent.payload.aips_slow_clk",
-          "clock.json#/recipes"
-        ],
-        "tests": [
-          "tests/unit/test_mcu_generality.py::test_recipe_still_pinned_after_forward_harden",
-          "tests/unit/test_mcu_apply.py::test_mcu_no_pll_set_false_when_pll_enabled",
-          "tests/unit/test_mcu_apply.py::test_mcu_pll0_under_mcu_control_in_general_config",
-          "tests/unit/test_mcu_apply.py::test_mcu_pll_under_mcu_control_true",
-          "tests/unit/test_mcu_apply.py::test_mcu_pll_odiv0_en_true",
-          "tests/unit/test_mcu_apply.py::test_mcu_pll_odiv1_en_true"
-        ]
-      }
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Mcu provider and is retained at the verified project or descriptor default.",
+      "dependency": "A future descriptor-forward Mcu intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Mcu]/ctr[MODULE-DEF]/ctr[McuModuleConfiguration]/lst[McuClockSettingConfig]/ctr[McuClockSettingConfig]/ctr[McuPll_1]/ctr[McuPll_Parameter]/var[PLL_PHI1_Frequency]",
@@ -18185,24 +18117,9 @@
           }
         ]
       },
-      "classification": "derived",
-      "trace": {
-        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_mcu_set",
-        "inputs": [
-          "intent.payload.core_clk",
-          "intent.payload.aips_plat_clk",
-          "intent.payload.aips_slow_clk",
-          "clock.json#/recipes"
-        ],
-        "tests": [
-          "tests/unit/test_mcu_generality.py::test_recipe_still_pinned_after_forward_harden",
-          "tests/unit/test_mcu_apply.py::test_mcu_no_pll_set_false_when_pll_enabled",
-          "tests/unit/test_mcu_apply.py::test_mcu_pll0_under_mcu_control_in_general_config",
-          "tests/unit/test_mcu_apply.py::test_mcu_pll_under_mcu_control_true",
-          "tests/unit/test_mcu_apply.py::test_mcu_pll_odiv0_en_true",
-          "tests/unit/test_mcu_apply.py::test_mcu_pll_odiv1_en_true"
-        ]
-      }
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Mcu provider and is retained at the verified project or descriptor default.",
+      "dependency": "A future descriptor-forward Mcu intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Mcu]/ctr[MODULE-DEF]/ctr[McuModuleConfiguration]/lst[McuClockSettingConfig]/ctr[McuClockSettingConfig]/ctr[McuPll_1]/ctr[McuPll_Parameter]/var[PLL_PHI2_Frequency]",
@@ -18304,24 +18221,9 @@
           }
         ]
       },
-      "classification": "derived",
-      "trace": {
-        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_mcu_set",
-        "inputs": [
-          "intent.payload.core_clk",
-          "intent.payload.aips_plat_clk",
-          "intent.payload.aips_slow_clk",
-          "clock.json#/recipes"
-        ],
-        "tests": [
-          "tests/unit/test_mcu_generality.py::test_recipe_still_pinned_after_forward_harden",
-          "tests/unit/test_mcu_apply.py::test_mcu_no_pll_set_false_when_pll_enabled",
-          "tests/unit/test_mcu_apply.py::test_mcu_pll0_under_mcu_control_in_general_config",
-          "tests/unit/test_mcu_apply.py::test_mcu_pll_under_mcu_control_true",
-          "tests/unit/test_mcu_apply.py::test_mcu_pll_odiv0_en_true",
-          "tests/unit/test_mcu_apply.py::test_mcu_pll_odiv1_en_true"
-        ]
-      }
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Mcu provider and is retained at the verified project or descriptor default.",
+      "dependency": "A future descriptor-forward Mcu intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Mcu]/ctr[MODULE-DEF]/ctr[McuModuleConfiguration]/lst[McuClockSettingConfig]/ctr[McuClockSettingConfig]/ctr[McuPll_1]/ctr[McuPll_Parameter]/var[PLL_VCO_Frequency]",
@@ -18551,24 +18453,9 @@
           }
         ]
       },
-      "classification": "derived",
-      "trace": {
-        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_mcu_set",
-        "inputs": [
-          "intent.payload.core_clk",
-          "intent.payload.aips_plat_clk",
-          "intent.payload.aips_slow_clk",
-          "clock.json#/recipes"
-        ],
-        "tests": [
-          "tests/unit/test_mcu_generality.py::test_recipe_still_pinned_after_forward_harden",
-          "tests/unit/test_mcu_apply.py::test_mcu_no_pll_set_false_when_pll_enabled",
-          "tests/unit/test_mcu_apply.py::test_mcu_pll0_under_mcu_control_in_general_config",
-          "tests/unit/test_mcu_apply.py::test_mcu_pll_under_mcu_control_true",
-          "tests/unit/test_mcu_apply.py::test_mcu_pll_odiv0_en_true",
-          "tests/unit/test_mcu_apply.py::test_mcu_pll_odiv1_en_true"
-        ]
-      }
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Mcu provider and is retained at the verified project or descriptor default.",
+      "dependency": "A future descriptor-forward Mcu intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Mcu]/ctr[MODULE-DEF]/ctr[McuModuleConfiguration]/lst[McuClockSettingConfig]/ctr[McuClockSettingConfig]/ctr[McuRtcClockSelect]/var[McuClockMuxUnderMcuControl]",
@@ -25002,8 +24889,8 @@
   "summary": {
     "total": 489,
     "configurable": 3,
-    "deferred": 471,
-    "derived": 15
+    "deferred": 479,
+    "derived": 7
   },
   "known_gaps": {
     "mcu_reset": [

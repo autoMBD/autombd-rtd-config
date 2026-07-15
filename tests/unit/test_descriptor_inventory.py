@@ -251,11 +251,11 @@ def test_known_descriptor_gap_groups_are_complete_and_explicitly_deferred():
         "adc": {
             "adc_dspss": 25,
             "adc_self_test": 8,
-            "adc_timing": 18,
+            "adc_timing": 12,
             "adc_general": 1,
-            "adc_power": 11,
+            "adc_power": 8,
             "adc_published_information": 14,
-            "adc_autosar_extension": 45,
+            "adc_autosar_extension": 43,
         },
     }
     for module, groups in expected.items():
