@@ -21,7 +21,7 @@
   "rules": [
     {
       "match": {
-        "key_regex": "\\[(McuNoPll|McuPll0UnderMcuControl|McuPLLUnderMcuControl|McuPllOdiv0_En|McuPllOdiv1_En|McuClockReferencePoint|McuClockFrequencySelect)\\]$"
+        "key_regex": "\\[(McuClockReferencePoint|McuClockFrequencySelect)\\]$"
       },
       "classification": "configurable",
       "trace": {
@@ -36,13 +36,24 @@
     },
     {
       "match": {
-        "key_regex": "\\[(McuPll_Parameter|PLL_PHI0_Frequency|PLL_PHI1_Frequency|PLL_PHI2_Frequency|VCO_Frequency|clock_output)\\]$"
+        "key_regex": "\\[(McuNoPll|McuPll0UnderMcuControl|McuPLLUnderMcuControl|McuPllOdiv0_En|McuPllOdiv1_En|McuPll_Parameter|PLL_PHI0_Frequency|PLL_PHI1_Frequency|PLL_PHI2_Frequency|VCO_Frequency|clock_output)\\]$"
       },
       "classification": "derived",
       "trace": {
-        "implementation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_mcu_set",
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_mcu_set",
+        "inputs": [
+          "intent.payload.core_clk",
+          "intent.payload.aips_plat_clk",
+          "intent.payload.aips_slow_clk",
+          "clock.json#/recipes"
+        ],
         "tests": [
-          "tests/unit/test_mcu_generality.py::test_recipe_still_pinned_after_forward_harden"
+          "tests/unit/test_mcu_generality.py::test_recipe_still_pinned_after_forward_harden",
+          "tests/unit/test_mcu_apply.py::test_mcu_no_pll_set_false_when_pll_enabled",
+          "tests/unit/test_mcu_apply.py::test_mcu_pll0_under_mcu_control_in_general_config",
+          "tests/unit/test_mcu_apply.py::test_mcu_pll_under_mcu_control_true",
+          "tests/unit/test_mcu_apply.py::test_mcu_pll_odiv0_en_true",
+          "tests/unit/test_mcu_apply.py::test_mcu_pll_odiv1_en_true"
         ]
       }
     }

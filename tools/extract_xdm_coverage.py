@@ -47,6 +47,7 @@
 from __future__ import annotations
 
 import argparse
+import ast
 import copy
 import hashlib
 import json
@@ -126,10 +127,7 @@ def _tests(element: ET.Element) -> list[dict[str, str]]:
     ]
 
 
-def _fact(element: ET.Element, name: str) -> dict | None:
-    source = next((child for child in element if child.get("name") == name), None)
-    if source is None:
-        return None
+def _fact_value(source: ET.Element) -> dict:
     tests = _tests(source)
     values = [
         child.get("value") if child.get("value") is not None else (child.text or "").strip()
@@ -151,6 +149,27 @@ def _fact(element: ET.Element, name: str) -> dict | None:
     return {"kind": "literal", "value": source.get("value", "")}
 
 
+def _facts(element: ET.Element, name: str) -> list[tuple[str, dict]]:
+    """Return every direct a:a/a:da fact in descriptor source order."""
+    return [
+        (_local(child), _fact_value(child))
+        for child in element
+        if child.get("name") == name and _local(child) in {"a", "da"}
+    ]
+
+
+def _fact(element: ET.Element, name: str) -> dict | list[dict] | None:
+    facts = _facts(element, name)
+    if not facts:
+        return None
+    if len(facts) == 1:
+        return facts[0][1]
+    return [
+        {"source_tag": source_tag, **fact}
+        for source_tag, fact in facts
+    ]
+
+
 def _reference_module(reference: str) -> str | None:
     raw = reference.split(":", 1)[-1]
     parts = [part for part in raw.split("/") if part]
@@ -163,20 +182,6 @@ def _reference_module(reference: str) -> str | None:
     return parts[0]
 
 
-def _include_reference(element: ET.Element, module: str) -> bool:
-    if not element.get("name"):
-        return False
-    reference = _fact(element, "REF")
-    target = None if reference is None else reference.get("value")
-    if module not in {"Mcu", "Adc"}:
-        return True
-    if not target or _reference_module(target) != module:
-        return False
-    # BCTU notification ADC index is a generated notification relationship;
-    # the enclosing list is the descriptor item and accounts for this field.
-    return element.get("name") != "BctuAdcNotificationsAdcIndex"
-
-
 def _release_from_items(items: list[dict]) -> str:
     values: dict[str, str] = {}
     aliases = {
@@ -186,8 +191,13 @@ def _release_from_items(items: list[dict]) -> str:
     for item in items:
         alias = aliases.get(item.get("name"))
         default = item.get("default")
-        if alias and isinstance(default, dict) and default.get("kind") == "literal":
-            values.setdefault(alias, str(default.get("value", "")))
+        defaults = default if isinstance(default, list) else [default]
+        literal = next((
+            value for value in defaults
+            if isinstance(value, dict) and value.get("kind") == "literal"
+        ), None)
+        if alias and literal is not None:
+            values.setdefault(alias, str(literal.get("value", "")))
     if set(values) == {"major", "minor", "patch"}:
         return f'{values["major"]}.{values["minor"]}.{values["patch"]}'
     return "7.0.1"
@@ -198,12 +208,18 @@ def extract_descriptor(path: Path | str, *, module: str) -> dict:
     source = Path(path)
     root = ET.parse(source).getroot()
     parents = {child: parent for parent in root.iter() for child in parent}
+    scope = next((
+        element for element in root.iter()
+        if _local(element) == "chc" and element.get("name") == module
+    ), root)
     items: list[dict] = []
-    for element in root.iter():
+    for element in scope.iter():
         local = _local(element)
+        if not element.get("name"):
+            continue
         if local in ITEM_TAGS:
             kind = ITEM_TAGS[local]
-        elif local == "ref" and _include_reference(element, module):
+        elif local == "ref":
             kind = "reference"
         else:
             continue
@@ -216,19 +232,28 @@ def extract_descriptor(path: Path | str, *, module: str) -> dict:
         }
         if element.get("type"):
             item["type"] = element.get("type")
+        fact_sources = {}
         for fact_name in FACT_NAMES:
             fact = _fact(element, fact_name)
             if fact is not None:
                 item[fact_name.casefold()] = fact
+                fact_sources[fact_name.casefold()] = [
+                    {"source_tag": source_tag, "evidence": evidence}
+                    for source_tag, evidence in _facts(element, fact_name)
+                ]
+        if fact_sources:
+            item["fact_sources"] = fact_sources
         reference = _fact(element, "REF")
         if reference is not None:
-            target = str(reference.get("value", ""))
-            item["reference"] = target
-            referenced_module = _reference_module(target)
-            item["cross_references"] = (
-                [referenced_module]
-                if referenced_module and referenced_module != module else []
-            )
+            references = reference if isinstance(reference, list) else [reference]
+            targets = [str(value.get("value", "")) for value in references]
+            item["reference"] = targets[0] if len(targets) == 1 else targets
+            cross_modules = sorted({
+                referenced for target in targets
+                if (referenced := _reference_module(target)) and referenced != module
+            })
+            item["cross_references"] = cross_modules
+            item["cross_modules"] = cross_modules
         items.append(item)
     items.sort(key=lambda item: item["key"])
     keys = [item["key"] for item in items]
@@ -236,6 +261,10 @@ def extract_descriptor(path: Path | str, *, module: str) -> dict:
         raise InventoryError("descriptor extraction produced duplicate stable keys")
     package_parent = source.parent.parent.name
     package = package_parent.split("_", 1)[1] if "_" in package_parent else package_parent
+    cross_module_index: dict[str, list[str]] = {}
+    for item in items:
+        for referenced in item.get("cross_modules", []):
+            cross_module_index.setdefault(referenced, []).append(item["key"])
     return {
         "format_version": FORMAT_VERSION,
         "source": {
@@ -246,11 +275,14 @@ def extract_descriptor(path: Path | str, *, module: str) -> dict:
             "sha256": _sha256(source),
         },
         "items": items,
+        "cross_module_index": cross_module_index,
     }
 
 
 def _matches(item: dict, match: dict) -> bool:
     if "name" in match and item.get("name") != match["name"]:
+        return False
+    if "name_not" in match and item.get("name") == match["name_not"]:
         return False
     if "kind" in match and item.get("kind") != match["kind"]:
         return False
@@ -307,15 +339,39 @@ def _resolve_symbol(repo_root: Path, reference: str) -> None:
     path = repo_root / PurePosixPath(path_text)
     if not separator or not path.is_file() or not symbol:
         raise InventoryError(f"invalid trace reference: {reference}")
-    if symbol not in path.read_text(encoding="utf-8"):
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    except (OSError, SyntaxError) as exc:
+        raise InventoryError(f"trace source is invalid: {reference}") from exc
+    nodes = tree.body
+    parts = symbol.split(".")
+    for index, part in enumerate(parts):
+        allowed = (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)
+        match = next((node for node in nodes if isinstance(node, allowed) and node.name == part), None)
+        if match is None or (index < len(parts) - 1 and not isinstance(match, ast.ClassDef)):
+            raise InventoryError(f"trace symbol is absent: {reference}")
+        nodes = match.body if isinstance(match, ast.ClassDef) else []
+    if not parts:
         raise InventoryError(f"trace symbol is absent: {reference}")
 
 
 def _resolve_test(repo_root: Path, reference: str) -> None:
     path_text, separator, node = reference.partition("::")
     path = repo_root / PurePosixPath(path_text)
-    if not separator or not path.is_file() or node not in path.read_text(encoding="utf-8"):
+    if not separator or not path.is_file() or not node:
         raise InventoryError(f"invalid test trace: {reference}")
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    except (OSError, SyntaxError) as exc:
+        raise InventoryError(f"invalid test trace: {reference}") from exc
+    nodes = tree.body
+    parts = node.split("::")
+    for index, part in enumerate(parts):
+        allowed = (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)
+        match = next((value for value in nodes if isinstance(value, allowed) and value.name == part), None)
+        if match is None or (index < len(parts) - 1 and not isinstance(match, ast.ClassDef)):
+            raise InventoryError(f"invalid test trace: {reference}")
+        nodes = match.body if isinstance(match, ast.ClassDef) else []
 
 
 def _resolve_asset(repo_root: Path, reference: str) -> None:
@@ -350,15 +406,19 @@ def validate_sidecar(sidecar: dict, *, repo_root: Path) -> None:
     keys = [item.get("key") for item in items]
     if len(keys) != len(set(keys)) or any(not isinstance(key, str) for key in keys):
         raise InventoryError("inventory keys must be unique strings")
+    observed_cross_index: dict[str, list[str]] = {}
     for item in items:
         if item.get("key") != f'{item.get("kind")}:{item.get("path")}':
             raise InventoryError("inventory stable key is malformed")
         classification = item.get("classification")
         if not isinstance(classification, str) or classification not in CLASSIFICATIONS:
             raise InventoryError("every item requires exactly one classification")
-        for module in item.get("cross_references", []):
+        if item.get("cross_modules", []) != item.get("cross_references", []):
+            raise InventoryError("cross-module item evidence is inconsistent")
+        for module in item.get("cross_modules", []):
             if module not in KNOWN_MODULES:
                 raise InventoryError("inventory cross-module reference is unknown")
+            observed_cross_index.setdefault(module, []).append(item["key"])
         if classification == "configurable":
             trace = item.get("trace")
             if not isinstance(trace, dict) or set(trace) != {
@@ -374,10 +434,16 @@ def validate_sidecar(sidecar: dict, *, repo_root: Path) -> None:
                 _resolve_test(repo_root, test)
         elif classification == "derived":
             trace = item.get("trace")
-            if not isinstance(trace, dict) or set(trace) != {"implementation", "tests"}:
+            if not isinstance(trace, dict) or set(trace) != {
+                "derivation", "inputs", "tests"
+            }:
                 raise InventoryError("derived item trace is incomplete")
-            _resolve_symbol(repo_root, trace["implementation"])
-            if not trace["tests"]:
+            _resolve_symbol(repo_root, trace["derivation"])
+            if not isinstance(trace["inputs"], list) or not trace["inputs"] or not all(
+                isinstance(value, str) and value for value in trace["inputs"]
+            ):
+                raise InventoryError("derived item needs explicit derivation inputs")
+            if not isinstance(trace["tests"], list) or not trace["tests"]:
                 raise InventoryError("derived item needs rule tests")
             for test in trace["tests"]:
                 _resolve_test(repo_root, test)
@@ -386,6 +452,8 @@ def validate_sidecar(sidecar: dict, *, repo_root: Path) -> None:
                 raise InventoryError("deferred item needs an engineering reason")
             if not str(item.get("dependency", "")).strip():
                 raise InventoryError("deferred item needs a dependency")
+    if sidecar.get("cross_module_index", {}) != observed_cross_index:
+        raise InventoryError("cross-module reference index is inconsistent")
     expected = {
         status: sum(item["classification"] == status for item in items)
         for status in sorted(CLASSIFICATIONS)
@@ -408,6 +476,7 @@ def _extraction_projection(sidecar: dict) -> dict:
         "format_version": sidecar["format_version"],
         "source": sidecar["source"],
         "items": [],
+        "cross_module_index": sidecar.get("cross_module_index", {}),
     }
     for item in sidecar["items"]:
         result["items"].append({

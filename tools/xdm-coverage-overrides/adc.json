@@ -5,18 +5,18 @@
     "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
   },
   "known_gap_rules": {
-    "adc_dspss": [{"key_regex": "Dspss|DSPSS"}],
+    "adc_dspss": [{"key_regex": "Dspss|DSPSS", "name_not": "SdadcDspssInitDmaChannelId"}],
     "adc_self_test": [{"key_regex": "SelfTest|Self_Test"}],
     "adc_timing": [{"key_regex": "ConvTimings|SamplingDuration"}],
     "adc_general": [{"name": "AdcGeneral"}],
     "adc_power": [{"key_regex": "Power|LowPower"}],
     "adc_published_information": [{"key_regex": "PublishedInformation"}],
-    "adc_autosar_extension": [{"key_regex": "AutosarExt"}]
+    "adc_autosar_extension": [{"key_regex": "AutosarExt", "name_not": "SdadcDspssInitDmaChannelId"}]
   },
   "rules": [
     {
       "match": {
-        "key_regex": "\\[(AdcHwUnitId|AdcTransferType|AdcGroupAccessMode|AdcGroupConversionMode|AdcGroupTriggSrc|AdcStreamingNumSamples|AdcNotification|AdcGroupDefinition|AdcChannelName|AdcChannelId|AdcEnableThresholds|AdcThresholdRegister|AdcWdogNotification|AdcThresholdControlRegister|AdcHighThreshold|AdcLowThreshold|AdcEnableWatchdogApi|WdgThresholdEnable|AdcHwTrigger|AdcHwTrigSrc|BctuInternalTrigger|BctuDataDestination|BctuTriggerConversionMode|BctuAdcChannelSingle|BctuListItems|BctuResultFifos|BctuFifoDmaEnable|BctuFifoDmaChannelId|BctuAdcNewDataNotification|BctuWatermarkNotification)\\]$"
+        "key_regex": "\\[(AdcHwUnitId|AdcTransferType|AdcGroupAccessMode|AdcGroupConversionMode|AdcGroupTriggSrc|AdcStreamingNumSamples|AdcNotification|AdcGroupDefinition|AdcChannelName|AdcChannelId|AdcEnableThresholds|AdcThresholdRegister|AdcWdogNotification|AdcThresholdControlRegister|AdcHighThreshold|AdcLowThreshold|AdcHwTrigger|AdcHwTrigSrc|BctuInternalTrigger|BctuDataDestination|BctuTriggerConversionMode|BctuAdcChannelSingle|BctuListItems|BctuResultFifos|BctuFifoDmaEnable|BctuFifoDmaChannelId|BctuAdcNewDataNotification|BctuWatermarkNotification)\\]$"
       },
       "classification": "configurable",
       "trace": {
@@ -32,14 +32,22 @@
     },
     {
       "match": {
-        "key_regex": "\\[(AdcPrescale|AdcSamplingDuration0|AdcSamplingDuration1|AdcSamplingDuration2|AdcGroupConversionType|AdcGroupHwTriggerSource|BctuTriggerSource|BctuAdcTargetMask|BctuLastChannel|BctuWatermarkValue)\\]$"
+        "key_regex": "\\[(AdcEnableWatchdogApi|WdgThresholdEnable|AdcPrescale|AdcSamplingDuration0|AdcSamplingDuration1|AdcSamplingDuration2|AdcGroupConversionType|AdcGroupHwTriggerSource|BctuTriggerSource|BctuAdcTargetMask|BctuLastChannel|BctuWatermarkValue)\\]$"
       },
       "classification": "derived",
       "trace": {
-        "implementation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload.sampling_time_us",
+          "intent.payload.watchdog",
+          "intent.payload.bctu",
+          "adc.json#/sampling_derivation"
+        ],
         "tests": [
           "tests/unit/test_adc_generality.py::test_adc0_sampling_3us_derives_general_formula",
-          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit"
+          "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
+          "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
+          "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
         ]
       }
     }
