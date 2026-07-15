@@ -4,7 +4,7 @@
   "files": [
     {
       "path": "SKILL.md",
-      "sha256": "6fef97740932b2542c2f50b36be3d456c01757cec8ae03804c4dff16eae82c00"
+      "sha256": "84bcf69c4120606514f9dcca267e3c1fc36e316580a0c8144bde9c618deff5d8"
     },
     {
       "path": "__main__.py",
@@ -92,7 +92,7 @@
     },
     {
       "path": "rtd-config-cli-py/rtd_config/__main__.py",
-      "sha256": "cf79fca3d0666e140650f82b13e4007e27124751aeea91f4256f3027096ab4b0"
+      "sha256": "23d453c2061f2ca1b7cd6205eb85c5df331008dee4e8f1fb4c011242e6967922"
     },
     {
       "path": "rtd-config-cli-py/rtd_config/backends/__init__.py",

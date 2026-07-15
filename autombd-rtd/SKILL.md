@@ -65,8 +65,10 @@ at the skill root, so the simplest invocation works from any directory:
 
 - **Recommended:** `python <skill-dir> <command>` — e.g.
   `python autombd-rtd inspect --project <dir> --json`. No environment setup.
-- Equivalent: put `<skill-dir>/rtd-config-cli-py` on `PYTHONPATH` (or `cd` into
-  it), then `python -m rtd_config <command>`.
+- Equivalent immutable invocation: put `<skill-dir>/rtd-config-cli-py` on
+  `PYTHONPATH` (or `cd` into it), then `python -B -m rtd_config <command>`.
+  Keep `-B`; it prevents Python from adding bytecode files to the verified
+  released payload. The root launcher sets the same protection automatically.
 
 The launcher resolves the committed assets (pin maps, per-module caches) from
 the `assets/` directory beside `rtd-config-cli-py/`, so it works from any

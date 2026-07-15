@@ -68,8 +68,11 @@ python autombd-rtd check --project <path> --json
 python autombd-rtd validate --project <path> --json
 ```
 
-(Equivalent without the launcher: put `autombd-rtd/rtd-config-cli-py` on
-`PYTHONPATH`, then use `python -m rtd_config <command>`.)
+(Equivalent immutable invocation without the launcher: put
+`autombd-rtd/rtd-config-cli-py` on `PYTHONPATH`, then use
+`python -B -m rtd_config <command>`. The `-B` flag is required for this
+lower-level entry point so Python does not add bytecode files to the verified
+release payload.)
 
 Every shortcut command normalizes to the same JSON intent and the same
 plan → apply → check → validate pipeline.

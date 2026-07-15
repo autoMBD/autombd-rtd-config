@@ -49,6 +49,7 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -692,6 +693,18 @@ def test_clean_deploy_contains_exact_manifest_set_and_runs_outside_repo(tmp_path
     resource_payload = json.loads(resource_result.stdout)
     assert resource_payload["status"] == "passed"
     assert resource_payload["options"]
+    module_environment = dict(os.environ)
+    module_environment["PYTHONPATH"] = str(installed / "rtd-config-cli-py")
+    module_result = subprocess.run(
+        [sys.executable, "-B", "-m", "rtd_config", "--version"],
+        cwd=outside,
+        env=module_environment,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert module_result.returncode == 0, module_result.stderr
+    assert json.loads(module_result.stdout)["version"] == EXPECTED_RELEASE_VERSION
     post_run_actual = {
         path.relative_to(installed).as_posix()
         for path in installed.rglob("*")
