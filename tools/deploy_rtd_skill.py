@@ -313,9 +313,15 @@ def normalize_agents(agents: tuple[str, ...] | list[str]) -> tuple[str, ...]:
     return tuple(normalized)
 
 
-def resolve_agent_skills_dir(target_project: Path, agent: str) -> Path:
+def resolve_agent_skills_dir(
+    target_project: Path,
+    agent: str,
+    *,
+    platform=None,
+) -> Path:
     agent = normalize_agents((agent,))[0]
-    return target_project.expanduser() / AGENT_SKILL_DIRS[agent]
+    target = Path(os.path.abspath(target_project.expanduser()))
+    return _ensure_safe_directory_chain(target, AGENT_SKILL_DIRS[agent], platform)
 
 
 def _is_ignored_runtime_artifact(relative: PurePosixPath) -> bool:
@@ -333,6 +339,112 @@ def _is_link_or_reparse(path: Path) -> bool:
     reparse_flag = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0)
     attributes = getattr(metadata, "st_file_attributes", 0)
     return path.is_symlink() or bool(reparse_flag and attributes & reparse_flag)
+
+
+def _platform_is_link_or_reparse(platform, path: Path) -> bool:
+    checker = _is_link_or_reparse if platform is None else platform.is_link_or_reparse
+    return bool(checker(Path(path)))
+
+
+@dataclass(frozen=True)
+class _DirectoryIdentity:
+    path: Path
+    device: int
+    inode: int
+
+
+def _directory_identity(path: Path, platform=None) -> _DirectoryIdentity:
+    path = Path(path)
+    if _platform_is_link_or_reparse(platform, path):
+        raise RuntimeError(
+            f"unsafe destination ancestor is a symlink or reparse point: {path}"
+        )
+    try:
+        metadata = path.lstat()
+    except FileNotFoundError as exc:
+        raise RuntimeError(f"destination ancestor is missing: {path}") from exc
+    if not stat.S_ISDIR(metadata.st_mode):
+        raise RuntimeError(f"unsafe destination ancestor is not a directory: {path}")
+    return _DirectoryIdentity(path, metadata.st_dev, metadata.st_ino)
+
+
+@dataclass(frozen=True)
+class _DestinationAncestorGuard:
+    identities: tuple[_DirectoryIdentity, ...]
+    platform: object | None = None
+
+    def verify(self) -> None:
+        for expected in self.identities:
+            observed = _directory_identity(expected.path, self.platform)
+            if (observed.device, observed.inode) != (expected.device, expected.inode):
+                raise RuntimeError(
+                    f"unsafe destination ancestor identity changed: {expected.path}"
+                )
+
+    def mutate(self, operation):
+        self.verify()
+        try:
+            return operation()
+        finally:
+            self.verify()
+
+
+def _guard_for_paths(paths: list[Path], platform=None) -> _DestinationAncestorGuard:
+    return _DestinationAncestorGuard(
+        tuple(_directory_identity(path, platform) for path in paths),
+        platform,
+    )
+
+
+def _ensure_safe_directory_chain(
+    target: Path,
+    relative: Path,
+    platform=None,
+) -> Path:
+    target = Path(os.path.abspath(target))
+    if _platform_is_link_or_reparse(platform, target):
+        raise RuntimeError(
+            f"unsafe target root is a symlink or reparse point: {target}"
+        )
+    if not path_present(target):
+        target.mkdir()
+    identities = [_directory_identity(target, platform)]
+    current = target
+    for component in relative.parts:
+        guard = _DestinationAncestorGuard(tuple(identities), platform)
+        current = current / component
+        if _platform_is_link_or_reparse(platform, current):
+            raise RuntimeError(
+                f"unsafe destination ancestor is a symlink or reparse point: {current}"
+            )
+        if not path_present(current):
+            guard.mutate(current.mkdir)
+        identities.append(_directory_identity(current, platform))
+    _DestinationAncestorGuard(tuple(identities), platform).verify()
+    return current
+
+
+def _capture_destination_guard(
+    destination_parent: Path,
+    platform=None,
+    *,
+    trusted_root: Path | None = None,
+) -> _DestinationAncestorGuard:
+    parent = Path(os.path.abspath(destination_parent))
+    if trusted_root is None:
+        paths = list(reversed((parent, *parent.parents)))
+    else:
+        root = Path(os.path.abspath(trusted_root))
+        try:
+            relative = parent.relative_to(root)
+        except ValueError as exc:
+            raise RuntimeError("destination escapes its trusted target root") from exc
+        paths = [root]
+        current = root
+        for component in relative.parts:
+            current = current / component
+            paths.append(current)
+    return _guard_for_paths(paths, platform)
 
 
 def _payload_files(root: Path) -> set[str]:
@@ -518,27 +630,45 @@ def remove_path_best_effort(path: Path) -> None:
 
 
 @contextmanager
-def deployment_lock(destination: Path):
+def deployment_lock(
+    destination: Path,
+    *,
+    platform=None,
+    guard: _DestinationAncestorGuard | None = None,
+):
     parent = destination.parent
-    parent.mkdir(parents=True, exist_ok=True)
+    guard = guard or _capture_destination_guard(parent, platform)
+    guard.verify()
     lock = parent / f".{destination.name}.deploy.lock"
     deadline = time.monotonic() + _DEPLOYMENT_LOCK_TIMEOUT_S
+    owned_lock: _DirectoryIdentity | None = None
 
     while True:
         try:
-            lock.mkdir()
+            guard.mutate(lock.mkdir)
+            owned_lock = _directory_identity(lock, platform)
             (lock / "owner.txt").write_text(
                 f"pid={os.getpid()}\nstarted={time.time():.6f}\n",
                 encoding="utf-8",
             )
+            guard.verify()
+            if _directory_identity(lock, platform) != owned_lock:
+                raise RuntimeError("deployment lock identity changed during acquisition")
             break
         except FileExistsError:
+            guard.verify()
+            lock_identity = _directory_identity(lock, platform)
             try:
-                stale = time.time() - lock.stat().st_mtime > _DEPLOYMENT_LOCK_STALE_S
+                stale = (
+                    time.time() - lock.lstat().st_mtime > _DEPLOYMENT_LOCK_STALE_S
+                )
             except OSError:
                 stale = False
             if stale:
-                remove_path_best_effort(lock)
+                guard.verify()
+                if _directory_identity(lock, platform) != lock_identity:
+                    raise RuntimeError("stale deployment lock identity changed")
+                guard.mutate(lambda: remove_path(lock))
                 continue
             if time.monotonic() >= deadline:
                 raise RuntimeError(
@@ -549,10 +679,17 @@ def deployment_lock(destination: Path):
     try:
         yield
     finally:
-        remove_path_best_effort(lock)
+        guard.verify()
+        if path_present(lock):
+            if owned_lock is None or _directory_identity(lock, platform) != owned_lock:
+                raise RuntimeError("refusing to remove a replaced deployment lock")
+            guard.mutate(lambda: remove_path(lock))
 
 
-def recover_interrupted_publish(destination: Path) -> None:
+def recover_interrupted_publish(
+    destination: Path,
+    guard: _DestinationAncestorGuard,
+) -> None:
     if path_present(destination):
         return
 
@@ -573,21 +710,31 @@ def recover_interrupted_publish(destination: Path) -> None:
             f"cannot recover interrupted deployment for {destination}; "
             f"multiple rollback candidates exist"
         )
-    _retry_fs(lambda: candidates[0].rename(destination))
+    guard.mutate(lambda: _retry_fs(lambda: candidates[0].rename(destination)))
 
 
 def copy_released_payload(
     source_skill_root: Path,
     destination: Path,
     manifest: ReleaseManifest | None = None,
+    *,
+    platform=None,
+    trusted_root: Path | None = None,
 ) -> None:
     if manifest is not None:
         verify_release_payload(source_skill_root, manifest)
-    with deployment_lock(destination):
-        recover_interrupted_publish(destination)
+    destination = Path(os.path.abspath(destination))
+    guard = _capture_destination_guard(
+        destination.parent,
+        platform,
+        trusted_root=trusted_root,
+    )
+    with deployment_lock(destination, platform=platform, guard=guard):
+        guard.verify()
+        recover_interrupted_publish(destination, guard)
         staging = transaction_path(destination, "deploying")
         previous = transaction_path(destination, "previous")
-        staging.mkdir()
+        guard.mutate(staging.mkdir)
 
         moved_previous = False
         try:
@@ -623,15 +770,21 @@ def copy_released_payload(
                 verify_release_payload(staging, staged_manifest)
 
             if path_present(destination):
-                _retry_fs(lambda: destination.rename(previous))
+                guard.mutate(
+                    lambda: _retry_fs(lambda: destination.rename(previous))
+                )
                 moved_previous = True
-            _retry_fs(lambda: staging.rename(destination))
+            guard.mutate(lambda: _retry_fs(lambda: staging.rename(destination)))
         except BaseException:
             if moved_previous and path_present(previous) and not path_present(destination):
-                _retry_fs(lambda: previous.rename(destination))
-            remove_path_best_effort(staging)
+                guard.mutate(
+                    lambda: _retry_fs(lambda: previous.rename(destination))
+                )
+            if path_present(staging):
+                guard.mutate(lambda: remove_path(staging))
             raise
-        remove_path(previous)
+        if path_present(previous):
+            guard.mutate(lambda: remove_path(previous))
 
 
 def remove_path(path: Path) -> None:
@@ -641,36 +794,45 @@ def remove_path(path: Path) -> None:
         _retry_fs(lambda: shutil.rmtree(path))
 
 
-def ensure_link(source: Path, destination: Path) -> str:
-    destination.parent.mkdir(parents=True, exist_ok=True)
+def ensure_link(source: Path, destination: Path, *, platform=None) -> str:
+    destination = Path(os.path.abspath(destination))
+    guard = _capture_destination_guard(destination.parent, platform)
     source = source.resolve()
     if destination.exists() and destination.resolve() == source:
         return "installed_link_is_current"
-    with deployment_lock(destination):
+    with deployment_lock(destination, platform=platform, guard=guard):
         if destination.exists() and destination.resolve() == source:
             return "installed_link_is_current"
         candidate = transaction_path(destination, "linking")
         previous = transaction_path(destination, "previous")
         moved_previous = False
         try:
-            candidate.symlink_to(source, target_is_directory=True)
+            guard.mutate(
+                lambda: candidate.symlink_to(source, target_is_directory=True)
+            )
             if path_present(destination):
-                _retry_fs(lambda: destination.rename(previous))
+                guard.mutate(
+                    lambda: _retry_fs(lambda: destination.rename(previous))
+                )
                 moved_previous = True
-            _retry_fs(lambda: candidate.rename(destination))
+            guard.mutate(lambda: _retry_fs(lambda: candidate.rename(destination)))
         except OSError as exc:
             if moved_previous and path_present(previous) and not path_present(destination):
-                _retry_fs(lambda: previous.rename(destination))
-            remove_path_best_effort(candidate)
+                guard.mutate(
+                    lambda: _retry_fs(lambda: previous.rename(destination))
+                )
+            if path_present(candidate):
+                guard.mutate(lambda: remove_path(candidate))
             message = "failed to create directory symlink"
             if sys.platform == "win32":
                 message += "; enable Developer Mode or run from an elevated shell"
             raise RuntimeError(message) from exc
-        remove_path(previous)
+        if path_present(previous):
+            guard.mutate(lambda: remove_path(previous))
         return "symlink_to_canonical_skill"
 
 
-def deploy_canonical(repo_root: Path, target_project: Path) -> DeployResult:
+def deploy_canonical(repo_root: Path, target_project: Path, *, platform=None) -> DeployResult:
     repo_root = repo_root.resolve()
     source_skill_root = repo_root / SKILL_NAME
     if not source_skill_root.is_dir():
@@ -679,7 +841,11 @@ def deploy_canonical(repo_root: Path, target_project: Path) -> DeployResult:
     source_version = require_consistent_project_versions(read_project_versions(repo_root))
     source_manifest = read_release_manifest(source_skill_root)
     verify_release_payload(source_skill_root, source_manifest)
-    skills_dir = resolve_agent_skills_dir(target_project, CANONICAL_AGENT)
+    skills_dir = resolve_agent_skills_dir(
+        target_project,
+        CANONICAL_AGENT,
+        platform=platform,
+    )
     destination = skills_dir / SKILL_NAME
     should_copy, reason = should_deploy(source_version, destination, source_manifest)
     if not should_copy:
@@ -691,7 +857,13 @@ def deploy_canonical(repo_root: Path, target_project: Path) -> DeployResult:
             reason=reason,
         )
 
-    copy_released_payload(source_skill_root, destination, source_manifest)
+    copy_released_payload(
+        source_skill_root,
+        destination,
+        source_manifest,
+        platform=platform,
+        trusted_root=Path(os.path.abspath(target_project.expanduser())),
+    )
     return DeployResult(
         agent=CANONICAL_AGENT,
         action="deployed",
@@ -701,14 +873,22 @@ def deploy_canonical(repo_root: Path, target_project: Path) -> DeployResult:
     )
 
 
-def deploy_one(repo_root: Path, target_project: Path, agent: str) -> DeployResult:
+def deploy_one(
+    repo_root: Path,
+    target_project: Path,
+    agent: str,
+    *,
+    platform=None,
+) -> DeployResult:
     agent = normalize_agents((agent,))[0]
-    canonical_result = deploy_canonical(repo_root, target_project)
+    canonical_result = deploy_canonical(repo_root, target_project, platform=platform)
     if agent == CANONICAL_AGENT:
         return canonical_result
 
-    destination = resolve_agent_skills_dir(target_project, agent) / SKILL_NAME
-    reason = ensure_link(canonical_result.destination, destination)
+    destination = (
+        resolve_agent_skills_dir(target_project, agent, platform=platform) / SKILL_NAME
+    )
+    reason = ensure_link(canonical_result.destination, destination, platform=platform)
     return DeployResult(
         agent=agent,
         action="skipped" if reason == "installed_link_is_current" else "linked",
@@ -722,9 +902,12 @@ def deploy(
     repo_root: Path,
     target_project: Path,
     agents: tuple[str, ...] | list[str] = ("both",),
+    *,
+    platform=None,
 ) -> tuple[DeployResult, ...]:
     return tuple(
-        deploy_one(repo_root, target_project, agent) for agent in normalize_agents(agents)
+        deploy_one(repo_root, target_project, agent, platform=platform)
+        for agent in normalize_agents(agents)
     )
 
 

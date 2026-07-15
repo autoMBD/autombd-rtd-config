@@ -94,8 +94,8 @@ By default the helper supports both agent indexes with one physical payload:
 for Claude Code. Use `--agent codex`, `--agent claude`, or `--agent both` to
 select the destination set explicitly. Deploying only Claude Code still ensures
 the canonical Codex copy exists first, then links Claude Code to it. On Windows,
-the helper creates a directory symlink when permitted and falls back to an NTFS
-junction when symlink privileges are unavailable.
+the helper requires directory-symlink permission (enable Developer Mode or run
+from an elevated shell); it does not silently fall back to a junction.
 
 The helper treats `pyproject.toml` as the version authority and requires the
 Skill frontmatter, launcher/package headers, package `__version__`, and committed
@@ -105,8 +105,8 @@ if its file set or hashes drift. A structurally complete newer installation is
 left untouched.
 
 The copied payload is intentionally limited to `SKILL.md`, `__main__.py`,
-`rtd-config-cli-py/`, and `assets/`; development materials such as `docs/`,
-`tests/`, and `tools/` are not included.
+`rtd-config-cli-py/`, `assets/`, `reference/`, and `release-manifest.json`;
+development materials such as `docs/`, `tests/`, and `tools/` are not included.
 
 ## Repository layout
 
