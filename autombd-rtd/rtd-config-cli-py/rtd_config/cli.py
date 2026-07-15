@@ -743,14 +743,28 @@ def _intent_dict(intent: Intent) -> dict:
 
 
 def _preflight_project(
-    project: Project, *, asset_root: Path | None = None
+    project: Project, *, asset_root: Path | None = None,
+    revalidate_metadata: bool = False,
 ) -> Project:
     """Resolve and cache exact project assets before provider or vendor work."""
+    lease_was_closed = project.verified_target.lease.closed
     metadata = project.metadata.require_identity()
     project._cache["asset_bundle"] = AssetBundleResolver(
         asset_root or DEFAULT_ASSET_ROOT
     ).resolve(metadata)
-    revalidate_project_metadata(project.verified_target, project.metadata)
+    if not revalidate_metadata:
+        return project
+    try:
+        revalidate_project_metadata(project.verified_target, project.metadata)
+    except CliFailure as exc:
+        if exc.code == "project_target_closed" and not lease_was_closed:
+            raise CliFailure(
+                "project_target_changed",
+                "The verified project target changed during compatibility preflight; "
+                "reload and retry.",
+                module="backend",
+            ) from exc
+        raise
     return project
 
 
@@ -798,7 +812,9 @@ def _execute_canonical_request(
     """Execute generic and shortcut requests through one registry-owned flow."""
     project = Project.verified(config.project, config.backend)
     try:
-        _preflight_project(project, asset_root=config.asset_root)
+        _preflight_project(
+            project, asset_root=config.asset_root, revalidate_metadata=True
+        )
         _assert_expected_identity(project, config, expected_fields)
         bundle = project.asset_bundle
         if shortcut_args is not None:

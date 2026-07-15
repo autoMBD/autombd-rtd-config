@@ -262,5 +262,52 @@ def test_asset_preflight_revalidates_observed_metadata(monkeypatch):
         lambda target, metadata: observed.append((target, metadata)),
     )
     with Project.verified(UART) as project:
-        cli._preflight_project(project)
+        cli._preflight_project(project, revalidate_metadata=True)
         assert observed == [(project.verified_target, project.metadata)]
+
+
+@pytest.mark.parametrize(
+    "command_name",
+    [
+        "cmd_uart_set", "cmd_uart_add_flexio_channel", "cmd_platform_set",
+        "cmd_basenxp_set", "cmd_mcl_set", "cmd_port_set", "cmd_dio_set",
+        "cmd_mcu_set", "cmd_adc_set",
+    ],
+)
+def test_shortcut_preflight_classifies_lease_swap_as_target_changed(
+    monkeypatch, command_name
+):
+    projects = []
+    original_verified = cli.Project.verified
+    original_resolver = cli.AssetBundleResolver
+
+    def tracked_verified(root, backend="s32-mex"):
+        project = original_verified(root, backend)
+        projects.append(project)
+        return project
+
+    class SwapAfterResolve:
+        def __init__(self, root):
+            self._delegate = original_resolver(root)
+
+        def resolve(self, metadata):
+            bundle = self._delegate.resolve(metadata)
+            projects[-1].close()
+            return bundle
+
+    monkeypatch.setattr(cli.Project, "verified", tracked_verified)
+    monkeypatch.setattr(cli, "AssetBundleResolver", SwapAfterResolve)
+
+    with pytest.raises(CliFailure) as caught:
+        getattr(cli, command_name)(
+            SimpleNamespace(project=UART, configure=False, backup=False)
+        )
+    assert caught.value.code == "project_target_changed"
+
+
+def test_caller_reusing_closed_project_keeps_target_closed_classification():
+    project = Project.verified(UART)
+    project.close()
+    with pytest.raises(CliFailure) as caught:
+        cli._preflight_project(project, revalidate_metadata=True)
+    assert caught.value.code == "project_target_closed"
