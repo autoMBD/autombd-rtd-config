@@ -653,6 +653,16 @@ def test_clean_deploy_contains_exact_manifest_set_and_runs_outside_repo(tmp_path
     assert actual == set(_manifest_paths(document)) | {RELEASE_MANIFEST_NAME}
     outside = tmp_path / "outside-repository-cwd"
     outside.mkdir()
+    version_result = subprocess.run(
+        [sys.executable, str(installed / "__main__.py"), "--version"],
+        cwd=outside,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert version_result.returncode == 0, version_result.stderr
+    version_payload = json.loads(version_result.stdout)
+    assert version_payload["version"] == EXPECTED_RELEASE_VERSION
     help_result = subprocess.run(
         [sys.executable, str(installed / "__main__.py"), "--help"],
         cwd=outside,
@@ -682,6 +692,15 @@ def test_clean_deploy_contains_exact_manifest_set_and_runs_outside_repo(tmp_path
     resource_payload = json.loads(resource_result.stdout)
     assert resource_payload["status"] == "passed"
     assert resource_payload["options"]
+    post_run_actual = {
+        path.relative_to(installed).as_posix()
+        for path in installed.rglob("*")
+        if path.is_file()
+    }
+    assert post_run_actual == set(_manifest_paths(document)) | {
+        RELEASE_MANIFEST_NAME
+    }, "running the released Skill must not create .pyc or other unmanifested files"
+    assert not any(path.name == "__pycache__" for path in installed.rglob("*"))
 
 
 @pytest.mark.parametrize("mutation", ("hash_mismatch", "extra"))
