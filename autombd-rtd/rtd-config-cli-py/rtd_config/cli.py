@@ -61,8 +61,16 @@ from .config import (
     validate_runtime_config_fields,
 )
 from .backends.s32_mex.document import MexDocument, MexWriteError
-from .backends.s32_mex.metadata import revalidate_project_metadata
-from .backends.s32_mex.target import release_for_publish, revalidate_snapshot
+from .backends.s32_mex.metadata import (
+    revalidate_project_metadata,
+    revalidate_project_metadata_after_release,
+)
+from .backends.s32_mex.target import (
+    PublishExpectation,
+    release_for_publish,
+    revalidate_publish_expectation,
+    revalidate_snapshot,
+)
 from .backends.s32_mex.transaction import ConfigureTransaction
 from .project import Project
 from .resources.pins import pin_options
@@ -76,7 +84,12 @@ from .modules.mcu import McuProvider
 from .modules.port import PortProvider
 from .modules.dio import DioProvider
 from .modules.adc import AdcProvider
-from .modules.registry import PhysicalRegion, ProviderBinding, ProviderRegistry
+from .modules.registry import (
+    BindingSelection,
+    PhysicalRegion,
+    ProviderBinding,
+    ProviderRegistry,
+)
 from .checks.static import run_static_checks
 from .backends.s32_mex.apply import apply_uart_set, apply_uart_add_flexio_channel, apply_platform_set, apply_basenxp_set, apply_mcl_set, apply_port_set, apply_dio_set, apply_mcu_set, apply_adc_set
 from .backends.s32_mex.validation import find_s32ds_root, probe_which_root, run_validation
@@ -747,7 +760,29 @@ def _preflight_project(
     revalidate_metadata: bool = False,
 ) -> Project:
     """Resolve and cache exact project assets before provider or vendor work."""
-    lease_was_closed = project.verified_target.lease.closed
+    if project.verified_target.lease.closed:
+        snapshot = project.verified_target.mex
+        try:
+            revalidate_publish_expectation(PublishExpectation(
+                snapshot.path, snapshot.identity, snapshot.sha256
+            ))
+            revalidate_project_metadata_after_release(project.root, project.metadata)
+        except CliFailure as exc:
+            if exc.code in {
+                "project_target_changed", "project_metadata_source_changed"
+            }:
+                raise CliFailure(
+                    "project_target_changed",
+                    "The verified project target changed during compatibility "
+                    "preflight; reload and retry.",
+                    module="backend",
+                ) from exc
+            raise
+        raise CliFailure(
+            "project_target_closed",
+            "The verified project lease is closing or closed.",
+            module="backend",
+        )
     metadata = project.metadata.require_identity()
     project._cache["asset_bundle"] = AssetBundleResolver(
         asset_root or DEFAULT_ASSET_ROOT
@@ -757,7 +792,7 @@ def _preflight_project(
     try:
         revalidate_project_metadata(project.verified_target, project.metadata)
     except CliFailure as exc:
-        if exc.code == "project_target_closed" and not lease_was_closed:
+        if exc.code == "project_target_closed":
             raise CliFailure(
                 "project_target_changed",
                 "The verified project target changed during compatibility preflight; "
@@ -804,7 +839,7 @@ def _execute_canonical_request(
     backup: bool,
     expected_fields: frozenset[str] = frozenset(),
     intent: Intent | None = None,
-    binding: ProviderBinding | None = None,
+    binding: ProviderBinding | BindingSelection | None = None,
     shortcut_args: argparse.Namespace | None = None,
     shortcut_module: str | None = None,
     shortcut_cli_action: str | None = None,
@@ -818,7 +853,19 @@ def _execute_canonical_request(
         _assert_expected_identity(project, config, expected_fields)
         bundle = project.asset_bundle
         if shortcut_args is not None:
-            if binding is None:
+            selection = binding if isinstance(binding, BindingSelection) else None
+            if selection is not None:
+                resolved = _shortcut_binding(
+                    shortcut_args, selection.module, selection.cli_action
+                )
+                if resolved.key != selection.key:
+                    raise CliFailure(
+                        "provider_binding_changed",
+                        "The provider registry changed during command preflight.",
+                        module="backend",
+                    )
+                binding = resolved
+            elif binding is None:
                 binding = _shortcut_binding(
                     shortcut_args, shortcut_module, shortcut_cli_action
                 )
@@ -1347,12 +1394,23 @@ def _run_registered_shortcut(
     args: argparse.Namespace, module: str | None = None, cli_action: str | None = None
 ) -> int:
     config, expected_fields = _load_runtime_config(args)
+    resolved_module = module if module is not None else getattr(args, "command", None)
+    resolved_cli_action = (
+        cli_action if cli_action is not None else getattr(args, "action", None)
+    )
+    registry_action = (
+        resolved_cli_action.replace("-", "_")
+        if isinstance(resolved_cli_action, str) else resolved_cli_action
+    )
+    selection = BindingSelection(
+        config.backend, resolved_module, registry_action, resolved_cli_action
+    )
     return _execute_canonical_request(
         config,
         configure=bool(getattr(args, "configure", False)),
         backup=bool(getattr(args, "backup", False)),
         expected_fields=expected_fields,
-        binding=None,
+        binding=selection,
         shortcut_args=args,
         shortcut_module=module,
         shortcut_cli_action=cli_action,

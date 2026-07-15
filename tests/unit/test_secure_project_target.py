@@ -680,10 +680,10 @@ def test_inspect_uses_verified_bytes_when_target_is_swapped(monkeypatch, capsys,
     root, mex = _bundle_compatible_project(tmp_path)
     _swap_project_after_verification(monkeypatch, root, mex)
 
-    assert cli.cmd_inspect(SimpleNamespace(project=root)) == 0
-    payload = json.loads(capsys.readouterr().out)
-
-    assert "Uart" in payload["modules"]
+    with pytest.raises(CliFailure) as caught:
+        cli.cmd_inspect(SimpleNamespace(project=root))
+    assert caught.value.code == "project_target_changed"
+    assert capsys.readouterr().out == ""
     assert mex.read_bytes() == XML_B
 
 
@@ -698,7 +698,7 @@ def test_check_uses_verified_bytes_when_target_is_swapped(monkeypatch, capsys, t
     with pytest.raises(CliFailure) as caught:
         cli.cmd_check(SimpleNamespace(project=root))
 
-    assert caught.value.code == "project_target_closed"
+    assert caught.value.code == "project_target_changed"
     assert mex.read_bytes() == XML_B
 
 
@@ -728,7 +728,7 @@ def test_validate_uses_snapshot_then_rejects_swapped_target_before_vendor(
     with pytest.raises(CliFailure) as caught:
         cli.cmd_validate(args)
 
-    assert caught.value.code == "project_target_closed"
+    assert caught.value.code == "project_target_changed"
     assert not vendor_called
 
 
@@ -754,7 +754,7 @@ def test_configure_uses_snapshot_then_rejects_swapped_target_before_publish(
     with pytest.raises(CliFailure) as caught:
         cli._configure_module(args, intent, plan, apply_snapshot)
 
-    assert caught.value.code == "project_metadata_unknown"
+    assert caught.value.code == "project_target_changed"
     assert mex.read_bytes() == XML_B
 
 

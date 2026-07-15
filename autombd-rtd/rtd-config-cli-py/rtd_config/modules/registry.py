@@ -64,6 +64,20 @@ class PhysicalRegion:
 
 
 @dataclass(frozen=True)
+class BindingSelection:
+    """Registry-free shortcut selection carried into canonical preflight."""
+
+    backend: str
+    module: str
+    action: str
+    cli_action: str
+
+    @property
+    def key(self) -> tuple[str, str, str]:
+        return self.backend, self.module, self.action
+
+
+@dataclass(frozen=True)
 class ProviderBinding:
     backend: str
     module: str

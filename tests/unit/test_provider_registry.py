@@ -228,6 +228,19 @@ def test_direct_namespace_shortcut_keeps_explicit_binding_through_configure(monk
     assert observed["binding"].action == "set"
 
 
+def test_shortcut_passes_registry_free_selection_to_canonical_dispatcher(monkeypatch):
+    observed = {}
+
+    def execute(_config, **kwargs):
+        observed["binding"] = kwargs["binding"]
+        return 0
+
+    monkeypatch.setattr(cli, "_execute_canonical_request", execute)
+
+    assert cli.cmd_mcl_set(SimpleNamespace(project=UART, configure=False)) == 0
+    assert observed["binding"].key == ("mex", "mcl", "set")
+
+
 def test_generic_registry_lookup_waits_until_asset_preflight(monkeypatch, tmp_path):
     intent = tmp_path / "intent.json"
     intent.write_text(
