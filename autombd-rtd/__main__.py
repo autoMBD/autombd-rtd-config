@@ -49,6 +49,12 @@
 from __future__ import annotations
 
 import sys
+
+# The released Skill is a verified immutable payload. Disable bytecode writes
+# before importing pathlib or any bundled package so normal CLI use cannot add
+# unmanifested __pycache__ files beneath the installed Skill directory.
+sys.dont_write_bytecode = True
+
 from pathlib import Path
 
 # The importable CLI package `rtd_config` lives under the bundled Python source

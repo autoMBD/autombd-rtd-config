@@ -44,4 +44,11 @@
 # Description: Package root for the RTD CfgFile CLI; exposes the package version.
 # =================================================================================
 
+import sys
+
+# `python -m rtd_config` imports this package before its module entry point.
+# Set the process flag here so that invocation path also leaves the verified
+# released payload byte-for-byte unchanged.
+sys.dont_write_bytecode = True
+
 __version__ = "0.1.8"

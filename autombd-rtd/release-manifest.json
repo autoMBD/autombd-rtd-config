@@ -8,7 +8,7 @@
     },
     {
       "path": "__main__.py",
-      "sha256": "3ed68582be6d4e813b7fedcdbe8da004c36d0b570d0e7e678ec36ef6b26ff5f8"
+      "sha256": "5762f7fe9ad4d78d21dedb418e055a94f6df2610775eb7820f3f4b355926bc77"
     },
     {
       "path": "assets/bundles.json",
@@ -88,7 +88,7 @@
     },
     {
       "path": "rtd-config-cli-py/rtd_config/__init__.py",
-      "sha256": "55ae8e97b2960d77a35c52454c79c7de3cd46306e8f4104d0ac37f70de45769d"
+      "sha256": "24023c0dc12c63882b0c249821ff4d9b2109bbd6f02cd34f98d43aa9c116be96"
     },
     {
       "path": "rtd-config-cli-py/rtd_config/__main__.py",
