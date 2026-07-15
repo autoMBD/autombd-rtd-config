@@ -341,13 +341,10 @@ def _load_canonical_intent(raw_path: str, *, backend: str) -> Intent:
             "intent_invalid", "Intent fields have invalid types.", module="cli",
         )
     intent = Intent.from_dict(raw)
-    try:
-        get_provider_registry().require_intent(intent, backend=backend)
-    except CliFailure as exc:
-        raise CliFailure(
-            "intent_invalid", "Intent does not select a registered provider action.",
-            module="cli",
-        ) from exc
+    # Provider lookup is deliberately deferred until exact project assets have
+    # passed preflight.  This keeps compatibility failures deterministic and
+    # prevents provider construction from preceding project verification.
+    del backend
     return intent
 
 
@@ -753,6 +750,7 @@ def _preflight_project(
     project._cache["asset_bundle"] = AssetBundleResolver(
         asset_root or DEFAULT_ASSET_ROOT
     ).resolve(metadata)
+    revalidate_project_metadata(project.verified_target, project.metadata)
     return project
 
 
@@ -794,6 +792,8 @@ def _execute_canonical_request(
     intent: Intent | None = None,
     binding: ProviderBinding | None = None,
     shortcut_args: argparse.Namespace | None = None,
+    shortcut_module: str | None = None,
+    shortcut_cli_action: str | None = None,
 ) -> int:
     """Execute generic and shortcut requests through one registry-owned flow."""
     project = Project.verified(config.project, config.backend)
@@ -803,11 +803,24 @@ def _execute_canonical_request(
         bundle = project.asset_bundle
         if shortcut_args is not None:
             if binding is None:
-                binding = _shortcut_binding(shortcut_args)
+                binding = _shortcut_binding(
+                    shortcut_args, shortcut_module, shortcut_cli_action
+                )
             intent = binding.normalizer(shortcut_args, bundle)
         if intent is None:
             raise CliFailure("intent_invalid", "Canonical intent is unavailable.", module="cli")
-        registered = get_provider_registry().require_intent(intent, backend=config.backend)
+        try:
+            registered = get_provider_registry().require_intent(
+                intent, backend=config.backend
+            )
+        except CliFailure as exc:
+            if shortcut_args is None:
+                raise CliFailure(
+                    "intent_invalid",
+                    "Intent does not select a registered provider action.",
+                    module="cli",
+                ) from exc
+            raise
         if binding is not None and registered is not binding:
             raise CliFailure(
                 "provider_binding_changed",
@@ -1305,8 +1318,12 @@ def get_provider_registry() -> ProviderRegistry:
 def _shortcut_binding(
     args: argparse.Namespace, module: str | None = None, cli_action: str | None = None
 ) -> ProviderBinding:
+    resolved_module = module if module is not None else getattr(args, "command", None)
+    resolved_action = (
+        cli_action if cli_action is not None else getattr(args, "action", None)
+    )
     return get_provider_registry().lookup_shortcut(
-        module or args.command, cli_action or args.action
+        resolved_module, resolved_action
     )
 
 
@@ -1321,6 +1338,8 @@ def _run_registered_shortcut(
         expected_fields=expected_fields,
         binding=None,
         shortcut_args=args,
+        shortcut_module=module,
+        shortcut_cli_action=cli_action,
     )
 
 

@@ -20,6 +20,8 @@
 from __future__ import annotations
 
 from dataclasses import FrozenInstanceError
+import json
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -28,12 +30,17 @@ from rtd_config import cli
 from rtd_config.errors import CliFailure
 from rtd_config.intent import Intent
 from rtd_config.plan import Plan, PlannedChange, TargetSelector
+from rtd_config.project import Project
 from rtd_config.modules.registry import (
     PhysicalRegion,
     ProviderBinding,
     ProviderRegistry,
     validate_provider_plan,
 )
+
+
+ROOT = Path(__file__).resolve().parents[2]
+UART = ROOT / "tests/fixtures/nxp/ds/s32k3/Uart_Example_S32K344"
 
 
 class _Provider:
@@ -204,3 +211,56 @@ def test_every_shortcut_command_resolves_through_registry(monkeypatch):
         )
         assert binding.module == module and binding.action == registry_action
     assert len(observed) == 9
+
+
+def test_direct_namespace_shortcut_keeps_explicit_binding_through_configure(monkeypatch):
+    observed = {}
+
+    def configure(_args, _intent, _plan, _apply_fn, _project, **kwargs):
+        observed["binding"] = kwargs["binding"]
+        return 0
+
+    monkeypatch.setattr(cli, "_configure_verified_project", configure)
+    args = SimpleNamespace(project=UART, configure=True, backup=False)
+
+    assert cli.cmd_mcl_set(args) == 0
+    assert observed["binding"].module == "mcl"
+    assert observed["binding"].action == "set"
+
+
+def test_generic_registry_lookup_waits_until_asset_preflight(monkeypatch, tmp_path):
+    intent = tmp_path / "intent.json"
+    intent.write_text(
+        json.dumps({"module": "mcl", "action": "set", "payload": {}}),
+        encoding="utf-8",
+    )
+
+    class RejectingResolver:
+        def __init__(self, _root):
+            pass
+
+        def resolve(self, _metadata):
+            raise CliFailure("asset_bundle_unsupported", "unsupported")
+
+    monkeypatch.setattr(cli, "AssetBundleResolver", RejectingResolver)
+    monkeypatch.setattr(
+        cli, "get_provider_registry",
+        lambda: pytest.fail("registry constructed before asset preflight"),
+    )
+
+    with pytest.raises(CliFailure) as caught:
+        cli._run_generic(SimpleNamespace(
+            command="plan", project=UART, intent=str(intent),
+        ))
+    assert caught.value.code == "asset_bundle_unsupported"
+
+
+def test_asset_preflight_revalidates_observed_metadata(monkeypatch):
+    observed = []
+    monkeypatch.setattr(
+        cli, "revalidate_project_metadata",
+        lambda target, metadata: observed.append((target, metadata)),
+    )
+    with Project.verified(UART) as project:
+        cli._preflight_project(project)
+        assert observed == [(project.verified_target, project.metadata)]
