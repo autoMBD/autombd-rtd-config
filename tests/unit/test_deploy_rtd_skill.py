@@ -989,3 +989,148 @@ def test_deploy_one_rejects_real_windows_junction_target_without_outside_writes(
         _assert_no_deploy_residue(outside)
     finally:
         os.rmdir(target)
+
+
+# ---------------------------------------------------------------------------
+# Destination-guard TOCTOU contract (Reviewer P1, round 2)
+# ---------------------------------------------------------------------------
+
+
+def _create_directory_redirect(link: Path, outside: Path) -> None:
+    if os.name == "nt":
+        created = subprocess.run(
+            ["cmd", "/c", "mklink", "/J", str(link), str(outside)],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if created.returncode != 0:
+            pytest.skip(
+                f"junction creation unavailable: {created.stderr or created.stdout}"
+            )
+    else:
+        try:
+            link.symlink_to(outside, target_is_directory=True)
+        except OSError as exc:
+            pytest.skip(f"directory symlink creation unavailable: {exc}")
+
+
+def _remove_directory_redirect(link: Path) -> None:
+    if os.name == "nt":
+        os.rmdir(link)
+    else:
+        link.unlink()
+
+
+def _swap_directory_during_mutation(
+    guarded_directory: Path,
+    outside: Path,
+    operation,
+):
+    displaced = guarded_directory.with_name(f"{guarded_directory.name}.displaced")
+    guarded_directory.rename(displaced)
+    _create_directory_redirect(guarded_directory, outside)
+    try:
+        return operation()
+    finally:
+        _remove_directory_redirect(guarded_directory)
+        displaced.rename(guarded_directory)
+
+
+@pytest.mark.parametrize("target_state", ("missing", "existing"))
+def test_deploy_rejects_linked_parent_chain_before_creating_target_or_children(
+    tmp_path,
+    target_state,
+):
+    deploy = load_deploy_module()
+    outside = tmp_path / "outside-parent"
+    outside.mkdir()
+    linked_parent = tmp_path / "linked-parent"
+    target = linked_parent / "target-project"
+    if target_state == "existing":
+        (outside / "target-project").mkdir()
+        (outside / "target-project" / "sentinel.bin").write_bytes(b"unchanged")
+    before = _tree_snapshot(outside)
+    _create_directory_redirect(linked_parent, outside)
+    try:
+        with pytest.raises(
+            RuntimeError,
+            match="unsafe|ancestor|parent|symlink|link|junction|reparse",
+        ):
+            deploy.deploy_one(REPO_ROOT, target, "codex")
+
+        assert _tree_snapshot(outside) == before
+        if target_state == "missing":
+            assert not (outside / "target-project").exists()
+        _assert_no_deploy_residue(outside)
+    finally:
+        _remove_directory_redirect(linked_parent)
+
+
+@pytest.mark.parametrize("race_point", ("lock", "staging", "publish"))
+def test_deploy_mutation_is_bound_to_guarded_directory_across_ancestor_swap(
+    tmp_path,
+    monkeypatch,
+    race_point,
+):
+    """A verified path swap must neither publish outside nor consume old install."""
+    deploy = load_deploy_module()
+    target = tmp_path / "target-project"
+    skills = target / ".agents" / "skills"
+    installed = skills / "autombd-rtd"
+    installed.mkdir(parents=True)
+    (installed / "sentinel.bin").write_bytes(b"old-install-must-survive")
+    outside = tmp_path / "outside-race-target"
+    outside.mkdir()
+    before_outside = _tree_snapshot(outside)
+    before_install = _tree_snapshot(installed)
+    platform = _InjectedDestinationPlatform(deploy)
+    triggered = False
+    real_mkdir = Path.mkdir
+    real_rename = Path.rename
+
+    def race_once(operation):
+        nonlocal triggered
+        assert not triggered
+        triggered = True
+        return _swap_directory_during_mutation(skills, outside, operation)
+
+    def racing_mkdir(self, *args, **kwargs):
+        if (
+            not triggered
+            and (
+                (race_point == "lock" and self.name.endswith(".deploy.lock"))
+                or (race_point == "staging" and ".deploying." in self.name)
+            )
+        ):
+            return race_once(lambda: real_mkdir(self, *args, **kwargs))
+        return real_mkdir(self, *args, **kwargs)
+
+    def racing_rename(self, target_path):
+        target_path = Path(target_path)
+        if (
+            not triggered
+            and race_point == "publish"
+            and ".deploying." in self.name
+            and target_path == installed
+        ):
+            outside_staging = outside / self.name
+            real_mkdir(outside_staging)
+            (outside_staging / "attacker.bin").write_bytes(b"outside")
+            return race_once(lambda: real_rename(self, target_path))
+        return real_rename(self, target_path)
+
+    monkeypatch.setattr(Path, "mkdir", racing_mkdir)
+    monkeypatch.setattr(Path, "rename", racing_rename)
+
+    with pytest.raises(
+        RuntimeError,
+        match="unsafe|identity|ancestor|changed|race|protected|rename",
+    ):
+        deploy.deploy_one(REPO_ROOT, target, "codex", platform=platform)
+
+    assert triggered, f"the deterministic {race_point} mutation hook did not run"
+    assert _tree_snapshot(outside) == before_outside
+    assert _tree_snapshot(installed) == before_install
+    _assert_no_deploy_residue(target)
+    _assert_no_deploy_residue(outside)
