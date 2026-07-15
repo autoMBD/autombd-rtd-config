@@ -353,9 +353,15 @@ class _DirectoryIdentity:
     device: int
     inode: int
     handle: int | None = field(default=None, compare=False, repr=False)
+    rename_access: bool = field(default=False, compare=False, repr=False)
 
 
-def _open_windows_directory(path: Path) -> tuple[int, int, int]:
+def _open_windows_directory(
+    path: Path,
+    *,
+    rename_access: bool = False,
+    share_delete: bool = False,
+) -> tuple[int, int, int]:
     from ctypes import wintypes
 
     class _ByHandleFileInformation(ctypes.Structure):
@@ -386,8 +392,8 @@ def _open_windows_directory(path: Path) -> tuple[int, int, int]:
     create_file.restype = wintypes.HANDLE
     handle = create_file(
         str(path),
-        0x80000000,  # GENERIC_READ; participates in delete-share arbitration
-        0x1 | 0x2,  # share read/write, deliberately deny FILE_SHARE_DELETE
+        0x80000000 | (0x00010000 if rename_access else 0),
+        0x1 | 0x2 | (0x4 if share_delete else 0),
         None,
         3,  # OPEN_EXISTING
         0x02000000 | 0x00200000,  # BACKUP_SEMANTICS | OPEN_REPARSE_POINT
@@ -430,6 +436,158 @@ def _close_directory_handle(handle: int) -> None:
         os.close(handle)
 
 
+def _open_windows_regular_file(
+    path: Path,
+    *,
+    desired_access: int,
+    creation_disposition: int,
+) -> int:
+    from ctypes import wintypes
+
+    class _ByHandleFileInformation(ctypes.Structure):
+        _fields_ = (
+            ("attributes", wintypes.DWORD),
+            ("creation_time", wintypes.FILETIME),
+            ("last_access_time", wintypes.FILETIME),
+            ("last_write_time", wintypes.FILETIME),
+            ("volume_serial", wintypes.DWORD),
+            ("file_size_high", wintypes.DWORD),
+            ("file_size_low", wintypes.DWORD),
+            ("number_of_links", wintypes.DWORD),
+            ("file_index_high", wintypes.DWORD),
+            ("file_index_low", wintypes.DWORD),
+        )
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    create_file = kernel32.CreateFileW
+    create_file.argtypes = (
+        wintypes.LPCWSTR,
+        wintypes.DWORD,
+        wintypes.DWORD,
+        wintypes.LPVOID,
+        wintypes.DWORD,
+        wintypes.DWORD,
+        wintypes.HANDLE,
+    )
+    create_file.restype = wintypes.HANDLE
+    handle = create_file(
+        str(path),
+        desired_access,
+        0x1 | 0x2,  # FILE_SHARE_READ | FILE_SHARE_WRITE; intentionally no delete.
+        None,
+        creation_disposition,
+        0x00200000,  # FILE_FLAG_OPEN_REPARSE_POINT
+        None,
+    )
+    invalid = ctypes.c_void_p(-1).value
+    if handle == invalid:
+        error = ctypes.get_last_error()
+        raise OSError(error, f"cannot open protected staging file {path}: WinError {error}")
+    information = _ByHandleFileInformation()
+    get_information = kernel32.GetFileInformationByHandle
+    get_information.argtypes = (wintypes.HANDLE, ctypes.POINTER(_ByHandleFileInformation))
+    get_information.restype = wintypes.BOOL
+    if not get_information(handle, ctypes.byref(information)):
+        error = ctypes.get_last_error()
+        kernel32.CloseHandle(handle)
+        raise OSError(error, f"cannot inspect protected staging file {path}: WinError {error}")
+    if information.attributes & 0x10 or information.attributes & 0x400:
+        kernel32.CloseHandle(handle)
+        raise RuntimeError(f"unsafe staging entry is not a regular file: {path}")
+    return int(handle)
+
+
+def _write_windows_handle(handle: int, content: bytes) -> None:
+    from ctypes import wintypes
+
+    write_file = ctypes.WinDLL("kernel32", use_last_error=True).WriteFile
+    write_file.argtypes = (
+        wintypes.HANDLE,
+        wintypes.LPCVOID,
+        wintypes.DWORD,
+        ctypes.POINTER(wintypes.DWORD),
+        wintypes.LPVOID,
+    )
+    write_file.restype = wintypes.BOOL
+    offset = 0
+    while offset < len(content):
+        chunk = content[offset : offset + 1024 * 1024]
+        buffer = ctypes.create_string_buffer(chunk)
+        written = wintypes.DWORD()
+        if not write_file(handle, buffer, len(chunk), ctypes.byref(written), None):
+            error = ctypes.get_last_error()
+            raise OSError(error, f"protected staging write failed: WinError {error}")
+        if not written.value:
+            raise OSError("protected staging write made no progress")
+        offset += written.value
+
+
+def _read_windows_handle(handle: int) -> bytes:
+    from ctypes import wintypes
+
+    read_file = ctypes.WinDLL("kernel32", use_last_error=True).ReadFile
+    read_file.argtypes = (
+        wintypes.HANDLE,
+        wintypes.LPVOID,
+        wintypes.DWORD,
+        ctypes.POINTER(wintypes.DWORD),
+        wintypes.LPVOID,
+    )
+    read_file.restype = wintypes.BOOL
+    chunks = []
+    while True:
+        buffer = ctypes.create_string_buffer(1024 * 1024)
+        read = wintypes.DWORD()
+        if not read_file(handle, buffer, len(buffer), ctypes.byref(read), None):
+            error = ctypes.get_last_error()
+            raise OSError(error, f"protected staging read failed: WinError {error}")
+        if not read.value:
+            return b"".join(chunks)
+        chunks.append(buffer.raw[: read.value])
+
+
+def _rename_windows_directory_handle(
+    handle: int,
+    destination: Path,
+) -> None:
+    from ctypes import wintypes
+
+    destination_text = str(Path(destination).absolute())
+
+    class _FileRenameInformation(ctypes.Structure):
+        _fields_ = (
+            ("flags", wintypes.DWORD),
+            ("root_directory", wintypes.HANDLE),
+            ("file_name_length", wintypes.DWORD),
+            ("file_name", wintypes.WCHAR * (len(destination_text) + 1)),
+        )
+
+    information = _FileRenameInformation()
+    information.flags = 0
+    information.root_directory = None
+    information.file_name_length = len(destination_text.encode("utf-16-le"))
+    information.file_name = destination_text
+    set_information = ctypes.WinDLL(
+        "kernel32",
+        use_last_error=True,
+    ).SetFileInformationByHandle
+    set_information.argtypes = (
+        wintypes.HANDLE,
+        ctypes.c_int,
+        wintypes.LPVOID,
+        wintypes.DWORD,
+    )
+    set_information.restype = wintypes.BOOL
+    if not set_information(
+        handle,
+        3,  # FileRenameInfo
+        ctypes.byref(information),
+        ctypes.sizeof(information),
+    ):
+        error = ctypes.get_last_error()
+        raise OSError(error, f"handle-bound directory rename failed: WinError {error}")
+
+
 def _open_directory_identity(path: Path, platform=None) -> _DirectoryIdentity:
     observed = _directory_identity(path, platform)
     if os.name == "nt":
@@ -449,6 +607,46 @@ def _open_directory_identity(path: Path, platform=None) -> _DirectoryIdentity:
     if (metadata.st_dev, metadata.st_ino) != (observed.device, observed.inode):
         os.close(descriptor)
         raise RuntimeError(f"destination ancestor changed while opening: {path}")
+    return _DirectoryIdentity(path, metadata.st_dev, metadata.st_ino, descriptor)
+
+
+def _open_child_directory_identity(
+    parent: _DirectoryIdentity,
+    path: Path,
+    platform=None,
+    *,
+    rename_access: bool = False,
+) -> _DirectoryIdentity:
+    if path.parent != parent.path or parent.handle is None:
+        raise RuntimeError("child capability is not relative to its pinned parent")
+    if _platform_is_link_or_reparse(platform, path):
+        raise RuntimeError(f"unsafe destination ancestor is linked: {path}")
+    if os.name == "nt":
+        if rename_access:
+            handle, volume, file_id = _open_windows_directory(
+                path,
+                rename_access=True,
+            )
+            return _DirectoryIdentity(
+                path,
+                volume,
+                file_id,
+                handle,
+                rename_access=True,
+            )
+        return _open_directory_identity(path, platform)
+    try:
+        descriptor = os.open(
+            path.name,
+            _posix_directory_open_flags(),
+            dir_fd=parent.handle,
+        )
+    except OSError as exc:
+        raise RuntimeError(f"cannot open protected child directory {path}: {exc}") from exc
+    metadata = os.fstat(descriptor)
+    if not stat.S_ISDIR(metadata.st_mode):
+        os.close(descriptor)
+        raise RuntimeError(f"unsafe destination ancestor is not a directory: {path}")
     return _DirectoryIdentity(path, metadata.st_dev, metadata.st_ino, descriptor)
 
 
@@ -508,7 +706,10 @@ class _DestinationAncestorGuard:
                     raise RuntimeError(
                         f"unsafe destination ancestor is linked: {expected.path}"
                     )
-                handle, device, inode = _open_windows_directory(expected.path)
+                handle, device, inode = _open_windows_directory(
+                    expected.path,
+                    share_delete=expected.rename_access,
+                )
                 _close_directory_handle(handle)
                 observed = _DirectoryIdentity(expected.path, device, inode)
             elif expected.handle is not None:
@@ -680,6 +881,184 @@ class _DestinationAncestorGuard:
                 )
             )
 
+    def open_child(
+        self,
+        path: Path,
+        *,
+        rename_access: bool = False,
+    ) -> _DestinationAncestorGuard:
+        identity = _open_child_directory_identity(
+            self.identities[-1],
+            Path(path),
+            self.platform,
+            rename_access=rename_access,
+        )
+        return _DestinationAncestorGuard((identity,), self.platform)
+
+    @staticmethod
+    def _validate_relative(relative: PurePosixPath) -> None:
+        if relative.is_absolute() or any(
+            part in ("", ".", "..") for part in relative.parts
+        ):
+            raise RuntimeError("relative capability path is unsafe")
+
+    @contextmanager
+    def _windows_relative_parent(
+        self,
+        relative: PurePosixPath,
+        *,
+        create: bool,
+    ):
+        handles = []
+        current = self.parent
+        try:
+            for component in relative.parts[:-1]:
+                current /= component
+                if create:
+                    try:
+                        current.mkdir()
+                    except FileExistsError:
+                        pass
+                if _platform_is_link_or_reparse(self.platform, current):
+                    raise RuntimeError(f"unsafe staging directory is linked: {current}")
+                handle, _device, _inode = _open_windows_directory(current)
+                handles.append(handle)
+                if _platform_is_link_or_reparse(self.platform, current):
+                    raise RuntimeError(f"unsafe staging directory is linked: {current}")
+            yield current / relative.name
+        finally:
+            for handle in reversed(handles):
+                _close_directory_handle(handle)
+
+    def write_relative_bytes(self, relative: PurePosixPath, content: bytes) -> None:
+        self._validate_relative(relative)
+        if os.name == "nt":
+            with self._windows_relative_parent(relative, create=True) as destination:
+                handle = _open_windows_regular_file(
+                    destination,
+                    desired_access=0x40000000,  # GENERIC_WRITE
+                    creation_disposition=1,  # CREATE_NEW
+                )
+                try:
+                    _write_windows_handle(handle, content)
+                finally:
+                    _close_directory_handle(handle)
+            return
+        current_fd = os.dup(self.parent_handle)
+        try:
+            for component in relative.parts[:-1]:
+                try:
+                    os.mkdir(component, dir_fd=current_fd)
+                except FileExistsError:
+                    pass
+                child_fd = os.open(
+                    component,
+                    _posix_directory_open_flags(),
+                    dir_fd=current_fd,
+                )
+                os.close(current_fd)
+                current_fd = child_fd
+            descriptor = os.open(
+                relative.name,
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+                0o644,
+                dir_fd=current_fd,
+            )
+            try:
+                view = memoryview(content)
+                while view:
+                    written = os.write(descriptor, view)
+                    view = view[written:]
+            finally:
+                os.close(descriptor)
+        finally:
+            os.close(current_fd)
+
+    def read_relative_bytes(self, relative: PurePosixPath) -> bytes:
+        self._validate_relative(relative)
+        if os.name == "nt":
+            with self._windows_relative_parent(relative, create=False) as source:
+                handle = _open_windows_regular_file(
+                    source,
+                    desired_access=0x80000000,  # GENERIC_READ
+                    creation_disposition=3,  # OPEN_EXISTING
+                )
+                try:
+                    return _read_windows_handle(handle)
+                finally:
+                    _close_directory_handle(handle)
+        current_fd = os.dup(self.parent_handle)
+        try:
+            for component in relative.parts[:-1]:
+                child_fd = os.open(
+                    component,
+                    _posix_directory_open_flags(),
+                    dir_fd=current_fd,
+                )
+                os.close(current_fd)
+                current_fd = child_fd
+            descriptor = os.open(relative.name, os.O_RDONLY, dir_fd=current_fd)
+            try:
+                chunks = []
+                while True:
+                    chunk = os.read(descriptor, 1024 * 1024)
+                    if not chunk:
+                        return b"".join(chunks)
+                    chunks.append(chunk)
+            finally:
+                os.close(descriptor)
+        finally:
+            os.close(current_fd)
+
+    def relative_files(self) -> set[str]:
+        if os.name == "nt":
+            def collect(directory: Path, prefix: PurePosixPath) -> set[str]:
+                result = set()
+                for name in os.listdir(directory):
+                    path = directory / name
+                    if _platform_is_link_or_reparse(self.platform, path):
+                        raise RuntimeError(f"unsafe staged entry is linked: {path}")
+                    metadata = path.lstat()
+                    relative = prefix / name
+                    if stat.S_ISDIR(metadata.st_mode):
+                        handle, _device, _inode = _open_windows_directory(path)
+                        try:
+                            result.update(collect(path, relative))
+                        finally:
+                            _close_directory_handle(handle)
+                        continue
+                    handle = _open_windows_regular_file(
+                        path,
+                        desired_access=0x80000000,  # GENERIC_READ
+                        creation_disposition=3,  # OPEN_EXISTING
+                    )
+                    _close_directory_handle(handle)
+                    result.add(relative.as_posix())
+                return result
+
+            return collect(self.parent, PurePosixPath())
+
+        def collect(directory_fd: int, prefix: PurePosixPath) -> set[str]:
+            result: set[str] = set()
+            for name in os.listdir(directory_fd):
+                metadata = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+                relative = prefix / name
+                if stat.S_ISDIR(metadata.st_mode) and not stat.S_ISLNK(metadata.st_mode):
+                    child_fd = os.open(
+                        name,
+                        _posix_directory_open_flags(),
+                        dir_fd=directory_fd,
+                    )
+                    try:
+                        result.update(collect(child_fd, relative))
+                    finally:
+                        os.close(child_fd)
+                else:
+                    result.add(relative.as_posix())
+            return result
+
+        return collect(self.parent_handle, PurePosixPath())
+
     def remove(self, path: Path) -> None:
         path = Path(path)
         if path.parent != self.parent:
@@ -710,8 +1089,13 @@ def _remove_at(parent_fd: int, name: str) -> None:
 def _guard_for_paths(paths: list[Path], platform=None) -> _DestinationAncestorGuard:
     identities: list[_DirectoryIdentity] = []
     try:
-        for path in paths:
-            identities.append(_open_directory_identity(path, platform))
+        for index, path in enumerate(paths):
+            if index == 0:
+                identities.append(_open_directory_identity(path, platform))
+            else:
+                identities.append(
+                    _open_child_directory_identity(identities[-1], path, platform)
+                )
     except BaseException:
         _DestinationAncestorGuard(tuple(identities), platform).close()
         raise
@@ -965,16 +1349,29 @@ def deployment_lock(
     lock = parent / f".{destination.name}.deploy.lock"
     deadline = time.monotonic() + _DEPLOYMENT_LOCK_TIMEOUT_S
     owned_lock: _DirectoryIdentity | None = None
+    owned_lock_guard: _DestinationAncestorGuard | None = None
 
     while True:
         try:
             guard.mkdir(lock, mutation_kind="lock")
             owned_lock = guard.entry_identity(lock)
-            guard.write_child_file(
-                lock,
-                "owner.txt",
-                f"pid={os.getpid()}\nstarted={time.time():.6f}\n",
-            )
+            owned_lock_guard = guard.open_child(lock)
+            owned_lock_guard.__enter__()
+            try:
+                owned_lock_guard._atomic_mutation(
+                    "lock-owner",
+                    lambda: owned_lock_guard.write_relative_bytes(
+                        PurePosixPath("owner.txt"),
+                        f"pid={os.getpid()}\nstarted={time.time():.6f}\n".encode(
+                            "utf-8"
+                        ),
+                    ),
+                )
+            except BaseException:
+                owned_lock_guard.close()
+                if guard.entry_present(lock):
+                    guard.remove(lock)
+                raise
             guard.verify()
             if guard.entry_identity(lock) != owned_lock:
                 raise RuntimeError("deployment lock identity changed during acquisition")
@@ -1004,6 +1401,8 @@ def deployment_lock(
     try:
         yield
     finally:
+        if owned_lock_guard is not None:
+            owned_lock_guard.close()
         guard.verify()
         if guard.entry_present(lock):
             if owned_lock is None or guard.entry_identity(lock) != owned_lock:
@@ -1039,6 +1438,84 @@ def recover_interrupted_publish(
     _retry_fs(lambda: guard.rename(candidates[0], destination))
 
 
+def _populate_staging_payload(
+    source_skill_root: Path,
+    staging_guard: _DestinationAncestorGuard,
+    manifest: ReleaseManifest | None,
+) -> None:
+    def populate() -> None:
+        if manifest is None:
+            for item in SKILL_PAYLOAD_ITEMS:
+                source = source_skill_root / item
+                if not source.exists():
+                    raise FileNotFoundError(source)
+                if source.is_file():
+                    staging_guard.write_relative_bytes(
+                        PurePosixPath(item),
+                        source.read_bytes(),
+                    )
+                    continue
+                for source_file in source.rglob("*"):
+                    if source_file.is_file():
+                        relative = PurePosixPath(
+                            *source_file.relative_to(source_skill_root).parts
+                        )
+                        staging_guard.write_relative_bytes(
+                            relative,
+                            source_file.read_bytes(),
+                        )
+            return
+
+        for entry in manifest.files:
+            relative = PurePosixPath(entry.path)
+            staging_guard.write_relative_bytes(
+                relative,
+                source_skill_root.joinpath(*relative.parts).read_bytes(),
+            )
+        staging_guard.write_relative_bytes(
+            PurePosixPath(RELEASE_MANIFEST_NAME),
+            (source_skill_root / RELEASE_MANIFEST_NAME).read_bytes(),
+        )
+
+    staging_guard._atomic_mutation("stage-copy", populate)
+
+    if manifest is None:
+        return
+    expected_files = {entry.path for entry in manifest.files} | {
+        RELEASE_MANIFEST_NAME
+    }
+    actual_files = staging_guard.relative_files()
+    if actual_files != expected_files:
+        raise RuntimeError(
+            "staged Skill payload file-set drift: "
+            f"missing={sorted(expected_files - actual_files) or 'none'}, "
+            f"extra={sorted(actual_files - expected_files) or 'none'}"
+        )
+    for entry in manifest.files:
+        digest = hashlib.sha256(
+            staging_guard.read_relative_bytes(PurePosixPath(entry.path))
+        ).hexdigest()
+        if digest != entry.sha256:
+            raise RuntimeError(f"staged Skill payload hash mismatch: {entry.path}")
+    if staging_guard.read_relative_bytes(
+        PurePosixPath(RELEASE_MANIFEST_NAME)
+    ) != (source_skill_root / RELEASE_MANIFEST_NAME).read_bytes():
+        raise RuntimeError("staged Skill release manifest drifted during copy")
+
+
+def _staged_legacy_payload_complete(
+    staging_guard: _DestinationAncestorGuard,
+) -> bool:
+    files = staging_guard.relative_files()
+    required = {path.as_posix() for path in SKILL_PAYLOAD_REQUIRED_FILES}
+    if not required.issubset(files):
+        return False
+    return all(
+        item in files or any(path.startswith(f"{item}/") for path in files)
+        for item in SKILL_PAYLOAD_ITEMS
+    )
+
+
 def copy_released_payload(
     source_skill_root: Path,
     destination: Path,
@@ -1061,51 +1538,38 @@ def copy_released_payload(
         staging = transaction_path(destination, "deploying")
         previous = transaction_path(destination, "previous")
         guard.mkdir(staging, mutation_kind="staging")
+        staging_guard = guard.open_child(staging, rename_access=True)
+        staging_guard.__enter__()
 
         moved_previous = False
         try:
-            if manifest is None:
-                # Kept for transaction-focused callers that construct a minimal
-                # synthetic payload. Production deployment always supplies the
-                # committed manifest and therefore uses the strict allowlist.
-                for item in SKILL_PAYLOAD_ITEMS:
-                    source = source_skill_root / item
-                    target = staging / item
-                    if source.is_dir():
-                        shutil.copytree(source, target)
-                    else:
-                        shutil.copy2(source, target)
-                if not installed_payload_complete(staging):
-                    raise RuntimeError(
-                        f"staged Skill payload is incomplete: {source_skill_root}"
-                    )
-            else:
-                for entry in manifest.files:
-                    relative = PurePosixPath(entry.path)
-                    source = source_skill_root.joinpath(*relative.parts)
-                    target = staging.joinpath(*relative.parts)
-                    target.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copy2(source, target)
-                shutil.copy2(
-                    source_skill_root / RELEASE_MANIFEST_NAME,
-                    staging / RELEASE_MANIFEST_NAME,
+            _populate_staging_payload(source_skill_root, staging_guard, manifest)
+            if manifest is None and not _staged_legacy_payload_complete(staging_guard):
+                raise RuntimeError(
+                    f"staged Skill payload is incomplete: {source_skill_root}"
                 )
-                staged_manifest = read_release_manifest(staging)
-                if staged_manifest != manifest:
-                    raise RuntimeError("staged Skill release manifest drifted during copy")
-                verify_release_payload(staging, staged_manifest)
 
             if guard.entry_present(destination):
                 _retry_fs(lambda: guard.rename(destination, previous))
                 moved_previous = True
-            _retry_fs(
-                lambda: guard.rename(
-                    staging,
-                    destination,
-                    mutation_kind="publish",
+            if os.name == "nt" and manifest is not None:
+                guard._atomic_mutation(
+                    "publish",
+                    lambda: _rename_windows_directory_handle(
+                        staging_guard.parent_handle,
+                        destination,
+                    ),
                 )
-            )
+            else:
+                _retry_fs(
+                    lambda: guard.rename(
+                        staging,
+                        destination,
+                        mutation_kind="publish",
+                    )
+                )
         except BaseException:
+            staging_guard.close()
             if (
                 moved_previous
                 and guard.entry_present(previous)
@@ -1115,6 +1579,7 @@ def copy_released_payload(
             if guard.entry_present(staging):
                 guard.remove(staging)
             raise
+        staging_guard.close()
         if guard.entry_present(previous):
             guard.remove(previous)
 
