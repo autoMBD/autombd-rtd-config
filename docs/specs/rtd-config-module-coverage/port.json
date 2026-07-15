@@ -79,13 +79,16 @@
           }
         ]
       },
-      "classification": "configurable",
+      "classification": "derived",
       "trace": {
-        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/port.py:PortProvider",
-        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_port_set",
-        "asset": "autombd-rtd/assets/nxp/s32k3/port/portpin.json#/portpin_struct",
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_port_set",
+        "inputs": [
+          "intent.payload",
+          "portpin.json#/portpin_struct"
+        ],
         "tests": [
-          "tests/unit/test_port_apply.py::test_portpin_tx_struct_inserted_correctly"
+          "tests/unit/test_port_apply.py::test_portpin_tx_struct_inserted_correctly",
+          "tests/unit/test_port_apply.py::test_portpin_struct_has_all_required_fields"
         ]
       }
     },
@@ -4192,9 +4195,18 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Port provider.",
-      "dependency": "A descriptor-forward Port implementation and generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_port_set",
+        "inputs": [
+          "intent.payload",
+          "portpin.json#/portpin_struct"
+        ],
+        "tests": [
+          "tests/unit/test_port_apply.py::test_portpin_tx_struct_inserted_correctly",
+          "tests/unit/test_port_apply.py::test_portpin_struct_has_all_required_fields"
+        ]
+      }
     },
     {
       "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Port]/ctr[MODULE-DEF]/ctr[PortConfigSet]/lst[UnTouchedPortPin]/ctr[UnTouchedPortPin]",
@@ -4272,13 +4284,16 @@
           }
         ]
       },
-      "classification": "configurable",
+      "classification": "derived",
       "trace": {
-        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/port.py:PortProvider",
-        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_port_set",
-        "asset": "autombd-rtd/assets/nxp/s32k3/port/portpin.json#/portpin_struct",
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_port_set",
+        "inputs": [
+          "intent.payload",
+          "portpin.json#/portpin_struct"
+        ],
         "tests": [
-          "tests/unit/test_port_apply.py::test_portpin_tx_struct_inserted_correctly"
+          "tests/unit/test_port_apply.py::test_portpin_tx_struct_inserted_correctly",
+          "tests/unit/test_port_apply.py::test_portpin_struct_has_all_required_fields"
         ]
       }
     },
@@ -4312,9 +4327,18 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Port provider.",
-      "dependency": "A descriptor-forward Port implementation and generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_port_set",
+        "inputs": [
+          "intent.payload",
+          "portpin.json#/portpin_struct"
+        ],
+        "tests": [
+          "tests/unit/test_port_apply.py::test_portpin_tx_struct_inserted_correctly",
+          "tests/unit/test_port_apply.py::test_portpin_struct_has_all_required_fields"
+        ]
+      }
     },
     {
       "key": "list:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Port]/ctr[MODULE-DEF]/ctr[PortConfigSet]/lst[UnTouchedPortPin]",
@@ -4421,9 +4445,18 @@
       "cross_modules": [
         "EcuC"
       ],
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Port provider.",
-      "dependency": "A descriptor-forward Port implementation and generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_port_set",
+        "inputs": [
+          "intent.payload",
+          "portpin.json#/portpin_struct"
+        ],
+        "tests": [
+          "tests/unit/test_port_apply.py::test_portpin_tx_struct_inserted_correctly",
+          "tests/unit/test_port_apply.py::test_portpin_struct_has_all_required_fields"
+        ]
+      }
     },
     {
       "key": "reference:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Port]/ctr[MODULE-DEF]/ctr[PortGeneral]/lst[PortEcucPartitionRef]/ref[PortEcucPartitionRef]",
@@ -13940,6 +13973,7 @@
           "portpin.json#/portpin_struct"
         ],
         "tests": [
+          "tests/unit/test_port_apply.py::test_portpin_tx_struct_inserted_correctly",
           "tests/unit/test_port_apply.py::test_portpin_struct_has_all_required_fields"
         ]
       }
@@ -13999,6 +14033,7 @@
           "portpin.json#/portpin_struct"
         ],
         "tests": [
+          "tests/unit/test_port_apply.py::test_portpin_tx_struct_inserted_correctly",
           "tests/unit/test_port_apply.py::test_portpin_struct_has_all_required_fields"
         ]
       }
@@ -18876,6 +18911,7 @@
           "portpin.json#/portpin_struct"
         ],
         "tests": [
+          "tests/unit/test_port_apply.py::test_portpin_tx_struct_inserted_correctly",
           "tests/unit/test_port_apply.py::test_portpin_struct_has_all_required_fields"
         ]
       }
@@ -18934,6 +18970,7 @@
           "portpin.json#/portpin_struct"
         ],
         "tests": [
+          "tests/unit/test_port_apply.py::test_portpin_tx_struct_inserted_correctly",
           "tests/unit/test_port_apply.py::test_portpin_struct_has_all_required_fields"
         ]
       }
@@ -18994,15 +19031,9 @@
           }
         ]
       },
-      "classification": "configurable",
-      "trace": {
-        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/port.py:PortProvider",
-        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_port_set",
-        "asset": "autombd-rtd/assets/nxp/s32k3/port/portpin.json#/portpin_struct",
-        "tests": [
-          "tests/unit/test_port_apply.py::test_portpin_tx_struct_inserted_correctly"
-        ]
-      }
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Port provider.",
+      "dependency": "A descriptor-forward Port implementation and generality tests are required before exposure."
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Port]/ctr[MODULE-DEF]/ctr[PortConfigSet]/lst[PortContainer]/ctr[PortContainer]/lst[PortPin]/ctr[PortPin]/var[PortPinDse]",
@@ -19064,6 +19095,7 @@
           "portpin.json#/portpin_struct"
         ],
         "tests": [
+          "tests/unit/test_port_apply.py::test_portpin_tx_struct_inserted_correctly",
           "tests/unit/test_port_apply.py::test_portpin_struct_has_all_required_fields"
         ]
       }
@@ -19155,6 +19187,7 @@
           "portpin.json#/portpin_struct"
         ],
         "tests": [
+          "tests/unit/test_port_apply.py::test_portpin_tx_struct_inserted_correctly",
           "tests/unit/test_port_apply.py::test_portpin_struct_has_all_required_fields"
         ]
       }
@@ -19209,6 +19242,7 @@
           "portpin.json#/portpin_struct"
         ],
         "tests": [
+          "tests/unit/test_port_apply.py::test_portpin_tx_struct_inserted_correctly",
           "tests/unit/test_port_apply.py::test_portpin_struct_has_all_required_fields"
         ]
       }
@@ -19292,6 +19326,7 @@
           "portpin.json#/portpin_struct"
         ],
         "tests": [
+          "tests/unit/test_port_apply.py::test_portpin_tx_struct_inserted_correctly",
           "tests/unit/test_port_apply.py::test_portpin_struct_has_all_required_fields"
         ]
       }
@@ -19373,6 +19408,7 @@
           "portpin.json#/portpin_struct"
         ],
         "tests": [
+          "tests/unit/test_port_apply.py::test_portpin_tx_struct_inserted_correctly",
           "tests/unit/test_port_apply.py::test_portpin_struct_has_all_required_fields"
         ]
       }
@@ -19419,15 +19455,9 @@
           }
         ]
       },
-      "classification": "configurable",
-      "trace": {
-        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/port.py:PortProvider",
-        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_port_set",
-        "asset": "autombd-rtd/assets/nxp/s32k3/port/portpin.json#/portpin_struct",
-        "tests": [
-          "tests/unit/test_port_apply.py::test_portpin_tx_struct_inserted_correctly"
-        ]
-      }
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Port provider.",
+      "dependency": "A descriptor-forward Port implementation and generality tests are required before exposure."
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Port]/ctr[MODULE-DEF]/ctr[PortConfigSet]/lst[PortContainer]/ctr[PortContainer]/lst[PortPin]/ctr[PortPin]/var[PortPinModeChangeable]",
@@ -19458,6 +19488,7 @@
           "portpin.json#/portpin_struct"
         ],
         "tests": [
+          "tests/unit/test_port_apply.py::test_portpin_tx_struct_inserted_correctly",
           "tests/unit/test_port_apply.py::test_portpin_struct_has_all_required_fields"
         ]
       }
@@ -225298,15 +225329,9 @@
           }
         ]
       },
-      "classification": "configurable",
-      "trace": {
-        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/port.py:PortProvider",
-        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_port_set",
-        "asset": "autombd-rtd/assets/nxp/s32k3/port/portpin.json#/portpin_struct",
-        "tests": [
-          "tests/unit/test_port_apply.py::test_portpin_tx_struct_inserted_correctly"
-        ]
-      }
+      "classification": "deferred",
+      "reason": "The descriptor item is not caller-controlled by the current Port provider.",
+      "dependency": "A descriptor-forward Port implementation and generality tests are required before exposure."
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Port]/ctr[MODULE-DEF]/ctr[PortConfigSet]/lst[PortContainer]/ctr[PortContainer]/lst[PortPin]/ctr[PortPin]/var[PortPinPcr]",
@@ -225410,6 +225435,7 @@
           "portpin.json#/portpin_struct"
         ],
         "tests": [
+          "tests/unit/test_port_apply.py::test_portpin_tx_struct_inserted_correctly",
           "tests/unit/test_port_apply.py::test_portpin_struct_has_all_required_fields"
         ]
       }
@@ -225435,13 +225461,16 @@
           }
         ]
       },
-      "classification": "configurable",
+      "classification": "derived",
       "trace": {
-        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/port.py:PortProvider",
-        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_port_set",
-        "asset": "autombd-rtd/assets/nxp/s32k3/port/portpin.json#/portpin_struct",
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_port_set",
+        "inputs": [
+          "intent.payload",
+          "portpin.json#/portpin_struct"
+        ],
         "tests": [
-          "tests/unit/test_port_apply.py::test_portpin_tx_struct_inserted_correctly"
+          "tests/unit/test_port_apply.py::test_portpin_tx_struct_inserted_correctly",
+          "tests/unit/test_port_apply.py::test_portpin_struct_has_all_required_fields"
         ]
       }
     },
@@ -225487,13 +225516,16 @@
           }
         ]
       },
-      "classification": "configurable",
+      "classification": "derived",
       "trace": {
-        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/port.py:PortProvider",
-        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_port_set",
-        "asset": "autombd-rtd/assets/nxp/s32k3/port/portpin.json#/portpin_struct",
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_port_set",
+        "inputs": [
+          "intent.payload",
+          "portpin.json#/portpin_struct"
+        ],
         "tests": [
-          "tests/unit/test_port_apply.py::test_portpin_tx_struct_inserted_correctly"
+          "tests/unit/test_port_apply.py::test_portpin_tx_struct_inserted_correctly",
+          "tests/unit/test_port_apply.py::test_portpin_struct_has_all_required_fields"
         ]
       }
     },
@@ -225551,6 +225583,7 @@
           "portpin.json#/portpin_struct"
         ],
         "tests": [
+          "tests/unit/test_port_apply.py::test_portpin_tx_struct_inserted_correctly",
           "tests/unit/test_port_apply.py::test_portpin_struct_has_all_required_fields"
         ]
       }
@@ -225597,6 +225630,7 @@
           "portpin.json#/portpin_struct"
         ],
         "tests": [
+          "tests/unit/test_port_apply.py::test_portpin_tx_struct_inserted_correctly",
           "tests/unit/test_port_apply.py::test_portpin_struct_has_all_required_fields"
         ]
       }
@@ -225719,6 +225753,7 @@
           "portpin.json#/portpin_struct"
         ],
         "tests": [
+          "tests/unit/test_port_apply.py::test_portpin_tx_struct_inserted_correctly",
           "tests/unit/test_port_apply.py::test_portpin_struct_has_all_required_fields"
         ]
       }
@@ -226563,8 +226598,8 @@
   },
   "summary": {
     "total": 82,
-    "configurable": 7,
+    "configurable": 0,
     "deferred": 61,
-    "derived": 14
+    "derived": 21
   }
 }

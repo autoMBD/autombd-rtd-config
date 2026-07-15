@@ -243,14 +243,17 @@
           }
         ]
       },
-      "classification": "configurable",
+      "classification": "derived",
       "trace": {
-        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/platform.py:PlatformProvider",
-        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_platform_set",
-        "asset": "autombd-rtd/assets/nxp/s32k3/platform/interrupts.json#/isr_priority",
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:_build_platform_isr_struct_bytes",
+        "inputs": [
+          "intent.payload.peripheral",
+          "intent.payload.priority",
+          "interrupts.json#/isr_priority"
+        ],
         "tests": [
           "tests/unit/test_platform_apply.py::test_set_priority_by_peripheral",
-          "tests/unit/test_platform_apply.py::test_other_interrupt_untouched"
+          "tests/unit/test_uart_apply.py::TestPlatformIsrInsert::test_isr_inserted_for_lpuart8"
         ]
       }
     },
@@ -260,14 +263,17 @@
       "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[IntCtrlConfig]/ctr[IntCtrlConfig]/lst[PlatformIsrConfig]/ctr[PlatformIsrConfig]",
       "name": "PlatformIsrConfig",
       "type": "IDENTIFIABLE",
-      "classification": "configurable",
+      "classification": "derived",
       "trace": {
-        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/platform.py:PlatformProvider",
-        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_platform_set",
-        "asset": "autombd-rtd/assets/nxp/s32k3/platform/interrupts.json#/isr_priority",
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:_build_platform_isr_struct_bytes",
+        "inputs": [
+          "intent.payload.peripheral",
+          "intent.payload.priority",
+          "interrupts.json#/isr_priority"
+        ],
         "tests": [
           "tests/unit/test_platform_apply.py::test_set_priority_by_peripheral",
-          "tests/unit/test_platform_apply.py::test_other_interrupt_untouched"
+          "tests/unit/test_uart_apply.py::TestPlatformIsrInsert::test_isr_inserted_for_lpuart8"
         ]
       }
     },
@@ -597,14 +603,17 @@
           }
         ]
       },
-      "classification": "configurable",
+      "classification": "derived",
       "trace": {
-        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/platform.py:PlatformProvider",
-        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_platform_set",
-        "asset": "autombd-rtd/assets/nxp/s32k3/platform/interrupts.json#/isr_priority",
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:_build_platform_isr_struct_bytes",
+        "inputs": [
+          "intent.payload.peripheral",
+          "intent.payload.priority",
+          "interrupts.json#/isr_priority"
+        ],
         "tests": [
           "tests/unit/test_platform_apply.py::test_set_priority_by_peripheral",
-          "tests/unit/test_platform_apply.py::test_other_interrupt_untouched"
+          "tests/unit/test_uart_apply.py::TestPlatformIsrInsert::test_isr_inserted_for_lpuart8"
         ]
       }
     },
@@ -642,14 +651,17 @@
           }
         ]
       },
-      "classification": "configurable",
+      "classification": "derived",
       "trace": {
-        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/platform.py:PlatformProvider",
-        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_platform_set",
-        "asset": "autombd-rtd/assets/nxp/s32k3/platform/interrupts.json#/isr_priority",
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:_build_platform_isr_struct_bytes",
+        "inputs": [
+          "intent.payload.peripheral",
+          "intent.payload.priority",
+          "interrupts.json#/isr_priority"
+        ],
         "tests": [
           "tests/unit/test_platform_apply.py::test_set_priority_by_peripheral",
-          "tests/unit/test_platform_apply.py::test_other_interrupt_untouched"
+          "tests/unit/test_uart_apply.py::TestPlatformIsrInsert::test_isr_inserted_for_lpuart8"
         ]
       }
     },
@@ -2850,14 +2862,17 @@
           }
         ]
       },
-      "classification": "configurable",
+      "classification": "derived",
       "trace": {
-        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/platform.py:PlatformProvider",
-        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_platform_set",
-        "asset": "autombd-rtd/assets/nxp/s32k3/platform/interrupts.json#/isr_priority",
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:_build_platform_isr_struct_bytes",
+        "inputs": [
+          "intent.payload.peripheral",
+          "intent.payload.priority",
+          "interrupts.json#/isr_priority"
+        ],
         "tests": [
           "tests/unit/test_platform_apply.py::test_set_priority_by_peripheral",
-          "tests/unit/test_platform_apply.py::test_other_interrupt_untouched"
+          "tests/unit/test_uart_apply.py::TestPlatformIsrInsert::test_isr_inserted_for_lpuart8"
         ]
       }
     },
@@ -2918,14 +2933,17 @@
           }
         ]
       },
-      "classification": "configurable",
+      "classification": "derived",
       "trace": {
-        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/platform.py:PlatformProvider",
-        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_platform_set",
-        "asset": "autombd-rtd/assets/nxp/s32k3/platform/interrupts.json#/isr_priority",
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:_build_platform_isr_struct_bytes",
+        "inputs": [
+          "intent.payload.peripheral",
+          "intent.payload.priority",
+          "interrupts.json#/isr_priority"
+        ],
         "tests": [
           "tests/unit/test_platform_apply.py::test_set_priority_by_peripheral",
-          "tests/unit/test_platform_apply.py::test_other_interrupt_untouched"
+          "tests/unit/test_uart_apply.py::TestPlatformIsrInsert::test_isr_inserted_for_lpuart8"
         ]
       }
     },
@@ -2999,14 +3017,17 @@
           }
         ]
       },
-      "classification": "configurable",
+      "classification": "derived",
       "trace": {
-        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/platform.py:PlatformProvider",
-        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_platform_set",
-        "asset": "autombd-rtd/assets/nxp/s32k3/platform/interrupts.json#/isr_priority",
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:_build_platform_isr_struct_bytes",
+        "inputs": [
+          "intent.payload.peripheral",
+          "intent.payload.priority",
+          "interrupts.json#/isr_priority"
+        ],
         "tests": [
           "tests/unit/test_platform_apply.py::test_set_priority_by_peripheral",
-          "tests/unit/test_platform_apply.py::test_other_interrupt_untouched"
+          "tests/unit/test_uart_apply.py::TestPlatformIsrInsert::test_isr_inserted_for_lpuart8"
         ]
       }
     },
@@ -3077,8 +3098,7 @@
         "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_platform_set",
         "asset": "autombd-rtd/assets/nxp/s32k3/platform/interrupts.json#/isr_priority",
         "tests": [
-          "tests/unit/test_platform_apply.py::test_set_priority_by_peripheral",
-          "tests/unit/test_platform_apply.py::test_other_interrupt_untouched"
+          "tests/unit/test_platform_apply.py::test_set_priority_by_peripheral"
         ]
       }
     },
@@ -3398,8 +3418,8 @@
   },
   "summary": {
     "total": 73,
-    "configurable": 8,
+    "configurable": 1,
     "deferred": 65,
-    "derived": 0
+    "derived": 7
   }
 }

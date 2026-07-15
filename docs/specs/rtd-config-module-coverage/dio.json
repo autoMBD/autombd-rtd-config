@@ -34,13 +34,16 @@
       "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]",
       "name": "DioPort",
       "type": "IDENTIFIABLE",
-      "classification": "configurable",
+      "classification": "derived",
       "trace": {
-        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/dio.py:DioProvider",
-        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_dio_set",
-        "asset": "autombd-rtd/assets/nxp/s32k3/dio/dio.json#/channel_fields",
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_dio_set",
+        "inputs": [
+          "intent.payload.pin",
+          "dio.json#/channel_fields"
+        ],
         "tests": [
           "tests/unit/test_dio_apply.py::test_dio_channel_inserted_into_dioport_0",
+          "tests/unit/test_dio_apply.py::test_dio_channel_has_ecuc_partition_ref_array",
           "tests/unit/test_dio_apply.py::test_dio_port_autocreated_for_port1_pin_pta16"
         ]
       }
@@ -76,9 +79,19 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Dio provider.",
-      "dependency": "A descriptor-forward Dio implementation and generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_dio_set",
+        "inputs": [
+          "intent.payload.pin",
+          "dio.json#/channel_fields"
+        ],
+        "tests": [
+          "tests/unit/test_dio_apply.py::test_dio_channel_inserted_into_dioport_0",
+          "tests/unit/test_dio_apply.py::test_dio_channel_has_ecuc_partition_ref_array",
+          "tests/unit/test_dio_apply.py::test_dio_port_autocreated_for_port1_pin_pta16"
+        ]
+      }
     },
     {
       "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioChannel]/ctr[DioChannel]",
@@ -86,13 +99,16 @@
       "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioChannel]/ctr[DioChannel]",
       "name": "DioChannel",
       "type": "IDENTIFIABLE",
-      "classification": "configurable",
+      "classification": "derived",
       "trace": {
-        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/dio.py:DioProvider",
-        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_dio_set",
-        "asset": "autombd-rtd/assets/nxp/s32k3/dio/dio.json#/channel_fields",
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_dio_set",
+        "inputs": [
+          "intent.payload.pin",
+          "dio.json#/channel_fields"
+        ],
         "tests": [
           "tests/unit/test_dio_apply.py::test_dio_channel_inserted_into_dioport_0",
+          "tests/unit/test_dio_apply.py::test_dio_channel_has_ecuc_partition_ref_array",
           "tests/unit/test_dio_apply.py::test_dio_port_autocreated_for_port1_pin_pta16"
         ]
       }
@@ -128,13 +144,16 @@
           }
         ]
       },
-      "classification": "configurable",
+      "classification": "derived",
       "trace": {
-        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/dio.py:DioProvider",
-        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_dio_set",
-        "asset": "autombd-rtd/assets/nxp/s32k3/dio/dio.json#/channel_fields",
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_dio_set",
+        "inputs": [
+          "intent.payload.pin",
+          "dio.json#/channel_fields"
+        ],
         "tests": [
           "tests/unit/test_dio_apply.py::test_dio_channel_inserted_into_dioport_0",
+          "tests/unit/test_dio_apply.py::test_dio_channel_has_ecuc_partition_ref_array",
           "tests/unit/test_dio_apply.py::test_dio_port_autocreated_for_port1_pin_pta16"
         ]
       }
@@ -160,9 +179,19 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Dio provider.",
-      "dependency": "A descriptor-forward Dio implementation and generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_dio_set",
+        "inputs": [
+          "intent.payload.pin",
+          "dio.json#/channel_fields"
+        ],
+        "tests": [
+          "tests/unit/test_dio_apply.py::test_dio_channel_inserted_into_dioport_0",
+          "tests/unit/test_dio_apply.py::test_dio_channel_has_ecuc_partition_ref_array",
+          "tests/unit/test_dio_apply.py::test_dio_port_autocreated_for_port1_pin_pta16"
+        ]
+      }
     },
     {
       "key": "list:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioChannelGroup]/ctr[DioChannelGroup]/lst[DioChannelGroupEcucPartitionRef]",
@@ -204,13 +233,16 @@
       "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioChannel]",
       "name": "DioChannel",
       "type": "MAP",
-      "classification": "configurable",
+      "classification": "derived",
       "trace": {
-        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/dio.py:DioProvider",
-        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_dio_set",
-        "asset": "autombd-rtd/assets/nxp/s32k3/dio/dio.json#/channel_fields",
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_dio_set",
+        "inputs": [
+          "intent.payload.pin",
+          "dio.json#/channel_fields"
+        ],
         "tests": [
           "tests/unit/test_dio_apply.py::test_dio_channel_inserted_into_dioport_0",
+          "tests/unit/test_dio_apply.py::test_dio_channel_has_ecuc_partition_ref_array",
           "tests/unit/test_dio_apply.py::test_dio_port_autocreated_for_port1_pin_pta16"
         ]
       }
@@ -245,9 +277,19 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Dio provider.",
-      "dependency": "A descriptor-forward Dio implementation and generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_dio_set",
+        "inputs": [
+          "intent.payload.pin",
+          "dio.json#/channel_fields"
+        ],
+        "tests": [
+          "tests/unit/test_dio_apply.py::test_dio_channel_inserted_into_dioport_0",
+          "tests/unit/test_dio_apply.py::test_dio_channel_has_ecuc_partition_ref_array",
+          "tests/unit/test_dio_apply.py::test_dio_port_autocreated_for_port1_pin_pta16"
+        ]
+      }
     },
     {
       "key": "list:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioPortEcucPartitionRef]",
@@ -279,9 +321,19 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Dio provider.",
-      "dependency": "A descriptor-forward Dio implementation and generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_dio_set",
+        "inputs": [
+          "intent.payload.pin",
+          "dio.json#/channel_fields"
+        ],
+        "tests": [
+          "tests/unit/test_dio_apply.py::test_dio_channel_inserted_into_dioport_0",
+          "tests/unit/test_dio_apply.py::test_dio_channel_has_ecuc_partition_ref_array",
+          "tests/unit/test_dio_apply.py::test_dio_port_autocreated_for_port1_pin_pta16"
+        ]
+      }
     },
     {
       "key": "list:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioGeneral]/lst[DioEcucPartitionRef]",
@@ -404,9 +456,19 @@
       "cross_modules": [
         "EcuC"
       ],
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Dio provider.",
-      "dependency": "A descriptor-forward Dio implementation and generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_dio_set",
+        "inputs": [
+          "intent.payload.pin",
+          "dio.json#/channel_fields"
+        ],
+        "tests": [
+          "tests/unit/test_dio_apply.py::test_dio_channel_inserted_into_dioport_0",
+          "tests/unit/test_dio_apply.py::test_dio_channel_has_ecuc_partition_ref_array",
+          "tests/unit/test_dio_apply.py::test_dio_port_autocreated_for_port1_pin_pta16"
+        ]
+      }
     },
     {
       "key": "reference:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioPortEcucPartitionRef]/ref[DioPortEcucPartitionRef]",
@@ -462,9 +524,19 @@
       "cross_modules": [
         "EcuC"
       ],
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Dio provider.",
-      "dependency": "A descriptor-forward Dio implementation and generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_dio_set",
+        "inputs": [
+          "intent.payload.pin",
+          "dio.json#/channel_fields"
+        ],
+        "tests": [
+          "tests/unit/test_dio_apply.py::test_dio_channel_inserted_into_dioport_0",
+          "tests/unit/test_dio_apply.py::test_dio_channel_has_ecuc_partition_ref_array",
+          "tests/unit/test_dio_apply.py::test_dio_port_autocreated_for_port1_pin_pta16"
+        ]
+      }
     },
     {
       "key": "reference:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioGeneral]/lst[DioEcucPartitionRef]/ref[DioEcucPartitionRef]",
@@ -1241,11 +1313,12 @@
         "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_dio_set",
         "inputs": [
           "intent.payload.pin",
-          "dio.json#/dio_channel_id_rule"
+          "dio.json#/channel_fields"
         ],
         "tests": [
-          "tests/unit/test_dio_apply.py::test_dio_channel_id_pta6_anti_hardcode",
-          "tests/unit/test_dio_apply.py::test_anti_hardcode_port_id_vs_array_index"
+          "tests/unit/test_dio_apply.py::test_dio_channel_inserted_into_dioport_0",
+          "tests/unit/test_dio_apply.py::test_dio_channel_has_ecuc_partition_ref_array",
+          "tests/unit/test_dio_apply.py::test_dio_port_autocreated_for_port1_pin_pta16"
         ]
       }
     },
@@ -1309,11 +1382,12 @@
         "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_dio_set",
         "inputs": [
           "intent.payload.pin",
-          "dio.json#/dio_channel_id_rule"
+          "dio.json#/channel_fields"
         ],
         "tests": [
-          "tests/unit/test_dio_apply.py::test_dio_channel_id_pta6_anti_hardcode",
-          "tests/unit/test_dio_apply.py::test_anti_hardcode_port_id_vs_array_index"
+          "tests/unit/test_dio_apply.py::test_dio_channel_inserted_into_dioport_0",
+          "tests/unit/test_dio_apply.py::test_dio_channel_has_ecuc_partition_ref_array",
+          "tests/unit/test_dio_apply.py::test_dio_port_autocreated_for_port1_pin_pta16"
         ]
       }
     },
@@ -1401,11 +1475,12 @@
         "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_dio_set",
         "inputs": [
           "intent.payload.pin",
-          "dio.json#/dio_channel_id_rule"
+          "dio.json#/channel_fields"
         ],
         "tests": [
-          "tests/unit/test_dio_apply.py::test_dio_channel_id_pta6_anti_hardcode",
-          "tests/unit/test_dio_apply.py::test_anti_hardcode_port_id_vs_array_index"
+          "tests/unit/test_dio_apply.py::test_dio_channel_inserted_into_dioport_0",
+          "tests/unit/test_dio_apply.py::test_dio_channel_has_ecuc_partition_ref_array",
+          "tests/unit/test_dio_apply.py::test_dio_port_autocreated_for_port1_pin_pta16"
         ]
       }
     },
@@ -1860,8 +1935,8 @@
   },
   "summary": {
     "total": 45,
-    "configurable": 4,
-    "deferred": 38,
-    "derived": 3
+    "configurable": 0,
+    "deferred": 32,
+    "derived": 13
   }
 }

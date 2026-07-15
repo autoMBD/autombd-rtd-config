@@ -24,9 +24,15 @@
       "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]",
       "name": "GeneralConfiguration",
       "type": "IDENTIFIABLE",
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Uart provider.",
-      "dependency": "A descriptor-forward Uart implementation and generality tests are required before exposure."
+      "classification": "configurable",
+      "trace": {
+        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/uart.py:UartProvider",
+        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_uart_set",
+        "asset": "autombd-rtd/assets/nxp/s32k3/uart/uart.json#/callback_fields",
+        "tests": [
+          "tests/unit/test_uart_apply.py::TestCallbackFields::test_callback_name_set"
+        ]
+      }
     },
     {
       "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[UartGlobalConfig]",
@@ -1209,9 +1215,19 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Uart provider.",
-      "dependency": "A descriptor-forward Uart implementation and generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_uart_set",
+        "inputs": [
+          "intent.payload.callback",
+          "intent.payload.mode",
+          "uart.json#/callback_fields"
+        ],
+        "tests": [
+          "tests/unit/test_uart_apply.py::TestCallbackFields::test_capability_enabled",
+          "tests/unit/test_uart_dma.py::TestUartDmaEnable::test_uart_dma_enable_true"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/var[UartCallback]",
@@ -1278,9 +1294,15 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Uart provider.",
-      "dependency": "A descriptor-forward Uart implementation and generality tests are required before exposure."
+      "classification": "configurable",
+      "trace": {
+        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/uart.py:UartProvider",
+        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_uart_set",
+        "asset": "autombd-rtd/assets/nxp/s32k3/uart/uart.json#/callback_fields",
+        "tests": [
+          "tests/unit/test_uart_apply.py::TestCallbackFields::test_callback_name_set"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/var[UartDevErrorDetect]",
@@ -1328,9 +1350,19 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Uart provider.",
-      "dependency": "A descriptor-forward Uart implementation and generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_uart_set",
+        "inputs": [
+          "intent.payload.callback",
+          "intent.payload.mode",
+          "uart.json#/callback_fields"
+        ],
+        "tests": [
+          "tests/unit/test_uart_apply.py::TestCallbackFields::test_capability_enabled",
+          "tests/unit/test_uart_dma.py::TestUartDmaEnable::test_uart_dma_enable_true"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Uart]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/var[UartEnableUserModeSupport]",
@@ -3091,8 +3123,8 @@
   },
   "summary": {
     "total": 56,
-    "configurable": 21,
-    "deferred": 27,
-    "derived": 8
+    "configurable": 23,
+    "deferred": 23,
+    "derived": 10
   }
 }

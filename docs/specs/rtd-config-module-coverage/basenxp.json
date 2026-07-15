@@ -129,7 +129,8 @@
           "osif.json#/OsIfCounterConfig"
         ],
         "tests": [
-          "tests/unit/test_basenxp_apply.py::test_apply_inserts_exactly_one_counter"
+          "tests/unit/test_basenxp_apply.py::test_apply_inserts_exactly_one_counter",
+          "tests/unit/test_basenxp_apply.py::test_counter_has_required_children"
         ]
       }
     },
@@ -193,7 +194,8 @@
           "osif.json#/OsIfCounterConfig"
         ],
         "tests": [
-          "tests/unit/test_basenxp_apply.py::test_apply_inserts_exactly_one_counter"
+          "tests/unit/test_basenxp_apply.py::test_apply_inserts_exactly_one_counter",
+          "tests/unit/test_basenxp_apply.py::test_counter_has_required_children"
         ]
       }
     },
@@ -293,9 +295,18 @@
       "cross_modules": [
         "EcuC"
       ],
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current BaseNXP provider.",
-      "dependency": "A descriptor-forward BaseNXP implementation and generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_basenxp_set",
+        "inputs": [
+          "intent.payload",
+          "osif.json#/OsIfCounterConfig"
+        ],
+        "tests": [
+          "tests/unit/test_basenxp_apply.py::test_apply_inserts_exactly_one_counter",
+          "tests/unit/test_basenxp_apply.py::test_counter_has_required_children"
+        ]
+      }
     },
     {
       "key": "reference:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]/lst[OsIfCounterConfig]/ctr[OsIfCounterConfig]/ref[OsIfOsCounterRef]",
@@ -351,9 +362,18 @@
       "cross_modules": [
         "Os"
       ],
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current BaseNXP provider.",
-      "dependency": "A descriptor-forward BaseNXP implementation and generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_basenxp_set",
+        "inputs": [
+          "intent.payload",
+          "osif.json#/OsIfCounterConfig"
+        ],
+        "tests": [
+          "tests/unit/test_basenxp_apply.py::test_apply_inserts_exactly_one_counter",
+          "tests/unit/test_basenxp_apply.py::test_counter_has_required_children"
+        ]
+      }
     },
     {
       "key": "reference:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]/lst[OsIfCounterConfig]/ctr[OsIfCounterConfig]/ref[OsIfSystemTimerClockRef]",
@@ -425,7 +445,8 @@
           "osif.json#/OsIfCounterConfig"
         ],
         "tests": [
-          "tests/unit/test_basenxp_apply.py::test_apply_inserts_exactly_one_counter"
+          "tests/unit/test_basenxp_apply.py::test_apply_inserts_exactly_one_counter",
+          "tests/unit/test_basenxp_apply.py::test_counter_has_required_children"
         ]
       }
     },
@@ -1046,7 +1067,8 @@
           "osif.json#/OsIfCounterConfig"
         ],
         "tests": [
-          "tests/unit/test_basenxp_apply.py::test_apply_inserts_exactly_one_counter"
+          "tests/unit/test_basenxp_apply.py::test_apply_inserts_exactly_one_counter",
+          "tests/unit/test_basenxp_apply.py::test_counter_has_required_children"
         ]
       }
     },
@@ -1489,7 +1511,8 @@
           "osif.json#/OsIfCounterConfig"
         ],
         "tests": [
-          "tests/unit/test_basenxp_apply.py::test_apply_inserts_exactly_one_counter"
+          "tests/unit/test_basenxp_apply.py::test_apply_inserts_exactly_one_counter",
+          "tests/unit/test_basenxp_apply.py::test_counter_has_required_children"
         ]
       }
     },
@@ -1551,7 +1574,7 @@
   "summary": {
     "total": 34,
     "configurable": 8,
-    "deferred": 21,
-    "derived": 5
+    "deferred": 19,
+    "derived": 7
   }
 }
