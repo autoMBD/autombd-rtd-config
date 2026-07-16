@@ -676,17 +676,15 @@ def _codex_extract_result(rr: RunResult) -> "dict[str, Any] | None":
 def _opencode_extract_result(rr: RunResult) -> "dict[str, Any] | None":
     """Extract BLACKBOX_RESULT from opencode NDJSON stdout.
 
-    Gather all ``text`` event ``part.text`` values in order, concatenate
-    *verbatim* (no inserted separator), then apply the existing
-    ``_extract_blackbox_result`` reverse-scan.
+    OpenCode emits both complete progress messages and streamed fragments as
+    ``text`` events.  Parse the terminal text event on its own first so a
+    progress message without a trailing newline cannot be glued to the final
+    marker.  If the marker itself was streamed across events, expand only the
+    terminal suffix, preserving verbatim concatenation between fragments.
 
-    The join MUST be ``""`` rather than ``"\n"``: opencode streams ``text``
-    events token-by-token, so the ``BLACKBOX_RESULT {...}`` marker can land
-    mid-JSON across two (or more) consecutive events with no newline between
-    the fragments. Inserting a separator there would split one logical line
-    into two and break ``_extract_blackbox_result``'s line-based reverse
-    scan. Concatenating verbatim reconstructs the stream exactly as the
-    agent emitted it.
+    A result is accepted only when exactly one marker is the final non-empty
+    line of that suffix.  This prevents an earlier (stale) result, a malformed
+    terminal result, or multiple ambiguous results from being promoted.
     """
     parts: list[str] = []
     for line in rr.stdout.splitlines():
@@ -702,8 +700,34 @@ def _opencode_extract_result(rr: RunResult) -> "dict[str, Any] | None":
             text = part.get("text", "")
             if text:
                 parts.append(text)
-    combined = "".join(parts)
-    return _extract_blackbox_result(combined)
+    if not parts:
+        return None
+
+    suffix = parts[-1]
+    if "BLACKBOX_RESULT " in suffix:
+        return _extract_terminal_blackbox_result(suffix)
+
+    for text in reversed(parts[:-1]):
+        suffix = text + suffix
+        if "BLACKBOX_RESULT " in suffix:
+            return _extract_terminal_blackbox_result(suffix)
+    return None
+
+
+def _extract_terminal_blackbox_result(text: str) -> "dict[str, Any] | None":
+    """Parse one unambiguous BLACKBOX_RESULT from the final non-empty line."""
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    if not lines:
+        return None
+    marker = "BLACKBOX_RESULT "
+    result_lines = [line for line in lines if line.startswith(marker)]
+    if len(result_lines) != 1 or result_lines[0] != lines[-1]:
+        return None
+    try:
+        result = json.loads(result_lines[0][len(marker):])
+    except json.JSONDecodeError:
+        return None
+    return result if isinstance(result, dict) else None
 
 
 def _codex_compute_kpi(rr: RunResult) -> "dict[str, Any] | None":
