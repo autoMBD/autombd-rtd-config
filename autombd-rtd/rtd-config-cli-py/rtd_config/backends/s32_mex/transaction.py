@@ -46,6 +46,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 import hashlib
 import os
@@ -584,14 +585,27 @@ class ConfigureTransaction:
         if not secondary:
             return primary
         details = dict(primary.details or {})
-        preserved = set(details.get("preserved", []))
-        cleanup: list[dict] = []
+        preserved: list[str] = []
+
+        def retain(names) -> None:
+            for name in names:
+                if name not in preserved:
+                    preserved.append(name)
+
+        retain(details.get("preserved", []))
+        existing = details.get("recovery_failures", [])
+        cleanup: list[dict] = (
+            list(existing) if isinstance(existing, (list, tuple)) else []
+        )
+        for item in cleanup:
+            if isinstance(item, Mapping):
+                retain(item.get("details", {}).get("preserved", []))
         for failure in secondary:
             item = cls._warning(failure)
             cleanup.append(item)
-            preserved.update(item.get("details", {}).get("preserved", []))
+            retain(item.get("details", {}).get("preserved", []))
         if preserved:
-            details["preserved"] = sorted(preserved)
+            details["preserved"] = preserved
         details["recovery_failures"] = cleanup
         return CliFailure(
             primary.code,

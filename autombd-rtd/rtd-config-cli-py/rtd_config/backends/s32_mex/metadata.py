@@ -276,10 +276,8 @@ def capture_validator_input_inventory(
                 if item.relative == mex_relative else _MAX_SOURCE_BYTES
             ),
         )
-        if current is None or (
-            current.identity != item.snapshot.identity
-            or current.size != item.snapshot.size
-            or current.sha256 != item.snapshot.sha256
+        if current is None or not _same_snapshot_evidence(
+            current, item.snapshot
         ):
             raise CliFailure(
                 "validation_inventory_changed",
@@ -323,9 +321,7 @@ def revalidate_validator_input_inventory(
         if (
             left.relative != right.relative
             or left.source_relative != right.source_relative
-            or left.snapshot.identity != right.snapshot.identity
-            or left.snapshot.size != right.snapshot.size
-            or left.snapshot.sha256 != right.snapshot.sha256
+            or not _same_snapshot_evidence(left.snapshot, right.snapshot)
         ):
             raise _validator_inventory_changed(Path(left.relative).name)
 
@@ -677,12 +673,22 @@ def _compare_auxiliary_sources(
             if actual.snapshot is not None:
                 raise _metadata_sources_changed()
             continue
-        if actual.snapshot is None or (
-            expected.snapshot.identity != actual.snapshot.identity
-            or expected.snapshot.size != actual.snapshot.size
-            or expected.snapshot.sha256 != actual.snapshot.sha256
+        if actual.snapshot is None or not _same_snapshot_evidence(
+            expected.snapshot, actual.snapshot
         ):
             raise _metadata_sources_changed()
+
+
+def _same_snapshot_evidence(left: FileSnapshot, right: FileSnapshot) -> bool:
+    """Compare all immutable evidence captured for one project input."""
+    return (
+        left.identity == right.identity
+        and left.size == right.size
+        and left.mtime_ns == right.mtime_ns
+        and left.ctime_ns == right.ctime_ns
+        and left.sha256 == right.sha256
+        and left.mode == right.mode
+    )
 
 
 def _metadata_sources_changed() -> CliFailure:

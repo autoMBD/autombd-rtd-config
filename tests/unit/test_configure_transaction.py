@@ -69,6 +69,7 @@ from rtd_config.backends.s32_mex.target import (
 from rtd_config.backends.s32_mex.transaction import ConfigureTransaction
 from rtd_config.backends.s32_mex.validation import run_validation
 import rtd_config.backends.s32_mex.target as target_module
+import rtd_config.backends.s32_mex.metadata as metadata_module
 import rtd_config.backends.s32_mex.transaction as transaction_module
 from rtd_config.errors import CliFailure
 from rtd_config.intent import Intent
@@ -197,7 +198,17 @@ def test_noop_does_not_stage_backup_or_replace(tmp_path):
         assert result.changed_modules == []
         assert result.published_bytes == original
         assert result.published is False
-        assert result.cleanup_warnings == []
+        if os.name == "nt":
+            assert result.cleanup_warnings == []
+        else:
+            assert len(result.cleanup_warnings) == 1
+            warning = result.cleanup_warnings[0]
+            assert warning["code"] == "configure_cleanup_residual"
+            preserved = warning["details"]["preserved"]
+            assert len(preserved) == 1
+            assert Path(preserved[0]).name == preserved[0]
+            residual = mex.parent / preserved[0]
+            assert residual.read_bytes() == original
         assert not mex.with_name(mex.name + ".bak").exists()
         assert not list(mex.parent.glob(f".{mex.name}.*.tmp"))
     finally:
@@ -467,7 +478,9 @@ def test_cleanup_failure_is_typed_without_publishing(monkeypatch, tmp_path):
     def fail_secure_delete(_path, _expected):
         raise OSError("injected secure-delete failure")
 
-    monkeypatch.setattr(platform, "secure_delete_owned", fail_secure_delete)
+    monkeypatch.setattr(
+        platform, "secure_delete_owned", fail_secure_delete, raising=False
+    )
     blocked = SimpleNamespace(status="blocked", diagnostics=[])
     with pytest.raises(CliFailure) as caught:
         ConfigureTransaction(
@@ -829,6 +842,33 @@ def test_flush_auxiliary_mutation_cannot_return_pass(monkeypatch, tmp_path):
     assert mex.read_bytes() == original
 
 
+@pytest.mark.parametrize("field", ["mtime_ns", "ctime_ns", "mode"])
+def test_auxiliary_metadata_only_drift_after_release_cannot_return_pass(
+    monkeypatch, tmp_path, field
+):
+    project = _prepared_project(tmp_path)
+    mex = project.mex_file
+    original = mex.read_bytes()
+    capture = metadata_module.snapshot_safe_relative
+
+    def drift_metadata(root, relative, *, max_bytes):
+        snapshot = capture(root, relative, max_bytes=max_bytes)
+        if relative != ".project" or snapshot is None:
+            return snapshot
+        return replace(snapshot, **{field: getattr(snapshot, field) + 1})
+
+    monkeypatch.setattr(
+        metadata_module, "snapshot_safe_relative", drift_metadata
+    )
+    with pytest.raises(CliFailure) as caught:
+        ConfigureTransaction(project, static_runner=_passed_static).execute(
+            _intent(), _edit
+        )
+
+    assert caught.value.code == "project_metadata_source_changed"
+    assert mex.read_bytes() == original
+
+
 def test_flush_target_swap_cannot_return_pass(monkeypatch, tmp_path):
     project = _prepared_project(tmp_path)
     mex = project.mex_file
@@ -870,9 +910,12 @@ def test_final_cas_external_target_preserves_attacker_and_restores_backup_pair(
             project, backup=True, static_runner=_passed_static
         ).execute(_intent(), _edit)
     assert caught.value.code == "project_target_changed"
-    assert caught.value.details["recovery_failures"][0]["code"] == (
-        "configure_publish_restore_failed"
-    )
+    recovery_codes = {
+        item["code"] for item in caught.value.details["recovery_failures"]
+    }
+    assert "configure_publish_restore_failed" in recovery_codes
+    if os.name != "nt":
+        assert "configure_cleanup_ownership_changed" in recovery_codes
     assert mex.read_bytes() == attacker
     if preexisting:
         assert backup.read_bytes() == prior
@@ -1242,7 +1285,12 @@ def test_second_finalize_failure_returns_published_with_cleanup_warning(
     assert result.published is True
     assert mex.read_bytes() == result.published_bytes != original
     assert mex.with_name(mex.name + ".bak").read_bytes() == original
-    assert result.cleanup_warnings[0]["code"] == "configure_cleanup_failed"
+    warning = next(
+        item
+        for item in result.cleanup_warnings
+        if item["code"] == "configure_cleanup_failed"
+    )
+    assert list(warning["details"]["preserved"]) == ["backup-evidence.tmp"]
 
 
 def test_target_finalize_failure_is_postcommit_warning_without_fake_rollback(
@@ -1292,7 +1340,7 @@ def test_committed_delete_failure_reports_auditable_warning_and_keeps_bytes(
     def fail_delete(_path, _expected):
         raise OSError("injected delete-by-handle failure")
 
-    monkeypatch.setattr(platform, "secure_delete_owned", fail_delete)
+    monkeypatch.setattr(platform, "secure_delete_owned", fail_delete, raising=False)
     result = ConfigureTransaction(
         project, backup=True, static_runner=_passed_static
     ).execute(_intent(), _edit)
@@ -1321,7 +1369,7 @@ def test_posix_shaped_adapter_without_conditional_delete_keeps_quarantine_warnin
     mex = project.mex_file
     original = mex.read_bytes()
     platform = project.verified_target.lease._resources["platform"]
-    monkeypatch.setattr(platform, "secure_delete_owned", None)
+    monkeypatch.setattr(platform, "secure_delete_owned", None, raising=False)
     monkeypatch.setattr(platform, "unlink_path", None, raising=False)
     result = ConfigureTransaction(project, static_runner=_passed_static).execute(
         _intent(), _edit
@@ -1336,6 +1384,42 @@ def test_posix_shaped_adapter_without_conditional_delete_keeps_quarantine_warnin
     residual = mex.parent / warning["details"]["preserved"][0]
     assert residual.exists()
     assert residual.read_bytes() == original
+
+
+def test_merge_failures_appends_existing_recovery_evidence_in_order():
+    primary = CliFailure(
+        "project_target_changed",
+        "primary",
+        module="backend",
+        details={
+            "preserved": ["primary.tmp"],
+            "recovery_failures": [{
+                "code": "existing_recovery",
+                "message": "existing",
+                "details": {"preserved": ["existing.tmp"]},
+            }],
+        },
+    )
+    secondary = [
+        CliFailure(
+            "secondary_one", "one", module="backend",
+            details={"preserved": ["one.tmp", "primary.tmp"]},
+        ),
+        CliFailure(
+            "secondary_two", "two", module="backend",
+            details={"preserved": ["two.tmp"]},
+        ),
+    ]
+
+    merged = ConfigureTransaction._merge_failures(primary, secondary)
+
+    assert merged.code == "project_target_changed"
+    assert [item["code"] for item in merged.details["recovery_failures"]] == [
+        "existing_recovery", "secondary_one", "secondary_two",
+    ]
+    assert list(merged.details["preserved"]) == [
+        "primary.tmp", "existing.tmp", "one.tmp", "two.tmp",
+    ]
 
 
 @pytest.mark.skipif(os.name != "nt", reason="real Windows delete-by-handle path")

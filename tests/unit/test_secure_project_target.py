@@ -49,6 +49,7 @@ from __future__ import annotations
 from contextlib import contextmanager, nullcontext
 from dataclasses import FrozenInstanceError, replace
 from functools import partial
+import errno
 import gc
 import hashlib
 import json
@@ -166,6 +167,19 @@ def test_rejects_missing_or_non_directory_root(tmp_path, kind):
         verify_project_target(root)
 
     assert caught.value.code in {"project_not_found", "project_not_directory"}
+
+
+def test_enotdir_during_protected_root_open_is_typed_as_not_directory(tmp_path):
+    class EnotdirPlatform(InjectedPlatform):
+        @contextmanager
+        def protect_root(self, _path):
+            raise OSError(errno.ENOTDIR, "not a directory")
+            yield  # pragma: no cover - contextmanager shape only
+
+    with pytest.raises(CliFailure) as caught:
+        verify_project_target(tmp_path / "project", platform=EnotdirPlatform())
+
+    assert caught.value.code == "project_not_directory"
 
 
 @pytest.mark.parametrize("count", [0, 2])

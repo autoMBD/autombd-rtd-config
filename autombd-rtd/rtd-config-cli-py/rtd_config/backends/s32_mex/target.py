@@ -774,6 +774,11 @@ def _inspect(path: Path, platform: TargetPlatform) -> PathInspection:
             module="backend", details={},
         ) from exc
     except OSError as exc:
+        if exc.errno == getattr(os, "ENOTDIR", 20):
+            raise CliFailure(
+                "project_not_directory", "The project path is not a directory.",
+                module="backend", details={},
+            ) from exc
         raise CliFailure(
             "unsafe_project_path",
             "The project path could not be inspected safely.",
@@ -977,6 +982,11 @@ def verify_project_target(
             module="backend", details={},
         ) from exc
     except OSError as exc:
+        if exc.errno == getattr(os, "ENOTDIR", 20):
+            raise CliFailure(
+                "project_not_directory", "The project path is not a directory.",
+                module="backend", details={},
+            ) from exc
         raise CliFailure(
             "unsafe_project_path",
             "The protected project lease could not be acquired safely.",

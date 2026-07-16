@@ -837,6 +837,66 @@ def test_inventory_capture_rejects_preference_swap_delete_or_recreation(
     assert caught.value.code == "validation_inventory_changed"
 
 
+@pytest.mark.parametrize("field", ["mtime_ns", "ctime_ns", "mode"])
+def test_inventory_capture_rejects_metadata_evidence_drift(
+    monkeypatch, tmp_path, field
+):
+    root = copy_uart_fixture(tmp_path)
+    relative = ".settings/org.eclipse.core.resources.prefs"
+    with Project.verified(root) as project:
+        project.metadata
+        capture = metadata_module.snapshot_project_relative
+        captures = {relative: 0}
+
+        def drift_second_capture(target, requested, *, max_bytes):
+            snapshot = capture(target, requested, max_bytes=max_bytes)
+            if requested != relative or snapshot is None:
+                return snapshot
+            captures[relative] += 1
+            if captures[relative] == 2:
+                value = getattr(snapshot, field)
+                return replace(snapshot, **{field: 0o640 if value != 0o640 else 0o600}) if field == "mode" else replace(
+                    snapshot, **{field: value + 1}
+                )
+            return snapshot
+
+        monkeypatch.setattr(
+            metadata_module, "snapshot_project_relative", drift_second_capture
+        )
+        with pytest.raises(CliFailure) as caught:
+            project.capture_validator_inputs()
+    assert caught.value.code == "validation_inventory_changed"
+
+
+@pytest.mark.parametrize("field", ["mtime_ns", "ctime_ns", "mode"])
+def test_inventory_revalidation_compares_complete_snapshot_evidence(
+    monkeypatch, tmp_path, field
+):
+    root = copy_uart_fixture(tmp_path)
+    relative = ".settings/org.eclipse.core.resources.prefs"
+    with Project.verified(root) as project:
+        expected = project.capture_validator_inputs()
+        capture = metadata_module.snapshot_project_relative
+
+        def drift_evidence(target, requested, *, max_bytes):
+            snapshot = capture(target, requested, max_bytes=max_bytes)
+            if requested != relative or snapshot is None:
+                return snapshot
+            value = getattr(snapshot, field)
+            return replace(snapshot, **{field: 0o640 if value != 0o640 else 0o600}) if field == "mode" else replace(
+                snapshot, **{field: value + 1}
+            )
+
+        monkeypatch.setattr(
+            metadata_module, "snapshot_project_relative", drift_evidence
+        )
+        with pytest.raises(CliFailure) as caught:
+            metadata_module.revalidate_validator_input_inventory(
+                project.verified_target, expected
+            )
+    assert caught.value.code == "validation_source_changed"
+
+
 @pytest.mark.parametrize("operation", ["add", "delete"])
 def test_inventory_capture_rejects_preference_set_drift(
     monkeypatch, tmp_path, operation
