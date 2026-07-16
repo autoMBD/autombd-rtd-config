@@ -218,6 +218,7 @@ def create_source_payload(source: Path, deploy) -> None:
             target.write_text(relative.as_posix(), encoding="utf-8")
 
 
+@pytest.mark.skipif(os.name != "nt", reason="Windows symlink error guidance")
 def test_ensure_link_windows_symlink_failure_with_metachar_path_never_invokes_cmd(
     tmp_path,
     monkeypatch,
@@ -238,6 +239,7 @@ def test_ensure_link_windows_symlink_failure_with_metachar_path_never_invokes_cm
         deploy.ensure_link(source, destination)
 
 
+@pytest.mark.skipif(os.name != "nt", reason="Windows symlink error guidance")
 def test_ensure_link_symlink_failure_preserves_existing_destination(
     tmp_path,
     monkeypatch,
@@ -274,17 +276,30 @@ def test_copy_released_payload_preserves_existing_install_when_publish_rename_fa
     old_skill = destination / "SKILL.md"
     old_skill.write_text("old payload", encoding="utf-8")
 
-    real_rename = deploy.Path.rename
+    if os.name == "nt":
+        real_rename = deploy.Path.rename
 
-    def fail_publish_rename(self, target):
-        if (
-            self.name.startswith(f".{destination.name}.deploying.")
-            and Path(target) == destination
-        ):
-            raise PermissionError("destination locked")
-        return real_rename(self, target)
+        def fail_publish_rename(self, target):
+            if (
+                self.name.startswith(f".{destination.name}.deploying.")
+                and Path(target) == destination
+            ):
+                raise PermissionError("destination locked")
+            return real_rename(self, target)
 
-    monkeypatch.setattr(deploy.Path, "rename", fail_publish_rename)
+        monkeypatch.setattr(deploy.Path, "rename", fail_publish_rename)
+    else:
+        real_rename = deploy.os.rename
+
+        def fail_publish_rename(source_name, destination_name, *args, **kwargs):
+            if (
+                str(source_name).startswith(f".{destination.name}.deploying.")
+                and destination_name == destination.name
+            ):
+                raise PermissionError("destination locked")
+            return real_rename(source_name, destination_name, *args, **kwargs)
+
+        monkeypatch.setattr(deploy.os, "rename", fail_publish_rename)
 
     with pytest.raises(PermissionError):
         deploy.copy_released_payload(source, destination)

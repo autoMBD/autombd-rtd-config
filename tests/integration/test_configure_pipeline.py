@@ -46,10 +46,12 @@
 
 import json
 import os
+import re
 import subprocess
 import sys
 from argparse import Namespace
 from dataclasses import replace
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -131,6 +133,35 @@ def _run_configure(project, *extra):
     )
 
 
+def _assert_expected_success_cleanup(warnings, *, expected_preserved=()):
+    preserved = []
+    for warning in warnings:
+        assert set(warning) == {"code", "message", "details"}
+        assert warning["code"] == "configure_cleanup_residual"
+        assert warning["message"] == (
+            "Verified rollback evidence was retained for audit cleanup."
+        )
+        assert set(warning["details"]) == {"preserved"}
+        assert len(warning["details"]["preserved"]) == 1
+        item = warning["details"]["preserved"][0]
+        assert Path(item).name == item
+        assert not Path(item).is_absolute()
+        preserved.append(item)
+
+    for item in expected_preserved:
+        assert preserved.count(item) == 1
+    generated = [item for item in preserved if item not in expected_preserved]
+    if os.name == "nt":
+        assert generated == []
+        return
+    assert len(generated) == 1
+    assert re.fullmatch(
+        r"\.\.Uart_Example\.mex\.candidate\.[0-9a-f]{24}\.tmp"
+        r"\.cleanup\.[0-9a-f]{24}\.tmp",
+        generated[0],
+    )
+
+
 def test_configure_lpuart_interrupt_changes_mex_and_checks(tmp_path):
     project = copy_uart_fixture(tmp_path)
     result = _run_configure(project)
@@ -139,7 +170,7 @@ def test_configure_lpuart_interrupt_changes_mex_and_checks(tmp_path):
     assert payload["status"] == "passed"
     assert "uart" in payload["changed_modules"]
     assert payload["published"] is True
-    assert payload["cleanup_warnings"] == []
+    _assert_expected_success_cleanup(payload["cleanup_warnings"])
     assert payload["runtime_verification"]["static_check"]["status"] == "passed"
     assert "Traceback" not in result.stderr
 
@@ -175,11 +206,9 @@ def test_cli_json_published_cleanup_warning_is_stable_and_path_safe(
     assert rc == 0
     assert payload["status"] == "passed"
     assert payload["published"] is True
-    assert payload["cleanup_warnings"] == [{
-        "code": "configure_cleanup_residual",
-        "message": "Verified rollback evidence was retained for audit cleanup.",
-        "details": {"preserved": [residual.name]},
-    }]
+    _assert_expected_success_cleanup(
+        payload["cleanup_warnings"], expected_preserved=(residual.name,)
+    )
     assert captured.err == ""
     assert "Traceback" not in captured.out
     assert str(project) not in json.dumps(payload)

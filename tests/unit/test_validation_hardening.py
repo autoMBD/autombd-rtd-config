@@ -352,13 +352,21 @@ def test_workspace_identity_cannot_swap_during_materialization(
         staticmethod(attacking_materialize),
     )
     workspace = ControlledValidationWorkspace(base, inventory)
-    try:
-        workspace.open()
-    except CliFailure:
-        pass
-    finally:
-        workspace.close()
-    assert attack_succeeded is False
+    if os.name == "nt":
+        try:
+            assert workspace.open() is workspace
+        finally:
+            assert workspace.close() == []
+        assert attack_succeeded is False
+        assert not displaced.exists()
+    else:
+        with pytest.raises(CliFailure) as caught:
+            workspace.open()
+        assert caught.value.code == "validation_workspace_unsafe"
+        assert workspace.close() == []
+        assert attack_succeeded is True
+        assert base.is_dir() and not any(base.iterdir())
+        assert displaced.is_dir() and not any(displaced.iterdir())
 
 
 def test_workspace_cleanup_keeps_identity_guard_until_recursive_delete(

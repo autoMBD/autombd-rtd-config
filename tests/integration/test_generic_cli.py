@@ -46,8 +46,10 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 import json
 import os
+import re
 import subprocess
 import sys
 from dataclasses import replace
@@ -98,6 +100,33 @@ SHORTCUTS = (
     ("mcu", "set"),
     ("adc", "set"),
 )
+
+
+def _normalize_checked_cleanup_residual(payload):
+    normalized = deepcopy(payload)
+    warnings = normalized["cleanup_warnings"]
+    if os.name == "nt":
+        assert warnings == []
+        return normalized
+    assert len(warnings) == 1
+    warning = warnings[0]
+    assert set(warning) == {"code", "message", "details"}
+    assert warning["code"] == "configure_cleanup_residual"
+    assert warning["message"] == (
+        "Verified rollback evidence was retained for audit cleanup."
+    )
+    assert set(warning["details"]) == {"preserved"}
+    assert len(warning["details"]["preserved"]) == 1
+    residual = warning["details"]["preserved"][0]
+    assert Path(residual).name == residual
+    assert not Path(residual).is_absolute()
+    assert re.fullmatch(
+        r"\.\.Uart_Example\.mex\.candidate\.[0-9a-f]{24}\.tmp"
+        r"\.cleanup\.[0-9a-f]{24}\.tmp",
+        residual,
+    )
+    warning["details"]["preserved"] = ["<transaction-residual>"]
+    return normalized
 
 
 def _write_json(path: Path, payload) -> Path:
@@ -637,7 +666,9 @@ def test_generic_configure_matches_every_registered_shortcut_and_published_bytes
     )
 
     assert generic_rc == shortcut_rc
-    assert generic == shortcut
+    assert _normalize_checked_cleanup_residual(generic) == (
+        _normalize_checked_cleanup_residual(shortcut)
+    )
     assert (generic_project / "Uart_Example.mex").read_bytes() == (
         shortcut_project / "Uart_Example.mex"
     ).read_bytes()
