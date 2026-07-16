@@ -1115,27 +1115,38 @@ def _ensure_safe_directory_chain(
             raise RuntimeError(f"cannot find a trusted parent for target: {target}")
         missing.append(existing)
         existing = existing.parent
-    for directory in reversed(missing):
-        with _capture_destination_guard(existing, platform) as parent_guard:
-            parent_guard.mkdir(directory)
-        existing = directory
-    parent_chain_guard = _capture_destination_guard(target, platform)
-    parent_chain_guard.close()
-    identities = [_directory_identity(target, platform)]
-    current = target
-    for component in relative.parts:
-        current = current / component
-        if _platform_is_link_or_reparse(platform, current):
-            raise RuntimeError(
-                f"unsafe destination ancestor is a symlink or reparse point: {current}"
+    guard = _capture_destination_guard(existing, platform)
+    try:
+        # Keep one capability chain alive from the trusted existing anchor to
+        # the final skills directory.  Closing and reopening by full path here
+        # would reintroduce a window in which an ancestor could be replaced by
+        # a link between two component opens.
+        for directory in reversed(missing):
+            guard.mkdir(directory)
+            identity = _open_child_directory_identity(
+                guard.identities[-1],
+                directory,
+                platform,
             )
-        if not path_present(current):
-            with _guard_for_paths([identity.path for identity in identities], platform) as guard:
+            guard.identities += (identity,)
+
+        if guard.parent != target:
+            raise RuntimeError("destination capability did not reach target root")
+
+        current = target
+        for component in relative.parts:
+            current = current / component
+            if not guard.entry_present(current):
                 guard.mkdir(current)
-        identities.append(_directory_identity(current, platform))
-    final_guard = _guard_for_paths([identity.path for identity in identities], platform)
-    final_guard.close()
-    return current
+            identity = _open_child_directory_identity(
+                guard.identities[-1],
+                current,
+                platform,
+            )
+            guard.identities += (identity,)
+        return current
+    finally:
+        guard.close()
 
 
 def _capture_destination_guard(
