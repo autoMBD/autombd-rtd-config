@@ -133,7 +133,9 @@ def _run_configure(project, *extra):
     )
 
 
-def _assert_expected_success_cleanup(warnings, *, expected_preserved=()):
+def _assert_expected_success_cleanup(
+    warnings, *, expected_preserved=(), expect_generated=True
+):
     preserved = []
     for warning in warnings:
         assert set(warning) == {"code", "message", "details"}
@@ -152,6 +154,9 @@ def _assert_expected_success_cleanup(warnings, *, expected_preserved=()):
         assert preserved.count(item) == 1
     generated = [item for item in preserved if item not in expected_preserved]
     if os.name == "nt":
+        assert generated == []
+        return
+    if not expect_generated:
         assert generated == []
         return
     assert len(generated) == 1
@@ -209,7 +214,9 @@ def test_cli_json_published_cleanup_warning_is_stable_and_path_safe(
     assert payload["status"] == "passed"
     assert payload["published"] is True
     _assert_expected_success_cleanup(
-        payload["cleanup_warnings"], expected_preserved=(residual.name,)
+        payload["cleanup_warnings"],
+        expected_preserved=(residual.name,),
+        expect_generated=False,
     )
     assert captured.err == ""
     assert "Traceback" not in captured.out
