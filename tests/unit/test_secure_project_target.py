@@ -170,6 +170,9 @@ def test_rejects_missing_or_non_directory_root(tmp_path, kind):
 
 
 def test_enotdir_during_protected_root_open_is_typed_as_not_directory(tmp_path):
+    root = tmp_path / "project"
+    root.write_text("not a directory", encoding="utf-8")
+
     class EnotdirPlatform(InjectedPlatform):
         @contextmanager
         def protect_root(self, _path):
@@ -177,9 +180,30 @@ def test_enotdir_during_protected_root_open_is_typed_as_not_directory(tmp_path):
             yield  # pragma: no cover - contextmanager shape only
 
     with pytest.raises(CliFailure) as caught:
-        verify_project_target(tmp_path / "project", platform=EnotdirPlatform())
+        verify_project_target(root, platform=EnotdirPlatform())
 
     assert caught.value.code == "project_not_directory"
+
+
+def test_enotdir_with_link_evidence_is_typed_as_unsafe_project_path(tmp_path):
+    root = tmp_path / "project"
+    root.mkdir()
+
+    class LinkedEnotdirPlatform(InjectedPlatform):
+        @contextmanager
+        def protect_root(self, _path):
+            raise OSError(errno.ENOTDIR, "no-follow rejected a link")
+            yield  # pragma: no cover - contextmanager shape only
+
+        def inspect(self, path):
+            if path == root:
+                return PathInspection(True, True, False, True, False, False)
+            return self.native.inspect(path)
+
+    with pytest.raises(CliFailure) as caught:
+        verify_project_target(root, platform=LinkedEnotdirPlatform())
+
+    assert caught.value.code == "unsafe_project_path"
 
 
 @pytest.mark.parametrize("count", [0, 2])

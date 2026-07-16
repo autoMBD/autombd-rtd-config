@@ -803,9 +803,11 @@ def _canonicalize(path: Path, platform: TargetPlatform) -> Path:
         ) from exc
 
 
-def _inspect_safe_chain(path: Path, platform: TargetPlatform) -> None:
+def _inspect_safe_chain(path: Path, platform: TargetPlatform) -> PathInspection:
+    final: PathInspection | None = None
     for component in _path_components(path):
         evidence = _inspect(component, platform)
+        final = evidence
         if not evidence.exists:
             raise FileNotFoundError(str(component))
         if evidence.is_symlink or evidence.is_reparse_point or evidence.is_mount_point:
@@ -815,6 +817,43 @@ def _inspect_safe_chain(path: Path, platform: TargetPlatform) -> None:
                 module="backend",
                 details={},
             )
+    if final is None:  # pragma: no cover - absolute roots have a component
+        raise FileNotFoundError(str(path))
+    return final
+
+
+def _raise_protected_root_enotdir(
+    path: Path,
+    platform: TargetPlatform,
+    cause: OSError,
+) -> None:
+    """Classify ENOTDIR without confusing a no-follow link rejection with a file."""
+    try:
+        root_evidence = _inspect_safe_chain(path, platform)
+    except CliFailure as failure:
+        if failure.code == "unsafe_project_path":
+            raise failure from cause
+        raise
+    except FileNotFoundError as changed:
+        raise CliFailure(
+            "unsafe_project_path",
+            "The project path changed while its protected lease was acquired.",
+            module="backend",
+            details={},
+        ) from changed
+    if not root_evidence.is_directory:
+        raise CliFailure(
+            "project_not_directory",
+            "The project path is not a directory.",
+            module="backend",
+            details={},
+        ) from cause
+    raise CliFailure(
+        "unsafe_project_path",
+        "The project path could not be opened without following links.",
+        module="backend",
+        details={},
+    ) from cause
 
 
 def _identity_available(identity: FileIdentity) -> bool:
@@ -983,10 +1022,7 @@ def verify_project_target(
         ) from exc
     except OSError as exc:
         if exc.errno == getattr(os, "ENOTDIR", 20):
-            raise CliFailure(
-                "project_not_directory", "The project path is not a directory.",
-                module="backend", details={},
-            ) from exc
+            _raise_protected_root_enotdir(supplied_root, adapter, exc)
         raise CliFailure(
             "unsafe_project_path",
             "The protected project lease could not be acquired safely.",
