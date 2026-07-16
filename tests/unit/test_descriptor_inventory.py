@@ -269,7 +269,7 @@ def test_known_descriptor_gap_groups_are_complete_and_explicitly_deferred():
             "adc_general": 1,
             "adc_power": 8,
             "adc_published_information": 14,
-            "adc_autosar_extension": 43,
+            "adc_autosar_extension": 42,
         },
     }
     for module, groups in expected.items():
@@ -370,6 +370,16 @@ def test_adc_created_parent_structures_are_coverage_accounted():
         if item["name"] in required and item["classification"] != "deferred"
     }
     assert observed == required
+
+
+def test_adc_dma_reference_and_ctu_gate_are_coverage_accounted():
+    sidecar = json.loads((COVERAGE_ROOT / "adc.json").read_text(encoding="utf-8"))
+    expected = {"AdcDmaChannelId", "CtuEnableDmaTransferMode"}
+    matched = [item for item in sidecar["items"] if item["name"] in expected]
+
+    assert {item["name"] for item in matched} == expected
+    assert all(item["classification"] == "derived" for item in matched)
+    assert all(item.get("trace", {}).get("tests") for item in matched)
 
 
 @pytest.mark.parametrize(

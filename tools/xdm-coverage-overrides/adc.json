@@ -30,7 +30,7 @@
     }],
     "adc_autosar_extension": [{
       "path_prefixes": ["/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AutosarExt]"],
-      "names": ["AdcBypassAbortChainCheck", "AdcConvTimeOnce", "AdcCtuHardwareTriggerOptimization", "AdcEnableApplyCalibration", "AdcEnableAsyncCalibration", "AdcEnableCalibration", "AdcEnableChDisableChApi", "AdcEnableCtuControlModeApi", "AdcEnableCtuTrigAutosarExtApi", "AdcEnableDmaErrorNotification", "AdcEnableDmaTransferMode", "AdcEnableDualClockMode", "AdcEnableGroupDependentChannelNames", "AdcEnableGroupStreamingResultReorder", "AdcEnableInitialNotification", "AdcEnableReadRawDataApi", "AdcEnableSelfTest", "AdcEnableSetChannel", "AdcEnableThresholdConfigurationApi", "AdcEnableUserModeSupport", "AdcGetInjectedConvStatusApi", "AdcMaxPartitions", "AdcMultiPartitionSupport", "AdcOptimizeDmaStreamingGroups", "AdcOptimizeOneShotHwTriggerConversions", "AdcPreSamplingOnce", "AdcSarEnable", "AdcSarEnableTempsenseApi", "AdcSarIpDevErrorDetect", "AdcSarPowerOnTempSense", "AdcSarTempSenseVsupply", "AdcSetHwUnitPowerModeApi", "AdcSetUserGainAndOffset", "AdcTimeoutMethod", "AdcTimeoutVal", "AdcUseHardwareNormalGroups", "AdcUseSoftwareInjectedGroups", "AutosarExt", "BctuIpDevErrorDetect", "CtuEnableDmaTransferMode", "SdAdcDspssSchedMode", "SdadcDspssEnable", "SdadcDspssErrorNotifCapability", "SdadcEnable", "SdadcIpDevErrorDetect"]
+      "names": ["AdcBypassAbortChainCheck", "AdcConvTimeOnce", "AdcCtuHardwareTriggerOptimization", "AdcEnableApplyCalibration", "AdcEnableAsyncCalibration", "AdcEnableCalibration", "AdcEnableChDisableChApi", "AdcEnableCtuControlModeApi", "AdcEnableCtuTrigAutosarExtApi", "AdcEnableDmaErrorNotification", "AdcEnableDmaTransferMode", "AdcEnableDualClockMode", "AdcEnableGroupDependentChannelNames", "AdcEnableGroupStreamingResultReorder", "AdcEnableInitialNotification", "AdcEnableReadRawDataApi", "AdcEnableSelfTest", "AdcEnableSetChannel", "AdcEnableThresholdConfigurationApi", "AdcEnableUserModeSupport", "AdcGetInjectedConvStatusApi", "AdcMaxPartitions", "AdcMultiPartitionSupport", "AdcOptimizeDmaStreamingGroups", "AdcOptimizeOneShotHwTriggerConversions", "AdcPreSamplingOnce", "AdcSarEnable", "AdcSarEnableTempsenseApi", "AdcSarIpDevErrorDetect", "AdcSarPowerOnTempSense", "AdcSarTempSenseVsupply", "AdcSetHwUnitPowerModeApi", "AdcSetUserGainAndOffset", "AdcTimeoutMethod", "AdcTimeoutVal", "AdcUseHardwareNormalGroups", "AdcUseSoftwareInjectedGroups", "AutosarExt", "BctuIpDevErrorDetect", "SdAdcDspssSchedMode", "SdadcDspssEnable", "SdadcDspssErrorNotifCapability", "SdadcEnable", "SdadcIpDevErrorDetect"]
     }]
   },
   "rules": [
@@ -80,6 +80,24 @@
           "tests/unit/test_adc_generality.py::test_bctu_multi_trigger_two_triggers_one_unit",
           "tests/unit/test_adc_apply.py::test_global_watchdog_api_flipped",
           "tests/unit/test_adc_apply.py::test_adc1_hw_configuration_added_with_interrupt_and_wdg"
+        ]
+      }
+    },
+    {
+      "match": {
+        "path_prefixes": [
+          "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]",
+          "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AutosarExt]"
+        ],
+        "names": ["AdcDmaChannelId", "CtuEnableDmaTransferMode"]
+      },
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": ["intent.payload", "autombd-rtd/assets/nxp/s32k3/adc/adc.json#/bctu"],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_single_unit_fifo_dma_plan_and_apply_share_mcl_ownership",
+          "tests/unit/test_adc002_dma_apply.py::test_dma_channel_ref_wired"
         ]
       }
     }

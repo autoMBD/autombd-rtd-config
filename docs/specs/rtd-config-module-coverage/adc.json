@@ -2027,9 +2027,18 @@
       "cross_modules": [
         "Mcl"
       ],
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "autombd-rtd/assets/nxp/s32k3/adc/adc.json#/bctu"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_single_unit_fifo_dma_plan_and_apply_share_mcl_ownership",
+          "tests/unit/test_adc002_dma_apply.py::test_dma_channel_ref_wired"
+        ]
+      }
     },
     {
       "key": "reference:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AdcConfigSet]/lst[BctuHwUnit]/ctr[BctuHwUnit]/lst[BctuAdcNotifications]/ctr[BctuAdcNotifications]/ref[BctuAdcNotificationsAdcIndex]",
@@ -15467,9 +15476,18 @@
           }
         ]
       },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current Adc provider and remains at a byte-faithful verified fixture or descriptor default.",
-      "dependency": "A future descriptor-forward Adc intent, provider/apply implementation, committed asset fact, and arbitrary-input generality tests are required before exposure."
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_adc_set",
+        "inputs": [
+          "intent.payload",
+          "autombd-rtd/assets/nxp/s32k3/adc/adc.json#/bctu"
+        ],
+        "tests": [
+          "tests/unit/test_adc_generality.py::test_single_unit_fifo_dma_plan_and_apply_share_mcl_ownership",
+          "tests/unit/test_adc002_dma_apply.py::test_dma_channel_ref_wired"
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AutosarExt]/var[SdAdcDspssSchedMode]",
@@ -16629,8 +16647,8 @@
   "summary": {
     "total": 279,
     "configurable": 48,
-    "deferred": 150,
-    "derived": 81
+    "deferred": 148,
+    "derived": 83
   },
   "known_gaps": {
     "adc_dspss": [
@@ -16751,7 +16769,6 @@
       "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AutosarExt]/var[AdcUseHardwareNormalGroups]",
       "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AutosarExt]/var[AdcUseSoftwareInjectedGroups]",
       "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AutosarExt]/var[BctuIpDevErrorDetect]",
-      "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AutosarExt]/var[CtuEnableDmaTransferMode]",
       "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AutosarExt]/var[SdAdcDspssSchedMode]",
       "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AutosarExt]/var[SdadcDspssEnable]",
       "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Adc]/ctr[MODULE-DEF]/ctr[AutosarExt]/var[SdadcDspssErrorNotifCapability]",

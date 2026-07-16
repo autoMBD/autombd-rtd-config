@@ -72,11 +72,15 @@ from rtd_config.backends.s32_mex.document import MexDocument
 from rtd_config.backends.s32_mex.apply import apply_adc_set, _derive_adc_sampling_duration
 from rtd_config.checks.static import run_static_checks
 from rtd_config.intent import Intent
+from rtd_config.modules.adc import AdcProvider
+from rtd_config.modules.mcl import MclProvider
 from tests.fixtures import copy_adc_fixture, resolved_adc_bundle
 
 _BUNDLE = resolved_adc_bundle()
 apply_adc_set = partial(apply_adc_set, bundle=_BUNDLE)
 run_static_checks = partial(run_static_checks, bundle=_BUNDLE)
+AdcProvider = partial(AdcProvider, _BUNDLE)
+MclProvider = partial(MclProvider, _BUNDLE)
 
 
 MEX_NAME = "Autombd_Test_Adc_S32K344.mex"
@@ -385,6 +389,95 @@ def test_bctu_list_partition_4_4_fifo2(tmp_path):
     fifos = _result_fifos(reloaded)
     assert len(fifos) == 1
     assert _val(reloaded, fifos[0], "BctuResultFifoIndex") == "BCTU_FIFO2"
+
+
+def test_plan_reuses_mcl_dma_ownership_for_mixed_unit_override():
+    payload = {
+        "units": [
+            {"unit": "ADC1", "sampling_time_us": 3, "transfer": "interrupt"},
+            {"unit": "ADC2", "sampling_time_us": 4, "transfer": "dma"},
+        ],
+        "transfer": "interrupt",
+    }
+    plan = AdcProvider().plan(_intent(payload))
+    mcl_changes = [change for change in plan.changes if change.owner == "mcl"]
+
+    assert mcl_changes == [MclProvider().dma_dependency("Adc")]
+
+
+def test_plan_reuses_mcl_dma_ownership_for_arbitrary_fifo_dma():
+    payload = {
+        "unit": "ADC0",
+        "transfer": "interrupt",
+        "groups": [],
+        "bctu": {
+            "mode": "list",
+            "targets": ["ADC0"],
+            "list": ["S18", "S19"],
+            "trigger_order": [2],
+            "destination": "fifo2",
+            "fifo_dma": True,
+            "trigger_source": "BCTU_EMIOS_0_7",
+        },
+    }
+    plan = AdcProvider().plan(_intent(payload))
+    mcl_changes = [change for change in plan.changes if change.owner == "mcl"]
+
+    assert mcl_changes == [MclProvider().dma_dependency("Adc")]
+
+
+def test_plan_interrupt_without_fifo_dma_declares_no_mcl_write():
+    payload = {
+        "units": [
+            {"unit": "ADC1", "sampling_time_us": 3},
+            {"unit": "ADC2", "sampling_time_us": 4, "transfer": "interrupt"},
+        ],
+        "transfer": "interrupt",
+        "bctu": {"fifo_dma": False},
+    }
+    plan = AdcProvider().plan(_intent(payload))
+
+    assert [change for change in plan.changes if change.owner == "mcl"] == []
+
+
+def test_single_unit_fifo_dma_plan_and_apply_share_mcl_ownership(tmp_path):
+    payload = {
+        "unit": "ADC0",
+        "transfer": "interrupt",
+        "sampling_time_us": 2,
+        "groups": [
+            {"trigger": "sw", "access": "single", "conv": "oneshot",
+             "num_samples": 1, "channels": ["S18", "S19"]},
+        ],
+        "bctu": {
+            "mode": "list",
+            "targets": ["ADC0"],
+            "list": ["S18", "S19"],
+            "trigger_order": [2],
+            "destination": "fifo2",
+            "fifo_dma": True,
+            "trigger_source": "BCTU_EMIOS_0_7",
+        },
+    }
+    plan = AdcProvider().plan(_intent(payload))
+    assert [change for change in plan.changes if change.owner == "mcl"] == [
+        MclProvider().dma_dependency("Adc")
+    ]
+
+    project = copy_adc_fixture(tmp_path)
+    mex = project / MEX_NAME
+    doc = MexDocument.load(mex)
+    result = apply_adc_set(doc, _intent(payload))
+    assert not result.blocked, [d.code for d in result.diagnostics]
+    assert result.changed_modules == ["adc", "mcl"]
+    doc.write(mex)
+
+    reloaded = MexDocument.load(mex)
+    adc_cfg = reloaded.find_config_set("Adc")
+    mcl_cfg = reloaded.find_config_set("Mcl")
+    assert _val(reloaded, adc_cfg, "CtuEnableDmaTransferMode") == "true"
+    assert _val(reloaded, mcl_cfg, "MclEnableDma") == "true"
+    assert "quick_selection" not in mcl_cfg.attrib
 
 
 # ===========================================================================

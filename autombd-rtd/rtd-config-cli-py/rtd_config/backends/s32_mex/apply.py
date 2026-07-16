@@ -6409,7 +6409,9 @@ def apply_adc_set(doc: MexDocument, intent: Intent, *, bundle: ResolvedAssetBund
             if not _apply_adc_bctu(doc, bctu, unit_id, asset, result):
                 return result
         _apply_adc_shared_tail(
-            doc, is_dma, bool(watchdog_by_channel), result, bundle, has_bctu=bctu is not None
+            doc, is_dma, bool(watchdog_by_channel), result, bundle,
+            has_bctu=bctu is not None,
+            has_fifo_dma=bool(bctu and bctu.get("fifo_dma", False)),
         )
         return result
 
@@ -6592,6 +6594,8 @@ def apply_adc_set(doc: MexDocument, intent: Intent, *, bundle: ResolvedAssetBund
             return result
 
     _apply_adc_shared_tail(
-        doc, is_dma, bool(watchdog_by_channel), result, bundle, has_bctu=bctu is not None
+        doc, is_dma, bool(watchdog_by_channel), result, bundle,
+        has_bctu=bctu is not None,
+        has_fifo_dma=bool(bctu and bctu.get("fifo_dma", False)),
     )
     return result

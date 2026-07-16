@@ -73,6 +73,7 @@ from rtd_config.backends.s32_mex.apply import (
 )
 from rtd_config.intent import Intent
 from rtd_config.modules.mcl import MclProvider
+from rtd_config.plan import TargetSelector
 from tests.fixtures import copy_uart_fixture, resolved_uart_bundle
 
 _BUNDLE = resolved_uart_bundle()
@@ -351,6 +352,17 @@ def test_plan_for_arbitrary_single_channel_declares_no_probe_no_uart_fast_path()
     assert "no inspect" in descriptions
     assert "no existing Mcl tree probe" in descriptions
     assert "no Uart configuration" in descriptions
+
+
+def test_dma_dependency_declares_complete_mcl_write_region():
+    """DMA activation owns the config-set carrier and both edited descendants."""
+    change = MclProvider().dma_dependency("ADC2")
+
+    assert change.targets == (
+        TargetSelector("config_set:Mcl", ("Mcl",)),
+        TargetSelector("config_set:Mcl", ("MclEnableDma",)),
+        TargetSelector("config_set:Mcl", ("dmaLogicChannel_Type",)),
+    )
 
 
 # ---------------------------------------------------------------------------

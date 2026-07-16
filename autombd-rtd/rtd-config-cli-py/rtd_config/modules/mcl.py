@@ -112,28 +112,25 @@ class MclProvider:
         return self._flexio_dependency(hw)
 
     def dma_dependency(self, hw: str) -> PlannedChange:
-        """Return the Mcl-owned DMA logic-channel dependency for DMA mode (RTD-MEX-UART-003).
+        """Return the complete Mcl-owned DMA activation write region.
 
-        In DMA mode, two dmaLogicChannel_Type structs are required:
-        - dmaLogicChannel_Type_0 (TX, existing in fixture, activated)
-        - dmaLogicChannel_Type_1 (RX, added by DMA path)
-        Grounded in uart.json dma_channel_ref_path_pattern and fixture dmaLogicChannel_Type_0.
+        The dependency covers the config-set carrier because applying any DMA
+        consumer removes its stale ``quick_selection`` in addition to updating
+        ``MclEnableDma`` and the DMA logic-channel array. Consumer-specific
+        channel counts and references remain in each consumer's apply path.
         """
         return PlannedChange(
             module="mcl",
             owner="mcl",
             path="/Mcl/Mcl/MclConfig/dmaLogicChannel_Type",
             description=(
-                f"Activate dmaLogicChannel_Type_0 (TX, DMA_IP_HW_CH_0) for {hw} DMA TX: "
-                "set dmaLogicChannel_EnableGlobalConfig=true, "
-                "dmaGlobalRequest_enDmaRequest=true (LPUART HW DMA request triggers transfer), "
-                "dmaLogicChannelConfig_enDmaMajorInterrupt=true (generates DMATCD0_IRQn). "
-                "Add dmaLogicChannel_Type_1 (RX, DMA_IP_HW_CH_1) mirroring _0 field set with "
-                "all activation flags=true (generates DMATCD1_IRQn). "
-                "Enable MclEnableDma=true. "
-                "Grounded in uart.json dma_channel_ref_path_pattern + fixture dmaLogicChannel_Type_0."
+                f"Enable Mcl DMA resources required by {hw}: set MclEnableDma=true, "
+                "activate the referenced dmaLogicChannel_Type entries, and remove "
+                "the stale Mcl config-set quick_selection carrier. Channel identity "
+                "and count are grounded by the consuming module's descriptor-backed asset."
             ),
             targets=(
+                TargetSelector("config_set:Mcl", ("Mcl",)),
                 TargetSelector("config_set:Mcl", ("MclEnableDma",)),
                 TargetSelector("config_set:Mcl", ("dmaLogicChannel_Type",)),
             ),
