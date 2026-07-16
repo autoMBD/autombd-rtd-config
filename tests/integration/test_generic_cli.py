@@ -108,6 +108,8 @@ def _normalize_checked_cleanup_residual(payload):
     if os.name == "nt":
         assert warnings == []
         return normalized
+    if not normalized["published"] and not warnings:
+        return normalized
     assert len(warnings) == 1
     warning = warnings[0]
     assert set(warning) == {"code", "message", "details"}

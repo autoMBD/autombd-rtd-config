@@ -182,8 +182,10 @@ def test_cli_json_published_cleanup_warning_is_stable_and_path_safe(
     mex = project / "Uart_Example.mex"
     original = mex.read_bytes()
     residual = project / ".absolute-residual-evidence.tmp"
+    real_finalize = transaction_module.finalize_atomic_publish
 
-    def return_residual(_publication, *, platform):
+    def return_residual(publication, *, platform):
+        real_finalize(publication, platform=platform)
         return residual
 
     def apply_ok(doc, _intent, *, bundle):
