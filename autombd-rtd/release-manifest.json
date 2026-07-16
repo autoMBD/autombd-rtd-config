@@ -4,7 +4,7 @@
   "files": [
     {
       "path": "SKILL.md",
-      "sha256": "dd32547264d0df7d1859bfa8bd2b27cd270819bdcdcc30a1e6083e9f42c1b82c"
+      "sha256": "aead03ba9007442167cc0b2fa78f660cd041a8eb2a6549befadffc3afc92b1a1"
     },
     {
       "path": "__main__.py",
@@ -80,7 +80,7 @@
     },
     {
       "path": "reference/port-spec.md",
-      "sha256": "f24ef573ae214bddfff116fe734ffa87aa52bcbfa8a30337408e7aab4581a88b"
+      "sha256": "6ab32ed37a8f0d08fa824712fbc7df48da0014e7c57d9407e522f7fba6641ece"
     },
     {
       "path": "reference/uart-spec.md",

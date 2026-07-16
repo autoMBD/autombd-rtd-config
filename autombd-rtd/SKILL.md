@@ -35,10 +35,21 @@ Do not spawn exploration tasks/subagents, run `inspect`, run `<module> set
 files, or run another module's `set` command unless the selected module
 reference explicitly requires that extra command.
 
+Port pin routing has one such read-only query. Run it exactly once before
+writing the Port spec, then select the requested TX/RX signals from its JSON
+output as described in `reference/port-spec.md`:
+
+```text
+rtd-config pin-options --bundle-id nxp-s32-mex-s32k344-mapbga257-rtd-7.0.1 --peripheral <peripheral> --json
+```
+
 For a single-module request, the only allowed shell commands are the three
 command forms above: `<module> set --spec --configure --json`, `check`, and
-`validate`, unless a module reference explicitly names a compatibility helper
-for that case. `inspect` is not validation; running it is a workflow failure.
+`validate`, plus a selected module reference's one explicitly required query
+or compatibility helper. No other command is allowed
+unless a module reference explicitly names a compatibility helper for that case.
+`inspect` is not validation.
+Running it is a workflow failure.
 When the prompt asks for `BLACKBOX_RESULT`, emit that line immediately after
 `validate` using the configure/check/validate outputs.
 
@@ -153,9 +164,10 @@ is required.
 ### Inspection & checks (never launch a vendor tool)
 - `rtd-config inspect --project <dir> --json` — report backend, family, device,
   package, RTD version, the resolved `.mex`, and the enabled module list.
-- `rtd-config pin-options --device s32k344 --package default --peripheral
-  LPUART_0 --json` — list verified TX/RX pin options for a peripheral. Query
-  this **before** choosing `--tx`/`--rx` for `port set`.
+- `rtd-config pin-options --bundle-id
+  nxp-s32-mex-s32k344-mapbga257-rtd-7.0.1 --peripheral <peripheral> --json` —
+  list verified TX/RX pin options for the released S32K344/MapBGA257/RTD 7.0.1
+  asset bundle. Query this exactly once before choosing pins for `port set`.
 - `rtd-config check --project <dir> --json` — run the static checks
   (well-formedness, single `.mex`, enabled modules, duplicate names,
   `quick_selection` conflicts, FlexIO reference coherence, DMA coherence,

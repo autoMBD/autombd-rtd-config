@@ -127,6 +127,31 @@ def test_rtd_config_skill_documents_public_cli_and_module_surface():
     assert "Milestone 1" not in skill
 
 
+def test_port_reference_documents_one_query_pin_selection_fast_path():
+    skill = Path("autombd-rtd/SKILL.md").read_text(encoding="utf-8")
+    reference = Path("autombd-rtd/reference/port-spec.md").read_text(encoding="utf-8")
+    skill_words = " ".join(skill.split())
+    reference_words = " ".join(reference.split())
+    query = (
+        "rtd-config pin-options --bundle-id "
+        "nxp-s32-mex-s32k344-mapbga257-rtd-7.0.1 "
+        "--peripheral <peripheral> --json"
+    )
+
+    assert query in skill_words
+    assert query in reference_words
+    assert "--package default" not in skill_words
+    assert "--package default" not in reference_words
+    assert "options[].signal" in reference
+    assert "options[].pin" in reference
+    assert "Do not run `pin-options --help`" in reference
+    assert "Do not run `inspect`" in reference
+    assert "Run `pin-options` exactly once" in reference
+    assert "port set --project <dir> --spec" in reference
+    assert "check --project <dir> --json" in reference
+    assert "validate --project <dir> --json" in reference
+
+
 def test_rtd_config_module_payload_details_live_in_references():
     expected = {
         "mcu": "core_clk",
