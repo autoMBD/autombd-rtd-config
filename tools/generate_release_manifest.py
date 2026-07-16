@@ -48,6 +48,8 @@
 from __future__ import annotations
 
 import argparse
+from dataclasses import replace
+import hashlib
 from pathlib import Path
 import subprocess
 import sys
@@ -84,13 +86,66 @@ def tracked_payload_paths(repo_root: Path) -> tuple[str, ...]:
     return tuple(sorted(paths))
 
 
+def require_lf_checkout_attributes(
+    repo_root: Path,
+    paths: tuple[str, ...],
+) -> None:
+    tracked = tuple(f"{SKILL_NAME}/{path}" for path in paths)
+    result = subprocess.run(
+        ["git", "-C", str(repo_root), "check-attr", "-z", "--stdin", "eol"],
+        input=("\0".join(tracked) + "\0").encode("utf-8"),
+        check=False,
+        capture_output=True,
+    )
+    if result.returncode != 0:
+        stderr = result.stderr.decode("utf-8", errors="replace").strip()
+        raise RuntimeError(f"cannot read Git release EOL attributes: {stderr}")
+    fields = result.stdout.split(b"\0")
+    if fields and fields[-1] == b"":
+        fields.pop()
+    if len(fields) != len(tracked) * 3:
+        raise RuntimeError("Git returned malformed release EOL attributes")
+    attributes = {
+        fields[index].decode("utf-8", errors="surrogateescape"): fields[index + 2]
+        .decode("utf-8", errors="replace")
+        .lower()
+        for index in range(0, len(fields), 3)
+    }
+    invalid = [path for path in tracked if attributes.get(path) != "lf"]
+    if invalid:
+        raise RuntimeError(
+            "every tracked release payload file must use Git eol=lf; "
+            f"invalid={invalid}"
+        )
+
+
+def _lf_checkout_bytes(path: Path) -> bytes:
+    return path.read_bytes().replace(b"\r\n", b"\n")
+
+
 def expected_manifest(repo_root: Path):
     skill_root = repo_root / SKILL_NAME
     version = read_project_version(repo_root / "pyproject.toml")
-    return build_release_manifest(
+    paths = tracked_payload_paths(repo_root)
+    require_lf_checkout_attributes(repo_root, paths)
+    manifest = build_release_manifest(
         skill_root,
         version,
-        tracked_payload_paths(repo_root),
+        paths,
+    )
+    return replace(
+        manifest,
+        files=tuple(
+            replace(
+                entry,
+                sha256=hashlib.sha256(
+                    _lf_checkout_bytes(
+                        skill_root.joinpath(*Path(entry.path).parts)
+                    )
+                ).hexdigest(),
+            )
+            for entry in manifest.files
+        ),
     )
 
 

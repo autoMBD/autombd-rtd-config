@@ -74,6 +74,20 @@ def load_deploy_module():
     return module
 
 
+def load_release_manifest_generator():
+    load_deploy_module()
+    module_path = REPO_ROOT / "tools" / "generate_release_manifest.py"
+    spec = importlib.util.spec_from_file_location(
+        "generate_release_manifest", module_path
+    )
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
 def test_retry_fs_recovers_from_transient_windows_lock(monkeypatch):
     """A transient WinError-5 on a deploy FS op is retried, then succeeds.
 
@@ -463,6 +477,93 @@ def _copy_release_repo(tmp_path: Path) -> Path:
     shutil.copy2(REPO_ROOT / "pyproject.toml", repo / "pyproject.toml")
     shutil.copytree(SOURCE_SKILL_ROOT, repo / "autombd-rtd")
     return repo
+
+
+def _create_lf_release_repo(tmp_path: Path) -> Path:
+    repo = tmp_path / "release-repo"
+    skill = repo / "autombd-rtd"
+    nested = skill / "nested"
+    nested.mkdir(parents=True)
+    (repo / ".gitattributes").write_bytes(
+        b"/autombd-rtd/** text eol=lf\n"
+    )
+    (repo / "pyproject.toml").write_bytes(
+        b'[project]\nname = "fixture"\nversion = "0.1.8"\n'
+    )
+    (skill / "SKILL.md").write_bytes(b"skill line one\nskill line two\n")
+    (nested / "module.py").write_bytes(b"value = 1\nreturn value\n")
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    subprocess.run(
+        ["git", "-C", str(repo), "config", "user.email", "test@example.com"],
+        check=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(repo), "config", "user.name", "Release Test"],
+        check=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(repo), "config", "core.autocrlf", "false"],
+        check=True,
+    )
+    subprocess.run(["git", "-C", str(repo), "add", "."], check=True)
+    subprocess.run(
+        ["git", "-C", str(repo), "commit", "-qm", "fixture"], check=True
+    )
+    return repo
+
+
+def test_manifest_generator_hashes_all_text_payload_as_lf_checkout(tmp_path):
+    generator = load_release_manifest_generator()
+    repo = _create_lf_release_repo(tmp_path)
+    skill = repo / "autombd-rtd"
+    working_bytes = {
+        "SKILL.md": b"skill line one\r\nskill line two\r\n",
+        "nested/module.py": b"value = 1\r\nreturn value\r\n",
+    }
+    checkout_bytes = {
+        path: content.replace(b"\r\n", b"\n")
+        for path, content in working_bytes.items()
+    }
+    for relative, content in working_bytes.items():
+        (skill / relative).write_bytes(content)
+
+    manifest = generator.expected_manifest(repo)
+
+    actual = {entry.path: entry.sha256 for entry in manifest.files}
+    assert actual == {
+        path: hashlib.sha256(content).hexdigest()
+        for path, content in checkout_bytes.items()
+    }
+    deploy = load_deploy_module()
+    deploy.write_release_manifest(skill, manifest)
+    with pytest.raises(RuntimeError, match="hash mismatch"):
+        deploy.verify_release_payload(skill, manifest)
+
+
+def test_manifest_generator_keeps_substantive_uncommitted_payload_changes(tmp_path):
+    generator = load_release_manifest_generator()
+    repo = _create_lf_release_repo(tmp_path)
+    changed = b"value = 37\r\nreturn value + 5\r\n"
+    (repo / "autombd-rtd/nested/module.py").write_bytes(changed)
+
+    manifest = generator.expected_manifest(repo)
+
+    hashes = {entry.path: entry.sha256 for entry in manifest.files}
+    assert hashes["nested/module.py"] == hashlib.sha256(
+        changed.replace(b"\r\n", b"\n")
+    ).hexdigest()
+
+
+def test_manifest_generator_requires_lf_for_every_tracked_payload(tmp_path):
+    generator = load_release_manifest_generator()
+    repo = _create_lf_release_repo(tmp_path)
+    (repo / ".gitattributes").write_bytes(
+        b"/autombd-rtd/** text eol=lf\n"
+        b"/autombd-rtd/nested/** text eol=crlf\n"
+    )
+
+    with pytest.raises(RuntimeError, match=r"eol=lf.*nested/module\.py"):
+        generator.expected_manifest(repo)
 
 
 def test_pyproject_is_the_single_release_version_authority():
