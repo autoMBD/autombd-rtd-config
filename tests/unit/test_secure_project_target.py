@@ -470,14 +470,21 @@ def test_posix_snapshot_opens_nonregular_targets_nonblocking(monkeypatch, tmp_pa
     opened = []
     closed = []
     fifo_status = SimpleNamespace(st_mode=target_module.stat.S_IFIFO)
+    real_close = target_module.os.close
 
     def fake_open(path, flags, **kwargs):
         opened.append((path, flags, kwargs))
         return 123
 
+    def close_synthetic_descriptor(fd):
+        if fd == 123:
+            closed.append(fd)
+            return
+        real_close(fd)
+
     monkeypatch.setattr(target_module.os, "open", fake_open)
     monkeypatch.setattr(target_module.os, "fstat", lambda _fd: fifo_status)
-    monkeypatch.setattr(target_module.os, "close", closed.append)
+    monkeypatch.setattr(target_module.os, "close", close_synthetic_descriptor)
 
     with pytest.raises(ValueError, match="regular file"):
         platform.snapshot_file(mex)
