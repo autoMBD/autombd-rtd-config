@@ -58,6 +58,7 @@ Next-available ids are computed from the first unused legal XDM enum values,
 not hardcoded or invented outside the descriptor domain.
 """
 import difflib
+from functools import partial
 import json
 import subprocess
 import sys
@@ -72,7 +73,12 @@ from rtd_config.backends.s32_mex.apply import (
 )
 from rtd_config.intent import Intent
 from rtd_config.modules.mcl import MclProvider
-from tests.fixtures import copy_uart_fixture
+from rtd_config.plan import TargetSelector
+from tests.fixtures import copy_uart_fixture, resolved_uart_bundle
+
+_BUNDLE = resolved_uart_bundle()
+apply_mcl_set = partial(apply_mcl_set, bundle=_BUNDLE)
+MclProvider = partial(MclProvider, _BUNDLE)
 
 
 def _intent(**payload) -> Intent:
@@ -163,31 +169,13 @@ def _flexio_stub(entries: list[tuple[str, str, str]]) -> bytes:
 
 
 # ---------------------------------------------------------------------------
-# Forward surface coverage: mcl.json must account for the Mcl.xdm surface.
+# Development coverage must not be published in mcl.json.
 # ---------------------------------------------------------------------------
-def test_mcl_json_asset_has_forward_surface_coverage():
+def test_mcl_json_asset_excludes_development_coverage():
     asset = json.loads(_asset_path().read_text(encoding="utf-8"))
 
     assert "Mcl.xdm" in asset["_source"]
-    coverage = asset["_coverage"]
-    configurable = coverage["configurable_today"]
-
-    assert "MclGeneral/MclFlexioCommon" in configurable
-    assert "MclEnableFlexioCommon" in configurable["MclGeneral/MclFlexioCommon"]
-
-    logic_channels = configurable["MclConfig/FlexioCommon/FlexioMclLogicChannels"]
-    for item in (
-        "Name",
-        "FlexioMclChannelId",
-        "FlexioMclPinId",
-        "FlexioMclAddPinEnable",
-        "FlexioMclAddPinId",
-        "FlexioMclAddChannelEnable",
-        "FlexioMclAddChannelId",
-    ):
-        assert item in logic_channels
-
-    assert "MclConfig/FlexioCommon/FlexioMclLogicChannels" in coverage["not_yet_exposed"]
+    assert "_coverage" not in asset
     algorithm = asset["FlexioMclLogicChannel"]["next_id_algorithm"]
     assert "first unused legal" in algorithm
     assert "max_existing" not in algorithm
@@ -364,6 +352,17 @@ def test_plan_for_arbitrary_single_channel_declares_no_probe_no_uart_fast_path()
     assert "no inspect" in descriptions
     assert "no existing Mcl tree probe" in descriptions
     assert "no Uart configuration" in descriptions
+
+
+def test_dma_dependency_declares_complete_mcl_write_region():
+    """DMA activation owns the config-set carrier and both edited descendants."""
+    change = MclProvider().dma_dependency("ADC2")
+
+    assert change.targets == (
+        TargetSelector("config_set:Mcl", ("Mcl",)),
+        TargetSelector("config_set:Mcl", ("MclEnableDma",)),
+        TargetSelector("config_set:Mcl", ("dmaLogicChannel_Type",)),
+    )
 
 
 # ---------------------------------------------------------------------------

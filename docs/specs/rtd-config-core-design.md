@@ -2,8 +2,8 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.7.1 |
-| Date | 2026-06-23 |
+| Version | 0.7.3 |
+| Date | 2026-07-18 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Long-term architecture and goals for the RTD CfgFile CLI. Holds the stable CLI/JSON contract, module-ownership rules, engineering constraints, and the minimal-system definition. Domain facts live in domain-truth; the test method lives in the test strategy; E2E cases live in the test-cases catalog. |
 
@@ -131,11 +131,13 @@ same architecture and provider model. Delivery sequencing lives in
 ## Assets
 
 Assets are committed, versioned JSON/cache files shipped under the skill's
-`assets/` directory; runtime commands read nothing else. Asset kinds: module
+`assets/` directory; runtime commands read nothing else. Each runtime asset is
+independent of development coverage data. Asset kinds: module
 manifests + metadata; **per-module schema/constraint/dependency caches extracted
-from each `<Module>.xdm`** (provider-owned, domain-truth §1), including a
-**surface-coverage inventory** (`_coverage`) recording which editable items are
-configurable today vs. deferred; **pin mapping by
+from each `<Module>.xdm`** (provider-owned, domain-truth §1); a separate
+development-only **single normalized development coverage definition** under
+`docs/specs/rtd-config-module-coverage/<module>.json`, recording which named
+editable items are configurable, derived, or deferred; **pin mapping by
 family/device/package/peripheral/signal/pin**; validation profiles;
 generated-file/reference patterns.
 
@@ -164,13 +166,20 @@ module is considered done:
    §1/§3). Never invent a value.
 2. **Asset.** Emit or refresh the committed per-module asset under
    `autombd-rtd/assets/<vendor>/<family>/<module>/`, each item traceable to its
-   `.xdm` source path and RTD version, and record a `_coverage` inventory of the
-   editable items configurable today vs. those deferred.
+   `.xdm` source path and RTD version. Separately regenerate the module's
+   development-only normalized coverage definition under
+   `docs/specs/rtd-config-module-coverage/` from that exact descriptor. It holds
+   fact-only items, a SHA-256-addressed fact pool, and embedded
+   `classification_default`, `classification_rules`, and `known_gap_rules`.
+   The expanded resolved coverage view exists in memory or temporary output
+   only. An optional asset-domain assertion names a descriptor fact and precise
+   asset pointer, with mode `exact` or `subset`; structural/template traces do
+   not assert semantic equality. No separate overrides directory exists.
 3. **Provider (TDD-first).** Implement or extend the module provider against
    that asset: ownership-bounded edits only, narrow byte-faithful `.mex` writes,
    structured diagnostics, supporting the module's full legal editable surface
-   (G10); where coverage is deferred, record it explicitly in the asset's
-   `_coverage` inventory rather than leaving an undocumented gap.
+   (G10); where coverage is deferred, record it explicitly in the module's
+   development-only surface inventory rather than leaving an undocumented gap.
 
 ## Intent and commands
 
@@ -275,6 +284,8 @@ configured installation environment internally.
 
 | Date | Version | Description |
 | --- | --- | --- |
+| 2026-07-18 | 0.7.3 | Defined one normalized development coverage source per module with pooled descriptor facts, embedded classification/gap rules, in-memory resolved reports, and explicit exact/subset asset-domain assertions independent of runtime assets. |
+| 2026-07-15 | 0.7.2 | Moved descriptor surface coverage out of runtime assets into exact-source, development-only per-module sidecars and required an inventory for all eight shipped providers. |
 | 2026-06-23 | 0.7.1 | Made the asset-build sequence extract the module's **complete editable surface** (G10 — the descriptor defines the surface, not the subset a test case exercises) and added a per-module `_coverage` surface-coverage inventory (configurable today vs. deferred) as an asset kind and a build-sequence output, so a deferred surface is recorded rather than left an undocumented gap. |
 | 2026-06-15 | 0.7.0 | Issue #7 documentation reorganization: stripped agent-discipline content (Subagent development workflow section, Documentation map section, KPI-cap/timing sentences from Tests and acceptance and Success criteria); folded content from `rtd-cfgfile-cli-implementation-plan.md` (minimal-system definition, asset build sequence steps 1–3, engineering constraints + development release boundary); updated figures path reference to `docs/specs/figures/`; updated header Description. |
 | 2026-06-14 | 0.6.3 | Fixed in-body doc path references that omitted the `docs/` prefix (`tests/…` → `docs/tests/…`, `references/…` → `docs/references/…`) so they match the doc map. |

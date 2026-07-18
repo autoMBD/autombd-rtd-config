@@ -59,5 +59,8 @@ def test_copy_uart_fixture_creates_isolated_project(tmp_path):
 
 def test_find_single_mex_returns_project_mex(tmp_path):
     project = copy_uart_fixture(tmp_path)
-    mex = find_single_mex(project)
-    assert mex == project / "Uart_Example.mex"
+    target = find_single_mex(project)
+    try:
+        assert target.mex.path == project / "Uart_Example.mex"
+    finally:
+        target.close()

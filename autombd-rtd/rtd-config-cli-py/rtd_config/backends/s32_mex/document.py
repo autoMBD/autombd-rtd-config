@@ -50,8 +50,12 @@ import io
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TYPE_CHECKING
 import xml.etree.ElementTree as ET
 from xml.parsers import expat
+
+if TYPE_CHECKING:
+    from .target import FileSnapshot
 
 
 # The .mex root declares a default namespace. By default ElementTree rewrites
@@ -92,13 +96,42 @@ class MexDocument:
     _raw: bytes = field(default=b"", repr=False, compare=False)
     _sources: list[_ElementSource] = field(default_factory=list, repr=False, compare=False)
     _aligned: bool = field(default=False, repr=False, compare=False)
+    _source_snapshot: "FileSnapshot | None" = field(
+        default=None, repr=False, compare=False
+    )
 
     @classmethod
     def load(cls, path: Path) -> "MexDocument":
+        """Safely load through a verified project snapshot.
+
+        This compatibility API verifies the containing single-.mex project,
+        parses only captured bytes, stores the verification evidence, and then
+        releases its lease. Public command flows keep their target lease alive
+        and call ``from_snapshot`` directly.
+        """
         path = Path(path)
-        raw = path.read_bytes()
-        doc = cls(path=path, tree=ET.parse(path), _raw=raw)
+        from .target import verify_project_target
+
+        target = verify_project_target(path.parent)
+        try:
+            if target.mex.path != path.resolve():
+                raise ValueError(f"verified .mex target does not match requested path: {path}")
+            doc = cls.from_snapshot(target.mex)
+            return doc
+        finally:
+            target.close()
+
+    @classmethod
+    def from_bytes(cls, path: Path, raw: bytes) -> "MexDocument":
+        path = Path(path)
+        doc = cls(path=path, tree=ET.ElementTree(ET.fromstring(raw)), _raw=raw)
         doc._capture_sources()
+        return doc
+
+    @classmethod
+    def from_snapshot(cls, snapshot: "FileSnapshot") -> "MexDocument":
+        doc = cls.from_bytes(snapshot.path, snapshot.content)
+        doc._source_snapshot = snapshot
         return doc
 
     @property
@@ -345,11 +378,15 @@ class MexDocument:
 
     def write(self, path: Path | None = None) -> None:
         target = Path(path) if path is not None else self.path
+        target.write_bytes(self.render())
+
+    def render(self) -> bytes:
+        """Render the pending narrow edit without opening a filesystem path."""
         if not self._aligned:
             raise MexWriteError(
                 "narrow .mex render unavailable: source byte mapping is not aligned"
             )
-        target.write_bytes(self._render_minimal())
+        return self._render_minimal()
 
     def _render_minimal(self) -> bytes:
         """Rebuild the file bytes, rewriting only start tags that changed.

@@ -44,9 +44,14 @@
 # Description: Unit tests for the static checks.
 # =================================================================================
 
+from functools import partial
+
 from rtd_config.backends.s32_mex.document import MexDocument
 from rtd_config.checks.static import run_static_checks
-from tests.fixtures import copy_uart_fixture
+from tests.fixtures import copy_uart_fixture, resolved_uart_bundle
+
+_BUNDLE = resolved_uart_bundle()
+run_static_checks = partial(run_static_checks, bundle=_BUNDLE)
 
 
 def _load(tmp_path):
@@ -126,7 +131,7 @@ def test_dma_enabled_uart_passes_static_check(tmp_path):
         "action": "set",
         "payload": {"hw": "LPUART_3", "mode": "dma", "priority": 2},
     })
-    apply_result = apply_uart_set(doc, intent)
+    apply_result = apply_uart_set(doc, intent, bundle=_BUNDLE)
     assert not apply_result.blocked, [d.to_dict() for d in apply_result.diagnostics]
     result = run_static_checks(mex, doc)
     assert result.status != "blocked", (
@@ -173,7 +178,7 @@ def test_dma_broken_mcl_not_enabled_is_blocked(tmp_path):
         "action": "set",
         "payload": {"hw": "LPUART_3", "mode": "dma", "priority": 2},
     })
-    apply_uart_set(doc, intent)
+    apply_uart_set(doc, intent, bundle=_BUNDLE)
     # Now manually break it by setting MclEnableDma back to false
     for setting in doc.root.iter():
         if (

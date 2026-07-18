@@ -46,8 +46,13 @@
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
+import json
+import os
 import re
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -61,6 +66,20 @@ SOURCE_SKILL_ROOT = REPO_ROOT / "autombd-rtd"
 def load_deploy_module():
     module_path = REPO_ROOT / "tools" / "deploy_rtd_skill.py"
     spec = importlib.util.spec_from_file_location("deploy_rtd_skill", module_path)
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def load_release_manifest_generator():
+    load_deploy_module()
+    module_path = REPO_ROOT / "tools" / "generate_release_manifest.py"
+    spec = importlib.util.spec_from_file_location(
+        "generate_release_manifest", module_path
+    )
     assert spec is not None
     assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)
@@ -199,6 +218,7 @@ def create_source_payload(source: Path, deploy) -> None:
             target.write_text(relative.as_posix(), encoding="utf-8")
 
 
+@pytest.mark.skipif(os.name != "nt", reason="Windows symlink error guidance")
 def test_ensure_link_windows_symlink_failure_with_metachar_path_never_invokes_cmd(
     tmp_path,
     monkeypatch,
@@ -219,6 +239,7 @@ def test_ensure_link_windows_symlink_failure_with_metachar_path_never_invokes_cm
         deploy.ensure_link(source, destination)
 
 
+@pytest.mark.skipif(os.name != "nt", reason="Windows symlink error guidance")
 def test_ensure_link_symlink_failure_preserves_existing_destination(
     tmp_path,
     monkeypatch,
@@ -255,17 +276,30 @@ def test_copy_released_payload_preserves_existing_install_when_publish_rename_fa
     old_skill = destination / "SKILL.md"
     old_skill.write_text("old payload", encoding="utf-8")
 
-    real_rename = deploy.Path.rename
+    if os.name == "nt":
+        real_rename = deploy.Path.rename
 
-    def fail_publish_rename(self, target):
-        if (
-            self.name.startswith(f".{destination.name}.deploying.")
-            and Path(target) == destination
-        ):
-            raise PermissionError("destination locked")
-        return real_rename(self, target)
+        def fail_publish_rename(self, target):
+            if (
+                self.name.startswith(f".{destination.name}.deploying.")
+                and Path(target) == destination
+            ):
+                raise PermissionError("destination locked")
+            return real_rename(self, target)
 
-    monkeypatch.setattr(deploy.Path, "rename", fail_publish_rename)
+        monkeypatch.setattr(deploy.Path, "rename", fail_publish_rename)
+    else:
+        real_rename = deploy.os.rename
+
+        def fail_publish_rename(source_name, destination_name, *args, **kwargs):
+            if (
+                str(source_name).startswith(f".{destination.name}.deploying.")
+                and destination_name == destination.name
+            ):
+                raise PermissionError("destination locked")
+            return real_rename(source_name, destination_name, *args, **kwargs)
+
+        monkeypatch.setattr(deploy.os, "rename", fail_publish_rename)
 
     with pytest.raises(PermissionError):
         deploy.copy_released_payload(source, destination)
@@ -426,3 +460,956 @@ def test_deploy_replaces_newer_install_when_required_reference_is_missing(tmp_pa
     assert result.action == "deployed"
     assert result.reason == "installed_payload_incomplete"
     assert_released_payload(installed)
+
+
+# ---------------------------------------------------------------------------
+# Release-integrity contract (runtime safety design §13 / §15)
+# ---------------------------------------------------------------------------
+
+EXPECTED_RELEASE_VERSION = "0.1.8"
+RELEASE_MANIFEST_NAME = "release-manifest.json"
+
+
+def _manifest_document(root: Path = SOURCE_SKILL_ROOT) -> dict:
+    manifest_path = root / RELEASE_MANIFEST_NAME
+    assert manifest_path.is_file(), (
+        "the released Skill must carry its committed release manifest"
+    )
+    document = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert isinstance(document, dict)
+    return document
+
+
+def _manifest_paths(document: dict) -> list[str]:
+    files = document.get("files")
+    assert isinstance(files, list)
+    return [entry["path"] for entry in files]
+
+
+def _copy_release_repo(tmp_path: Path) -> Path:
+    repo = tmp_path / "release-repo"
+    repo.mkdir()
+    shutil.copy2(REPO_ROOT / "pyproject.toml", repo / "pyproject.toml")
+    shutil.copytree(SOURCE_SKILL_ROOT, repo / "autombd-rtd")
+    return repo
+
+
+def _create_lf_release_repo(tmp_path: Path) -> Path:
+    repo = tmp_path / "release-repo"
+    skill = repo / "autombd-rtd"
+    nested = skill / "nested"
+    nested.mkdir(parents=True)
+    (repo / ".gitattributes").write_bytes(
+        b"/autombd-rtd/** text eol=lf\n"
+    )
+    (repo / "pyproject.toml").write_bytes(
+        b'[project]\nname = "fixture"\nversion = "0.1.8"\n'
+    )
+    (skill / "SKILL.md").write_bytes(b"skill line one\nskill line two\n")
+    (nested / "module.py").write_bytes(b"value = 1\nreturn value\n")
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    subprocess.run(
+        ["git", "-C", str(repo), "config", "user.email", "test@example.com"],
+        check=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(repo), "config", "user.name", "Release Test"],
+        check=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(repo), "config", "core.autocrlf", "false"],
+        check=True,
+    )
+    subprocess.run(["git", "-C", str(repo), "add", "."], check=True)
+    subprocess.run(
+        ["git", "-C", str(repo), "commit", "-qm", "fixture"], check=True
+    )
+    return repo
+
+
+def test_manifest_generator_hashes_all_text_payload_as_lf_checkout(tmp_path):
+    generator = load_release_manifest_generator()
+    repo = _create_lf_release_repo(tmp_path)
+    skill = repo / "autombd-rtd"
+    working_bytes = {
+        "SKILL.md": b"skill line one\r\nskill line two\r\n",
+        "nested/module.py": b"value = 1\r\nreturn value\r\n",
+    }
+    checkout_bytes = {
+        path: content.replace(b"\r\n", b"\n")
+        for path, content in working_bytes.items()
+    }
+    for relative, content in working_bytes.items():
+        (skill / relative).write_bytes(content)
+
+    manifest = generator.expected_manifest(repo)
+
+    actual = {entry.path: entry.sha256 for entry in manifest.files}
+    assert actual == {
+        path: hashlib.sha256(content).hexdigest()
+        for path, content in checkout_bytes.items()
+    }
+    deploy = load_deploy_module()
+    deploy.write_release_manifest(skill, manifest)
+    with pytest.raises(RuntimeError, match="hash mismatch"):
+        deploy.verify_release_payload(skill, manifest)
+
+
+def test_manifest_generator_keeps_substantive_uncommitted_payload_changes(tmp_path):
+    generator = load_release_manifest_generator()
+    repo = _create_lf_release_repo(tmp_path)
+    changed = b"value = 37\r\nreturn value + 5\r\n"
+    (repo / "autombd-rtd/nested/module.py").write_bytes(changed)
+
+    manifest = generator.expected_manifest(repo)
+
+    hashes = {entry.path: entry.sha256 for entry in manifest.files}
+    assert hashes["nested/module.py"] == hashlib.sha256(
+        changed.replace(b"\r\n", b"\n")
+    ).hexdigest()
+
+
+def test_manifest_generator_requires_lf_for_every_tracked_payload(tmp_path):
+    generator = load_release_manifest_generator()
+    repo = _create_lf_release_repo(tmp_path)
+    (repo / ".gitattributes").write_bytes(
+        b"/autombd-rtd/** text eol=lf\n"
+        b"/autombd-rtd/nested/** text eol=crlf\n"
+    )
+
+    with pytest.raises(RuntimeError, match=r"eol=lf.*nested/module\.py"):
+        generator.expected_manifest(repo)
+
+
+def test_pyproject_is_the_single_release_version_authority():
+    deploy = load_deploy_module()
+
+    versions = deploy.read_project_versions(REPO_ROOT)
+
+    assert versions.project == EXPECTED_RELEASE_VERSION
+    assert versions.skill == versions.project
+    assert versions.launcher_header == versions.project
+    assert versions.package_header == versions.project
+    assert versions.package == versions.project
+    assert versions.manifest == versions.project
+    assert deploy.require_consistent_project_versions(versions) == versions.project
+
+
+def test_release_manifest_has_exact_canonical_schema_and_sorted_paths():
+    document = _manifest_document()
+
+    assert set(document) == {"format_version", "release_version", "files"}
+    assert document["format_version"] == 1
+    assert document["release_version"] == EXPECTED_RELEASE_VERSION
+    paths = _manifest_paths(document)
+    assert paths == sorted(paths)
+    assert len(paths) == len(set(paths))
+    assert RELEASE_MANIFEST_NAME not in paths, "the manifest must not hash itself"
+    assert all(set(entry) == {"path", "sha256"} for entry in document["files"])
+    assert all(re.fullmatch(r"[0-9a-f]{64}", entry["sha256"])
+               for entry in document["files"])
+
+
+@pytest.mark.parametrize(
+    "document,error",
+    (
+        ({"format_version": 2, "release_version": EXPECTED_RELEASE_VERSION,
+          "files": []}, "format"),
+        ({"format_version": 1, "release_version": EXPECTED_RELEASE_VERSION,
+          "files": [], "unexpected": True}, "schema|unexpected"),
+        ({"format_version": 1, "release_version": "v0.1.8",
+          "files": []}, "version"),
+        ({"format_version": 1, "release_version": EXPECTED_RELEASE_VERSION,
+          "files": [{"path": "SKILL.md", "sha256": "NOT-A-SHA"}]},
+         "sha|hash"),
+        ({"format_version": 1, "release_version": EXPECTED_RELEASE_VERSION,
+          "files": [
+              {"path": "z-last", "sha256": "1" * 64},
+              {"path": "a-first", "sha256": "2" * 64},
+          ]}, "sort|order"),
+    ),
+)
+def test_manifest_parser_rejects_invalid_schema_version_hash_and_order(
+    tmp_path,
+    document,
+    error,
+):
+    deploy = load_deploy_module()
+    root = tmp_path / "skill"
+    root.mkdir()
+    (root / RELEASE_MANIFEST_NAME).write_text(
+        json.dumps(document),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(RuntimeError, match=error):
+        deploy.read_release_manifest(root)
+
+
+@pytest.mark.parametrize(
+    "bad_path",
+    (
+        "/absolute.py",
+        "C:/absolute.py",
+        "../escape.py",
+        "nested/../../escape.py",
+        r"rtd-config-cli-py\rtd_config\cli.py",
+        "./SKILL.md",
+        "nested//file.py",
+    ),
+)
+def test_manifest_parser_rejects_noncanonical_or_escaping_paths(tmp_path, bad_path):
+    deploy = load_deploy_module()
+    root = tmp_path / "skill"
+    root.mkdir()
+    (root / RELEASE_MANIFEST_NAME).write_text(
+        json.dumps(
+            {
+                "format_version": 1,
+                "release_version": EXPECTED_RELEASE_VERSION,
+                "files": [{"path": bad_path, "sha256": "0" * 64}],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(RuntimeError, match="manifest|path|canonical|relative"):
+        deploy.read_release_manifest(root)
+
+
+@pytest.mark.parametrize(
+    "paths",
+    (
+        ("SKILL.md", "SKILL.md"),
+        ("Reference/mcu-spec.md", "reference/mcu-spec.md"),
+    ),
+)
+def test_manifest_parser_rejects_duplicate_and_case_colliding_paths(tmp_path, paths):
+    deploy = load_deploy_module()
+    root = tmp_path / "skill"
+    root.mkdir()
+    (root / RELEASE_MANIFEST_NAME).write_text(
+        json.dumps(
+            {
+                "format_version": 1,
+                "release_version": EXPECTED_RELEASE_VERSION,
+                "files": [
+                    {"path": path, "sha256": f"{index + 1:064x}"}
+                    for index, path in enumerate(paths)
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(RuntimeError, match="duplicate|collision|case"):
+        deploy.read_release_manifest(root)
+
+
+def test_committed_manifest_is_an_exact_hash_allowlist_for_release_payload():
+    deploy = load_deploy_module()
+    manifest = deploy.read_release_manifest(SOURCE_SKILL_ROOT)
+
+    deploy.verify_release_payload(SOURCE_SKILL_ROOT, manifest)
+    document = _manifest_document()
+    paths = _manifest_paths(document)
+    assert not any(path.endswith((".pyc", ".pyo")) for path in paths)
+    assert not any("__pycache__" in Path(path).parts for path in paths)
+    assert not any(path.startswith("docs/") for path in paths)
+    assert not any("rtd-config-module-coverage" in path for path in paths)
+    eligible_source_files = {
+        path.relative_to(SOURCE_SKILL_ROOT).as_posix()
+        for path in SOURCE_SKILL_ROOT.rglob("*")
+        if path.is_file()
+        and not path.is_symlink()
+        and path.name != RELEASE_MANIFEST_NAME
+        and path.suffix not in {".pyc", ".pyo"}
+        and "__pycache__" not in path.relative_to(SOURCE_SKILL_ROOT).parts
+    }
+    assert set(paths) == eligible_source_files
+    for entry in document["files"]:
+        actual = hashlib.sha256(
+            (SOURCE_SKILL_ROOT / entry["path"]).read_bytes()
+        ).hexdigest()
+        assert actual == entry["sha256"]
+
+
+@pytest.mark.parametrize("mutation", ("missing", "hash_mismatch", "extra"))
+def test_release_verifier_rejects_every_payload_drift_class(tmp_path, mutation):
+    deploy = load_deploy_module()
+    source = tmp_path / "skill"
+    shutil.copytree(SOURCE_SKILL_ROOT, source)
+    manifest = deploy.read_release_manifest(source)
+    declared = source / _manifest_paths(_manifest_document(source))[0]
+
+    if mutation == "missing":
+        declared.unlink()
+    elif mutation == "hash_mismatch":
+        declared.write_bytes(declared.read_bytes() + b"\n# drift\n")
+    else:
+        (source / "unapproved-extra.txt").write_text("extra", encoding="utf-8")
+
+    with pytest.raises(RuntimeError, match="missing|hash|extra|drift"):
+        deploy.verify_release_payload(source, manifest)
+
+
+def test_clean_deploy_contains_exact_manifest_set_and_runs_outside_repo(tmp_path):
+    deploy = load_deploy_module()
+    document = _manifest_document()
+    target = tmp_path / "target-project"
+
+    result = deploy.deploy_one(REPO_ROOT, target, "codex")
+
+    assert result.action == "deployed"
+    installed = result.destination
+    actual = {
+        path.relative_to(installed).as_posix()
+        for path in installed.rglob("*")
+        if path.is_file()
+    }
+    assert actual == set(_manifest_paths(document)) | {RELEASE_MANIFEST_NAME}
+    outside = tmp_path / "outside-repository-cwd"
+    outside.mkdir()
+    version_result = subprocess.run(
+        [sys.executable, str(installed / "__main__.py"), "--version"],
+        cwd=outside,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert version_result.returncode == 0, version_result.stderr
+    version_payload = json.loads(version_result.stdout)
+    assert version_payload["version"] == EXPECTED_RELEASE_VERSION
+    help_result = subprocess.run(
+        [sys.executable, str(installed / "__main__.py"), "--help"],
+        cwd=outside,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert help_result.returncode == 0, help_result.stderr
+    assert "usage: rtd-config" in help_result.stdout
+    resource_result = subprocess.run(
+        [
+            sys.executable,
+            str(installed / "__main__.py"),
+            "pin-options",
+            "--bundle-id",
+            "nxp-s32-mex-s32k344-mapbga257-rtd-7.0.1",
+            "--peripheral",
+            "LPUART_3",
+            "--json",
+        ],
+        cwd=outside,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert resource_result.returncode == 0, resource_result.stderr
+    resource_payload = json.loads(resource_result.stdout)
+    assert resource_payload["status"] == "passed"
+    assert resource_payload["options"]
+    module_environment = dict(os.environ)
+    module_environment["PYTHONPATH"] = str(installed / "rtd-config-cli-py")
+    module_result = subprocess.run(
+        [sys.executable, "-B", "-m", "rtd_config", "--version"],
+        cwd=outside,
+        env=module_environment,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert module_result.returncode == 0, module_result.stderr
+    assert json.loads(module_result.stdout)["version"] == EXPECTED_RELEASE_VERSION
+    post_run_actual = {
+        path.relative_to(installed).as_posix()
+        for path in installed.rglob("*")
+        if path.is_file()
+    }
+    assert post_run_actual == set(_manifest_paths(document)) | {
+        RELEASE_MANIFEST_NAME
+    }, "running the released Skill must not create .pyc or other unmanifested files"
+    assert not any(path.name == "__pycache__" for path in installed.rglob("*"))
+
+
+@pytest.mark.parametrize("mutation", ("hash_mismatch", "extra"))
+def test_same_version_installed_drift_forces_redeployment(tmp_path, mutation):
+    deploy = load_deploy_module()
+    target = tmp_path / "target-project"
+    first = deploy.deploy_one(REPO_ROOT, target, "codex")
+    installed = first.destination
+    if mutation == "hash_mismatch":
+        (installed / "SKILL.md").write_bytes(
+            (installed / "SKILL.md").read_bytes() + b"\n# local drift\n"
+        )
+    else:
+        (installed / "unapproved-extra.txt").write_text("extra", encoding="utf-8")
+
+    second = deploy.deploy_one(REPO_ROOT, target, "codex")
+
+    assert second.action == "deployed"
+    assert second.reason == "installed_payload_drift"
+    deploy.verify_release_payload(
+        installed,
+        deploy.read_release_manifest(installed),
+    )
+
+
+def test_source_payload_symlink_is_rejected_before_existing_install_changes(tmp_path):
+    deploy = load_deploy_module()
+    repo = _copy_release_repo(tmp_path)
+    source = repo / "autombd-rtd"
+    victim = source / "reference" / "mcu-spec.md"
+    outside = tmp_path / "outside-source.md"
+    outside.write_bytes(victim.read_bytes())
+    victim.unlink()
+    try:
+        victim.symlink_to(outside)
+    except OSError as exc:
+        pytest.skip(f"test host cannot create a file symlink: {exc}")
+    target = tmp_path / "target-project"
+    installed = target / ".agents" / "skills" / "autombd-rtd"
+    installed.mkdir(parents=True)
+    sentinel = installed / "keep.txt"
+    sentinel.write_text("old install", encoding="utf-8")
+
+    with pytest.raises(RuntimeError, match="symlink|reparse|link"):
+        deploy.deploy_one(repo, target, "codex")
+
+    assert sentinel.read_text(encoding="utf-8") == "old install"
+
+
+def test_installed_payload_symlink_is_drift_and_never_treated_complete(tmp_path):
+    deploy = load_deploy_module()
+    target = tmp_path / "target-project"
+    installed = deploy.deploy_one(REPO_ROOT, target, "codex").destination
+    victim = installed / "reference" / "mcu-spec.md"
+    outside = tmp_path / "outside-installed.md"
+    outside.write_bytes(victim.read_bytes())
+    victim.unlink()
+    try:
+        victim.symlink_to(outside)
+    except OSError as exc:
+        pytest.skip(f"test host cannot create a file symlink: {exc}")
+
+    second = deploy.deploy_one(REPO_ROOT, target, "codex")
+
+    assert second.action == "deployed"
+    assert "drift" in second.reason
+    assert not (second.destination / "reference" / "mcu-spec.md").is_symlink()
+
+
+def test_ci_contract_covers_supported_pythons_platforms_and_release_smoke():
+    workflow = REPO_ROOT / ".github" / "workflows" / "ci.yml"
+    assert workflow.is_file(), "the deterministic release CI workflow is missing"
+    text = workflow.read_text(encoding="utf-8")
+
+    for python_version in ("3.11", "3.12", "3.13", "3.14"):
+        assert python_version in text
+    assert "windows" in text.lower()
+    assert "ubuntu" in text.lower() or "linux" in text.lower()
+    assert "pytest" in text
+    assert "release-manifest" in text or "release_manifest" in text
+    assert "deploy_rtd_skill" in text
+    assert "outside" in text.lower() or "smoke" in text.lower()
+
+
+# ---------------------------------------------------------------------------
+# Destination-ancestor fail-closed contract (Reviewer P1)
+# ---------------------------------------------------------------------------
+
+
+def _tree_snapshot(root: Path) -> tuple[tuple[str, ...], dict[str, bytes]]:
+    """Capture relative directory names and file bytes without following links."""
+    directories: list[str] = []
+    files: dict[str, bytes] = {}
+    if not root.exists():
+        return (), files
+    for current, directory_names, file_names in os.walk(root, followlinks=False):
+        current_path = Path(current)
+        directories.extend(
+            (current_path / name).relative_to(root).as_posix()
+            for name in directory_names
+        )
+        files.update(
+            {
+                (current_path / name).relative_to(root).as_posix():
+                    (current_path / name).read_bytes()
+                for name in file_names
+            }
+        )
+    return tuple(sorted(directories)), files
+
+
+def _assert_no_deploy_residue(root: Path) -> None:
+    names = {path.name for path in root.rglob("*")}
+    assert not any(".deploying." in name for name in names)
+    assert not any(".previous." in name for name in names)
+    assert not any(name.endswith(".deploy.lock") for name in names)
+
+
+def _seed_linked_install(outside: Path, linked_part: str) -> Path:
+    if linked_part == "target":
+        installed = outside / ".agents" / "skills" / "autombd-rtd"
+    elif linked_part == ".agents":
+        installed = outside / "skills" / "autombd-rtd"
+    else:
+        installed = outside / "autombd-rtd"
+    installed.mkdir(parents=True)
+    (installed / "sentinel.bin").write_bytes(b"existing-install-must-not-change\x00")
+    return installed
+
+
+def _make_project_link(target: Path, outside: Path, linked_part: str) -> Path:
+    if linked_part == "target":
+        link = target
+    elif linked_part == ".agents":
+        target.mkdir()
+        link = target / ".agents"
+    else:
+        (target / ".agents").mkdir(parents=True)
+        link = target / ".agents" / "skills"
+    link.symlink_to(outside, target_is_directory=True)
+    return link
+
+
+@pytest.mark.skipif(os.name == "nt", reason="real POSIX symlink coverage")
+@pytest.mark.parametrize("linked_part", ("target", ".agents", "skills"))
+def test_deploy_one_rejects_real_posix_linked_destination_ancestor_without_writes(
+    tmp_path,
+    linked_part,
+):
+    deploy = load_deploy_module()
+    target = tmp_path / "target-project"
+    outside = tmp_path / "outside-destination"
+    outside.mkdir()
+    installed = _seed_linked_install(outside, linked_part)
+    before_outside = _tree_snapshot(outside)
+    before_install = _tree_snapshot(installed)
+    try:
+        _make_project_link(target, outside, linked_part)
+    except OSError as exc:
+        pytest.skip(f"test host cannot create a directory symlink: {exc}")
+
+    with pytest.raises(RuntimeError, match="unsafe|ancestor|symlink|link|reparse"):
+        deploy.deploy_one(REPO_ROOT, target, "codex")
+
+    assert _tree_snapshot(outside) == before_outside
+    assert _tree_snapshot(installed) == before_install
+    _assert_no_deploy_residue(outside)
+
+
+class _InjectedDestinationPlatform:
+    """Delegate native checks except for explicit reparse-point observations."""
+
+    def __init__(self, deploy, *unsafe_paths: Path) -> None:
+        self._native = deploy._is_link_or_reparse
+        self._unsafe = {Path(path) for path in unsafe_paths}
+
+    def is_link_or_reparse(self, path: Path) -> bool:
+        candidate = Path(path)
+        return candidate in self._unsafe or self._native(candidate)
+
+
+@pytest.mark.parametrize("unsafe_part", ("target", ".agents", "skills"))
+def test_resolve_agent_skills_dir_rejects_injected_reparse_ancestor(
+    tmp_path,
+    unsafe_part,
+):
+    deploy = load_deploy_module()
+    target = tmp_path / "target-project"
+    (target / ".agents" / "skills").mkdir(parents=True)
+    unsafe = {
+        "target": target,
+        ".agents": target / ".agents",
+        "skills": target / ".agents" / "skills",
+    }[unsafe_part]
+    platform = _InjectedDestinationPlatform(deploy, unsafe)
+    before = _tree_snapshot(target)
+
+    with pytest.raises(RuntimeError, match="unsafe|ancestor|symlink|link|reparse"):
+        deploy.resolve_agent_skills_dir(target, "codex", platform=platform)
+
+    assert _tree_snapshot(target) == before
+    _assert_no_deploy_residue(target)
+
+
+def test_copy_released_payload_rejects_injected_reparse_parent_before_lock_or_stage(
+    tmp_path,
+):
+    deploy = load_deploy_module()
+    target = tmp_path / "target-project"
+    destination = target / ".agents" / "skills" / "autombd-rtd"
+    destination.mkdir(parents=True)
+    (destination / "sentinel.bin").write_bytes(b"existing-install")
+    unsafe_parent = target / ".agents"
+    platform = _InjectedDestinationPlatform(deploy, unsafe_parent)
+    manifest = deploy.read_release_manifest(SOURCE_SKILL_ROOT)
+    before = _tree_snapshot(target)
+    before_install = _tree_snapshot(destination)
+
+    with pytest.raises(RuntimeError, match="unsafe|ancestor|symlink|link|reparse"):
+        deploy.copy_released_payload(
+            SOURCE_SKILL_ROOT,
+            destination,
+            manifest,
+            platform=platform,
+        )
+
+    assert _tree_snapshot(target) == before
+    assert _tree_snapshot(destination) == before_install
+    _assert_no_deploy_residue(target)
+
+
+def test_deploy_one_rejects_injected_reparse_target_root_without_writes(tmp_path):
+    deploy = load_deploy_module()
+    target = tmp_path / "target-project"
+    installed = target / ".agents" / "skills" / "autombd-rtd"
+    installed.mkdir(parents=True)
+    (installed / "sentinel.bin").write_bytes(b"existing-install")
+    platform = _InjectedDestinationPlatform(deploy, target)
+    before = _tree_snapshot(target)
+
+    with pytest.raises(RuntimeError, match="unsafe|ancestor|symlink|link|reparse"):
+        deploy.deploy_one(REPO_ROOT, target, "codex", platform=platform)
+
+    assert _tree_snapshot(target) == before
+    _assert_no_deploy_residue(target)
+
+
+@pytest.mark.skipif(os.name != "nt", reason="real Windows junction coverage")
+def test_deploy_one_rejects_real_windows_junction_target_without_outside_writes(
+    tmp_path,
+):
+    deploy = load_deploy_module()
+    target = tmp_path / "target-project"
+    outside = tmp_path / "outside-destination"
+    outside.mkdir()
+    installed = _seed_linked_install(outside, "target")
+    before_outside = _tree_snapshot(outside)
+    before_install = _tree_snapshot(installed)
+    created = subprocess.run(
+        ["cmd", "/c", "mklink", "/J", str(target), str(outside)],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if created.returncode != 0:
+        pytest.skip(f"junction creation unavailable: {created.stderr or created.stdout}")
+    try:
+        with pytest.raises(RuntimeError, match="unsafe|ancestor|junction|link|reparse"):
+            deploy.deploy_one(REPO_ROOT, target, "codex")
+
+        assert _tree_snapshot(outside) == before_outside
+        assert _tree_snapshot(installed) == before_install
+        _assert_no_deploy_residue(outside)
+    finally:
+        os.rmdir(target)
+
+
+# ---------------------------------------------------------------------------
+# Destination-guard TOCTOU contract (Reviewer P1, round 2)
+# ---------------------------------------------------------------------------
+
+
+def _create_directory_redirect(link: Path, outside: Path) -> None:
+    if os.name == "nt":
+        created = subprocess.run(
+            ["cmd", "/c", "mklink", "/J", str(link), str(outside)],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if created.returncode != 0:
+            pytest.skip(
+                f"junction creation unavailable: {created.stderr or created.stdout}"
+            )
+    else:
+        try:
+            link.symlink_to(outside, target_is_directory=True)
+        except OSError as exc:
+            pytest.skip(f"directory symlink creation unavailable: {exc}")
+
+
+def _remove_directory_redirect(link: Path) -> None:
+    if os.name == "nt":
+        os.rmdir(link)
+    else:
+        link.unlink()
+
+
+@pytest.mark.parametrize("target_state", ("missing", "existing"))
+def test_deploy_rejects_linked_parent_chain_before_creating_target_or_children(
+    tmp_path,
+    target_state,
+):
+    deploy = load_deploy_module()
+    outside = tmp_path / "outside-parent"
+    outside.mkdir()
+    linked_parent = tmp_path / "linked-parent"
+    target = linked_parent / "target-project"
+    if target_state == "existing":
+        (outside / "target-project").mkdir()
+        (outside / "target-project" / "sentinel.bin").write_bytes(b"unchanged")
+    before = _tree_snapshot(outside)
+    _create_directory_redirect(linked_parent, outside)
+    try:
+        with pytest.raises(
+            RuntimeError,
+            match="unsafe|ancestor|parent|symlink|link|junction|reparse",
+        ):
+            deploy.deploy_one(REPO_ROOT, target, "codex")
+
+        assert _tree_snapshot(outside) == before
+        if target_state == "missing":
+            assert not (outside / "target-project").exists()
+        _assert_no_deploy_residue(outside)
+    finally:
+        _remove_directory_redirect(linked_parent)
+
+
+class _AtomicMutationRacePlatform(_InjectedDestinationPlatform):
+    """Attempt one ancestor swap from inside the public mutation capability."""
+
+    def __init__(self, deploy, race_point: str, skills: Path, outside: Path) -> None:
+        super().__init__(deploy)
+        self.race_point = race_point
+        self.skills = skills
+        self.outside = outside
+        self.attempted = False
+        self.swap_succeeded = False
+        self.swap_blocked = False
+        self.restored = False
+
+    def before_mutation(self, mutation_kind: str, guarded_directory: Path):
+        """Return cleanup for a test-only race attempted before atomic mutation."""
+        if self.attempted or mutation_kind != self.race_point:
+            return lambda: None
+        assert Path(guarded_directory) == self.skills
+        self.attempted = True
+        displaced = self.skills.with_name(f"{self.skills.name}.displaced")
+        try:
+            self.skills.rename(displaced)
+        except OSError:
+            # Windows safety relies on a pinned directory handle opened without
+            # FILE_SHARE_DELETE, so the rename must be denied by the OS.
+            self.swap_blocked = True
+            return lambda: None
+
+        self.swap_succeeded = True
+        _create_directory_redirect(self.skills, self.outside)
+
+        def restore() -> None:
+            _remove_directory_redirect(self.skills)
+            displaced.rename(self.skills)
+            self.restored = True
+
+        return restore
+
+
+@pytest.mark.parametrize("race_point", ("lock", "staging", "publish"))
+def test_deploy_mutation_is_bound_to_guarded_directory_across_ancestor_swap(
+    tmp_path,
+    race_point,
+):
+    """Atomic mutation stays in its pinned directory while an ancestor is swapped."""
+    deploy = load_deploy_module()
+    target = tmp_path / "target-project"
+    skills = target / ".agents" / "skills"
+    installed = skills / "autombd-rtd"
+    installed.mkdir(parents=True)
+    (installed / "sentinel.bin").write_bytes(b"old-install-must-survive")
+    outside = tmp_path / "outside-race-target"
+    outside.mkdir()
+    before_outside = _tree_snapshot(outside)
+    platform = _AtomicMutationRacePlatform(
+        deploy,
+        race_point,
+        skills,
+        outside,
+    )
+
+    result = deploy.deploy_one(REPO_ROOT, target, "codex", platform=platform)
+
+    assert result.action == "deployed"
+    assert platform.attempted, (
+        f"the atomic mutation capability did not invoke the {race_point} race hook"
+    )
+    if os.name == "nt":
+        assert platform.swap_blocked, (
+            "the pinned Windows directory handle allowed an ancestor rename"
+        )
+    else:
+        assert platform.swap_succeeded
+        assert platform.restored
+    assert _tree_snapshot(outside) == before_outside
+    assert not (installed / "sentinel.bin").exists()
+    installed_manifest = deploy.read_release_manifest(installed)
+    deploy.verify_release_payload(installed, installed_manifest)
+    _assert_no_deploy_residue(target)
+    _assert_no_deploy_residue(outside)
+
+
+# ---------------------------------------------------------------------------
+# Chained and child capability capture (Reviewer P1, round 3)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX dirfd capture semantics")
+def test_posix_destination_capture_opens_each_child_relative_to_parent_capability(
+    tmp_path,
+    monkeypatch,
+):
+    """Replacing target after its open cannot redirect later child captures."""
+    deploy = load_deploy_module()
+    target = tmp_path / "unique-target-root"
+    (target / ".agents" / "skills").mkdir(parents=True)
+    outside = tmp_path / "outside-capture"
+    (outside / ".agents" / "skills").mkdir(parents=True)
+    before_outside = _tree_snapshot(outside)
+    displaced = tmp_path / "displaced-target-root"
+    real_open = deploy.os.open
+    records: list[tuple[object, int | None]] = []
+    swapped = False
+    restored = False
+
+    def recording_open(path, flags, mode=0o777, *, dir_fd=None):
+        nonlocal swapped, restored
+        records.append((path, dir_fd))
+        if dir_fd is None:
+            descriptor = real_open(path, flags, mode)
+        else:
+            descriptor = real_open(path, flags, mode, dir_fd=dir_fd)
+        path_text = os.fspath(path)
+        opened_target = (
+            Path(path_text) == target
+            if os.path.isabs(path_text)
+            else path_text == target.name
+        )
+        if opened_target and not swapped:
+            target.rename(displaced)
+            target.symlink_to(outside, target_is_directory=True)
+            swapped = True
+        elif swapped and not restored and path_text == "skills" and dir_fd is not None:
+            target.unlink()
+            displaced.rename(target)
+            restored = True
+        return descriptor
+
+    monkeypatch.setattr(deploy.os, "open", recording_open)
+    try:
+        resolved = deploy.resolve_agent_skills_dir(
+            target,
+            "codex",
+            platform=_InjectedDestinationPlatform(deploy),
+        )
+    finally:
+        if swapped and not restored:
+            target.unlink()
+            displaced.rename(target)
+
+    assert resolved == target / ".agents" / "skills"
+    assert swapped and restored
+    child_paths = {target / ".agents", target / ".agents" / "skills"}
+    assert not any(
+        dir_fd is None and Path(os.fspath(path)) in child_paths
+        for path, dir_fd in records
+    ), "child capabilities must never be opened from complete paths"
+    assert any(os.fspath(path) == ".agents" and dir_fd is not None
+               for path, dir_fd in records)
+    assert any(os.fspath(path) == "skills" and dir_fd is not None
+               for path, dir_fd in records)
+    assert _tree_snapshot(outside) == before_outside
+
+
+class _ChildCapabilityRacePlatform(_InjectedDestinationPlatform):
+    """Swap a newly created child after it is pinned but before its first write."""
+
+    def __init__(self, deploy, race_point: str, child: Path, outside: Path) -> None:
+        super().__init__(deploy)
+        self.race_point = race_point
+        self.child = child
+        self.outside = outside
+        self.attempted = False
+        self.swap_succeeded = False
+        self.swap_blocked = False
+        self.restored = False
+
+    def before_mutation(self, mutation_kind: str, guarded_directory: Path):
+        if self.attempted or mutation_kind != self.race_point:
+            return lambda: None
+        assert Path(guarded_directory) == self.child
+        self.attempted = True
+        displaced = self.child.with_name(f"{self.child.name}.displaced-child")
+        try:
+            self.child.rename(displaced)
+        except OSError:
+            self.swap_blocked = True
+            return lambda: None
+        self.swap_succeeded = True
+        _create_directory_redirect(self.child, self.outside)
+
+        def restore() -> None:
+            _remove_directory_redirect(self.child)
+            displaced.rename(self.child)
+            self.restored = True
+
+        return restore
+
+
+@pytest.mark.parametrize("race_point", ("lock-owner", "stage-copy"))
+def test_new_child_capability_pins_owner_and_payload_writes(
+    tmp_path,
+    race_point,
+):
+    deploy = load_deploy_module()
+    target = tmp_path / "target-project"
+    skills = target / ".agents" / "skills"
+    installed = skills / "autombd-rtd"
+    installed.mkdir(parents=True)
+    (installed / "sentinel.bin").write_bytes(b"old-install")
+    before_install = _tree_snapshot(installed)
+    outside = tmp_path / "outside-child-race"
+    outside.mkdir()
+    before_outside = _tree_snapshot(outside)
+    if race_point == "lock-owner":
+        child = skills / ".autombd-rtd.deploy.lock"
+    else:
+        # transaction_path uses a random suffix; the capability supplies the
+        # actual created staging child path to the hook, so match by role below.
+        child = skills / ".autombd-rtd.deploying.expected-dynamic-suffix"
+
+    class MatchingChildPlatform(_ChildCapabilityRacePlatform):
+        def before_mutation(self, mutation_kind: str, guarded_directory: Path):
+            if mutation_kind == self.race_point and not self.attempted:
+                self.child = Path(guarded_directory)
+            return super().before_mutation(mutation_kind, guarded_directory)
+
+    platform = MatchingChildPlatform(deploy, race_point, child, outside)
+    failure: RuntimeError | None = None
+    result = None
+    try:
+        result = deploy.deploy_one(REPO_ROOT, target, "codex", platform=platform)
+    except RuntimeError as exc:
+        failure = exc
+
+    assert platform.attempted, (
+        f"the pinned child capability did not invoke the {race_point} hook"
+    )
+    if os.name == "nt":
+        assert platform.swap_blocked, (
+            "the pinned Windows child handle allowed a directory rename"
+        )
+    else:
+        assert platform.swap_succeeded
+        assert platform.restored
+    assert _tree_snapshot(outside) == before_outside
+    if failure is None:
+        assert result is not None and result.action == "deployed"
+        assert not (installed / "sentinel.bin").exists()
+        manifest = deploy.read_release_manifest(installed)
+        deploy.verify_release_payload(installed, manifest)
+    else:
+        assert _tree_snapshot(installed) == before_install
+    _assert_no_deploy_residue(target)
+    _assert_no_deploy_residue(outside)

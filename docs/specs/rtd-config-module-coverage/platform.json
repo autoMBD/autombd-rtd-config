@@ -1,0 +1,2568 @@
+{
+  "format_version": 2,
+  "source": {
+    "module": "Platform",
+    "descriptor": "Platform.xdm",
+    "package": "TS_T40D34M70I1R0",
+    "rtd_release": "7.0.1",
+    "sha256": "D3BA70C932DA05DF1A952CCB5D5737DF083CAC942C9FA204E7D075B8C3C8939B"
+  },
+  "fact_pool": {
+    "010F8F48D31ADB400D730EF0C9D4F34973527DAC368A367C8C850B8A09F9996E": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": "(./../../GeneralConfiguration/PlatformMulticoreSupport = 'true') and (node:exists(./PlatformMcmEcucPartitionRef) = false()) ",
+          "true": "When PlatformMultiPartitionSupport = true, PlatformMcmEcucPartitionRef must be configured"
+        },
+        {
+          "expr": "(./../../GeneralConfiguration/PlatformMulticoreSupport = 'false') and (node:exists(./PlatformMcmEcucPartitionRef) = true()) ",
+          "true": "When PlatformMultiPartitionSupport = false, PlatformMcmEcucPartitionRef must be disabled"
+        }
+      ]
+    },
+    "01AD10400310DE3DF31EEE23F9608E67D83CE376B2043FB232F216B6171E3B35": {
+      "kind": "xpath",
+      "expr": "ecu:list('Platform.intMonitorsList')"
+    },
+    "06D448EA757C3F46E2CD5D69084B20C46529E6B52C882D5C9DCC8D17D3BFDB7B": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": "(./../GeneralConfiguration/PlatformMulticoreSupport = 'false') and (count(./*) >= 2) ",
+          "true": "When PlatformMultiPartitionSupport = false, only 1 McmConfig instance can be existed, for default core"
+        },
+        {
+          "expr": "(./../GeneralConfiguration/PlatformMcmConfigurable = 'false') and (count(./*) >= 1) ",
+          "true": "When PlatformMcmConfigurable = false, all McmConfig instance must to be removed"
+        },
+        {
+          "expr": "count(./*) > ecu:get('Platform.systemMcmInstList')",
+          "true": " exceed maximum System Settings allowed"
+        },
+        {
+          "expr": "node:value(../GeneralConfiguration/PlatformMcmConfigurable)='true' and (num:i(count(./*))='0')",
+          "true": "This McmConfig must have one child at least when System Settings Configurable = TRUE"
+        }
+      ]
+    },
+    "06E282EF2558C168E2F748B2163A4B532950FEAC55B5AE76017EB5A24D4A43DA": {
+      "kind": "xpath",
+      "expr": "node:fallback( node:current() /../../GeneralConfiguration/PlatformMpuM7Configurable, num:i(0))"
+    },
+    "09E95112A9B59921A447821D809734394F66B455A72B64B865BC76FD90B5AE66": {
+      "kind": "xpath",
+      "expr": "./../../../GeneralConfiguration/PlatformIntmConfigurable = 'true'"
+    },
+    "0D531B996960F7F4201E25A7442384D521B19B08F433DC1830C71F044C5A2E02": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": "./../../GeneralConfiguration/PlatformMpuM7Configurable = 'true' and (num:i(count(*)) = 0)",
+          "true": "At least one MPU M7 configuration must be configured when Plaform Enable MPU M7 Support is checked!"
+        },
+        {
+          "expr": "./../../GeneralConfiguration/PlatformMpuM7Configurable = 'false' and (num:i(count(*)) > 1)",
+          "true": "Plaform MPU M7 only support when PlatformMpuM7Configurable is enable !"
+        },
+        {
+          "expr": "./../../GeneralConfiguration/PlatformMulticoreSupport = 'false' and (num:i(count(*)) > 1)",
+          "true": "Only one configuration element is allowed when disable MultiPartition support!"
+        }
+      ]
+    },
+    "1382FC797392728E4FE2A1BE75ECED4AB7ED19CBA178DC464BBE153CF4B15CC3": {
+      "kind": "literal",
+      "value": "VariantPreCompile"
+    },
+    "149194095090A0828521BE9F867ADCDD16F356D8E8E46165228F427DA2E4106D": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": "<num:i(ecu:get('Platform.Mpu_M7.MaximumRegionCount'))",
+          "false": "Value must be lower than ecu:get('Platform.Mpu_M7.MaximumRegionCount')"
+        },
+        {
+          "expr": ">=0",
+          "false": "Value must be higher or equal than ecu:get('Platform.Mpu_M7.MinimumRegionCount')"
+        }
+      ]
+    },
+    "16828C1496A3A1031EF6AB8615212FF12218A5D867013121C60EB2626ABCFC08": {
+      "kind": "xpath",
+      "expr": "num:i(ecu:list('Platform.Mpu_M7.RegionStartAddress')[num:i( node:fallback( node:current()/../@index, num:i(0))) + 1])"
+    },
+    "1870C7CC5A2CBB92185E63D9A23AA461D1DC47B5ED078E317FB936CD6E7A256C": {
+      "kind": "xpath",
+      "expr": "ecu:list('Platform.irqsList')"
+    },
+    "1C689DACFFF642525DBBC6AE16A1E9DE56DD771927BD250B62B357E8D2B71A00": {
+      "kind": "xpath",
+      "expr": "(ecu:list('Platform.irqsMonitorList'))[position()-1=node:fallback(node:current()/../@index,'0')]"
+    },
+    "1C6C27BB4A0E8F303300C8B5EDAE04FBA9FDCD75EECE378F73F33C6FE78D4B09": {
+      "kind": "xpath",
+      "expr": "ecu:list('Platform.Mpu_M7.RegionSubregionMask')[num:i(node:fallback( node:current()/../@index, num:i(0))) + 1]"
+    },
+    "1E5BB6F73F4AA6726484D5C2A690884ECD1050EBF9C38900954E76D758A659FF": {
+      "kind": "xpath",
+      "expr": "(ecu:list('Platform.Mpu_M7.RegionOuterCachePolicy'))[num:i( node:fallback( node:current()/../@index, num:i(0))) + 1]"
+    },
+    "1F9D69B9506862AABDEAF04C7E61A0CDC3E3A9C67470FE4FB82A08A1532778BF": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": ">=0"
+        },
+        {
+          "expr": "<num:i(ecu:get('Platform.intmCount'))"
+        }
+      ]
+    },
+    "248A82E28CDE1625D5F148288583ABA1215DF2E67F132F4991A365CAF31F42E2": {
+      "kind": "literal",
+      "value": "Cortex_M7_Core0"
+    },
+    "26F2132E6F61F84655CD737130084FCF8EA7D968FD4E526F7F43FA868C3BAFC2": {
+      "kind": "literal",
+      "value": "undefined_handler"
+    },
+    "2AFEF86CBBDF88CCBF5B5A2000696314AA6B1DDBF535C46AB9DC8869B7D95873": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": "num:i(num:i(node:fallback(node:current()/../EndAddress, num:i(0))) - num:i(node:fallback(node:current()/../StartAddress, num:i(0))) + num:i(1)) = num:i(node:value(.))",
+          "false": "Please recalculate value"
+        },
+        {
+          "expr": "(num:i(node:fallback(node:current()/../StartAddress, num:i(0))) mod num:i(node:value(.))) = 0",
+          "false": "The StartAddress is aligned to the size of the region. For example, a 64KB region must be aligned on a multiple of 64KB, for example, at 0x00010000 or 0x00020000"
+        },
+        {
+          "expr": "(num:i(node:value(.))>= 32 )",
+          "false": "The RegionSize must than 32"
+        },
+        {
+          "expr": "(num:i(node:value(.)) mod 32) = 0",
+          "false": " RegionSize mod 32 == 0"
+        }
+      ]
+    },
+    "2BA67C4C02FD5F6B6EF882F5C28C5BE3883D8CCEF1B54B650CE3EE5CBA6951B0": {
+      "kind": "xpath",
+      "expr": "ecu:list('Platform.systemIrqsList')"
+    },
+    "2E60AA37E1BB9BF7DEB419D251FBB908946E2FF0FF5941EAC12B2C56A93D3052": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": "<i(0xFFFFFFFF)"
+        },
+        {
+          "expr": ">=i(0)"
+        }
+      ]
+    },
+    "2F17746C6156966B7C08B149A7A41B6C9CF0A4DAF8893E4F01312B1E484D5D0B": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": "(. = 'true') and not(num:i(ecu:get('Platform.msiCoresCnt')) > 1)",
+          "true": "The platform MSI configuration is only enabled when the number of cores in the derivative is greater than 1."
+        }
+      ]
+    },
+    "36EA0E3273483523D21D3C4F8AAF46C20C639C3269FCE2081773EA245D7F6A4B": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": "ecu:get('Platform.intmCount')"
+        }
+      ]
+    },
+    "3C8C68E5B8BE48B9F5D18C42168F037C3D3217E5189DDAE6A19ACFF3E34E43AB": {
+      "kind": "xpath",
+      "expr": "num:i(num:i(node:fallback(node:current()/../EndAddress, num:i(0))) - num:i(node:fallback(node:current()/../StartAddress, num:i(0))) + num:i(1))"
+    },
+    "3DE4C9D54549E2BFA5D0E6148B81C411BCAFB3DC9F60C79519DC63D1EA4DF0CC": [
+      {
+        "source_tag": "da",
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": "bit:and(num:i(.), num:hextoint(ecu:get('Platform.VtorAddressMask'))) = 0",
+            "false": "The VTOR address should be aligned by rounding up to the next power of two"
+          }
+        ]
+      },
+      {
+        "source_tag": "da",
+        "kind": "xpath",
+        "tests": [
+          {
+            "expr": ">=0"
+          },
+          {
+            "expr": "<=4294967295"
+          }
+        ]
+      }
+    ],
+    "40EEB44BE3DC18EC1CB58865D7B89AC993FADDD1A4FCF37DD0485A54BE3F7D55": {
+      "kind": "literal",
+      "value": ""
+    },
+    "4277956FBBFF120A35E15346E43B062AD9615FBF3944F8E0CB6EDF341FA3A458": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": ">=255"
+        },
+        {
+          "expr": "<=255"
+        }
+      ]
+    },
+    "43407099A21A756F993FE61B28AC2C68141E88A19DCFC14D85379A163B3EF27B": {
+      "kind": "literal",
+      "value": "1"
+    },
+    "456153ABD25FBF6B71B13344F9DC4C31D9D1B02CA30B1B5DA4CECB7AE00B872C": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": ">=1"
+        },
+        {
+          "expr": "<=1"
+        }
+      ]
+    },
+    "48A3A71A2F24BECC708DC90F9A9A59AAF768FD2F1D7493039A2053CE77C66037": {
+      "kind": "literal",
+      "value": "7"
+    },
+    "4B276A3824A673055C439CD4C544142E1ADDC40324430550C89FFF45DF16D0C2": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": "(text:uniq(../../*/MonitoredIrq, .)) or (./../../../../GeneralConfiguration/PlatformMulticoreSupport = 'true')",
+          "false": "Same interrupt source should not configured twice in the case single core"
+        }
+      ]
+    },
+    "53E30AC20DEF236DC54F0F0301FA3050D4FAD7E07F9B9EC2BD3BB8CD0331FB0E": {
+      "kind": "literal",
+      "value": "true"
+    },
+    "5711C942F04FB4BD2435CF46C4EDBBACFA9967F94265C74F3378BBDB64C1606B": {
+      "kind": "literal",
+      "value": "43"
+    },
+    "57A2AF2021D5413ED6D158F8438B17E01C034C737106C2A714418D46F264BA15": {
+      "kind": "xpath",
+      "expr": "ecu:get('Platform.Mpu_M7.MaximumRegionCount')"
+    },
+    "57FEFDB3C23C6FB56D7FF5B08698CB5A6F45C1400B39FC2DDDFBCBCDA3A564C8": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": ">=0"
+        },
+        {
+          "expr": "<=0"
+        }
+      ]
+    },
+    "5A2EA0512C44FD6791727D5C72A11A268600F1704147FD11ADC64F8817B4388F": {
+      "kind": "xpath",
+      "expr": "(ecu:list('Platform.Mpu_M7.RegionInnerCachePolicy'))[num:i( node:fallback( node:current()/../@index, num:i(0))) + 1]"
+    },
+    "5B6305915339F912258686679E57C4A37515B63786D79285C475D01A7F878A0B": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": "(./../../../GeneralConfiguration/PlatformMulticoreSupport = 'true') and (node:exists(./Mpu_M7_EcucPartitionRef) = false()) ",
+          "true": "When PlatformMultiPartitionSupport = true, MPU M7 Partition must be configured"
+        }
+      ]
+    },
+    "5C64FE60C627266E0A9DC086782DF135BCD6026C2EF3C9E412945E364B66F0B5": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": "(./../../../GeneralConfiguration/PlatformMulticoreSupport = 'true') and (node:exists(./PlatformIntmChannelEcucPartitionRef) = false()) ",
+          "true": "When PlatformMultiPartitionSupport = true, PlatformIntmChannelEcucPartitionRef must be configured"
+        },
+        {
+          "expr": "(./../../../GeneralConfiguration/PlatformMulticoreSupport = 'false') and (node:exists(./PlatformIntmChannelEcucPartitionRef) = true()) ",
+          "true": "When PlatformMultiPartitionSupport = false, PlatformIntmChannelEcucPartitionRef must be disabled"
+        }
+      ]
+    },
+    "5EC346F423AA2A472541C1522F45DC7ECA1DD02F9DEC938974CF325ABF603595": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": ">=7"
+        },
+        {
+          "expr": "<=7"
+        }
+      ]
+    },
+    "607BF8CDDE936475DB9A378EE5ACBDCF5612B947B92FA5A6736C559124A22A8F": {
+      "kind": "literal",
+      "value": "Round_robin"
+    },
+    "60F91283C27A8CF5ECDF87032E649843AE730219CBB87173DE3CDF77E661EC2B": {
+      "kind": "xpath",
+      "expr": "num:i(node:fallback(node:current()/../RegionSize, num:i(0))) >= num:i(ecu:get('Platform.Mpu_M7.MinRegionSizeWithSubregion'))"
+    },
+    "667E0A1421D5B248D2751A6ECEB8AD99DDFC520FA8C0AF471004BE7628928EB7": {
+      "kind": "xpath",
+      "expr": "(ecu:list('Platform.Mpu_M7.RegionMemoryType'))[num:i( node:fallback( node:current()/../@index, num:i(0))) + 1]"
+    },
+    "671206746BF6F5914E42F6ED0E2075BA240622B5AA262BB15F384B1CF802A2B3": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": "                                                 ./../GeneralConfiguration/PlatformEnableIntCtrlConfiguration  = 'false'                                                 and                                                 ./../GeneralConfiguration/PlatformMcmConfigurable  = 'false'                                                 and                                                 ./../GeneralConfiguration/PlatformMpuM7Configurable  = 'false'                                                 ",
+          "true": "At least one feature configuration must be enabled when adding the Platform configuration.!"
+        }
+      ]
+    },
+    "69C9B589D1861A34E017C45990BF24BF70DA7A22A4FF512AAA29F3E46D8A5FE9": {
+      "kind": "xpath",
+      "expr": "ecu:get('Platform.Mpu_M7.MinimumRegionCount')"
+    },
+    "6F6D9A0D365F972895B6D2667FB81AD99AB2BD4DC8C091FFA3E3C57888AAF54B": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": "text:match(normalize-space(.),'^[_a-zA-Z]+[_0-9a-zA-Z]*$') and (node:value(.)!='NULL')",
+          "false": "Invalid name of the IsrHandler. Must be valid C function name or NULL_PTR."
+        }
+      ]
+    },
+    "7321CFDE8BB5CEC002A94F05E9795F0AD88CC79BE836D8C45342805F51B3A165": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": "text:uniq(../*, .)",
+          "false": "Duplicate Partition."
+        },
+        {
+          "expr": "(num:i(count(./../../../McmConfig/*[./PlatformMcmEcucPartitionRef = node:current()])) = 0) and                                                         (num:i(count(./../../../IntCtrlConfig/*[./PlatformNvicEcucPartitionRef = node:current()])) = 0) and                                                         ((./../../../IntmConfig/IntmGenericSettings/PlatformIntmGenericEcucPartitionRef = node:current()) = 0) and                                                         (num:i(count(./../../../IntmConfig/IntmChannel/*[./PlatformIntmChannelEcucPartitionRef = node:current()])) = 0) and                                                         (num:i(count(./../../../MPU_M7_Configuration/MPU_M7_ModuleConfig/*[./Mpu_M7_EcucPartitionRef = node:current()])) = 0) and                                                         (num:i(count(./../../../Mpu_M33_Configuration/Mpu_M33_ModuleConfig/*[./Mpu_M33_EcucPartitionRef = node:current()])) = 0) and                                                         (num:i(count(./../../../MPU_R52_Configuration/*[./MPU_R52_EcucPartitionRef = node:current()])) = 0) and                                                         (num:i(count(./../../../PlatformMruConfiguration/PlatformMruTransmittingChannel/*[./PlatformMruChannelEcucPartitionRef = node:current()])) = 0) and                                                         (num:i(count(./../../../PlatformMruConfiguration/PlatformMruReceivingChannel/*[./PlatformMruChannelEcucPartitionRef = node:current()])) = 0) and                                                         (num:i(count(./../../../PlatformMruConfiguration/PlatformMruResetInstance/*[./PlatformMruChannelEcucPartitionRef = node:current()])) = 0) and                                                         (num:i(count(./../../../Mpu_Configuration/MpuRegionConfig/*[./PlatformMpuEcucPartitionRef = node:current()])) = 0)",
+          "true": "This PlatformEcucPartitionRef is not used anywhere in Platform"
+        }
+      ]
+    },
+    "73A614E7DB5C1B35285E461EACCE3CA8E8AD796825CB5A476E2A94C5559B5B43": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": "not(text:uniq(../../*/IsrName,.))",
+          "true": "This field must be unique."
+        }
+      ]
+    },
+    "780A0B699AE5A31CA14A2BDF5085D32B6B22611523F4789008284F3DA51CE105": {
+      "kind": "xpath",
+      "expr": "ecu:get('Platform.irqCount')"
+    },
+    "793DC38E4AA4AA0AFFABF64C74974CCC5FB1DD1E02B24AC473D2D80968D3FF9A": {
+      "kind": "literal",
+      "value": "4"
+    },
+    "7AB477AE63DBE5A487F6C5771E062950C52641947FE4026E329781BA40D26ACF": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": "(./../../GeneralConfiguration/PlatformMulticoreSupport = 'true') and (node:exists(./PlatformNvicEcucPartitionRef) = false()) ",
+          "true": "When PlatformMultiPartitionSupport = true, PlatformNvicEcucPartitionRef must be configured"
+        },
+        {
+          "expr": "(./../../GeneralConfiguration/PlatformMulticoreSupport = 'false') and (node:exists(./PlatformNvicEcucPartitionRef) = true()) ",
+          "true": "When PlatformMultiPartitionSupport = false, PlatformNvicEcucPartitionRef must be disabled"
+        }
+      ]
+    },
+    "7B681DD63545D1B2C93E513E7538EBC6B802138ED8A218F6B7FAEE5918777058": {
+      "kind": "xpath",
+      "expr": "ecu:list('Platform.Mpu_M7.CachePolicyType')"
+    },
+    "7B811DC76E02C12D52E40F3732FF9BC5449BDB965D271E166240481F6FD2B224": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": "count(text:grep(./../../../GeneralConfiguration/PlatformEcucPartitionRef/*,.)) > 0",
+          "false": "The ECUC partition must be defined on the PlatformEcucPartitionRef."
+        },
+        {
+          "expr": "(./../../../GeneralConfiguration/PlatformMulticoreSupport = 'true') and (count(./../../*[./PlatformNvicEcucPartitionRef = node:current()]) >=2 )  ",
+          "true": "PlatformNvicEcucPartitionRef refer to same value in others"
+        }
+      ]
+    },
+    "7E35CC2D94DBE47BF1B5A5DB612CD3043DB9F9BAC49BF87B406D366B5E06B5C5": {
+      "kind": "xpath",
+      "expr": "ecu:list('Platform.Mpu_M7.MemoryType')"
+    },
+    "7E5678BDD2E51A7D1D823395E66F2A70E49C6CA13D5AE027E43DFB1476326E46": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": "(. = 'true') and not(num:i(ecu:get('Platform.fpu')) > 0)",
+          "true": "Platform mcm configurable only enabled when fpu is supported. S32K116 and S32K118 do not support the fpu."
+        }
+      ]
+    },
+    "80295687483CD907E8464C4A918561FA82A02847B1EFF40012AB2EBA7FAFF082": {
+      "kind": "xpath",
+      "expr": "num:i(ecu:list('Platform.Mpu_M7.RegionEndAddress')[num:i( node:fallback( node:current()/../@index, num:i(0))) + 1])"
+    },
+    "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F": {
+      "kind": "literal",
+      "value": "false"
+    },
+    "84073046E64C62E238FD3A7A91291C9AD233B88E5CEC2F93F79DE5B8E67A514C": {
+      "kind": "literal",
+      "value": "255"
+    },
+    "90D69857C35ACF17C9457AE5C52AB516C7B5E9846AA0A53A36ABBED21D9EC797": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": "(./../GeneralConfiguration/PlatformMulticoreSupport = 'false') and (count(./*) > 1)",
+          "true": "This list must have only 1 child when PlatformMultiPartitionSupport = FALSE"
+        }
+      ]
+    },
+    "96B5A8E8C68C53B16C0AB0033557797E36A220CA9EE0CBEE4960256554F8200A": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": "(. = 'true') and not(num:i(count(../../GeneralConfiguration/PlatformEcucPartitionRef/*) > 0))",
+          "true": "Platform MultiPartition Support is only enabled when at least one EcucPartition needs to be defined (in all variants)."
+        }
+      ]
+    },
+    "9B9AABC118BF034E401B3A6B2BF5723D07141CF5B5CB779BD6341DF19DF2C81A": {
+      "kind": "xpath",
+      "expr": "node:fallback(node:current()/../@index, num:i(1))"
+    },
+    "A306CAA45EECB11AD2D4390217330C328F013FC303A95BF6ACEEC91198A51FA0": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": "../../GeneralConfiguration/PlatformMulticoreSupport"
+        }
+      ]
+    },
+    "A356592302973F710D712B9B6FAB7C910657D10482F07C21AD412532AD46C4B1": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": "<=ecu:get('Platform.intmMaxLatency')"
+        },
+        {
+          "expr": ">=0"
+        }
+      ]
+    },
+    "A6054F5A73FE452DFF6CC0E89E2CA930716E97A19985224A02A3BCB984CE7AE6": {
+      "kind": "literal",
+      "values": [
+        "VariantPreCompile",
+        "VariantPostBuild"
+      ]
+    },
+    "A7286DC53D89AF6962512EF91B562D7E3A5DFCCD27D3733254530FB5D59F83A3": {
+      "kind": "xpath",
+      "expr": "./../../GeneralConfiguration/PlatformIntmConfigurable = 'true'"
+    },
+    "A8AA861DD0D806C9A911F21E75E8F5DA623C892F93A6DECBCE66994C7046957D": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": "text:uniq(../../*/SystemIsrName, .)",
+          "false": "Duplicate system interrupt configuration"
+        }
+      ]
+    },
+    "AA0F3130419F1A180756BE342ACBAEF1E5428D8F0E13AC89F89AA9B8853ED819": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": "count(text:grep(./../../../GeneralConfiguration/PlatformEcucPartitionRef/*,.)) > 0",
+          "false": "The ECUC partition must be defined on the PlatformEcucPartitionRef."
+        },
+        {
+          "expr": "(./../../../GeneralConfiguration/PlatformMulticoreSupport = 'true') and (count(./../../*[./PlatformMcmEcucPartitionRef = node:current()]) >=2 )  ",
+          "true": "PlatformMcmEcucPartitionRef refer to same value in others"
+        }
+      ]
+    },
+    "AA86B1D932D349C535CBE138E6DC9960F0C654F4F00F9E9F71A0417ABB7A11A3": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": "<i(256)"
+        },
+        {
+          "expr": ">=i(0)"
+        }
+      ]
+    },
+    "AB64FA37AB3A32DD65E6A201D455BD1CF375936BDA30C0768B7665E5FBBF95C7": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": "count(text:grep(../../../../GeneralConfiguration/PlatformEcucPartitionRef/*,.)) > 0",
+          "false": "The ECUC partition must be defined on the PlatformEcucPartitionRef."
+        },
+        {
+          "expr": "(../../../../GeneralConfiguration/PlatformMulticoreSupport = 'true') and (count(./../../*[./Mpu_M7_EcucPartitionRef = node:current()]) >=2 )  ",
+          "true": "Mpu_M7_EcucPartitionRef refer to same value in others"
+        }
+      ]
+    },
+    "AC5CC529B8A594968C804B774F99FB9F5B8ADF9D7A06E6DD612238C87ED26505": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": "<= ecu:get('Platform.irqMaxPrio')"
+        },
+        {
+          "expr": ">=0"
+        }
+      ]
+    },
+    "B6977C8C9DD84F8DB3CF789B8372267656AD195730F40E9BF93EF9AE547565A7": {
+      "kind": "literal",
+      "values": [
+        "Round_robin",
+        "AHB_Slave_priority"
+      ]
+    },
+    "B9028926796F65B8D6A44EDD1BE37BC4146933B7B4E94D5A1EE54363BA2CDC4A": {
+      "kind": "xpath",
+      "expr": "(ecu:list('Platform.irqsList'))[position()-1=node:fallback(node:current()/../@index,'0')]"
+    },
+    "BA4EC6011C48C840D804AE2F75FE5A8AABBB58F87D8DEE708B6555574185515C": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": "bit:and(num:i(.), num:hextoint(ecu:get('Platform.VtorAddressMask'))) = 0",
+          "false": "The VTOR address should be aligned by rounding up to the next power of two"
+        }
+      ]
+    },
+    "BFE287A4185982225D580B4743F0240EC4E6BAA3D048DE0A0BDDD955C869E337": {
+      "kind": "xpath",
+      "expr": "num:i(0)"
+    },
+    "C190E7AB294E4574C1750468ED507E8330E4BAF8BC6F97CE9C09D7A8C1BA40BE": {
+      "kind": "xpath",
+      "expr": "(ecu:list('Platform.Mpu_M7.Core.List'))"
+    },
+    "C2E9E6436ACBD7AB114E0B3F3D3FF6DD6691A95267CC7750D4F17A8028D98ABE": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": "<=i(0xFFFFFFFF)"
+        },
+        {
+          "expr": ">=num:i(num:i(ecu:get('Platform.Mpu_M7.MinRegionSize'))-1)"
+        }
+      ]
+    },
+    "C2EF64531BE946E77DB8223ADDC9D2FC0D592BED88578FD1D6924F3BE73A9A87": {
+      "kind": "literal",
+      "value": "0"
+    },
+    "C608F1128B24504244511C19725EF01C6030EDDC238B68C2B831EC67534516E3": {
+      "kind": "xpath",
+      "expr": "(ecu:list('Platform.intMonitorsList'))[position()-1=node:fallback(node:current()/../@index,'0')]"
+    },
+    "C6C4D4A339A4EFB680143DE784AE9668136118B26378F3E41AF645E2075CBE72": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": "text:uniq(../../*/InterruptMonitor, .)",
+          "false": "Same interrupt monitor configured twice"
+        }
+      ]
+    },
+    "C9C871A3A1117B270396A1B1426926E90C00449FE405723DC1C4460D5186FD40": {
+      "kind": "xpath",
+      "expr": "ecu:list('Platform.Mpu_M7.AccessRightsType')"
+    },
+    "CA11DEDFC681DCD82411902D7993093C4381D3F61F1875BC10DCCB5BE5134BCB": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": ">=4"
+        },
+        {
+          "expr": "<=4"
+        }
+      ]
+    },
+    "CE9E21310BE1D7A0F40414F6837AC353EC495CB8D4653B76CF48049A220925B7": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": "(./../../GeneralConfiguration/PlatformMulticoreSupport = 'true') and (node:exists(./PlatformIntmGenericEcucPartitionRef) = false()) ",
+          "true": "When PlatformMultiPartitionSupport = true, PlatformIntmGenericEcucPartitionRef must be configured"
+        },
+        {
+          "expr": "(./../../GeneralConfiguration/PlatformMulticoreSupport = 'false') and (node:exists(./PlatformIntmGenericEcucPartitionRef) = true()) ",
+          "true": "When PlatformMultiPartitionSupport = false, PlatformIntmGenericEcucPartitionRef must be disabled"
+        }
+      ]
+    },
+    "D2CA9405E36D6B21907E548EA9765D41BFEE7263FDC5BE9446774BBE4D3C3EE4": {
+      "kind": "xpath",
+      "expr": "num:i(ecu:get('Platform.fpu')) > 0"
+    },
+    "D46E9D856121CA561A667A60E9495F4477741F4F4071736CA8B7FF6E8D5342B8": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": "((../ARM_Core = 'ARM_A64_ARCH') and (. = 'true'))",
+          "true": "This feature only supports on M7 core."
+        }
+      ]
+    },
+    "D90A30A0B5F3811B26EA3845350EC56D7B0358801B45352B328AC73FBD387197": {
+      "kind": "xpath",
+      "expr": "ecu:list('Platform.Mpu_M7.RegionShareable')[num:i( node:fallback( node:current()/../@index, num:i(0))) + 1]"
+    },
+    "D9E49251055BB744B29FF8F461AEB3F1FD10A5BE006C21E7B84CAE8952386EF1": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": ">=43"
+        },
+        {
+          "expr": "<=43"
+        }
+      ]
+    },
+    "DC1BBE470FD45BA69AD8784F49C6B5E3439B19B7A139A61086B49F07CC3F07F4": {
+      "kind": "xpath",
+      "expr": "(ecu:list('Platform.systemIrqsList'))[position()-1=node:fallback(node:current()/../@index,'0')]"
+    },
+    "DCE45B47F7E5F2655BC80E99E7AF954705BF507FC551F40D7CFB89819D6BDD33": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": ">=0"
+        },
+        {
+          "expr": "<=4294967295"
+        }
+      ]
+    },
+    "DE0BB04E185C19BC750F4130C9B83EF5F4B9F1A16C50DDB368C4AD25A6181568": {
+      "kind": "xpath",
+      "expr": "ecu:get('Platform.systemIrqsCount')"
+    },
+    "E1B72BEC26BE296462245F0144B28EF0101298BC95A51604D11468C37860A66C": {
+      "kind": "xpath",
+      "expr": "(ecu:list('Platform.Mpu_M7.RegionAccessRights'))[num:i( node:fallback( node:current()/../@index, num:i(0))) + 1]"
+    },
+    "E39C354E280600FD4619E05270B7A25CEB8B09A9DDBFA78F8F92E8F8BE341861": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": "count(text:grep(./../../../GeneralConfiguration/PlatformEcucPartitionRef/*,.)) > 0",
+          "false": "The ECUC partition must be defined on the PlatformEcucPartitionRef."
+        }
+      ]
+    },
+    "E89249EB27E661619A026228B47DAF7CB3A6D13BC04A4AAA66243A57EC3E2D3C": {
+      "kind": "xpath",
+      "expr": "./../../../GeneralConfiguration/PlatformEnableVtorConfiguration = 'true'"
+    },
+    "E9C4AF082A0B6ABDFECAC0C6C071D5E957B953BC82F729B483919F81B4316649": {
+      "kind": "xpath",
+      "expr": "ecu:list('Platform.irqsMonitorList')"
+    },
+    "EAE331CCABBFB9AB71BFD96232E8F4D960F450AFD11CE3926EA81073917CF19B": {
+      "kind": "xpath",
+      "expr": "./../GeneralConfiguration/PlatformMcmConfigurable = 'true'"
+    },
+    "EB713CE1ED2BEEE082EB095B6EC7084CDCA728EA6C1C81992C162208BED2BCF2": {
+      "kind": "xpath",
+      "expr": "node:fallback( node:current() /../GeneralConfiguration/PlatformEnableIntCtrlConfiguration, num:i(0))"
+    },
+    "ECF08A2A070221F86E07B74E83ECCBE3DF3308F4A49E1FD780D00BCC1060D9C2": {
+      "kind": "xpath",
+      "expr": "num:i(ecu:get('Platform.VtorAddress'))"
+    },
+    "ECFB04CFCCC2F802C6714ED54DDBDA45C1CC6C37BF92510FF01A39BDE1CE42EC": {
+      "kind": "xpath",
+      "expr": "num:i( node:fallback( node:current()/../@index, num:i(0)))"
+    },
+    "F3BF02EB9742EF911E63072C8D997BC50D04684867DA80A8DF6864D956DACB72": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": "count(text:grep(./../../../../GeneralConfiguration/PlatformEcucPartitionRef/*,.)) > 0",
+          "false": "The ECUC partition must be defined on the PlatformEcucPartitionRef."
+        }
+      ]
+    },
+    "F41B4C2A153D870E7007A0CD20B7F8624733E42E379C5817E8AAC7D8C218308A": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": "(./../../GeneralConfiguration/PlatformIntmConfigurable = 'true') and (count(./*) = 0) ",
+          "true": "When PlatformIntmConfigurable = true, at least one IntmChannel must be configured"
+        }
+      ]
+    },
+    "F5B1D6C6A1B832E25C1DBE7BE02B38DCEB154CB5102145589DCC31423FFD8D06": {
+      "kind": "literal",
+      "value": "9"
+    },
+    "FEE656E02D7FDD9C1C3224BF4634F134B76AA3478EAABA5D99E8B21CCBC9F6F0": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": "(node:fallback(.,1) >= 0) and (node:fallback(.,1) < num:i(count(node:fallback(node:current()/../../*, num:i(50)))) )",
+          "false": "Value out of range: must be in range 0 to N-1 (N is number of configured channels). Use the Calc button to calculate correct default value."
+        },
+        {
+          "expr": "text:uniq(node:fallback(../../*/PlatformIntmChannelId, text:split('1 2 3')), node:fallback(.,1))",
+          "false": "Duplicated value, PlatformIntmChannelId must be unique across all channels. Use the Calc button to calculate correct default value."
+        }
+      ]
+    },
+    "FF167184B38369D71CB01E34B30A42503147A332B3802D6E917EABE13CE09C50": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": ">=9"
+        },
+        {
+          "expr": "<=9"
+        }
+      ]
+    }
+  },
+  "items": [
+    {
+      "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]",
+      "kind": "container",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]",
+      "name": "CommonPublishedInformation",
+      "type": "IDENTIFIABLE"
+    },
+    {
+      "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]",
+      "kind": "container",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]",
+      "name": "GeneralConfiguration",
+      "type": "IDENTIFIABLE",
+      "facts": {
+        "invalid": "671206746BF6F5914E42F6ED0E2075BA240622B5AA262BB15F384B1CF802A2B3"
+      },
+      "fact_sources": {
+        "invalid": [
+          {
+            "source_tag": "da",
+            "fact": "671206746BF6F5914E42F6ED0E2075BA240622B5AA262BB15F384B1CF802A2B3"
+          }
+        ]
+      }
+    },
+    {
+      "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[IntmConfig]",
+      "kind": "container",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[IntmConfig]",
+      "name": "IntmConfig",
+      "type": "IDENTIFIABLE"
+    },
+    {
+      "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[IntmConfig]/ctr[IntmGenericSettings]",
+      "kind": "container",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[IntmConfig]/ctr[IntmGenericSettings]",
+      "name": "IntmGenericSettings",
+      "type": "IDENTIFIABLE",
+      "facts": {
+        "invalid": "CE9E21310BE1D7A0F40414F6837AC353EC495CB8D4653B76CF48049A220925B7"
+      },
+      "fact_sources": {
+        "invalid": [
+          {
+            "source_tag": "da",
+            "fact": "CE9E21310BE1D7A0F40414F6837AC353EC495CB8D4653B76CF48049A220925B7"
+          }
+        ]
+      }
+    },
+    {
+      "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[IntmConfig]/lst[IntmChannel]/ctr[IntmChannel]",
+      "kind": "container",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[IntmConfig]/lst[IntmChannel]/ctr[IntmChannel]",
+      "name": "IntmChannel",
+      "type": "IDENTIFIABLE",
+      "facts": {
+        "invalid": "5C64FE60C627266E0A9DC086782DF135BCD6026C2EF3C9E412945E364B66F0B5"
+      },
+      "fact_sources": {
+        "invalid": [
+          {
+            "source_tag": "da",
+            "fact": "5C64FE60C627266E0A9DC086782DF135BCD6026C2EF3C9E412945E364B66F0B5"
+          }
+        ]
+      }
+    },
+    {
+      "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]",
+      "kind": "container",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]",
+      "name": "MPU_M7_Configuration",
+      "type": "IDENTIFIABLE"
+    },
+    {
+      "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]",
+      "kind": "container",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]",
+      "name": "MPU_M7_ModuleConfig",
+      "type": "IDENTIFIABLE",
+      "facts": {
+        "invalid": "5B6305915339F912258686679E57C4A37515B63786D79285C475D01A7F878A0B"
+      },
+      "fact_sources": {
+        "invalid": [
+          {
+            "source_tag": "da",
+            "fact": "5B6305915339F912258686679E57C4A37515B63786D79285C475D01A7F878A0B"
+          }
+        ]
+      }
+    },
+    {
+      "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/lst[RegionConfig]/ctr[RegionConfig]",
+      "kind": "container",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/lst[RegionConfig]/ctr[RegionConfig]",
+      "name": "RegionConfig",
+      "type": "IDENTIFIABLE"
+    },
+    {
+      "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[IntCtrlConfig]/ctr[IntCtrlConfig]",
+      "kind": "container",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[IntCtrlConfig]/ctr[IntCtrlConfig]",
+      "name": "IntCtrlConfig",
+      "type": "IDENTIFIABLE",
+      "facts": {
+        "invalid": "7AB477AE63DBE5A487F6C5771E062950C52641947FE4026E329781BA40D26ACF"
+      },
+      "fact_sources": {
+        "invalid": [
+          {
+            "source_tag": "da",
+            "fact": "7AB477AE63DBE5A487F6C5771E062950C52641947FE4026E329781BA40D26ACF"
+          }
+        ]
+      }
+    },
+    {
+      "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[IntCtrlConfig]/ctr[IntCtrlConfig]/lst[PlatformIsrConfig]/ctr[PlatformIsrConfig]",
+      "kind": "container",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[IntCtrlConfig]/ctr[IntCtrlConfig]/lst[PlatformIsrConfig]/ctr[PlatformIsrConfig]",
+      "name": "PlatformIsrConfig",
+      "type": "IDENTIFIABLE"
+    },
+    {
+      "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[McmConfig]/ctr[McmConfig]",
+      "kind": "container",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[McmConfig]/ctr[McmConfig]",
+      "name": "McmConfig",
+      "type": "IDENTIFIABLE",
+      "facts": {
+        "invalid": "010F8F48D31ADB400D730EF0C9D4F34973527DAC368A367C8C850B8A09F9996E"
+      },
+      "fact_sources": {
+        "invalid": [
+          {
+            "source_tag": "da",
+            "fact": "010F8F48D31ADB400D730EF0C9D4F34973527DAC368A367C8C850B8A09F9996E"
+          }
+        ]
+      }
+    },
+    {
+      "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[McmConfig]/ctr[McmConfig]/lst[SystemIsrConfig]/ctr[SystemIsrConfig]",
+      "kind": "container",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[McmConfig]/ctr[McmConfig]/lst[SystemIsrConfig]/ctr[SystemIsrConfig]",
+      "name": "SystemIsrConfig",
+      "type": "IDENTIFIABLE"
+    },
+    {
+      "key": "list:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/lst[PlatformEcucPartitionRef]",
+      "kind": "list",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/lst[PlatformEcucPartitionRef]",
+      "name": "PlatformEcucPartitionRef",
+      "facts": {
+        "editable": "A306CAA45EECB11AD2D4390217330C328F013FC303A95BF6ACEEC91198A51FA0"
+      },
+      "fact_sources": {
+        "editable": [
+          {
+            "source_tag": "da",
+            "fact": "A306CAA45EECB11AD2D4390217330C328F013FC303A95BF6ACEEC91198A51FA0"
+          }
+        ]
+      }
+    },
+    {
+      "key": "list:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[IntmConfig]/lst[IntmChannel]",
+      "kind": "list",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[IntmConfig]/lst[IntmChannel]",
+      "name": "IntmChannel",
+      "type": "MAP",
+      "facts": {
+        "editable": "A7286DC53D89AF6962512EF91B562D7E3A5DFCCD27D3733254530FB5D59F83A3",
+        "invalid": "F41B4C2A153D870E7007A0CD20B7F8624733E42E379C5817E8AAC7D8C218308A",
+        "max": "36EA0E3273483523D21D3C4F8AAF46C20C639C3269FCE2081773EA245D7F6A4B"
+      },
+      "fact_sources": {
+        "invalid": [
+          {
+            "source_tag": "da",
+            "fact": "F41B4C2A153D870E7007A0CD20B7F8624733E42E379C5817E8AAC7D8C218308A"
+          }
+        ],
+        "editable": [
+          {
+            "source_tag": "da",
+            "fact": "A7286DC53D89AF6962512EF91B562D7E3A5DFCCD27D3733254530FB5D59F83A3"
+          }
+        ],
+        "max": [
+          {
+            "source_tag": "da",
+            "fact": "36EA0E3273483523D21D3C4F8AAF46C20C639C3269FCE2081773EA245D7F6A4B"
+          }
+        ]
+      }
+    },
+    {
+      "key": "list:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]",
+      "kind": "list",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]",
+      "name": "MPU_M7_ModuleConfig",
+      "type": "MAP",
+      "facts": {
+        "editable": "06E282EF2558C168E2F748B2163A4B532950FEAC55B5AE76017EB5A24D4A43DA",
+        "invalid": "0D531B996960F7F4201E25A7442384D521B19B08F433DC1830C71F044C5A2E02",
+        "min": "C2EF64531BE946E77DB8223ADDC9D2FC0D592BED88578FD1D6924F3BE73A9A87"
+      },
+      "fact_sources": {
+        "invalid": [
+          {
+            "source_tag": "da",
+            "fact": "0D531B996960F7F4201E25A7442384D521B19B08F433DC1830C71F044C5A2E02"
+          }
+        ],
+        "editable": [
+          {
+            "source_tag": "da",
+            "fact": "06E282EF2558C168E2F748B2163A4B532950FEAC55B5AE76017EB5A24D4A43DA"
+          }
+        ],
+        "min": [
+          {
+            "source_tag": "da",
+            "fact": "C2EF64531BE946E77DB8223ADDC9D2FC0D592BED88578FD1D6924F3BE73A9A87"
+          }
+        ]
+      }
+    },
+    {
+      "key": "list:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/lst[RegionConfig]",
+      "kind": "list",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/lst[RegionConfig]",
+      "name": "RegionConfig",
+      "type": "MAP",
+      "facts": {
+        "max": "57A2AF2021D5413ED6D158F8438B17E01C034C737106C2A714418D46F264BA15",
+        "min": "69C9B589D1861A34E017C45990BF24BF70DA7A22A4FF512AAA29F3E46D8A5FE9"
+      },
+      "fact_sources": {
+        "min": [
+          {
+            "source_tag": "da",
+            "fact": "69C9B589D1861A34E017C45990BF24BF70DA7A22A4FF512AAA29F3E46D8A5FE9"
+          }
+        ],
+        "max": [
+          {
+            "source_tag": "da",
+            "fact": "57A2AF2021D5413ED6D158F8438B17E01C034C737106C2A714418D46F264BA15"
+          }
+        ]
+      }
+    },
+    {
+      "key": "list:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[IntCtrlConfig]",
+      "kind": "list",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[IntCtrlConfig]",
+      "name": "IntCtrlConfig",
+      "type": "MAP",
+      "facts": {
+        "editable": "EB713CE1ED2BEEE082EB095B6EC7084CDCA728EA6C1C81992C162208BED2BCF2",
+        "invalid": "90D69857C35ACF17C9457AE5C52AB516C7B5E9846AA0A53A36ABBED21D9EC797",
+        "min": "C2EF64531BE946E77DB8223ADDC9D2FC0D592BED88578FD1D6924F3BE73A9A87"
+      },
+      "fact_sources": {
+        "invalid": [
+          {
+            "source_tag": "da",
+            "fact": "90D69857C35ACF17C9457AE5C52AB516C7B5E9846AA0A53A36ABBED21D9EC797"
+          }
+        ],
+        "editable": [
+          {
+            "source_tag": "da",
+            "fact": "EB713CE1ED2BEEE082EB095B6EC7084CDCA728EA6C1C81992C162208BED2BCF2"
+          }
+        ],
+        "min": [
+          {
+            "source_tag": "a",
+            "fact": "C2EF64531BE946E77DB8223ADDC9D2FC0D592BED88578FD1D6924F3BE73A9A87"
+          }
+        ]
+      }
+    },
+    {
+      "key": "list:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[IntCtrlConfig]/ctr[IntCtrlConfig]/lst[PlatformIsrConfig]",
+      "kind": "list",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[IntCtrlConfig]/ctr[IntCtrlConfig]/lst[PlatformIsrConfig]",
+      "name": "PlatformIsrConfig",
+      "type": "MAP",
+      "facts": {
+        "max": "780A0B699AE5A31CA14A2BDF5085D32B6B22611523F4789008284F3DA51CE105",
+        "min": "BFE287A4185982225D580B4743F0240EC4E6BAA3D048DE0A0BDDD955C869E337"
+      },
+      "fact_sources": {
+        "min": [
+          {
+            "source_tag": "da",
+            "fact": "BFE287A4185982225D580B4743F0240EC4E6BAA3D048DE0A0BDDD955C869E337"
+          }
+        ],
+        "max": [
+          {
+            "source_tag": "da",
+            "fact": "780A0B699AE5A31CA14A2BDF5085D32B6B22611523F4789008284F3DA51CE105"
+          }
+        ]
+      }
+    },
+    {
+      "key": "list:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[McmConfig]",
+      "kind": "list",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[McmConfig]",
+      "name": "McmConfig",
+      "type": "MAP",
+      "facts": {
+        "editable": "EAE331CCABBFB9AB71BFD96232E8F4D960F450AFD11CE3926EA81073917CF19B",
+        "invalid": "06D448EA757C3F46E2CD5D69084B20C46529E6B52C882D5C9DCC8D17D3BFDB7B",
+        "min": "C2EF64531BE946E77DB8223ADDC9D2FC0D592BED88578FD1D6924F3BE73A9A87"
+      },
+      "fact_sources": {
+        "invalid": [
+          {
+            "source_tag": "da",
+            "fact": "06D448EA757C3F46E2CD5D69084B20C46529E6B52C882D5C9DCC8D17D3BFDB7B"
+          }
+        ],
+        "editable": [
+          {
+            "source_tag": "da",
+            "fact": "EAE331CCABBFB9AB71BFD96232E8F4D960F450AFD11CE3926EA81073917CF19B"
+          }
+        ],
+        "min": [
+          {
+            "source_tag": "a",
+            "fact": "C2EF64531BE946E77DB8223ADDC9D2FC0D592BED88578FD1D6924F3BE73A9A87"
+          }
+        ]
+      }
+    },
+    {
+      "key": "list:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[McmConfig]/ctr[McmConfig]/lst[SystemIsrConfig]",
+      "kind": "list",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[McmConfig]/ctr[McmConfig]/lst[SystemIsrConfig]",
+      "name": "SystemIsrConfig",
+      "type": "MAP",
+      "facts": {
+        "max": "DE0BB04E185C19BC750F4130C9B83EF5F4B9F1A16C50DDB368C4AD25A6181568",
+        "min": "C2EF64531BE946E77DB8223ADDC9D2FC0D592BED88578FD1D6924F3BE73A9A87"
+      },
+      "fact_sources": {
+        "min": [
+          {
+            "source_tag": "a",
+            "fact": "C2EF64531BE946E77DB8223ADDC9D2FC0D592BED88578FD1D6924F3BE73A9A87"
+          }
+        ],
+        "max": [
+          {
+            "source_tag": "a",
+            "fact": "DE0BB04E185C19BC750F4130C9B83EF5F4B9F1A16C50DDB368C4AD25A6181568"
+          }
+        ]
+      }
+    },
+    {
+      "key": "reference:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/lst[PlatformEcucPartitionRef]/ref[PlatformEcucPartitionRef]",
+      "kind": "reference",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/lst[PlatformEcucPartitionRef]/ref[PlatformEcucPartitionRef]",
+      "name": "PlatformEcucPartitionRef",
+      "type": "REFERENCE",
+      "reference": "ASPathDataOfSchema:/AUTOSAR/EcucDefs/EcuC/EcucPartitionCollection/EcucPartition",
+      "cross_references": [
+        "EcuC"
+      ],
+      "cross_modules": [
+        "EcuC"
+      ],
+      "facts": {
+        "invalid": "7321CFDE8BB5CEC002A94F05E9795F0AD88CC79BE836D8C45342805F51B3A165"
+      },
+      "fact_sources": {
+        "invalid": [
+          {
+            "source_tag": "da",
+            "fact": "7321CFDE8BB5CEC002A94F05E9795F0AD88CC79BE836D8C45342805F51B3A165"
+          }
+        ]
+      }
+    },
+    {
+      "key": "reference:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[IntmConfig]/ctr[IntmGenericSettings]/ref[PlatformIntmGenericEcucPartitionRef]",
+      "kind": "reference",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[IntmConfig]/ctr[IntmGenericSettings]/ref[PlatformIntmGenericEcucPartitionRef]",
+      "name": "PlatformIntmGenericEcucPartitionRef",
+      "type": "REFERENCE",
+      "reference": "ASPathDataOfSchema:/AUTOSAR/EcucDefs/EcuC/EcucPartitionCollection/EcucPartition",
+      "cross_references": [
+        "EcuC"
+      ],
+      "cross_modules": [
+        "EcuC"
+      ],
+      "facts": {
+        "invalid": "E39C354E280600FD4619E05270B7A25CEB8B09A9DDBFA78F8F92E8F8BE341861"
+      },
+      "fact_sources": {
+        "invalid": [
+          {
+            "source_tag": "da",
+            "fact": "E39C354E280600FD4619E05270B7A25CEB8B09A9DDBFA78F8F92E8F8BE341861"
+          }
+        ]
+      }
+    },
+    {
+      "key": "reference:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[IntmConfig]/lst[IntmChannel]/ctr[IntmChannel]/ref[PlatformIntmChannelEcucPartitionRef]",
+      "kind": "reference",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[IntmConfig]/lst[IntmChannel]/ctr[IntmChannel]/ref[PlatformIntmChannelEcucPartitionRef]",
+      "name": "PlatformIntmChannelEcucPartitionRef",
+      "type": "REFERENCE",
+      "reference": "ASPathDataOfSchema:/AUTOSAR/EcucDefs/EcuC/EcucPartitionCollection/EcucPartition",
+      "cross_references": [
+        "EcuC"
+      ],
+      "cross_modules": [
+        "EcuC"
+      ],
+      "facts": {
+        "invalid": "F3BF02EB9742EF911E63072C8D997BC50D04684867DA80A8DF6864D956DACB72"
+      },
+      "fact_sources": {
+        "invalid": [
+          {
+            "source_tag": "da",
+            "fact": "F3BF02EB9742EF911E63072C8D997BC50D04684867DA80A8DF6864D956DACB72"
+          }
+        ]
+      }
+    },
+    {
+      "key": "reference:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/ref[Mpu_M7_EcucPartitionRef]",
+      "kind": "reference",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/ref[Mpu_M7_EcucPartitionRef]",
+      "name": "Mpu_M7_EcucPartitionRef",
+      "type": "REFERENCE",
+      "reference": "ASPathDataOfSchema:/AUTOSAR/EcucDefs/EcuC/EcucPartitionCollection/EcucPartition",
+      "cross_references": [
+        "EcuC"
+      ],
+      "cross_modules": [
+        "EcuC"
+      ],
+      "facts": {
+        "invalid": "AB64FA37AB3A32DD65E6A201D455BD1CF375936BDA30C0768B7665E5FBBF95C7"
+      },
+      "fact_sources": {
+        "invalid": [
+          {
+            "source_tag": "da",
+            "fact": "AB64FA37AB3A32DD65E6A201D455BD1CF375936BDA30C0768B7665E5FBBF95C7"
+          }
+        ]
+      }
+    },
+    {
+      "key": "reference:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[IntCtrlConfig]/ctr[IntCtrlConfig]/ref[PlatformNvicEcucPartitionRef]",
+      "kind": "reference",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[IntCtrlConfig]/ctr[IntCtrlConfig]/ref[PlatformNvicEcucPartitionRef]",
+      "name": "PlatformNvicEcucPartitionRef",
+      "type": "REFERENCE",
+      "reference": "ASPathDataOfSchema:/AUTOSAR/EcucDefs/EcuC/EcucPartitionCollection/EcucPartition",
+      "cross_references": [
+        "EcuC"
+      ],
+      "cross_modules": [
+        "EcuC"
+      ],
+      "facts": {
+        "invalid": "7B811DC76E02C12D52E40F3732FF9BC5449BDB965D271E166240481F6FD2B224"
+      },
+      "fact_sources": {
+        "invalid": [
+          {
+            "source_tag": "da",
+            "fact": "7B811DC76E02C12D52E40F3732FF9BC5449BDB965D271E166240481F6FD2B224"
+          }
+        ]
+      }
+    },
+    {
+      "key": "reference:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[McmConfig]/ctr[McmConfig]/ref[PlatformMcmEcucPartitionRef]",
+      "kind": "reference",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[McmConfig]/ctr[McmConfig]/ref[PlatformMcmEcucPartitionRef]",
+      "name": "PlatformMcmEcucPartitionRef",
+      "type": "REFERENCE",
+      "reference": "ASPathDataOfSchema:/AUTOSAR/EcucDefs/EcuC/EcucPartitionCollection/EcucPartition",
+      "cross_references": [
+        "EcuC"
+      ],
+      "cross_modules": [
+        "EcuC"
+      ],
+      "facts": {
+        "invalid": "AA0F3130419F1A180756BE342ACBAEF1E5428D8F0E13AC89F89AA9B8853ED819"
+      },
+      "fact_sources": {
+        "invalid": [
+          {
+            "source_tag": "da",
+            "fact": "AA0F3130419F1A180756BE342ACBAEF1E5428D8F0E13AC89F89AA9B8853ED819"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[ArReleaseMajorVersion]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[ArReleaseMajorVersion]",
+      "name": "ArReleaseMajorVersion",
+      "type": "INTEGER_LABEL",
+      "facts": {
+        "default": "793DC38E4AA4AA0AFFABF64C74974CCC5FB1DD1E02B24AC473D2D80968D3FF9A",
+        "invalid": "CA11DEDFC681DCD82411902D7993093C4381D3F61F1875BC10DCCB5BE5134BCB"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "793DC38E4AA4AA0AFFABF64C74974CCC5FB1DD1E02B24AC473D2D80968D3FF9A"
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "fact": "CA11DEDFC681DCD82411902D7993093C4381D3F61F1875BC10DCCB5BE5134BCB"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[ArReleaseMinorVersion]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[ArReleaseMinorVersion]",
+      "name": "ArReleaseMinorVersion",
+      "type": "INTEGER_LABEL",
+      "facts": {
+        "default": "F5B1D6C6A1B832E25C1DBE7BE02B38DCEB154CB5102145589DCC31423FFD8D06",
+        "invalid": "FF167184B38369D71CB01E34B30A42503147A332B3802D6E917EABE13CE09C50"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "F5B1D6C6A1B832E25C1DBE7BE02B38DCEB154CB5102145589DCC31423FFD8D06"
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "fact": "FF167184B38369D71CB01E34B30A42503147A332B3802D6E917EABE13CE09C50"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[ArReleaseRevisionVersion]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[ArReleaseRevisionVersion]",
+      "name": "ArReleaseRevisionVersion",
+      "type": "INTEGER_LABEL",
+      "facts": {
+        "default": "C2EF64531BE946E77DB8223ADDC9D2FC0D592BED88578FD1D6924F3BE73A9A87",
+        "invalid": "57FEFDB3C23C6FB56D7FF5B08698CB5A6F45C1400B39FC2DDDFBCBCDA3A564C8"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "C2EF64531BE946E77DB8223ADDC9D2FC0D592BED88578FD1D6924F3BE73A9A87"
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "fact": "57FEFDB3C23C6FB56D7FF5B08698CB5A6F45C1400B39FC2DDDFBCBCDA3A564C8"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[ModuleId]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[ModuleId]",
+      "name": "ModuleId",
+      "type": "INTEGER_LABEL",
+      "facts": {
+        "default": "84073046E64C62E238FD3A7A91291C9AD233B88E5CEC2F93F79DE5B8E67A514C",
+        "invalid": "4277956FBBFF120A35E15346E43B062AD9615FBF3944F8E0CB6EDF341FA3A458"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "84073046E64C62E238FD3A7A91291C9AD233B88E5CEC2F93F79DE5B8E67A514C"
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "fact": "4277956FBBFF120A35E15346E43B062AD9615FBF3944F8E0CB6EDF341FA3A458"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[SwMajorVersion]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[SwMajorVersion]",
+      "name": "SwMajorVersion",
+      "type": "INTEGER_LABEL",
+      "facts": {
+        "default": "48A3A71A2F24BECC708DC90F9A9A59AAF768FD2F1D7493039A2053CE77C66037",
+        "invalid": "5EC346F423AA2A472541C1522F45DC7ECA1DD02F9DEC938974CF325ABF603595"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "48A3A71A2F24BECC708DC90F9A9A59AAF768FD2F1D7493039A2053CE77C66037"
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "fact": "5EC346F423AA2A472541C1522F45DC7ECA1DD02F9DEC938974CF325ABF603595"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[SwMinorVersion]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[SwMinorVersion]",
+      "name": "SwMinorVersion",
+      "type": "INTEGER_LABEL",
+      "facts": {
+        "default": "C2EF64531BE946E77DB8223ADDC9D2FC0D592BED88578FD1D6924F3BE73A9A87",
+        "invalid": "57FEFDB3C23C6FB56D7FF5B08698CB5A6F45C1400B39FC2DDDFBCBCDA3A564C8"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "C2EF64531BE946E77DB8223ADDC9D2FC0D592BED88578FD1D6924F3BE73A9A87"
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "fact": "57FEFDB3C23C6FB56D7FF5B08698CB5A6F45C1400B39FC2DDDFBCBCDA3A564C8"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[SwPatchVersion]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[SwPatchVersion]",
+      "name": "SwPatchVersion",
+      "type": "INTEGER_LABEL",
+      "facts": {
+        "default": "43407099A21A756F993FE61B28AC2C68141E88A19DCFC14D85379A163B3EF27B",
+        "invalid": "456153ABD25FBF6B71B13344F9DC4C31D9D1B02CA30B1B5DA4CECB7AE00B872C"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "43407099A21A756F993FE61B28AC2C68141E88A19DCFC14D85379A163B3EF27B"
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "fact": "456153ABD25FBF6B71B13344F9DC4C31D9D1B02CA30B1B5DA4CECB7AE00B872C"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[VendorApiInfix]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[VendorApiInfix]",
+      "name": "VendorApiInfix",
+      "type": "STRING_LABEL",
+      "facts": {
+        "default": "40EEB44BE3DC18EC1CB58865D7B89AC993FADDD1A4FCF37DD0485A54BE3F7D55",
+        "readonly": "53E30AC20DEF236DC54F0F0301FA3050D4FAD7E07F9B9EC2BD3BB8CD0331FB0E"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "40EEB44BE3DC18EC1CB58865D7B89AC993FADDD1A4FCF37DD0485A54BE3F7D55"
+          }
+        ],
+        "readonly": [
+          {
+            "source_tag": "da",
+            "fact": "53E30AC20DEF236DC54F0F0301FA3050D4FAD7E07F9B9EC2BD3BB8CD0331FB0E"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[VendorId]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[VendorId]",
+      "name": "VendorId",
+      "type": "INTEGER_LABEL",
+      "facts": {
+        "default": "5711C942F04FB4BD2435CF46C4EDBBACFA9967F94265C74F3378BBDB64C1606B",
+        "invalid": "D9E49251055BB744B29FF8F461AEB3F1FD10A5BE006C21E7B84CAE8952386EF1"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "5711C942F04FB4BD2435CF46C4EDBBACFA9967F94265C74F3378BBDB64C1606B"
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "fact": "D9E49251055BB744B29FF8F461AEB3F1FD10A5BE006C21E7B84CAE8952386EF1"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/var[PlatformDevErrorDetect]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/var[PlatformDevErrorDetect]",
+      "name": "PlatformDevErrorDetect",
+      "type": "BOOLEAN",
+      "facts": {
+        "default": "53E30AC20DEF236DC54F0F0301FA3050D4FAD7E07F9B9EC2BD3BB8CD0331FB0E"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "53E30AC20DEF236DC54F0F0301FA3050D4FAD7E07F9B9EC2BD3BB8CD0331FB0E"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/var[PlatformEnableIntCtrlConfiguration]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/var[PlatformEnableIntCtrlConfiguration]",
+      "name": "PlatformEnableIntCtrlConfiguration",
+      "type": "BOOLEAN",
+      "facts": {
+        "default": "53E30AC20DEF236DC54F0F0301FA3050D4FAD7E07F9B9EC2BD3BB8CD0331FB0E"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "53E30AC20DEF236DC54F0F0301FA3050D4FAD7E07F9B9EC2BD3BB8CD0331FB0E"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/var[PlatformEnableMSIConfiguration]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/var[PlatformEnableMSIConfiguration]",
+      "name": "PlatformEnableMSIConfiguration",
+      "type": "BOOLEAN",
+      "facts": {
+        "default": "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F",
+        "invalid": "2F17746C6156966B7C08B149A7A41B6C9CF0A4DAF8893E4F01312B1E484D5D0B"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F"
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "a",
+            "fact": "2F17746C6156966B7C08B149A7A41B6C9CF0A4DAF8893E4F01312B1E484D5D0B"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/var[PlatformEnableUserModeSupport]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/var[PlatformEnableUserModeSupport]",
+      "name": "PlatformEnableUserModeSupport",
+      "type": "BOOLEAN",
+      "facts": {
+        "default": "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/var[PlatformEnableVtorConfiguration]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/var[PlatformEnableVtorConfiguration]",
+      "name": "PlatformEnableVtorConfiguration",
+      "type": "BOOLEAN",
+      "facts": {
+        "default": "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F",
+        "editable": "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F"
+          }
+        ],
+        "editable": [
+          {
+            "source_tag": "da",
+            "fact": "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/var[PlatformIntmConfigurable]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/var[PlatformIntmConfigurable]",
+      "name": "PlatformIntmConfigurable",
+      "type": "BOOLEAN",
+      "facts": {
+        "default": "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/var[PlatformIpAPIsAvailable]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/var[PlatformIpAPIsAvailable]",
+      "name": "PlatformIpAPIsAvailable",
+      "type": "BOOLEAN",
+      "facts": {
+        "default": "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/var[PlatformMcmConfigurable]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/var[PlatformMcmConfigurable]",
+      "name": "PlatformMcmConfigurable",
+      "type": "BOOLEAN",
+      "facts": {
+        "default": "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F",
+        "editable": "D2CA9405E36D6B21907E548EA9765D41BFEE7263FDC5BE9446774BBE4D3C3EE4",
+        "invalid": "7E5678BDD2E51A7D1D823395E66F2A70E49C6CA13D5AE027E43DFB1476326E46"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F"
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "a",
+            "fact": "7E5678BDD2E51A7D1D823395E66F2A70E49C6CA13D5AE027E43DFB1476326E46"
+          }
+        ],
+        "editable": [
+          {
+            "source_tag": "da",
+            "fact": "D2CA9405E36D6B21907E548EA9765D41BFEE7263FDC5BE9446774BBE4D3C3EE4"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/var[PlatformMpuM7Configurable]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/var[PlatformMpuM7Configurable]",
+      "name": "PlatformMpuM7Configurable",
+      "type": "BOOLEAN",
+      "facts": {
+        "default": "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F",
+        "invalid": "D46E9D856121CA561A667A60E9495F4477741F4F4071736CA8B7FF6E8D5342B8"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F"
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "a",
+            "fact": "D46E9D856121CA561A667A60E9495F4477741F4F4071736CA8B7FF6E8D5342B8"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/var[PlatformMulticoreSupport]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[GeneralConfiguration]/var[PlatformMulticoreSupport]",
+      "name": "PlatformMulticoreSupport",
+      "type": "BOOLEAN",
+      "facts": {
+        "default": "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F",
+        "editable": "53E30AC20DEF236DC54F0F0301FA3050D4FAD7E07F9B9EC2BD3BB8CD0331FB0E",
+        "invalid": "96B5A8E8C68C53B16C0AB0033557797E36A220CA9EE0CBEE4960256554F8200A"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F"
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "a",
+            "fact": "96B5A8E8C68C53B16C0AB0033557797E36A220CA9EE0CBEE4960256554F8200A"
+          }
+        ],
+        "editable": [
+          {
+            "source_tag": "a",
+            "fact": "53E30AC20DEF236DC54F0F0301FA3050D4FAD7E07F9B9EC2BD3BB8CD0331FB0E"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[IntmConfig]/ctr[IntmGenericSettings]/var[IntmEnable]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[IntmConfig]/ctr[IntmGenericSettings]/var[IntmEnable]",
+      "name": "IntmEnable",
+      "type": "BOOLEAN",
+      "facts": {
+        "default": "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F",
+        "editable": "09E95112A9B59921A447821D809734394F66B455A72B64B865BC76FD90B5AE66"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F"
+          }
+        ],
+        "editable": [
+          {
+            "source_tag": "da",
+            "fact": "09E95112A9B59921A447821D809734394F66B455A72B64B865BC76FD90B5AE66"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[IntmConfig]/lst[IntmChannel]/ctr[IntmChannel]/var[AcceptedLatency]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[IntmConfig]/lst[IntmChannel]/ctr[IntmChannel]/var[AcceptedLatency]",
+      "name": "AcceptedLatency",
+      "type": "INTEGER",
+      "facts": {
+        "default": "C2EF64531BE946E77DB8223ADDC9D2FC0D592BED88578FD1D6924F3BE73A9A87",
+        "editable": "53E30AC20DEF236DC54F0F0301FA3050D4FAD7E07F9B9EC2BD3BB8CD0331FB0E",
+        "invalid": "A356592302973F710D712B9B6FAB7C910657D10482F07C21AD412532AD46C4B1"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "C2EF64531BE946E77DB8223ADDC9D2FC0D592BED88578FD1D6924F3BE73A9A87"
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "fact": "A356592302973F710D712B9B6FAB7C910657D10482F07C21AD412532AD46C4B1"
+          }
+        ],
+        "editable": [
+          {
+            "source_tag": "da",
+            "fact": "53E30AC20DEF236DC54F0F0301FA3050D4FAD7E07F9B9EC2BD3BB8CD0331FB0E"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[IntmConfig]/lst[IntmChannel]/ctr[IntmChannel]/var[InterruptMonitor]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[IntmConfig]/lst[IntmChannel]/ctr[IntmChannel]/var[InterruptMonitor]",
+      "name": "InterruptMonitor",
+      "type": "ENUMERATION",
+      "facts": {
+        "default": "C608F1128B24504244511C19725EF01C6030EDDC238B68C2B831EC67534516E3",
+        "editable": "53E30AC20DEF236DC54F0F0301FA3050D4FAD7E07F9B9EC2BD3BB8CD0331FB0E",
+        "invalid": "C6C4D4A339A4EFB680143DE784AE9668136118B26378F3E41AF645E2075CBE72",
+        "range": "01AD10400310DE3DF31EEE23F9608E67D83CE376B2043FB232F216B6171E3B35"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "C608F1128B24504244511C19725EF01C6030EDDC238B68C2B831EC67534516E3"
+          }
+        ],
+        "range": [
+          {
+            "source_tag": "da",
+            "fact": "01AD10400310DE3DF31EEE23F9608E67D83CE376B2043FB232F216B6171E3B35"
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "fact": "C6C4D4A339A4EFB680143DE784AE9668136118B26378F3E41AF645E2075CBE72"
+          }
+        ],
+        "editable": [
+          {
+            "source_tag": "da",
+            "fact": "53E30AC20DEF236DC54F0F0301FA3050D4FAD7E07F9B9EC2BD3BB8CD0331FB0E"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[IntmConfig]/lst[IntmChannel]/ctr[IntmChannel]/var[MonitoredIrq]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[IntmConfig]/lst[IntmChannel]/ctr[IntmChannel]/var[MonitoredIrq]",
+      "name": "MonitoredIrq",
+      "type": "ENUMERATION",
+      "facts": {
+        "default": "1C689DACFFF642525DBBC6AE16A1E9DE56DD771927BD250B62B357E8D2B71A00",
+        "editable": "53E30AC20DEF236DC54F0F0301FA3050D4FAD7E07F9B9EC2BD3BB8CD0331FB0E",
+        "invalid": "4B276A3824A673055C439CD4C544142E1ADDC40324430550C89FFF45DF16D0C2",
+        "range": "E9C4AF082A0B6ABDFECAC0C6C071D5E957B953BC82F729B483919F81B4316649"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "1C689DACFFF642525DBBC6AE16A1E9DE56DD771927BD250B62B357E8D2B71A00"
+          }
+        ],
+        "range": [
+          {
+            "source_tag": "da",
+            "fact": "E9C4AF082A0B6ABDFECAC0C6C071D5E957B953BC82F729B483919F81B4316649"
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "fact": "4B276A3824A673055C439CD4C544142E1ADDC40324430550C89FFF45DF16D0C2"
+          }
+        ],
+        "editable": [
+          {
+            "source_tag": "da",
+            "fact": "53E30AC20DEF236DC54F0F0301FA3050D4FAD7E07F9B9EC2BD3BB8CD0331FB0E"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[IntmConfig]/lst[IntmChannel]/ctr[IntmChannel]/var[PlatformIntmChannelId]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[IntmConfig]/lst[IntmChannel]/ctr[IntmChannel]/var[PlatformIntmChannelId]",
+      "name": "PlatformIntmChannelId",
+      "type": "INTEGER",
+      "facts": {
+        "default": "9B9AABC118BF034E401B3A6B2BF5723D07141CF5B5CB779BD6341DF19DF2C81A",
+        "invalid": "1F9D69B9506862AABDEAF04C7E61A0CDC3E3A9C67470FE4FB82A08A1532778BF",
+        "range": "FEE656E02D7FDD9C1C3224BF4634F134B76AA3478EAABA5D99E8B21CCBC9F6F0"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "9B9AABC118BF034E401B3A6B2BF5723D07141CF5B5CB779BD6341DF19DF2C81A"
+          }
+        ],
+        "range": [
+          {
+            "source_tag": "da",
+            "fact": "FEE656E02D7FDD9C1C3224BF4634F134B76AA3478EAABA5D99E8B21CCBC9F6F0"
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "fact": "1F9D69B9506862AABDEAF04C7E61A0CDC3E3A9C67470FE4FB82A08A1532778BF"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/lst[RegionConfig]/ctr[RegionConfig]/var[AccessRights]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/lst[RegionConfig]/ctr[RegionConfig]/var[AccessRights]",
+      "name": "AccessRights",
+      "type": "ENUMERATION",
+      "facts": {
+        "default": "E1B72BEC26BE296462245F0144B28EF0101298BC95A51604D11468C37860A66C",
+        "range": "C9C871A3A1117B270396A1B1426926E90C00449FE405723DC1C4460D5186FD40"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "E1B72BEC26BE296462245F0144B28EF0101298BC95A51604D11468C37860A66C"
+          }
+        ],
+        "range": [
+          {
+            "source_tag": "da",
+            "fact": "C9C871A3A1117B270396A1B1426926E90C00449FE405723DC1C4460D5186FD40"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/lst[RegionConfig]/ctr[RegionConfig]/var[EndAddress]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/lst[RegionConfig]/ctr[RegionConfig]/var[EndAddress]",
+      "name": "EndAddress",
+      "type": "INTEGER",
+      "facts": {
+        "default": "80295687483CD907E8464C4A918561FA82A02847B1EFF40012AB2EBA7FAFF082",
+        "invalid": "C2E9E6436ACBD7AB114E0B3F3D3FF6DD6691A95267CC7750D4F17A8028D98ABE"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "80295687483CD907E8464C4A918561FA82A02847B1EFF40012AB2EBA7FAFF082"
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "fact": "C2E9E6436ACBD7AB114E0B3F3D3FF6DD6691A95267CC7750D4F17A8028D98ABE"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/lst[RegionConfig]/ctr[RegionConfig]/var[InnerCachePolicy]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/lst[RegionConfig]/ctr[RegionConfig]/var[InnerCachePolicy]",
+      "name": "InnerCachePolicy",
+      "type": "ENUMERATION",
+      "facts": {
+        "default": "5A2EA0512C44FD6791727D5C72A11A268600F1704147FD11ADC64F8817B4388F",
+        "range": "7B681DD63545D1B2C93E513E7538EBC6B802138ED8A218F6B7FAEE5918777058"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "5A2EA0512C44FD6791727D5C72A11A268600F1704147FD11ADC64F8817B4388F"
+          }
+        ],
+        "range": [
+          {
+            "source_tag": "da",
+            "fact": "7B681DD63545D1B2C93E513E7538EBC6B802138ED8A218F6B7FAEE5918777058"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/lst[RegionConfig]/ctr[RegionConfig]/var[MemoryType]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/lst[RegionConfig]/ctr[RegionConfig]/var[MemoryType]",
+      "name": "MemoryType",
+      "type": "ENUMERATION",
+      "facts": {
+        "default": "667E0A1421D5B248D2751A6ECEB8AD99DDFC520FA8C0AF471004BE7628928EB7",
+        "range": "7E35CC2D94DBE47BF1B5A5DB612CD3043DB9F9BAC49BF87B406D366B5E06B5C5"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "667E0A1421D5B248D2751A6ECEB8AD99DDFC520FA8C0AF471004BE7628928EB7"
+          }
+        ],
+        "range": [
+          {
+            "source_tag": "da",
+            "fact": "7E35CC2D94DBE47BF1B5A5DB612CD3043DB9F9BAC49BF87B406D366B5E06B5C5"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/lst[RegionConfig]/ctr[RegionConfig]/var[OuterCachePolicy]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/lst[RegionConfig]/ctr[RegionConfig]/var[OuterCachePolicy]",
+      "name": "OuterCachePolicy",
+      "type": "ENUMERATION",
+      "facts": {
+        "default": "1E5BB6F73F4AA6726484D5C2A690884ECD1050EBF9C38900954E76D758A659FF",
+        "range": "7B681DD63545D1B2C93E513E7538EBC6B802138ED8A218F6B7FAEE5918777058"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "1E5BB6F73F4AA6726484D5C2A690884ECD1050EBF9C38900954E76D758A659FF"
+          }
+        ],
+        "range": [
+          {
+            "source_tag": "da",
+            "fact": "7B681DD63545D1B2C93E513E7538EBC6B802138ED8A218F6B7FAEE5918777058"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/lst[RegionConfig]/ctr[RegionConfig]/var[RegionNumber]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/lst[RegionConfig]/ctr[RegionConfig]/var[RegionNumber]",
+      "name": "RegionNumber",
+      "type": "INTEGER",
+      "facts": {
+        "default": "ECFB04CFCCC2F802C6714ED54DDBDA45C1CC6C37BF92510FF01A39BDE1CE42EC",
+        "invalid": "149194095090A0828521BE9F867ADCDD16F356D8E8E46165228F427DA2E4106D"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "ECFB04CFCCC2F802C6714ED54DDBDA45C1CC6C37BF92510FF01A39BDE1CE42EC"
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "fact": "149194095090A0828521BE9F867ADCDD16F356D8E8E46165228F427DA2E4106D"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/lst[RegionConfig]/ctr[RegionConfig]/var[RegionSize]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/lst[RegionConfig]/ctr[RegionConfig]/var[RegionSize]",
+      "name": "RegionSize",
+      "type": "INTEGER",
+      "facts": {
+        "default": "3C8C68E5B8BE48B9F5D18C42168F037C3D3217E5189DDAE6A19ACFF3E34E43AB",
+        "invalid": "2AFEF86CBBDF88CCBF5B5A2000696314AA6B1DDBF535C46AB9DC8869B7D95873"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "3C8C68E5B8BE48B9F5D18C42168F037C3D3217E5189DDAE6A19ACFF3E34E43AB"
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "fact": "2AFEF86CBBDF88CCBF5B5A2000696314AA6B1DDBF535C46AB9DC8869B7D95873"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/lst[RegionConfig]/ctr[RegionConfig]/var[Shareable]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/lst[RegionConfig]/ctr[RegionConfig]/var[Shareable]",
+      "name": "Shareable",
+      "type": "BOOLEAN",
+      "facts": {
+        "default": "D90A30A0B5F3811B26EA3845350EC56D7B0358801B45352B328AC73FBD387197"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "D90A30A0B5F3811B26EA3845350EC56D7B0358801B45352B328AC73FBD387197"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/lst[RegionConfig]/ctr[RegionConfig]/var[StartAddress]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/lst[RegionConfig]/ctr[RegionConfig]/var[StartAddress]",
+      "name": "StartAddress",
+      "type": "INTEGER",
+      "facts": {
+        "default": "16828C1496A3A1031EF6AB8615212FF12218A5D867013121C60EB2626ABCFC08",
+        "invalid": "2E60AA37E1BB9BF7DEB419D251FBB908946E2FF0FF5941EAC12B2C56A93D3052"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "16828C1496A3A1031EF6AB8615212FF12218A5D867013121C60EB2626ABCFC08"
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "fact": "2E60AA37E1BB9BF7DEB419D251FBB908946E2FF0FF5941EAC12B2C56A93D3052"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/lst[RegionConfig]/ctr[RegionConfig]/var[SubregionMask]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/lst[RegionConfig]/ctr[RegionConfig]/var[SubregionMask]",
+      "name": "SubregionMask",
+      "type": "INTEGER",
+      "facts": {
+        "default": "1C6C27BB4A0E8F303300C8B5EDAE04FBA9FDCD75EECE378F73F33C6FE78D4B09",
+        "editable": "60F91283C27A8CF5ECDF87032E649843AE730219CBB87173DE3CDF77E661EC2B",
+        "invalid": "AA86B1D932D349C535CBE138E6DC9960F0C654F4F00F9E9F71A0417ABB7A11A3"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "1C6C27BB4A0E8F303300C8B5EDAE04FBA9FDCD75EECE378F73F33C6FE78D4B09"
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "fact": "AA86B1D932D349C535CBE138E6DC9960F0C654F4F00F9E9F71A0417ABB7A11A3"
+          }
+        ],
+        "editable": [
+          {
+            "source_tag": "da",
+            "fact": "60F91283C27A8CF5ECDF87032E649843AE730219CBB87173DE3CDF77E661EC2B"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/var[DefaultMapEnable]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/var[DefaultMapEnable]",
+      "name": "DefaultMapEnable",
+      "type": "BOOLEAN",
+      "facts": {
+        "default": "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/var[MemManageInterruptEnable]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/var[MemManageInterruptEnable]",
+      "name": "MemManageInterruptEnable",
+      "type": "BOOLEAN",
+      "facts": {
+        "default": "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/var[PhysicalCoreID]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/var[PhysicalCoreID]",
+      "name": "PhysicalCoreID",
+      "type": "ENUMERATION",
+      "facts": {
+        "default": "248A82E28CDE1625D5F148288583ABA1215DF2E67F132F4991A365CAF31F42E2",
+        "range": "C190E7AB294E4574C1750468ED507E8330E4BAF8BC6F97CE9C09D7A8C1BA40BE"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "248A82E28CDE1625D5F148288583ABA1215DF2E67F132F4991A365CAF31F42E2"
+          }
+        ],
+        "range": [
+          {
+            "source_tag": "da",
+            "fact": "C190E7AB294E4574C1750468ED507E8330E4BAF8BC6F97CE9C09D7A8C1BA40BE"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/var[RunInHFNMIEnable]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/ctr[MPU_M7_Configuration]/lst[MPU_M7_ModuleConfig]/ctr[MPU_M7_ModuleConfig]/var[RunInHFNMIEnable]",
+      "name": "RunInHFNMIEnable",
+      "type": "BOOLEAN",
+      "facts": {
+        "default": "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[IntCtrlConfig]/ctr[IntCtrlConfig]/lst[PlatformIsrConfig]/ctr[PlatformIsrConfig]/var[IsrEnabled]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[IntCtrlConfig]/ctr[IntCtrlConfig]/lst[PlatformIsrConfig]/ctr[PlatformIsrConfig]/var[IsrEnabled]",
+      "name": "IsrEnabled",
+      "type": "BOOLEAN",
+      "facts": {
+        "default": "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F",
+        "editable": "53E30AC20DEF236DC54F0F0301FA3050D4FAD7E07F9B9EC2BD3BB8CD0331FB0E"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F"
+          }
+        ],
+        "editable": [
+          {
+            "source_tag": "a",
+            "fact": "53E30AC20DEF236DC54F0F0301FA3050D4FAD7E07F9B9EC2BD3BB8CD0331FB0E"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[IntCtrlConfig]/ctr[IntCtrlConfig]/lst[PlatformIsrConfig]/ctr[PlatformIsrConfig]/var[IsrHandler]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[IntCtrlConfig]/ctr[IntCtrlConfig]/lst[PlatformIsrConfig]/ctr[PlatformIsrConfig]/var[IsrHandler]",
+      "name": "IsrHandler",
+      "type": "FUNCTION-NAME",
+      "facts": {
+        "default": "26F2132E6F61F84655CD737130084FCF8EA7D968FD4E526F7F43FA868C3BAFC2",
+        "editable": "53E30AC20DEF236DC54F0F0301FA3050D4FAD7E07F9B9EC2BD3BB8CD0331FB0E",
+        "invalid": "6F6D9A0D365F972895B6D2667FB81AD99AB2BD4DC8C091FFA3E3C57888AAF54B"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "26F2132E6F61F84655CD737130084FCF8EA7D968FD4E526F7F43FA868C3BAFC2"
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "fact": "6F6D9A0D365F972895B6D2667FB81AD99AB2BD4DC8C091FFA3E3C57888AAF54B"
+          }
+        ],
+        "editable": [
+          {
+            "source_tag": "da",
+            "fact": "53E30AC20DEF236DC54F0F0301FA3050D4FAD7E07F9B9EC2BD3BB8CD0331FB0E"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[IntCtrlConfig]/ctr[IntCtrlConfig]/lst[PlatformIsrConfig]/ctr[PlatformIsrConfig]/var[IsrName]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[IntCtrlConfig]/ctr[IntCtrlConfig]/lst[PlatformIsrConfig]/ctr[PlatformIsrConfig]/var[IsrName]",
+      "name": "IsrName",
+      "type": "ENUMERATION",
+      "facts": {
+        "default": "B9028926796F65B8D6A44EDD1BE37BC4146933B7B4E94D5A1EE54363BA2CDC4A",
+        "editable": "53E30AC20DEF236DC54F0F0301FA3050D4FAD7E07F9B9EC2BD3BB8CD0331FB0E",
+        "invalid": "73A614E7DB5C1B35285E461EACCE3CA8E8AD796825CB5A476E2A94C5559B5B43",
+        "range": "1870C7CC5A2CBB92185E63D9A23AA461D1DC47B5ED078E317FB936CD6E7A256C"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "B9028926796F65B8D6A44EDD1BE37BC4146933B7B4E94D5A1EE54363BA2CDC4A"
+          }
+        ],
+        "range": [
+          {
+            "source_tag": "da",
+            "fact": "1870C7CC5A2CBB92185E63D9A23AA461D1DC47B5ED078E317FB936CD6E7A256C"
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "fact": "73A614E7DB5C1B35285E461EACCE3CA8E8AD796825CB5A476E2A94C5559B5B43"
+          }
+        ],
+        "editable": [
+          {
+            "source_tag": "a",
+            "fact": "53E30AC20DEF236DC54F0F0301FA3050D4FAD7E07F9B9EC2BD3BB8CD0331FB0E"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[IntCtrlConfig]/ctr[IntCtrlConfig]/lst[PlatformIsrConfig]/ctr[PlatformIsrConfig]/var[IsrPriority]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[IntCtrlConfig]/ctr[IntCtrlConfig]/lst[PlatformIsrConfig]/ctr[PlatformIsrConfig]/var[IsrPriority]",
+      "name": "IsrPriority",
+      "type": "INTEGER",
+      "facts": {
+        "default": "C2EF64531BE946E77DB8223ADDC9D2FC0D592BED88578FD1D6924F3BE73A9A87",
+        "editable": "53E30AC20DEF236DC54F0F0301FA3050D4FAD7E07F9B9EC2BD3BB8CD0331FB0E",
+        "invalid": "AC5CC529B8A594968C804B774F99FB9F5B8ADF9D7A06E6DD612238C87ED26505"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "C2EF64531BE946E77DB8223ADDC9D2FC0D592BED88578FD1D6924F3BE73A9A87"
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "fact": "AC5CC529B8A594968C804B774F99FB9F5B8ADF9D7A06E6DD612238C87ED26505"
+          }
+        ],
+        "editable": [
+          {
+            "source_tag": "da",
+            "fact": "53E30AC20DEF236DC54F0F0301FA3050D4FAD7E07F9B9EC2BD3BB8CD0331FB0E"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[IntCtrlConfig]/ctr[IntCtrlConfig]/var[PlatformVtorAddressConfig]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[IntCtrlConfig]/ctr[IntCtrlConfig]/var[PlatformVtorAddressConfig]",
+      "name": "PlatformVtorAddressConfig",
+      "type": "INTEGER",
+      "facts": {
+        "default": "ECF08A2A070221F86E07B74E83ECCBE3DF3308F4A49E1FD780D00BCC1060D9C2",
+        "editable": "E89249EB27E661619A026228B47DAF7CB3A6D13BC04A4AAA66243A57EC3E2D3C",
+        "invalid": "3DE4C9D54549E2BFA5D0E6148B81C411BCAFB3DC9F60C79519DC63D1EA4DF0CC"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "ECF08A2A070221F86E07B74E83ECCBE3DF3308F4A49E1FD780D00BCC1060D9C2"
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "fact": "BA4EC6011C48C840D804AE2F75FE5A8AABBB58F87D8DEE708B6555574185515C"
+          },
+          {
+            "source_tag": "da",
+            "fact": "DCE45B47F7E5F2655BC80E99E7AF954705BF507FC551F40D7CFB89819D6BDD33"
+          }
+        ],
+        "editable": [
+          {
+            "source_tag": "da",
+            "fact": "E89249EB27E661619A026228B47DAF7CB3A6D13BC04A4AAA66243A57EC3E2D3C"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[McmConfig]/ctr[McmConfig]/lst[SystemIsrConfig]/ctr[SystemIsrConfig]/var[SystemIsrEnabled]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[McmConfig]/ctr[McmConfig]/lst[SystemIsrConfig]/ctr[SystemIsrConfig]/var[SystemIsrEnabled]",
+      "name": "SystemIsrEnabled",
+      "type": "BOOLEAN",
+      "facts": {
+        "default": "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F",
+        "editable": "53E30AC20DEF236DC54F0F0301FA3050D4FAD7E07F9B9EC2BD3BB8CD0331FB0E"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F"
+          }
+        ],
+        "editable": [
+          {
+            "source_tag": "a",
+            "fact": "53E30AC20DEF236DC54F0F0301FA3050D4FAD7E07F9B9EC2BD3BB8CD0331FB0E"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[McmConfig]/ctr[McmConfig]/lst[SystemIsrConfig]/ctr[SystemIsrConfig]/var[SystemIsrName]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[McmConfig]/ctr[McmConfig]/lst[SystemIsrConfig]/ctr[SystemIsrConfig]/var[SystemIsrName]",
+      "name": "SystemIsrName",
+      "type": "ENUMERATION",
+      "facts": {
+        "default": "DC1BBE470FD45BA69AD8784F49C6B5E3439B19B7A139A61086B49F07CC3F07F4",
+        "editable": "53E30AC20DEF236DC54F0F0301FA3050D4FAD7E07F9B9EC2BD3BB8CD0331FB0E",
+        "invalid": "A8AA861DD0D806C9A911F21E75E8F5DA623C892F93A6DECBCE66994C7046957D",
+        "range": "2BA67C4C02FD5F6B6EF882F5C28C5BE3883D8CCEF1B54B650CE3EE5CBA6951B0"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "DC1BBE470FD45BA69AD8784F49C6B5E3439B19B7A139A61086B49F07CC3F07F4"
+          }
+        ],
+        "range": [
+          {
+            "source_tag": "da",
+            "fact": "2BA67C4C02FD5F6B6EF882F5C28C5BE3883D8CCEF1B54B650CE3EE5CBA6951B0"
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "fact": "A8AA861DD0D806C9A911F21E75E8F5DA623C892F93A6DECBCE66994C7046957D"
+          }
+        ],
+        "editable": [
+          {
+            "source_tag": "da",
+            "fact": "53E30AC20DEF236DC54F0F0301FA3050D4FAD7E07F9B9EC2BD3BB8CD0331FB0E"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[McmConfig]/ctr[McmConfig]/var[SystemAhbSlavePrio]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[McmConfig]/ctr[McmConfig]/var[SystemAhbSlavePrio]",
+      "name": "SystemAhbSlavePrio",
+      "type": "ENUMERATION",
+      "facts": {
+        "default": "607BF8CDDE936475DB9A378EE5ACBDCF5612B947B92FA5A6736C559124A22A8F",
+        "range": "B6977C8C9DD84F8DB3CF789B8372267656AD195730F40E9BF93EF9AE547565A7"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "607BF8CDDE936475DB9A378EE5ACBDCF5612B947B92FA5A6736C559124A22A8F"
+          }
+        ],
+        "range": [
+          {
+            "source_tag": "da",
+            "fact": "B6977C8C9DD84F8DB3CF789B8372267656AD195730F40E9BF93EF9AE547565A7"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/var[IMPLEMENTATION_CONFIG_VARIANT]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/var[IMPLEMENTATION_CONFIG_VARIANT]",
+      "name": "IMPLEMENTATION_CONFIG_VARIANT",
+      "type": "ENUMERATION",
+      "facts": {
+        "default": "1382FC797392728E4FE2A1BE75ECED4AB7ED19CBA178DC464BBE153CF4B15CC3",
+        "range": "A6054F5A73FE452DFF6CC0E89E2CA930716E97A19985224A02A3BCB984CE7AE6",
+        "readonly": "53E30AC20DEF236DC54F0F0301FA3050D4FAD7E07F9B9EC2BD3BB8CD0331FB0E"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "1382FC797392728E4FE2A1BE75ECED4AB7ED19CBA178DC464BBE153CF4B15CC3"
+          }
+        ],
+        "range": [
+          {
+            "source_tag": "da",
+            "fact": "A6054F5A73FE452DFF6CC0E89E2CA930716E97A19985224A02A3BCB984CE7AE6"
+          }
+        ],
+        "readonly": [
+          {
+            "source_tag": "da",
+            "fact": "53E30AC20DEF236DC54F0F0301FA3050D4FAD7E07F9B9EC2BD3BB8CD0331FB0E"
+          }
+        ]
+      }
+    }
+  ],
+  "classification_default": {
+    "classification": "deferred",
+    "reason": "The descriptor item is not caller-controlled by the current Platform provider.",
+    "dependency": "A descriptor-forward Platform implementation and generality tests are required before exposure."
+  },
+  "classification_rules": [
+    {
+      "match": {
+        "path_prefixes": [
+          "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[IntCtrlConfig]"
+        ],
+        "names": [
+          "IsrPriority"
+        ]
+      },
+      "classification": "configurable",
+      "trace": {
+        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/platform.py:PlatformProvider",
+        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_platform_set",
+        "asset": "autombd-rtd/assets/nxp/s32k3/platform/interrupts.json#/isr_priority",
+        "tests": [
+          "tests/unit/test_platform_apply.py::test_set_priority_by_peripheral"
+        ]
+      }
+    },
+    {
+      "match": {
+        "path_prefixes": [
+          "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[IntCtrlConfig]"
+        ],
+        "names": [
+          "IntCtrlConfig",
+          "PlatformIsrConfig",
+          "IsrEnabled",
+          "IsrHandler",
+          "IsrName"
+        ]
+      },
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:_build_platform_isr_struct_bytes",
+        "inputs": [
+          "intent.payload.peripheral",
+          "intent.payload.priority",
+          "interrupts.json#/isr_priority"
+        ],
+        "tests": [
+          "tests/unit/test_platform_apply.py::test_set_priority_by_peripheral",
+          "tests/unit/test_uart_apply.py::TestPlatformIsrInsert::test_isr_inserted_for_lpuart8"
+        ]
+      }
+    }
+  ],
+  "known_gap_rules": {}
+}

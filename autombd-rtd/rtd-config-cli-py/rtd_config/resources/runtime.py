@@ -51,4 +51,7 @@ from pathlib import Path
 
 
 def load_json(path: Path) -> dict:
-    return json.loads(path.read_text(encoding="utf-8"))
+    value = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(value, dict):
+        raise TypeError("Runtime JSON assets must contain an object.")
+    return value

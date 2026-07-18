@@ -63,7 +63,8 @@ def test_inspect_uart_fixture_reports_modules_and_backend(tmp_path):
     assert result.returncode == 0
     payload = json.loads(result.stdout)
     assert payload["status"] == "passed"
-    assert payload["backend"] == "mex"
-    assert payload["family"] == "s32k3"
-    assert payload["device"] == "s32k344"
+    assert payload["backend"] == "s32-mex"
+    assert payload["family"] == "S32K3"
+    assert payload["device"] == "S32K344"
+    assert payload["package"] == "mapbga257"
     assert "Uart" in payload["modules"]

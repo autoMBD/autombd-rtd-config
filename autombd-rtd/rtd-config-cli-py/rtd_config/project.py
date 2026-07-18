@@ -46,12 +46,80 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
+
+from .backends.s32_mex.document import MexDocument
+from .backends.s32_mex.metadata import (
+    ProjectMetadata,
+    ValidatorInputInventory,
+    capture_validator_input_inventory,
+    parse_project_metadata,
+    revalidate_project_metadata,
+)
+from .backends.s32_mex.target import FileSnapshot, VerifiedProjectTarget, verify_project_target
+from .resources.bundles import ResolvedAssetBundle
 
 
 @dataclass(frozen=True)
 class Project:
     root: Path
     backend: str
-    mex_file: Path
+    verified_target: VerifiedProjectTarget
+    _cache: dict = field(default_factory=dict, repr=False, compare=False)
+
+    @property
+    def document(self) -> MexDocument:
+        document = self._cache.get("document")
+        if document is None:
+            document = MexDocument.from_snapshot(self.verified_target.mex)
+            self._cache["document"] = document
+        return document
+
+    @property
+    def metadata(self) -> ProjectMetadata:
+        metadata = self._cache.get("metadata")
+        if metadata is None:
+            metadata = parse_project_metadata(self.verified_target, self.document)
+            self._cache["metadata"] = metadata
+        return metadata
+
+    @property
+    def asset_bundle(self) -> ResolvedAssetBundle:
+        bundle = self._cache.get("asset_bundle")
+        if bundle is None:
+            raise RuntimeError("Project asset bundle has not passed preflight.")
+        return bundle
+
+    @property
+    def mex_file(self) -> Path:
+        return self.verified_target.mex.path
+
+    def capture_validator_inputs(
+        self,
+        *,
+        selected_mex: FileSnapshot | None = None,
+        selected_source_relative: str | None = None,
+    ) -> ValidatorInputInventory:
+        self.metadata.require_consistent()
+        revalidate_project_metadata(self.verified_target, self.metadata)
+        return capture_validator_input_inventory(
+            self.verified_target,
+            selected_mex=selected_mex,
+            selected_source_relative=selected_source_relative,
+        )
+
+    def close(self) -> None:
+        if not self.verified_target.lease.closed:
+            self.verified_target.close()
+
+    def __enter__(self) -> "Project":
+        return self
+
+    def __exit__(self, *_exc_info) -> None:
+        self.close()
+
+    @classmethod
+    def verified(cls, root: Path, backend: str = "s32-mex") -> "Project":
+        target = verify_project_target(root)
+        return cls(target.root, backend, target)

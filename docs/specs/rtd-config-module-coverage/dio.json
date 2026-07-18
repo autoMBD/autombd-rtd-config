@@ -1,0 +1,1341 @@
+{
+  "format_version": 2,
+  "source": {
+    "module": "Dio",
+    "descriptor": "Dio.xdm",
+    "package": "TS_T40D34M70I1R0",
+    "rtd_release": "7.0.1",
+    "sha256": "E3F8FDF2BACED5D8014FA9FE1A4B0C5AB527B9C1C665C8FC1E6A15768BC63278"
+  },
+  "fact_pool": {
+    "0460600F372E7B31E58774334B782277A448AD5E4DBC8CF0BD15982135BF841F": {
+      "kind": "literal",
+      "values": [
+        "VariantLinkTime",
+        "VariantPreCompile"
+      ]
+    },
+    "1382FC797392728E4FE2A1BE75ECED4AB7ED19CBA178DC464BBE153CF4B15CC3": {
+      "kind": "literal",
+      "value": "VariantPreCompile"
+    },
+    "327EB9AF679294AF9F240250687AF86F2BF1129741E9E87091ADE7C0BDB71549": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": "text:uniq(../*, .)",
+          "false": "Duplicate Partition."
+        },
+        {
+          "expr": "node:containsValue(as:modconf('Os')[1]/OsApplication/*/OsAppEcucPartitionRef, .)",
+          "false": "The referenced ECUC partition isn't used by any OsApplication (i.e. Os/OsApplication/*/OsAppEcucPartitionRef)"
+        },
+        {
+          "expr": "../../../DioGeneral/DioMultiPartitionSupport",
+          "false": "The Dio MultiPartition Support parameter is not enabled"
+        }
+      ]
+    },
+    "3443B93C1F0D5FB183B20058ECD1109AA6761F3B46E3836750F452A82A1273E5": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": "text:uniq(../../../../*/DioChannelGroup/*, .)",
+          "false": "ChannelGroup name duplicated. Channel group names must be unique even across ports and configurations."
+        }
+      ]
+    },
+    "3E23960C56565E67A70EFF81A7E64775B8801D1126AE9BD8D9DB1AA55F1F1FD3": {
+      "kind": "literal",
+      "value": "TRUE"
+    },
+    "40EEB44BE3DC18EC1CB58865D7B89AC993FADDD1A4FCF37DD0485A54BE3F7D55": {
+      "kind": "literal",
+      "value": ""
+    },
+    "43407099A21A756F993FE61B28AC2C68141E88A19DCFC14D85379A163B3EF27B": {
+      "kind": "literal",
+      "value": "1"
+    },
+    "456153ABD25FBF6B71B13344F9DC4C31D9D1B02CA30B1B5DA4CECB7AE00B872C": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": ">=1"
+        },
+        {
+          "expr": "<=1"
+        }
+      ]
+    },
+    "459576108FF1B8BC06287016858F3C98B10DCD220E7E012022D9167A808CCF8C": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": "(num:i(count(./*)) = 0) and (num:i(count(../../../../DioGeneral/DioEcucPartitionRef/*)) > 0)",
+          "true": "At least one partition need to be defined in DioPortEcucPartitionRef"
+        }
+      ]
+    },
+    "48A3A71A2F24BECC708DC90F9A9A59AAF768FD2F1D7493039A2053CE77C66037": {
+      "kind": "literal",
+      "value": "7"
+    },
+    "4E4988F836B999C225F37231DC0330EE4B0431A06380A3B6AABB47E8223ACF22": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": ">=120"
+        },
+        {
+          "expr": "<=120"
+        }
+      ]
+    },
+    "53E30AC20DEF236DC54F0F0301FA3050D4FAD7E07F9B9EC2BD3BB8CD0331FB0E": {
+      "kind": "literal",
+      "value": "true"
+    },
+    "56687427DC54A673139E90418DEFE777B404FAD87A2F293D8B75A5D82A3EE16F": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": "text:uniq(../../*/DioPortId, .)",
+          "false": "DioPortId is repeated for two or more ports."
+        },
+        {
+          "expr": "(num:hextoint(ecu:list('Dio.AvailablePortPinsForWrite')[num:dectoint(node:current())+1]) != num:i('0')) or (num:hextoint(ecu:list('Dio.AvailablePortPinsForRead')[num:dectoint(node:current())+1]) != num:i('0'))",
+          "false": "This port is not available for the selected package. Please see RM for a list of available ports for selected package."
+        }
+      ]
+    },
+    "5711C942F04FB4BD2435CF46C4EDBBACFA9967F94265C74F3378BBDB64C1606B": {
+      "kind": "literal",
+      "value": "43"
+    },
+    "57FEFDB3C23C6FB56D7FF5B08698CB5A6F45C1400B39FC2DDDFBCBCDA3A564C8": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": ">=0"
+        },
+        {
+          "expr": "<=0"
+        }
+      ]
+    },
+    "5DE712E1AA2683E90996454A9FB799F2CD86B89D9090F370D5FB7C099C132FA2": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": "(. = 'true') and (../DioVirtWrapperSupport = 'true')",
+          "true": "This API will be unavailable when one channel or group channel from the port is allocated to another domain. To use this API, please disable Dio VirtWrapper Support"
+        }
+      ]
+    },
+    "5EC346F423AA2A472541C1522F45DC7ECA1DD02F9DEC938974CF325ABF603595": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": ">=7"
+        },
+        {
+          "expr": "<=7"
+        }
+      ]
+    },
+    "667E81A3C2BF9D4CBAD8561D3C562B58F474DB0E76741BC4E3CAD837C69C47E2": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": "text:uniq(../*, .)",
+          "false": "Duplicate Partition."
+        },
+        {
+          "expr": "count(text:grep(../../../../DioPortEcucPartitionRef/*,.)) > 0",
+          "false": "The ECUC partition must be defined on the DioPortEcucPartitionRef."
+        },
+        {
+          "expr": "(num:i(count(../*)) > 1) and (../../../../../../../DioGeneral/DioVirtWrapperSupport = 'true')",
+          "true": "When VirtWrapper Support is enabled, just only one partition is allowed"
+        }
+      ]
+    },
+    "68FE4FB7A6E4FB130A8B7EE5D4996F6CB741079403954049D545C69484E3F020": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": "(num:i(count(./*)) = 0) and (num:i(count(../../../DioPortEcucPartitionRef/*)) > 0)",
+          "true": "At least one partition need to be defined in DioChannelEcucPartitionRef"
+        }
+      ]
+    },
+    "7751FC06F3A79AFFA471D8D2733EBA4AE7F6F8F539B3227EF7E3F6A3925EBF24": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": "(bit:shl((bit:shl(1,node:fallback(../DioPortBitNumber,0)) - 1), node:fallback(../DioPortOffset,1)))"
+        }
+      ]
+    },
+    "793DC38E4AA4AA0AFFABF64C74974CCC5FB1DD1E02B24AC473D2D80968D3FF9A": {
+      "kind": "literal",
+      "value": "4"
+    },
+    "7C97A266565FA05628A154E5AAB8A26240255466B77F4E09D589F263B66BFE32": {
+      "kind": "literal",
+      "value": "VIRTUAL_WRAPPER_PDAC0"
+    },
+    "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F": {
+      "kind": "literal",
+      "value": "false"
+    },
+    "83CCF9C2AE24BA008027ED4AFF00CB94AC6BA2A51631C13B07B71AEAE287A575": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": ">=1"
+        },
+        {
+          "expr": "<=16"
+        }
+      ]
+    },
+    "84073046E64C62E238FD3A7A91291C9AD233B88E5CEC2F93F79DE5B8E67A514C": {
+      "kind": "literal",
+      "value": "255"
+    },
+    "897E0E31B64FA4B091075F37BC46437A8313FE160963AC5B4B1A875C65F6B011": {
+      "kind": "xpath",
+      "expr": "ecu:list('Dio.PdacSlot')"
+    },
+    "A11AB976D678F3BFEC71CDA8B6C0E08307543E2326AEC8D923C8E40AD5FBE562": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": "(../../../../../../DioGeneral/DioVirtWrapperSupport = 'true') and (not(node:exists('ASPathDataOfSchema:/AUTOSAR/EcucDefs/Rm/')))"
+        }
+      ]
+    },
+    "A38FA7DFAFE8A0FEFEC2DC61B1BC8C0255F7035C027DDCBAD7C64013E9460D4A": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": "text:match(normalize-space(.),'^[_a-zA-Z]+[_0-9a-zA-Z]*$') or normalize-space(.) = ' ' ",
+          "false": "DioChannelGroupIdentification name should be entered as string."
+        },
+        {
+          "expr": "text:uniq(../../../../*/DioChannelGroup/*/DioChannelGroupIdentification, .)",
+          "false": "DioChannelGroupIdentification is repeated for two or more channel groups. Please enter different symbolic name."
+        }
+      ]
+    },
+    "B0CAC2E96B17071C6368B5FAF756C5E0BD87C4CE36D5C62E3ED5B472D3A4B5D2": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": "<=num:i(count(ecu:list('Dio.AvailablePortPinsForRead')) - 1)"
+        },
+        {
+          "expr": ">=0"
+        }
+      ]
+    },
+    "B5D51E13574D0BFCB1181EF32206C6744489D007DB62EC84C1DE08F7E99008E4": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": "text:uniq(../*, .)",
+          "false": "Duplicate Partition."
+        },
+        {
+          "expr": "count(text:grep(../../../../../DioGeneral/DioEcucPartitionRef/*,.)) > 0",
+          "false": "The ECUC partition must be defined on the DioEcucPartitionRef."
+        },
+        {
+          "expr": "(num:i(count(../*)) > 1) and (../../../../../DioGeneral/DioVirtWrapperSupport = 'true')",
+          "true": "When VirtWrapper Support is enabled, just only one partition is allowed"
+        }
+      ]
+    },
+    "C2EF64531BE946E77DB8223ADDC9D2FC0D592BED88578FD1D6924F3BE73A9A87": {
+      "kind": "literal",
+      "value": "0"
+    },
+    "CA11DEDFC681DCD82411902D7993093C4381D3F61F1875BC10DCCB5BE5134BCB": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": ">=4"
+        },
+        {
+          "expr": "<=4"
+        }
+      ]
+    },
+    "CBFAF6E244B37B3929021C150D456AA28DCCAE58E78DECAE484071EB98C2D3A3": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": "<=15"
+        },
+        {
+          "expr": ">=0"
+        }
+      ]
+    },
+    "D9E49251055BB744B29FF8F461AEB3F1FD10A5BE006C21E7B84CAE8952386EF1": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": ">=43"
+        },
+        {
+          "expr": "<=43"
+        }
+      ]
+    },
+    "DC7579B67F350297F28002553C1DB3504624A8F44C623DB798222FCF4A9E5BAB": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": "text:uniq(../../*/DioChannelId, .)",
+          "false": "DioChannelId is repeated for two or more channels."
+        },
+        {
+          "expr": "(bit:and(num:hextoint(ecu:list('Dio.AvailablePortPinsForWrite')[num:dectoint((node:current())/../../../DioPortId)+1]),bit:shl( num:i(1),num:dectoint ( node:current() ) )) != '0') or (bit:and(num:hextoint(ecu:list('Dio.AvailablePortPinsForRead')[num:dectoint((node:current())/../../../DioPortId)+1]),bit:shl( num:i(1),num:dectoint ( node:current() ) )) != '0')",
+          "false": "This channel is not available in the selected package. Please see RM for a list of available channels for selected package."
+        }
+      ]
+    },
+    "E1EE4475AFB28275D9B4A66CF946FE29200A26FA4BA49D5291D0CC012B2F8173": {
+      "kind": "literal",
+      "value": "120"
+    },
+    "E6B033F145996B86D0D6E25B3A2DD426D511C0E05B4ED4480BB1EE548E8E2009": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": "(. = 'true') and (node:exists('ASPathDataOfSchema:/AUTOSAR/EcucDefs/Rm/')) and (node:refs('ASPathDataOfSchema:/AUTOSAR/EcucDefs/Rm/RmGeneral/RmVirtWrapperConfigurable/') = 'false')",
+          "true": "The RM Enable Virtual Wrapper feature is required to enabled when Dio Virtual Wrapper Support is enabled"
+        }
+      ]
+    },
+    "F0EF7694094267245EE11AC26B26F662E6E8299F47B0CB9C6122EF777CAC582F": {
+      "kind": "literal",
+      "value": "DioChannelGroup"
+    },
+    "F25FE72C8C420C55AD7CA20D3187898AC882FBB38FDB4A02B92ACCDE11E12623": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": "(. = 'true') and not(num:i(count(../../DioGeneral/DioEcucPartitionRef/*) > 0))",
+          "true": "Dio MultiPartition Support is only enabled when at least one EcucPartition needs to be defined (in all variants)."
+        }
+      ]
+    },
+    "F5B1D6C6A1B832E25C1DBE7BE02B38DCEB154CB5102145589DCC31423FFD8D06": {
+      "kind": "literal",
+      "value": "9"
+    },
+    "F9CA889AE5B5CD627F42A87166E42656720C9253F157E156A3366F5F8EFCB57C": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": "(num:i(count(./*)) = 0) and (num:i(count(../../../DioPortEcucPartitionRef/*)) > 0)",
+          "true": "At least one partition need to be defined in DioChannelGroupEcucPartitionRef"
+        }
+      ]
+    },
+    "FF167184B38369D71CB01E34B30A42503147A332B3802D6E917EABE13CE09C50": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": ">=9"
+        },
+        {
+          "expr": "<=9"
+        }
+      ]
+    }
+  },
+  "items": [
+    {
+      "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]",
+      "kind": "container",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]",
+      "name": "CommonPublishedInformation",
+      "type": "IDENTIFIABLE"
+    },
+    {
+      "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]",
+      "kind": "container",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]",
+      "name": "DioConfig",
+      "type": "IDENTIFIABLE"
+    },
+    {
+      "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]",
+      "kind": "container",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]",
+      "name": "DioPort",
+      "type": "IDENTIFIABLE"
+    },
+    {
+      "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioChannelGroup]/ctr[DioChannelGroup]",
+      "kind": "container",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioChannelGroup]/ctr[DioChannelGroup]",
+      "name": "DioChannelGroup",
+      "type": "IDENTIFIABLE",
+      "facts": {
+        "invalid": "3443B93C1F0D5FB183B20058ECD1109AA6761F3B46E3836750F452A82A1273E5"
+      },
+      "fact_sources": {
+        "invalid": [
+          {
+            "source_tag": "da",
+            "fact": "3443B93C1F0D5FB183B20058ECD1109AA6761F3B46E3836750F452A82A1273E5"
+          }
+        ]
+      }
+    },
+    {
+      "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioChannel]/ctr[DioChannel]",
+      "kind": "container",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioChannel]/ctr[DioChannel]",
+      "name": "DioChannel",
+      "type": "IDENTIFIABLE"
+    },
+    {
+      "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioGeneral]",
+      "kind": "container",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioGeneral]",
+      "name": "DioGeneral",
+      "type": "IDENTIFIABLE"
+    },
+    {
+      "key": "list:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]",
+      "kind": "list",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]",
+      "name": "DioPort",
+      "type": "MAP",
+      "facts": {
+        "min": "43407099A21A756F993FE61B28AC2C68141E88A19DCFC14D85379A163B3EF27B"
+      },
+      "fact_sources": {
+        "min": [
+          {
+            "source_tag": "da",
+            "fact": "43407099A21A756F993FE61B28AC2C68141E88A19DCFC14D85379A163B3EF27B"
+          }
+        ]
+      }
+    },
+    {
+      "key": "list:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioChannelGroup]",
+      "kind": "list",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioChannelGroup]",
+      "name": "DioChannelGroup",
+      "type": "MAP",
+      "facts": {
+        "max": "84073046E64C62E238FD3A7A91291C9AD233B88E5CEC2F93F79DE5B8E67A514C"
+      },
+      "fact_sources": {
+        "max": [
+          {
+            "source_tag": "da",
+            "fact": "84073046E64C62E238FD3A7A91291C9AD233B88E5CEC2F93F79DE5B8E67A514C"
+          }
+        ]
+      }
+    },
+    {
+      "key": "list:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioChannelGroup]/ctr[DioChannelGroup]/lst[DioChannelGroupEcucPartitionRef]",
+      "kind": "list",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioChannelGroup]/ctr[DioChannelGroup]/lst[DioChannelGroupEcucPartitionRef]",
+      "name": "DioChannelGroupEcucPartitionRef",
+      "facts": {
+        "invalid": "F9CA889AE5B5CD627F42A87166E42656720C9253F157E156A3366F5F8EFCB57C"
+      },
+      "fact_sources": {
+        "invalid": [
+          {
+            "source_tag": "da",
+            "fact": "F9CA889AE5B5CD627F42A87166E42656720C9253F157E156A3366F5F8EFCB57C"
+          }
+        ]
+      }
+    },
+    {
+      "key": "list:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioChannel]",
+      "kind": "list",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioChannel]",
+      "name": "DioChannel",
+      "type": "MAP"
+    },
+    {
+      "key": "list:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioChannel]/ctr[DioChannel]/lst[DioChannelEcucPartitionRef]",
+      "kind": "list",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioChannel]/ctr[DioChannel]/lst[DioChannelEcucPartitionRef]",
+      "name": "DioChannelEcucPartitionRef",
+      "facts": {
+        "invalid": "68FE4FB7A6E4FB130A8B7EE5D4996F6CB741079403954049D545C69484E3F020"
+      },
+      "fact_sources": {
+        "invalid": [
+          {
+            "source_tag": "da",
+            "fact": "68FE4FB7A6E4FB130A8B7EE5D4996F6CB741079403954049D545C69484E3F020"
+          }
+        ]
+      }
+    },
+    {
+      "key": "list:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioPortEcucPartitionRef]",
+      "kind": "list",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioPortEcucPartitionRef]",
+      "name": "DioPortEcucPartitionRef",
+      "facts": {
+        "invalid": "459576108FF1B8BC06287016858F3C98B10DCD220E7E012022D9167A808CCF8C"
+      },
+      "fact_sources": {
+        "invalid": [
+          {
+            "source_tag": "da",
+            "fact": "459576108FF1B8BC06287016858F3C98B10DCD220E7E012022D9167A808CCF8C"
+          }
+        ]
+      }
+    },
+    {
+      "key": "list:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioGeneral]/lst[DioEcucPartitionRef]",
+      "kind": "list",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioGeneral]/lst[DioEcucPartitionRef]",
+      "name": "DioEcucPartitionRef"
+    },
+    {
+      "key": "reference:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioChannelGroup]/ctr[DioChannelGroup]/lst[DioChannelGroupEcucPartitionRef]/ref[DioChannelGroupEcucPartitionRef]",
+      "kind": "reference",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioChannelGroup]/ctr[DioChannelGroup]/lst[DioChannelGroupEcucPartitionRef]/ref[DioChannelGroupEcucPartitionRef]",
+      "name": "DioChannelGroupEcucPartitionRef",
+      "type": "REFERENCE",
+      "reference": "ASPathDataOfSchema:/AUTOSAR/EcucDefs/EcuC/EcucPartitionCollection/EcucPartition",
+      "cross_references": [
+        "EcuC"
+      ],
+      "cross_modules": [
+        "EcuC"
+      ],
+      "facts": {
+        "invalid": "667E81A3C2BF9D4CBAD8561D3C562B58F474DB0E76741BC4E3CAD837C69C47E2"
+      },
+      "fact_sources": {
+        "invalid": [
+          {
+            "source_tag": "da",
+            "fact": "667E81A3C2BF9D4CBAD8561D3C562B58F474DB0E76741BC4E3CAD837C69C47E2"
+          }
+        ]
+      }
+    },
+    {
+      "key": "reference:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioChannel]/ctr[DioChannel]/lst[DioChannelEcucPartitionRef]/ref[DioChannelEcucPartitionRef]",
+      "kind": "reference",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioChannel]/ctr[DioChannel]/lst[DioChannelEcucPartitionRef]/ref[DioChannelEcucPartitionRef]",
+      "name": "DioChannelEcucPartitionRef",
+      "type": "REFERENCE",
+      "reference": "ASPathDataOfSchema:/AUTOSAR/EcucDefs/EcuC/EcucPartitionCollection/EcucPartition",
+      "cross_references": [
+        "EcuC"
+      ],
+      "cross_modules": [
+        "EcuC"
+      ],
+      "facts": {
+        "invalid": "667E81A3C2BF9D4CBAD8561D3C562B58F474DB0E76741BC4E3CAD837C69C47E2"
+      },
+      "fact_sources": {
+        "invalid": [
+          {
+            "source_tag": "da",
+            "fact": "667E81A3C2BF9D4CBAD8561D3C562B58F474DB0E76741BC4E3CAD837C69C47E2"
+          }
+        ]
+      }
+    },
+    {
+      "key": "reference:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioPortEcucPartitionRef]/ref[DioPortEcucPartitionRef]",
+      "kind": "reference",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioPortEcucPartitionRef]/ref[DioPortEcucPartitionRef]",
+      "name": "DioPortEcucPartitionRef",
+      "type": "REFERENCE",
+      "reference": "ASPathDataOfSchema:/AUTOSAR/EcucDefs/EcuC/EcucPartitionCollection/EcucPartition",
+      "cross_references": [
+        "EcuC"
+      ],
+      "cross_modules": [
+        "EcuC"
+      ],
+      "facts": {
+        "invalid": "B5D51E13574D0BFCB1181EF32206C6744489D007DB62EC84C1DE08F7E99008E4"
+      },
+      "fact_sources": {
+        "invalid": [
+          {
+            "source_tag": "da",
+            "fact": "B5D51E13574D0BFCB1181EF32206C6744489D007DB62EC84C1DE08F7E99008E4"
+          }
+        ]
+      }
+    },
+    {
+      "key": "reference:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioGeneral]/lst[DioEcucPartitionRef]/ref[DioEcucPartitionRef]",
+      "kind": "reference",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioGeneral]/lst[DioEcucPartitionRef]/ref[DioEcucPartitionRef]",
+      "name": "DioEcucPartitionRef",
+      "type": "REFERENCE",
+      "reference": "ASPathDataOfSchema:/AUTOSAR/EcucDefs/EcuC/EcucPartitionCollection/EcucPartition",
+      "cross_references": [
+        "EcuC"
+      ],
+      "cross_modules": [
+        "EcuC"
+      ],
+      "facts": {
+        "invalid": "327EB9AF679294AF9F240250687AF86F2BF1129741E9E87091ADE7C0BDB71549"
+      },
+      "fact_sources": {
+        "invalid": [
+          {
+            "source_tag": "da",
+            "fact": "327EB9AF679294AF9F240250687AF86F2BF1129741E9E87091ADE7C0BDB71549"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[ArReleaseMajorVersion]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[ArReleaseMajorVersion]",
+      "name": "ArReleaseMajorVersion",
+      "type": "INTEGER_LABEL",
+      "facts": {
+        "default": "793DC38E4AA4AA0AFFABF64C74974CCC5FB1DD1E02B24AC473D2D80968D3FF9A",
+        "invalid": "CA11DEDFC681DCD82411902D7993093C4381D3F61F1875BC10DCCB5BE5134BCB"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "793DC38E4AA4AA0AFFABF64C74974CCC5FB1DD1E02B24AC473D2D80968D3FF9A"
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "fact": "CA11DEDFC681DCD82411902D7993093C4381D3F61F1875BC10DCCB5BE5134BCB"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[ArReleaseMinorVersion]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[ArReleaseMinorVersion]",
+      "name": "ArReleaseMinorVersion",
+      "type": "INTEGER_LABEL",
+      "facts": {
+        "default": "F5B1D6C6A1B832E25C1DBE7BE02B38DCEB154CB5102145589DCC31423FFD8D06",
+        "invalid": "FF167184B38369D71CB01E34B30A42503147A332B3802D6E917EABE13CE09C50"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "F5B1D6C6A1B832E25C1DBE7BE02B38DCEB154CB5102145589DCC31423FFD8D06"
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "fact": "FF167184B38369D71CB01E34B30A42503147A332B3802D6E917EABE13CE09C50"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[ArReleaseRevisionVersion]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[ArReleaseRevisionVersion]",
+      "name": "ArReleaseRevisionVersion",
+      "type": "INTEGER_LABEL",
+      "facts": {
+        "default": "C2EF64531BE946E77DB8223ADDC9D2FC0D592BED88578FD1D6924F3BE73A9A87",
+        "invalid": "57FEFDB3C23C6FB56D7FF5B08698CB5A6F45C1400B39FC2DDDFBCBCDA3A564C8"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "C2EF64531BE946E77DB8223ADDC9D2FC0D592BED88578FD1D6924F3BE73A9A87"
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "fact": "57FEFDB3C23C6FB56D7FF5B08698CB5A6F45C1400B39FC2DDDFBCBCDA3A564C8"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[ModuleId]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[ModuleId]",
+      "name": "ModuleId",
+      "type": "INTEGER_LABEL",
+      "facts": {
+        "default": "E1EE4475AFB28275D9B4A66CF946FE29200A26FA4BA49D5291D0CC012B2F8173",
+        "invalid": "4E4988F836B999C225F37231DC0330EE4B0431A06380A3B6AABB47E8223ACF22"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "E1EE4475AFB28275D9B4A66CF946FE29200A26FA4BA49D5291D0CC012B2F8173"
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "fact": "4E4988F836B999C225F37231DC0330EE4B0431A06380A3B6AABB47E8223ACF22"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[SwMajorVersion]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[SwMajorVersion]",
+      "name": "SwMajorVersion",
+      "type": "INTEGER_LABEL",
+      "facts": {
+        "default": "48A3A71A2F24BECC708DC90F9A9A59AAF768FD2F1D7493039A2053CE77C66037",
+        "invalid": "5EC346F423AA2A472541C1522F45DC7ECA1DD02F9DEC938974CF325ABF603595"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "48A3A71A2F24BECC708DC90F9A9A59AAF768FD2F1D7493039A2053CE77C66037"
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "fact": "5EC346F423AA2A472541C1522F45DC7ECA1DD02F9DEC938974CF325ABF603595"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[SwMinorVersion]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[SwMinorVersion]",
+      "name": "SwMinorVersion",
+      "type": "INTEGER_LABEL",
+      "facts": {
+        "default": "C2EF64531BE946E77DB8223ADDC9D2FC0D592BED88578FD1D6924F3BE73A9A87",
+        "invalid": "57FEFDB3C23C6FB56D7FF5B08698CB5A6F45C1400B39FC2DDDFBCBCDA3A564C8"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "C2EF64531BE946E77DB8223ADDC9D2FC0D592BED88578FD1D6924F3BE73A9A87"
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "fact": "57FEFDB3C23C6FB56D7FF5B08698CB5A6F45C1400B39FC2DDDFBCBCDA3A564C8"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[SwPatchVersion]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[SwPatchVersion]",
+      "name": "SwPatchVersion",
+      "type": "INTEGER_LABEL",
+      "facts": {
+        "default": "43407099A21A756F993FE61B28AC2C68141E88A19DCFC14D85379A163B3EF27B",
+        "invalid": "456153ABD25FBF6B71B13344F9DC4C31D9D1B02CA30B1B5DA4CECB7AE00B872C"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "43407099A21A756F993FE61B28AC2C68141E88A19DCFC14D85379A163B3EF27B"
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "fact": "456153ABD25FBF6B71B13344F9DC4C31D9D1B02CA30B1B5DA4CECB7AE00B872C"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[VendorApiInfix]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[VendorApiInfix]",
+      "name": "VendorApiInfix",
+      "type": "STRING_LABEL",
+      "facts": {
+        "default": "40EEB44BE3DC18EC1CB58865D7B89AC993FADDD1A4FCF37DD0485A54BE3F7D55"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "40EEB44BE3DC18EC1CB58865D7B89AC993FADDD1A4FCF37DD0485A54BE3F7D55"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[VendorId]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[VendorId]",
+      "name": "VendorId",
+      "type": "INTEGER_LABEL",
+      "facts": {
+        "default": "5711C942F04FB4BD2435CF46C4EDBBACFA9967F94265C74F3378BBDB64C1606B",
+        "invalid": "D9E49251055BB744B29FF8F461AEB3F1FD10A5BE006C21E7B84CAE8952386EF1"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "5711C942F04FB4BD2435CF46C4EDBBACFA9967F94265C74F3378BBDB64C1606B"
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "fact": "D9E49251055BB744B29FF8F461AEB3F1FD10A5BE006C21E7B84CAE8952386EF1"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioChannelGroup]/ctr[DioChannelGroup]/var[DioChannelGroupIdentification]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioChannelGroup]/ctr[DioChannelGroup]/var[DioChannelGroupIdentification]",
+      "name": "DioChannelGroupIdentification",
+      "type": "STRING",
+      "facts": {
+        "default": "F0EF7694094267245EE11AC26B26F662E6E8299F47B0CB9C6122EF777CAC582F",
+        "invalid": "A38FA7DFAFE8A0FEFEC2DC61B1BC8C0255F7035C027DDCBAD7C64013E9460D4A"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "F0EF7694094267245EE11AC26B26F662E6E8299F47B0CB9C6122EF777CAC582F"
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "fact": "A38FA7DFAFE8A0FEFEC2DC61B1BC8C0255F7035C027DDCBAD7C64013E9460D4A"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioChannelGroup]/ctr[DioChannelGroup]/var[DioPortBitNumber]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioChannelGroup]/ctr[DioChannelGroup]/var[DioPortBitNumber]",
+      "name": "DioPortBitNumber",
+      "type": "INTEGER",
+      "facts": {
+        "default": "43407099A21A756F993FE61B28AC2C68141E88A19DCFC14D85379A163B3EF27B",
+        "invalid": "83CCF9C2AE24BA008027ED4AFF00CB94AC6BA2A51631C13B07B71AEAE287A575"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "43407099A21A756F993FE61B28AC2C68141E88A19DCFC14D85379A163B3EF27B"
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "fact": "83CCF9C2AE24BA008027ED4AFF00CB94AC6BA2A51631C13B07B71AEAE287A575"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioChannelGroup]/ctr[DioChannelGroup]/var[DioPortMask]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioChannelGroup]/ctr[DioChannelGroup]/var[DioPortMask]",
+      "name": "DioPortMask",
+      "type": "INTEGER",
+      "facts": {
+        "default": "7751FC06F3A79AFFA471D8D2733EBA4AE7F6F8F539B3227EF7E3F6A3925EBF24",
+        "invalid": "40EEB44BE3DC18EC1CB58865D7B89AC993FADDD1A4FCF37DD0485A54BE3F7D55"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "7751FC06F3A79AFFA471D8D2733EBA4AE7F6F8F539B3227EF7E3F6A3925EBF24"
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "a",
+            "fact": "40EEB44BE3DC18EC1CB58865D7B89AC993FADDD1A4FCF37DD0485A54BE3F7D55"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioChannelGroup]/ctr[DioChannelGroup]/var[DioPortOffset]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioChannelGroup]/ctr[DioChannelGroup]/var[DioPortOffset]",
+      "name": "DioPortOffset",
+      "type": "INTEGER",
+      "facts": {
+        "default": "C2EF64531BE946E77DB8223ADDC9D2FC0D592BED88578FD1D6924F3BE73A9A87",
+        "invalid": "40EEB44BE3DC18EC1CB58865D7B89AC993FADDD1A4FCF37DD0485A54BE3F7D55"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "C2EF64531BE946E77DB8223ADDC9D2FC0D592BED88578FD1D6924F3BE73A9A87"
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "fact": "40EEB44BE3DC18EC1CB58865D7B89AC993FADDD1A4FCF37DD0485A54BE3F7D55"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioChannel]/ctr[DioChannel]/var[DioChannelId]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioChannel]/ctr[DioChannel]/var[DioChannelId]",
+      "name": "DioChannelId",
+      "type": "INTEGER",
+      "facts": {
+        "default": "C2EF64531BE946E77DB8223ADDC9D2FC0D592BED88578FD1D6924F3BE73A9A87",
+        "invalid": "CBFAF6E244B37B3929021C150D456AA28DCCAE58E78DECAE484071EB98C2D3A3",
+        "range": "DC7579B67F350297F28002553C1DB3504624A8F44C623DB798222FCF4A9E5BAB"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "C2EF64531BE946E77DB8223ADDC9D2FC0D592BED88578FD1D6924F3BE73A9A87"
+          }
+        ],
+        "range": [
+          {
+            "source_tag": "da",
+            "fact": "DC7579B67F350297F28002553C1DB3504624A8F44C623DB798222FCF4A9E5BAB"
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "fact": "CBFAF6E244B37B3929021C150D456AA28DCCAE58E78DECAE484071EB98C2D3A3"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioChannel]/ctr[DioChannel]/var[PDACSlot]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/lst[DioChannel]/ctr[DioChannel]/var[PDACSlot]",
+      "name": "PDACSlot",
+      "type": "ENUMERATION",
+      "facts": {
+        "default": "7C97A266565FA05628A154E5AAB8A26240255466B77F4E09D589F263B66BFE32",
+        "editable": "A11AB976D678F3BFEC71CDA8B6C0E08307543E2326AEC8D923C8E40AD5FBE562",
+        "range": "897E0E31B64FA4B091075F37BC46437A8313FE160963AC5B4B1A875C65F6B011"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "7C97A266565FA05628A154E5AAB8A26240255466B77F4E09D589F263B66BFE32"
+          }
+        ],
+        "range": [
+          {
+            "source_tag": "da",
+            "fact": "897E0E31B64FA4B091075F37BC46437A8313FE160963AC5B4B1A875C65F6B011"
+          }
+        ],
+        "editable": [
+          {
+            "source_tag": "da",
+            "fact": "A11AB976D678F3BFEC71CDA8B6C0E08307543E2326AEC8D923C8E40AD5FBE562"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/var[DioPortId]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]/ctr[DioPort]/var[DioPortId]",
+      "name": "DioPortId",
+      "type": "INTEGER",
+      "facts": {
+        "default": "C2EF64531BE946E77DB8223ADDC9D2FC0D592BED88578FD1D6924F3BE73A9A87",
+        "invalid": "B0CAC2E96B17071C6368B5FAF756C5E0BD87C4CE36D5C62E3ED5B472D3A4B5D2",
+        "range": "56687427DC54A673139E90418DEFE777B404FAD87A2F293D8B75A5D82A3EE16F"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "C2EF64531BE946E77DB8223ADDC9D2FC0D592BED88578FD1D6924F3BE73A9A87"
+          }
+        ],
+        "range": [
+          {
+            "source_tag": "da",
+            "fact": "56687427DC54A673139E90418DEFE777B404FAD87A2F293D8B75A5D82A3EE16F"
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "fact": "B0CAC2E96B17071C6368B5FAF756C5E0BD87C4CE36D5C62E3ED5B472D3A4B5D2"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioGeneral]/var[DioDevErrorDetect]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioGeneral]/var[DioDevErrorDetect]",
+      "name": "DioDevErrorDetect",
+      "type": "BOOLEAN",
+      "facts": {
+        "default": "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioGeneral]/var[DioEnableUserModeSupport]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioGeneral]/var[DioEnableUserModeSupport]",
+      "name": "DioEnableUserModeSupport",
+      "type": "BOOLEAN",
+      "facts": {
+        "default": "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F",
+        "readonly": "53E30AC20DEF236DC54F0F0301FA3050D4FAD7E07F9B9EC2BD3BB8CD0331FB0E"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F"
+          }
+        ],
+        "readonly": [
+          {
+            "source_tag": "da",
+            "fact": "53E30AC20DEF236DC54F0F0301FA3050D4FAD7E07F9B9EC2BD3BB8CD0331FB0E"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioGeneral]/var[DioFlipChannelApi]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioGeneral]/var[DioFlipChannelApi]",
+      "name": "DioFlipChannelApi",
+      "type": "BOOLEAN",
+      "facts": {
+        "default": "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioGeneral]/var[DioMaskedWritePortApi]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioGeneral]/var[DioMaskedWritePortApi]",
+      "name": "DioMaskedWritePortApi",
+      "type": "BOOLEAN",
+      "facts": {
+        "default": "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F",
+        "invalid": "5DE712E1AA2683E90996454A9FB799F2CD86B89D9090F370D5FB7C099C132FA2"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F"
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "da",
+            "fact": "5DE712E1AA2683E90996454A9FB799F2CD86B89D9090F370D5FB7C099C132FA2"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioGeneral]/var[DioMultiPartitionSupport]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioGeneral]/var[DioMultiPartitionSupport]",
+      "name": "DioMultiPartitionSupport",
+      "type": "BOOLEAN",
+      "facts": {
+        "default": "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F",
+        "editable": "53E30AC20DEF236DC54F0F0301FA3050D4FAD7E07F9B9EC2BD3BB8CD0331FB0E",
+        "invalid": "F25FE72C8C420C55AD7CA20D3187898AC882FBB38FDB4A02B92ACCDE11E12623"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F"
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "a",
+            "fact": "F25FE72C8C420C55AD7CA20D3187898AC882FBB38FDB4A02B92ACCDE11E12623"
+          }
+        ],
+        "editable": [
+          {
+            "source_tag": "a",
+            "fact": "53E30AC20DEF236DC54F0F0301FA3050D4FAD7E07F9B9EC2BD3BB8CD0331FB0E"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioGeneral]/var[DioReadZeroForUndefinedPortPins]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioGeneral]/var[DioReadZeroForUndefinedPortPins]",
+      "name": "DioReadZeroForUndefinedPortPins",
+      "type": "BOOLEAN",
+      "facts": {
+        "default": "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioGeneral]/var[DioReversePortBits]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioGeneral]/var[DioReversePortBits]",
+      "name": "DioReversePortBits",
+      "type": "BOOLEAN",
+      "facts": {
+        "default": "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioGeneral]/var[DioVersionInfoApi]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioGeneral]/var[DioVersionInfoApi]",
+      "name": "DioVersionInfoApi",
+      "type": "BOOLEAN",
+      "facts": {
+        "default": "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioGeneral]/var[DioVirtWrapperSupport]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioGeneral]/var[DioVirtWrapperSupport]",
+      "name": "DioVirtWrapperSupport",
+      "type": "BOOLEAN",
+      "facts": {
+        "default": "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F",
+        "editable": "53E30AC20DEF236DC54F0F0301FA3050D4FAD7E07F9B9EC2BD3BB8CD0331FB0E",
+        "invalid": "E6B033F145996B86D0D6E25B3A2DD426D511C0E05B4ED4480BB1EE548E8E2009"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F"
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "a",
+            "fact": "E6B033F145996B86D0D6E25B3A2DD426D511C0E05B4ED4480BB1EE548E8E2009"
+          }
+        ],
+        "editable": [
+          {
+            "source_tag": "a",
+            "fact": "53E30AC20DEF236DC54F0F0301FA3050D4FAD7E07F9B9EC2BD3BB8CD0331FB0E"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioGeneral]/var[SIUL2DioIPDevErrorDetect]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioGeneral]/var[SIUL2DioIPDevErrorDetect]",
+      "name": "SIUL2DioIPDevErrorDetect",
+      "type": "BOOLEAN",
+      "facts": {
+        "default": "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/var[IMPLEMENTATION_CONFIG_VARIANT]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/var[IMPLEMENTATION_CONFIG_VARIANT]",
+      "name": "IMPLEMENTATION_CONFIG_VARIANT",
+      "type": "ENUMERATION",
+      "facts": {
+        "default": "1382FC797392728E4FE2A1BE75ECED4AB7ED19CBA178DC464BBE153CF4B15CC3",
+        "range": "0460600F372E7B31E58774334B782277A448AD5E4DBC8CF0BD15982135BF841F"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "1382FC797392728E4FE2A1BE75ECED4AB7ED19CBA178DC464BBE153CF4B15CC3"
+          }
+        ],
+        "range": [
+          {
+            "source_tag": "da",
+            "fact": "0460600F372E7B31E58774334B782277A448AD5E4DBC8CF0BD15982135BF841F"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/var[POST_BUILD_VARIANT_USED]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/var[POST_BUILD_VARIANT_USED]",
+      "name": "POST_BUILD_VARIANT_USED",
+      "type": "BOOLEAN",
+      "facts": {
+        "default": "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F",
+        "readonly": "3E23960C56565E67A70EFF81A7E64775B8801D1126AE9BD8D9DB1AA55F1F1FD3"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F"
+          }
+        ],
+        "readonly": [
+          {
+            "source_tag": "da",
+            "fact": "3E23960C56565E67A70EFF81A7E64775B8801D1126AE9BD8D9DB1AA55F1F1FD3"
+          }
+        ]
+      }
+    }
+  ],
+  "classification_default": {
+    "classification": "deferred",
+    "reason": "The descriptor item is not caller-controlled by the current Dio provider.",
+    "dependency": "A descriptor-forward Dio implementation and generality tests are required before exposure."
+  },
+  "classification_rules": [
+    {
+      "match": {
+        "path_prefixes": [
+          "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Dio]/ctr[MODULE-DEF]/ctr[DioConfig]/lst[DioPort]"
+        ],
+        "names": [
+          "DioPort",
+          "DioChannel",
+          "DioChannelGroup",
+          "DioChannelEcucPartitionRef",
+          "DioPortEcucPartitionRef",
+          "DioChannelId",
+          "PDACSlot",
+          "DioPortId"
+        ]
+      },
+      "classification": "derived",
+      "trace": {
+        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_dio_set",
+        "inputs": [
+          "intent.payload.pin",
+          "dio.json#/channel_fields"
+        ],
+        "tests": [
+          "tests/unit/test_dio_apply.py::test_dio_channel_inserted_into_dioport_0",
+          "tests/unit/test_dio_apply.py::test_dio_channel_has_ecuc_partition_ref_array",
+          "tests/unit/test_dio_apply.py::test_dio_port_autocreated_for_port1_pin_pta16"
+        ]
+      }
+    }
+  ],
+  "known_gap_rules": {}
+}

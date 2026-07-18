@@ -68,6 +68,7 @@ Ground truth (from brief, Uart.xdm, Mcl.xdm, fixture):
 from __future__ import annotations
 
 import json
+from functools import partial
 import subprocess
 import sys
 import xml.etree.ElementTree as ET
@@ -79,7 +80,13 @@ from rtd_config.backends.s32_mex.apply import apply_uart_add_flexio_channel
 from rtd_config.backends.s32_mex.document import MexDocument
 from rtd_config.intent import Intent
 from rtd_config.modules.uart import UartProvider
-from tests.fixtures import copy_uart_fixture
+from tests.fixtures import copy_uart_fixture, resolved_uart_bundle
+
+_BUNDLE = resolved_uart_bundle()
+apply_uart_add_flexio_channel = partial(
+    apply_uart_add_flexio_channel, bundle=_BUNDLE
+)
+UartProvider = partial(UartProvider, _BUNDLE)
 
 # ---------------------------------------------------------------------------
 # Asset path
@@ -870,7 +877,7 @@ class TestAntiHardcode:
             "module": "mcl", "action": "set",
             "payload": {"add_flexio_logic_channel": "PRE_EXISTING"},
         })
-        pre_result = apply_mcl_set(doc, pre_intent)
+        pre_result = apply_mcl_set(doc, pre_intent, bundle=_BUNDLE)
         assert not pre_result.blocked, [d.to_dict() for d in pre_result.diagnostics]
         # Now apply UART-002 -- it should compute ids starting from 3 (TX) and 4 (RX)
         result = apply_uart_add_flexio_channel(doc, _default_intent())
@@ -1016,7 +1023,9 @@ class TestCliAddFlexioChannel:
             check=True,
         )
         from rtd_config.backends.s32_mex.locate import find_single_mex
-        mex = find_single_mex(project)
+        target = find_single_mex(project)
+        mex = target.mex.path
+        target.close()
         doc = MexDocument.load(mex)
         assert _mcl_channel_by_name(doc, "UART2_TX") is not None
         assert _mcl_channel_by_name(doc, "UART2_RX") is not None
@@ -1042,7 +1051,9 @@ class TestCliAddFlexioChannel:
             check=True,
         )
         from rtd_config.backends.s32_mex.locate import find_single_mex
-        mex = find_single_mex(project)
+        target = find_single_mex(project)
+        mex = target.mex.path
+        target.close()
         doc = MexDocument.load(mex)
         assert _uart_channel_by_name(doc, "UART2_TX") is not None
         assert _uart_channel_by_name(doc, "UART2_RX") is not None

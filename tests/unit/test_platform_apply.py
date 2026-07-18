@@ -54,6 +54,7 @@ interrupt (FLEXIO_IRQn). The edit is a narrow attribute change on an existing
 element -- no element creation.
 """
 import difflib
+from functools import partial
 import json
 import subprocess
 import sys
@@ -63,7 +64,11 @@ from rtd_config.backends.s32_mex.document import MexDocument
 from rtd_config.backends.s32_mex.apply import apply_platform_set
 from rtd_config.intent import Intent
 from rtd_config.modules.platform import PlatformProvider
-from tests.fixtures import copy_uart_fixture
+from tests.fixtures import copy_uart_fixture, resolved_uart_bundle
+
+_BUNDLE = resolved_uart_bundle()
+apply_platform_set = partial(apply_platform_set, bundle=_BUNDLE)
+PlatformProvider = partial(PlatformProvider, _BUNDLE)
 
 
 def _intent(**payload) -> Intent:
@@ -95,22 +100,11 @@ def _setting_value(doc: MexDocument, entry, name: str) -> str | None:
     return setting.attrib.get("value") if setting is not None else None
 
 
-def test_platform_json_asset_has_forward_surface_coverage():
+def test_platform_json_asset_excludes_development_coverage():
     asset = json.loads(_asset_path().read_text(encoding="utf-8"))
 
     assert "Platform.xdm" in asset["source"]
-    coverage = asset["_coverage"]
-
-    isr_surface = coverage["configurable_today"]["IntCtrlConfig/PlatformIsrConfig"]
-    for item in ("IsrName", "IsrEnabled", "IsrPriority", "IsrHandler"):
-        assert item in isr_surface
-
-    assert "PlatformNvicEcucPartitionRef" in coverage["not_yet_exposed"]["partitioning"]
-    assert "SystemIsrConfig" in coverage["not_yet_exposed"]["system_interrupts"]
-    assert coverage["references"] == [
-        "Platform.xdm:IntCtrlConfig/PlatformIsrConfig",
-        "issue #53 Platform KPI route correction",
-    ]
+    assert "_coverage" not in asset
 
 
 def test_set_priority_by_peripheral(tmp_path):

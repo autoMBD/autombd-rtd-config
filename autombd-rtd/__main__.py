@@ -40,7 +40,7 @@
 # File:        __main__.py
 # Author:      autoMBD <tkung.lqk@foxmail.com>
 # Date:        2026-06-06
-# Version:     0.1.7
+# Version:     0.1.8
 # Description: Zero-config launcher for the bundled RTD CfgFile CLI. Lets the
 #              skill run self-contained as `python <skill-dir> <command>` from any
 #              working directory, with no PYTHONPATH setup and no install.
@@ -49,6 +49,12 @@
 from __future__ import annotations
 
 import sys
+
+# The released Skill is a verified immutable payload. Disable bytecode writes
+# before importing pathlib or any bundled package so normal CLI use cannot add
+# unmanifested __pycache__ files beneath the installed Skill directory.
+sys.dont_write_bytecode = True
+
 from pathlib import Path
 
 # The importable CLI package `rtd_config` lives under the bundled Python source

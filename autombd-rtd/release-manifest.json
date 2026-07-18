@@ -1,0 +1,250 @@
+{
+  "format_version": 1,
+  "release_version": "0.1.8",
+  "files": [
+    {
+      "path": "SKILL.md",
+      "sha256": "aead03ba9007442167cc0b2fa78f660cd041a8eb2a6549befadffc3afc92b1a1"
+    },
+    {
+      "path": "__main__.py",
+      "sha256": "4158e6385e209d81fbd4c9f882d5dcb3512ba1254edbc6ba0c99cdd991dab328"
+    },
+    {
+      "path": "assets/bundles.json",
+      "sha256": "167403f3b3a98ba66355e86ed5e604cac00f4f50301e75b80a949d61c2968447"
+    },
+    {
+      "path": "assets/nxp/s32k1/README.md",
+      "sha256": "6797349706689fa23732555684e641671316aff7430a6f220ba6be7584d62b67"
+    },
+    {
+      "path": "assets/nxp/s32k3/adc/adc.json",
+      "sha256": "00f26a33c4a0628001dea6c0f123d703fe43a52687ce63e747cac0225ab21ce6"
+    },
+    {
+      "path": "assets/nxp/s32k3/basenxp/osif.json",
+      "sha256": "ee240405485e04f02a94bbd07315d07b552e9aa7b2bbee67d4144aa71827eaa5"
+    },
+    {
+      "path": "assets/nxp/s32k3/dio/dio.json",
+      "sha256": "4a191d8c2fa08c313784dcc6fca2e36d65674d8c930b38db785ef5c1dc9f6e29"
+    },
+    {
+      "path": "assets/nxp/s32k3/mcl/mcl.json",
+      "sha256": "37f0738afcf24b79041b4c447496222cfd4a9e0d45304f93eb55ae0653a5a5cb"
+    },
+    {
+      "path": "assets/nxp/s32k3/mcu/clock.json",
+      "sha256": "dd7bb59174a295349e7b241b8889d9fb583739e8ec6eab34bdb34470ca259494"
+    },
+    {
+      "path": "assets/nxp/s32k3/platform/interrupts.json",
+      "sha256": "d41cc6dfbb99f57c6cf1986db031a592dc2ebcc6d91e0cc5086f728eee54d542"
+    },
+    {
+      "path": "assets/nxp/s32k3/port/pins.json",
+      "sha256": "0b716c948fbd9d5872d4e37a6bd865d0bf6e3ef00f3b7a49789f8ac34cf3c25b"
+    },
+    {
+      "path": "assets/nxp/s32k3/port/portpin.json",
+      "sha256": "bfb844544165da50e1712a9f39a4b9ce87254e4337919a83a931c7137baaf896"
+    },
+    {
+      "path": "assets/nxp/s32k3/uart/uart.json",
+      "sha256": "e105b303b656b711ac26713be81ca596900c53ae4f02c1904db4f8d1ce23e099"
+    },
+    {
+      "path": "reference/adc-spec.md",
+      "sha256": "53e645b43e85fa782274579b0150f2ac7bafc783f368423078f0ec2e8e4b707d"
+    },
+    {
+      "path": "reference/basenxp-spec.md",
+      "sha256": "d2dac2a8d8be76c86b68ec6c53449a7e053cb50d9475586a9555c4e10c2e9cd7"
+    },
+    {
+      "path": "reference/dio-spec.md",
+      "sha256": "4816c39ec54d9445a500e8456be53b109aa7b7201e88c1d5e82b8b6c73aefd4a"
+    },
+    {
+      "path": "reference/mcl-spec.md",
+      "sha256": "29a9be9c8b711d3ef4b3f97df64a038f803390de834efd60b9dc4806b7871e54"
+    },
+    {
+      "path": "reference/mcu-spec.md",
+      "sha256": "550dcf7960164c156bb3708682bb9f9da6321cf8c0a83c4ed3f2571fe474e3a4"
+    },
+    {
+      "path": "reference/platform-spec.md",
+      "sha256": "1c138d0de946d651a2708e36a57d6bcb0bb01f69129293dd1ef77684cab2f17c"
+    },
+    {
+      "path": "reference/port-spec.md",
+      "sha256": "6ab32ed37a8f0d08fa824712fbc7df48da0014e7c57d9407e522f7fba6641ece"
+    },
+    {
+      "path": "reference/uart-spec.md",
+      "sha256": "0c02423ee3b7638c14d7f78dd7ec7df51553b134ad59fce24f16c30c6b620433"
+    },
+    {
+      "path": "rtd-config-cli-py/rtd_config/__init__.py",
+      "sha256": "805539642a9aed5705ecc43a0123cedbf718aefca2d3bfc4b432e2dbce1747b4"
+    },
+    {
+      "path": "rtd-config-cli-py/rtd_config/__main__.py",
+      "sha256": "23d453c2061f2ca1b7cd6205eb85c5df331008dee4e8f1fb4c011242e6967922"
+    },
+    {
+      "path": "rtd-config-cli-py/rtd_config/backends/__init__.py",
+      "sha256": "0059fbc911ce739dd1960981fbd2166c8f54e27028bb429effda498bb2ff9222"
+    },
+    {
+      "path": "rtd-config-cli-py/rtd_config/backends/base.py",
+      "sha256": "357cd7bbb0c0d5d7724c1a99fc4965fe664e66f9623c2fd4beaf58957cc1a76c"
+    },
+    {
+      "path": "rtd-config-cli-py/rtd_config/backends/s32_mex/__init__.py",
+      "sha256": "2cd0b9d3048499d0e31d6c5af8c706da8a2039852eee39abb9bda58fd529c66c"
+    },
+    {
+      "path": "rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py",
+      "sha256": "ce8030d134d94c9fe2f45808c4a36a8adb0ed4cf4e2403a6a5734da9fdb22bc8"
+    },
+    {
+      "path": "rtd-config-cli-py/rtd_config/backends/s32_mex/document.py",
+      "sha256": "090cf25de5cbb4aa17b4c1bbf20969c2b726a3ff9fde64ede076cbe82eee4dc5"
+    },
+    {
+      "path": "rtd-config-cli-py/rtd_config/backends/s32_mex/locate.py",
+      "sha256": "681e2814025ba938db720fccb8ccd1e0b35753d4b1abb86d7272eb3c73671a8e"
+    },
+    {
+      "path": "rtd-config-cli-py/rtd_config/backends/s32_mex/metadata.py",
+      "sha256": "875dd9d0289a97f97dd8c6810ac80ae52f6bbb6dd05b280280dcc09b89281a02"
+    },
+    {
+      "path": "rtd-config-cli-py/rtd_config/backends/s32_mex/ownership.py",
+      "sha256": "7373c70d501c86e4b10dc80bf6a0bba7aaf62b7f5c9207ce28607c6045dfaf23"
+    },
+    {
+      "path": "rtd-config-cli-py/rtd_config/backends/s32_mex/process_tree.py",
+      "sha256": "134eb4a5c865d484e4b76a0f39202d2bac81be5664d1a4302ddc4e7937d22077"
+    },
+    {
+      "path": "rtd-config-cli-py/rtd_config/backends/s32_mex/static_check.py",
+      "sha256": "7ded5f61223a0a453fabf26928142d959d09628f8dcaa9595d5b4fe2899d112d"
+    },
+    {
+      "path": "rtd-config-cli-py/rtd_config/backends/s32_mex/target.py",
+      "sha256": "19dcc2bd9610955f5f0570615540fa9548532af0e74c66e3ec32b690b668c958"
+    },
+    {
+      "path": "rtd-config-cli-py/rtd_config/backends/s32_mex/transaction.py",
+      "sha256": "3a57fcb084a26e6fb9d3fb5ffdafea06aefafbbd5270366c1f7e24fd9323e611"
+    },
+    {
+      "path": "rtd-config-cli-py/rtd_config/backends/s32_mex/validation.py",
+      "sha256": "5f17329938febc71baa19efc5153eef6d83d34454bc23c4d60413865ca61c52f"
+    },
+    {
+      "path": "rtd-config-cli-py/rtd_config/backends/s32_mex/validation_workspace.py",
+      "sha256": "a3390e3b204a5afec1e51c07b69e841be01fad8d4ba3efbfebc47106ec3c370c"
+    },
+    {
+      "path": "rtd-config-cli-py/rtd_config/checks/__init__.py",
+      "sha256": "34d063718f8d7d2aecd2bcd7bbca1fa358a7d9f472a34dfbeb8708c2a6bcf529"
+    },
+    {
+      "path": "rtd-config-cli-py/rtd_config/checks/static.py",
+      "sha256": "d1a2d94a43316e447d6170177644a414e1f3ebcb26c9e4873abb117ceef549d2"
+    },
+    {
+      "path": "rtd-config-cli-py/rtd_config/cli.py",
+      "sha256": "754e4a25497b9f61df418b3f5c4a2adc73c43a132f592cc73d5b64322e9cf6a8"
+    },
+    {
+      "path": "rtd-config-cli-py/rtd_config/config.py",
+      "sha256": "4a3e440cc63da536b9cae3ba63ea02460bbd5b2861b226c4eb086109e9bc4994"
+    },
+    {
+      "path": "rtd-config-cli-py/rtd_config/diagnostics.py",
+      "sha256": "d83db33178708ef53b962ad3280fdad0e1cd8c64351fa253663bcc8ed2b75c9b"
+    },
+    {
+      "path": "rtd-config-cli-py/rtd_config/errors.py",
+      "sha256": "b62cb5f7e126353314cf423eb7d80e1e1fb75c8b50e66778074ca3ae09bf74a9"
+    },
+    {
+      "path": "rtd-config-cli-py/rtd_config/intent.py",
+      "sha256": "a0363fd87f1205f9497a4d804240b53a160e5ccab30cf8d1d7ac17dff12ab83b"
+    },
+    {
+      "path": "rtd-config-cli-py/rtd_config/modules/__init__.py",
+      "sha256": "c7ede2d6bf6e0e86f237e2d2335160a9707221b05308f90f7d54f94c869023b9"
+    },
+    {
+      "path": "rtd-config-cli-py/rtd_config/modules/adc.py",
+      "sha256": "b79fb230c083bf2d7e38ad1c263ab3139b50080c27d9e578704a975eb9af6d80"
+    },
+    {
+      "path": "rtd-config-cli-py/rtd_config/modules/base.py",
+      "sha256": "b9fd04913b8ee1859ce3be65dddffcb5e2b9942781c0f646366fce23db59b9ac"
+    },
+    {
+      "path": "rtd-config-cli-py/rtd_config/modules/basenxp.py",
+      "sha256": "0372f06c372bc0ce54b9524fc0a8d7e7f691ba0b0e7ea6e18a6da77c8e2d3f19"
+    },
+    {
+      "path": "rtd-config-cli-py/rtd_config/modules/dio.py",
+      "sha256": "30fbfbd6b7b48327111a1e6c961d69a72bd0dc7d10fedf260ab648b9f4fd84b3"
+    },
+    {
+      "path": "rtd-config-cli-py/rtd_config/modules/mcl.py",
+      "sha256": "7413b9ba9c4c9edda40693fe34cf62ad74bf51e94a71961db5085790301c8e26"
+    },
+    {
+      "path": "rtd-config-cli-py/rtd_config/modules/mcu.py",
+      "sha256": "c3e79a97e1dc1e772979cfc75cac1541226fd0f2bde59e3be7b2aa37cf6c1d5d"
+    },
+    {
+      "path": "rtd-config-cli-py/rtd_config/modules/platform.py",
+      "sha256": "15083c893e89b62316c9fd84960a96869feb348e258c3189282bd33d83cab298"
+    },
+    {
+      "path": "rtd-config-cli-py/rtd_config/modules/port.py",
+      "sha256": "04b0b3f97842f7c6640687b86ed4d3dddef8a8a07957b8d32c37f24eae8215b4"
+    },
+    {
+      "path": "rtd-config-cli-py/rtd_config/modules/registry.py",
+      "sha256": "a059c4dee551c6090662099aa0a548b9b5f2a61beed3fe4a4567f441c66be73d"
+    },
+    {
+      "path": "rtd-config-cli-py/rtd_config/modules/uart.py",
+      "sha256": "3e79f2e63de599c063e48997bac14f2c203cede13e92b092d8c6815cd0ac5467"
+    },
+    {
+      "path": "rtd-config-cli-py/rtd_config/plan.py",
+      "sha256": "a5852ed14bc5d0384f41ab5f0be93cbcb8ea2870f2d2d9c6aa4c877fb86f7078"
+    },
+    {
+      "path": "rtd-config-cli-py/rtd_config/project.py",
+      "sha256": "ee58e2f1e27013249bec432962f9dd1c769ba68af5d6be983d81926b53dddf70"
+    },
+    {
+      "path": "rtd-config-cli-py/rtd_config/resources/__init__.py",
+      "sha256": "a67b8078a9182020956ca95420d020cdfcf7fbbd8f1421ce706ca1fa2edd36bb"
+    },
+    {
+      "path": "rtd-config-cli-py/rtd_config/resources/bundles.py",
+      "sha256": "fef1a45d1a839f004bdf6d31f5f9b909c38d2196d23e6c8dc30966a1cbe8669e"
+    },
+    {
+      "path": "rtd-config-cli-py/rtd_config/resources/pins.py",
+      "sha256": "230b405aaf96b88d1984b611f4c4895636161a9acf1db86051e7683beb410299"
+    },
+    {
+      "path": "rtd-config-cli-py/rtd_config/resources/runtime.py",
+      "sha256": "686b0e3bd5ca219f39f0775b5b045991df4133d0affccdf73f6481926e023cc7"
+    }
+  ]
+}

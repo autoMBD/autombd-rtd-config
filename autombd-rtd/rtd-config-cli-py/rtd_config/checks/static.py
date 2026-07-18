@@ -71,7 +71,9 @@ from typing import Iterable
 
 from rtd_config.backends.s32_mex.document import MexDocument
 from rtd_config.backends.s32_mex.locate import find_single_mex
+from rtd_config.backends.s32_mex.target import VerifiedProjectTarget
 from rtd_config.backends.s32_mex.static_check import is_xml_well_formed
+from rtd_config.resources.bundles import ResolvedAssetBundle
 from rtd_config.diagnostics import Diagnostic, Result
 
 
@@ -117,7 +119,37 @@ def flexio_logic_channel_refs(doc: MexDocument) -> set[str]:
     return refs
 
 
-def _check_xml_and_single_mex(mex_path: Path, checks: dict, diagnostics: list[Diagnostic]) -> None:
+def _check_xml_and_single_mex(
+    mex_path: Path,
+    checks: dict,
+    diagnostics: list[Diagnostic],
+    verified_target: VerifiedProjectTarget | None = None,
+    doc: MexDocument | None = None,
+) -> None:
+    if verified_target is not None:
+        checks["xml_well_formed"] = True
+        checks["single_mex"] = True
+        checks["project_target"] = not verified_target.lease.closed
+        try:
+            original = MexDocument.from_snapshot(verified_target.mex)
+            schema_attribute = "{http://www.w3.org/2001/XMLSchema-instance}schemaLocation"
+            checks["schema"] = bool(doc is not None) and (
+                doc.root.tag == original.root.tag
+                and doc.root.attrib.get(schema_attribute)
+                == original.root.attrib.get(schema_attribute)
+                and doc.root.attrib.get("version") == original.root.attrib.get("version")
+            )
+        except ET.ParseError:
+            checks["schema"] = False
+        if not checks["schema"]:
+            diagnostics.append(Diagnostic(
+                severity="blocker",
+                code="candidate_schema_changed",
+                module="backend",
+                message="The candidate .mex schema differs from the verified project schema.",
+                details={},
+            ))
+        return
     well_formed = is_xml_well_formed(mex_path)
     checks["xml_well_formed"] = well_formed
     if not well_formed:
@@ -130,7 +162,10 @@ def _check_xml_and_single_mex(mex_path: Path, checks: dict, diagnostics: list[Di
         ))
     try:
         located = find_single_mex(mex_path.parent)
-        checks["single_mex"] = located == mex_path
+        try:
+            checks["single_mex"] = located.mex.path == mex_path
+        finally:
+            located.close()
     except ValueError as exc:
         checks["single_mex"] = False
         diagnostics.append(Diagnostic(
@@ -415,18 +450,14 @@ def _mcl_dma_enabled(doc: MexDocument) -> bool:
     return False
 
 
-def _adc_channel_enum() -> set[str]:
+def _adc_channel_enum(bundle: ResolvedAssetBundle) -> set[str]:
     """Return the device ADC channel-name enum from the committed adc.json asset.
 
     Runtime reads only the committed asset, never the raw .epd. Returns an empty
     set if the asset is unavailable so the check degrades to a no-op rather than
     raising.
     """
-    try:
-        from rtd_config.backends.s32_mex.apply import _load_adc_asset
-        return set(_load_adc_asset().get("channel_name_to_id", {}).keys())
-    except Exception:  # pragma: no cover - asset always present in this repo
-        return set()
+    return set(bundle.load_json("adc").get("channel_name_to_id", {}).keys())
 
 
 def _adc_unit_structs(doc: MexDocument, adc_cfg: ET.Element) -> list[ET.Element]:
@@ -450,7 +481,7 @@ def _adc_hw_config_by_id(doc: MexDocument, adc_cfg: ET.Element) -> dict[str, ET.
     return out
 
 
-def _check_adc(doc: MexDocument, diagnostics: list[Diagnostic]) -> None:
+def _check_adc(doc: MexDocument, diagnostics: list[Diagnostic], bundle: ResolvedAssetBundle) -> None:
     """ADC coherence validation (RTD-MEX-ADC-001).
 
     Encodes the Adc.xdm INVALID rules that ConfigTools would otherwise report as
@@ -490,7 +521,7 @@ def _check_adc(doc: MexDocument, diagnostics: list[Diagnostic]) -> None:
     if adc_cfg is None:
         return
 
-    channel_enum = _adc_channel_enum()
+    channel_enum = _adc_channel_enum(bundle)
     hw_configs = _adc_hw_config_by_id(doc, adc_cfg)
 
     # Adc-global watchdog API switch.
@@ -914,6 +945,8 @@ def run_static_checks(
     *,
     modified_elements: Iterable[ET.Element] | None = None,
     requested_callback: str | None = None,
+    verified_target: VerifiedProjectTarget | None = None,
+    bundle: ResolvedAssetBundle,
 ) -> Result:
     """Run all static checks against a .mex document.
 
@@ -921,29 +954,50 @@ def run_static_checks(
     present, otherwise "passed". Never raises for expected validation failures;
     structured diagnostics are returned instead of tracebacks.
     """
-    diagnostics: list[Diagnostic] = []
-    checks: dict = {}
-
-    _check_xml_and_single_mex(mex_path, checks, diagnostics)
-
-    if doc is None and checks.get("xml_well_formed"):
-        doc = MexDocument.load(mex_path)
-
-    if doc is not None and checks.get("xml_well_formed", True):
-        _check_enabled_modules(doc, checks, diagnostics)
-        _check_dma(doc, diagnostics)
-        _check_flexio_refs(doc, diagnostics)
-        _check_duplicate_lpuart_hw(doc, diagnostics)
-        _check_uart_channel_ids(doc, diagnostics)
-        _check_adc(doc, diagnostics)
-        _check_quick_selection_conflict(doc, modified_elements or [], diagnostics)
-        _check_callback(requested_callback, diagnostics)
-
-    has_blocker = any(d.severity == "blocker" for d in diagnostics)
-    status = "blocked" if has_blocker else "passed"
-    return Result(
-        status=status,
-        command="check",
-        diagnostics=diagnostics,
-        data={"checks": checks},
-    )
+    owned_target: VerifiedProjectTarget | None = None
+    if verified_target is None:
+        owned_target = find_single_mex(mex_path.parent)
+        verified_target = owned_target
+        mex_path = owned_target.mex.path
+    try:
+        diagnostics: list[Diagnostic] = []
+        checks: dict = {}
+        if doc is None and verified_target is not None:
+            try:
+                doc = MexDocument.from_snapshot(verified_target.mex)
+            except ET.ParseError as exc:
+                checks["xml_well_formed"] = False
+                checks["single_mex"] = True
+                diagnostics.append(Diagnostic(
+                    severity="blocker",
+                    code="xml_not_well_formed",
+                    module="backend",
+                    message=f"{mex_path.name} is not well-formed XML.",
+                    details={"reason": str(exc)},
+                ))
+                return Result(
+                    status="blocked", command="check",
+                    diagnostics=diagnostics, data={"checks": checks},
+                )
+        _check_xml_and_single_mex(
+            mex_path, checks, diagnostics, verified_target, doc
+        )
+        if doc is not None and checks.get("xml_well_formed", True):
+            _check_enabled_modules(doc, checks, diagnostics)
+            _check_dma(doc, diagnostics)
+            _check_flexio_refs(doc, diagnostics)
+            _check_duplicate_lpuart_hw(doc, diagnostics)
+            _check_uart_channel_ids(doc, diagnostics)
+            _check_adc(doc, diagnostics, bundle)
+            _check_quick_selection_conflict(doc, modified_elements or [], diagnostics)
+            _check_callback(requested_callback, diagnostics)
+        has_blocker = any(d.severity == "blocker" for d in diagnostics)
+        return Result(
+            status="blocked" if has_blocker else "passed",
+            command="check",
+            diagnostics=diagnostics,
+            data={"checks": checks},
+        )
+    finally:
+        if owned_target is not None:
+            owned_target.close()

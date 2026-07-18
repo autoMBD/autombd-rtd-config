@@ -1,44 +1,9 @@
 {
-  "family": "s32k3",
-  "device": "s32k344",
-  "rtd_version": "7_0_1",
+  "_identity": {"vendor":"NXP","family":"S32K3","device":"S32K344","package":"mapbga257","rtd_release":"7.0.1","module":"Platform","role":"interrupt_schema"},
+  "family": "S32K3",
+  "device": "S32K344",
+  "rtd_version": "7.0.1",
   "source": "RTD/Platform_TS_T40D34M70I1R0/config/Platform.xdm",
-  "_coverage": {
-    "_note": "Forward, Spec-first coverage inventory for the Platform.xdm interrupt-controller surface used by the current Platform provider. The CLI edits existing PlatformIsrConfig entries for interrupt enablement/priority/handler preservation; it does not create new interrupt entries or configure partitioning surfaces.",
-    "configurable_today": {
-      "IntCtrlConfig/PlatformIsrConfig": [
-        "IsrName",
-        "IsrEnabled",
-        "IsrPriority",
-        "IsrHandler"
-      ]
-    },
-    "not_yet_exposed": {
-      "_note": "Each item exists in Platform.xdm but is not user-tunable through `platform set` yet. The current provider is intentionally narrow: update an existing ISR entry found in the project and let S32DS enforce device-specific IRQ and priority limits.",
-      "partitioning": [
-        "PlatformNvicEcucPartitionRef",
-        "PlatformMulticoreSupport-owned interrupt partition behavior"
-      ],
-      "system_interrupts": [
-        "SystemIsrConfig",
-        "SystemIsrName",
-        "SystemIsrEnabled"
-      ],
-      "entry_lifecycle": [
-        "creating a missing PlatformIsrConfig entry",
-        "removing a PlatformIsrConfig entry",
-        "bulk enable/disable of interrupt entries"
-      ],
-      "other_platform_surfaces": [
-        "GeneralConfiguration",
-        "Platform published information and generated metadata"
-      ]
-    },
-    "references": [
-      "Platform.xdm:IntCtrlConfig/PlatformIsrConfig",
-      "issue #53 Platform KPI route correction"
-    ]
-  },
   "isr_priority": {
     "min": 0,
     "max_ref": "Platform.irqMaxPrio",

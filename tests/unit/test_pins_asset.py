@@ -79,9 +79,9 @@ def signals(pins_data):
 # ---------------------------------------------------------------------------
 
 def test_asset_top_level_metadata(pins_data):
-    assert pins_data["family"] == "s32k3"
-    assert pins_data["device"] == "s32k344"
-    assert pins_data["package"] == "default"
+    assert pins_data["family"] == "S32K3"
+    assert pins_data["device"] == "S32K344"
+    assert pins_data["packages"] == {"mapbga257": "pin_mapbga257"}
 
 
 def test_asset_is_complete_not_stub(signals):

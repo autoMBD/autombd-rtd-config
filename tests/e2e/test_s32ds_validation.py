@@ -45,19 +45,44 @@
 # =================================================================================
 
 import json
+import hashlib
 import os
 import subprocess
 import sys
+from pathlib import Path
 
 from tests.fixtures import copy_uart_fixture
+
+
+S32DS_ROOT = Path("C:/NXP/S32DS.3.6.7")
+
+
+def _project_manifest(root):
+    return {
+        path.relative_to(root).as_posix(): (
+            path.stat().st_ino,
+            hashlib.sha256(path.read_bytes()).hexdigest(),
+        )
+        for path in root.rglob("*")
+        if path.is_file()
+    }
 
 
 def test_validate_uart_fixture_headless(tmp_path):
     if not os.environ.get("RTD_CONFIG_RUN_S32DS_VALIDATION"):
         return
     project = copy_uart_fixture(tmp_path)
+    workspace = tmp_path / "live-s32ds-workspace"
+    before = _project_manifest(project)
+    assert Path("tests/.tmp").absolute() in workspace.absolute().parents
     result = subprocess.run(
-        [sys.executable, "-m", "rtd_config", "validate", "--project", str(project), "--json"],
+        [
+            sys.executable, "-m", "rtd_config", "validate",
+            "--project", str(project),
+            "--workspace", str(workspace),
+            "--s32ds-root", str(S32DS_ROOT),
+            "--json",
+        ],
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -68,3 +93,15 @@ def test_validate_uart_fixture_headless(tmp_path):
     assert result.returncode == 0
     assert payload["status"] == "passed"
     assert payload["validation"]["exit_code"] == 0
+    assert payload["validation"]["passed"] is True
+    assert payload["validation"]["process_code"] == "process_exit"
+    assert payload["validation"]["severe_problems"] == []
+    assert payload["validation"]["cleanup_warnings"] == []
+    assert payload["validation"]["output_faults"] == []
+    assert payload["validation"]["stdout_truncated"] is False
+    assert payload["validation"]["stderr_truncated"] is False
+    command = payload["validation"]["command"]
+    assert command[0] == "s32dsc.exe"
+    assert all(str(project) not in item and str(workspace) not in item for item in command)
+    assert not workspace.exists()
+    assert _project_manifest(project) == before

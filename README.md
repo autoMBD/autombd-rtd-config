@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![Python](https://img.shields.io/badge/python-3.11%2B-blue.svg)
 ![Dependencies](https://img.shields.io/badge/deps-stdlib--only-success.svg)
-![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg)
+[![CI](https://github.com/autoMBD/autombd-rtd-config/actions/workflows/ci.yml/badge.svg)](https://github.com/autoMBD/autombd-rtd-config/actions/workflows/ci.yml)
 ![Backend](https://img.shields.io/badge/backend-S32%20ConfigTools%20.mex-blue.svg)
 ![NXP RTD](https://img.shields.io/badge/NXP%20RTD-7.0.1-blue.svg)
 ![Minimal system](https://img.shields.io/badge/minimal%20system-complete-brightgreen.svg)
@@ -35,8 +35,10 @@ self-contained on another machine or in another agent environment.
 BaseNXP, Platform, Port, Dio, Mcl, Uart` (equal priority) — are delivered and
 vendor-validated end to end: every E2E acceptance case passes the S32DS gate
 (exit `0`, code generated, no SEVERE `[TOOL]`) with its generated code verified.
-See
-[`docs/tests/rtd-config-acceptance-report.md`](docs/tests/rtd-config-acceptance-report.md).
+See the dated
+[`2026-07-17 acceptance evidence`](docs/tests/rtd-config-acceptance-report.md);
+S32DS and isolated black-box acceptance remain separate from hosted CI because
+the vendor environment is local/licensed.
 
 > RTD models the Uart asynchronous method as **interrupt or DMA only** (no
 > polling). Both modes are delivered: `uart set --mode interrupt|dma` (DMA wires
@@ -66,8 +68,11 @@ python autombd-rtd check --project <path> --json
 python autombd-rtd validate --project <path> --json
 ```
 
-(Equivalent without the launcher: put `autombd-rtd/rtd-config-cli-py` on
-`PYTHONPATH`, then use `python -m rtd_config <command>`.)
+(Equivalent immutable invocation without the launcher: put
+`autombd-rtd/rtd-config-cli-py` on `PYTHONPATH`, then use
+`python -B -m rtd_config <command>`. The `-B` flag is required for this
+lower-level entry point so Python does not add bytecode files to the verified
+release payload.)
 
 Every shortcut command normalizes to the same JSON intent and the same
 plan → apply → check → validate pipeline.
@@ -89,18 +94,19 @@ By default the helper supports both agent indexes with one physical payload:
 for Claude Code. Use `--agent codex`, `--agent claude`, or `--agent both` to
 select the destination set explicitly. Deploying only Claude Code still ensures
 the canonical Codex copy exists first, then links Claude Code to it. On Windows,
-the helper creates a directory symlink when permitted and falls back to an NTFS
-junction when symlink privileges are unavailable.
+the helper requires directory-symlink permission (enable Developer Mode or run
+from an elevated shell); it does not silently fall back to a junction.
 
-The helper checks the source version across `autombd-rtd/SKILL.md`, the
-launcher header, and the Python package version before updating the canonical
-copy. It deploys only when the canonical skill, bundled tool payload, or version
-metadata is missing, or when the installed version is older than the project
-version. Current or newer complete installations are left untouched.
+The helper treats `pyproject.toml` as the version authority and requires the
+Skill frontmatter, launcher/package headers, package `__version__`, and committed
+release manifest to match it. Deployment copies only the manifest allowlist,
+verifies every staged/installed byte, and replaces a same-version installation
+if its file set or hashes drift. A structurally complete newer installation is
+left untouched.
 
 The copied payload is intentionally limited to `SKILL.md`, `__main__.py`,
-`rtd-config-cli-py/`, and `assets/`; development materials such as `docs/`,
-`tests/`, and `tools/` are not included.
+`rtd-config-cli-py/`, `assets/`, `reference/`, and `release-manifest.json`;
+development materials such as `docs/`, `tests/`, and `tools/` are not included.
 
 ## Repository layout
 

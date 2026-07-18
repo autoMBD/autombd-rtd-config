@@ -47,10 +47,23 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from collections.abc import Mapping
 from typing import Any, Literal
+
+from .errors import CliFailure
 
 Severity = Literal["blocker", "error", "warning", "info"]
 Status = Literal["passed", "failed", "blocked"]
+
+
+def _json_compatible(value: Any) -> Any:
+    """Thaw immutable failure details into ordinary JSON-compatible containers."""
+
+    if isinstance(value, Mapping):
+        return {key: _json_compatible(item) for key, item in value.items()}
+    if isinstance(value, (tuple, list, set, frozenset)):
+        return [_json_compatible(item) for item in value]
+    return value
 
 
 @dataclass(frozen=True)
@@ -86,3 +99,22 @@ class Result:
         }
         payload.update(self.data)
         return payload
+
+
+def render_failure(failure: CliFailure, command: str) -> dict[str, Any]:
+    """Render a typed failure using the stable public result contract."""
+
+    severity: Severity = "blocker" if failure.status == "blocked" else "error"
+    return Result(
+        status=failure.status,
+        command=command,
+        diagnostics=[
+            Diagnostic(
+                severity=severity,
+                code=failure.code,
+                module=failure.module or "cli",
+                message=failure.message,
+                details=_json_compatible(failure.details),
+            )
+        ],
+    ).to_dict()

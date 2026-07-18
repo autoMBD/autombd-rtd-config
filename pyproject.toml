@@ -1,12 +1,13 @@
 # pyproject.toml
 [project]
 name = "rtd-cfgfile-cli"
-version = "0.1.0"
+version = "0.1.8"
 requires-python = ">=3.11"
 
 # Note: no console-script / packaging entry is declared. The CLI is run from the
-# bundled skill (`python autombd-rtd <command>` launcher, or `python -m
-# rtd_config` with the source root on PYTHONPATH) — stdlib-only, no install.
+# bundled skill (`python autombd-rtd <command>` launcher, or the immutable
+# `python -B -m rtd_config` form with the source root on PYTHONPATH) —
+# stdlib-only, no install.
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

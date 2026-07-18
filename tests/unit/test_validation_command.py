@@ -44,8 +44,22 @@
 # Description: Unit tests for the S32DS validation command builder.
 # =================================================================================
 
+import hashlib
+import _thread
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import replace
+import json
+import os
 from pathlib import Path
+import shutil
+import sys
+import time
+import threading
+from types import SimpleNamespace
 
+import pytest
+
+from rtd_config import cli
 from rtd_config.backends.s32_mex.validation import (
     ValidationOutcome,
     _DEFAULT_S32DS_PARENTS,
@@ -55,7 +69,19 @@ from rtd_config.backends.s32_mex.validation import (
     find_s32ds_root,
     is_valid_s32ds_root,
     probe_which_root,
+    run_validation,
 )
+from rtd_config.backends.s32_mex.metadata import ValidatorInputInventory
+from rtd_config.backends.s32_mex.process_tree import (
+    ProcessOutputLimits,
+    ProcessTreeRunner,
+)
+from rtd_config.errors import CliFailure
+from rtd_config.project import Project
+from tests.fixtures import copy_uart_fixture
+from rtd_config.backends.s32_mex.validation_workspace import ControlledValidationWorkspace
+import rtd_config.backends.s32_mex.metadata as metadata_module
+import rtd_config.backends.s32_mex.validation_workspace as workspace_module
 
 
 def _validate_cmd():
@@ -223,14 +249,679 @@ def test_validation_outcome_pass_gate():
     assert ValidationOutcome(
         exit_code=0, severe_problems=["boom"], generated_files=122, **base
     ).passed is False
-    # exit 0, no severe, but no code generated -> not a pass.
+    # The vendor gate is exactly exit 0 + no qualifying resource problem.
     assert ValidationOutcome(
         exit_code=0, severe_problems=[], generated_files=0, **base
-    ).passed is False
+    ).passed is True
     # non-zero exit -> not a pass.
     assert ValidationOutcome(
         exit_code=2, severe_problems=[], generated_files=122, **base
     ).passed is False
+
+
+def test_process_tree_runner_bounds_invalid_output_without_deadlock(tmp_path):
+    runner = ProcessTreeRunner(ProcessOutputLimits(max_bytes=128, max_lines=4))
+    result = runner.run(
+        [
+            sys.executable,
+            "-c",
+            "import os; os.write(1, b'head\\n' + b'x'*4096 + b'\\xfftail\\n')",
+        ],
+        cwd=tmp_path,
+        env={},
+        timeout_s=10,
+    )
+    assert result.exit_code == 0
+    assert result.stdout_truncated is True
+    assert len(result.stdout.encode("utf-8")) <= 256
+    assert "tail" in result.stdout
+    assert "\ufffd" in result.stdout
+
+
+def test_process_tree_timeout_kills_descendant_before_it_can_escape(tmp_path):
+    marker = tmp_path / "escaped.txt"
+    child = (
+        "import pathlib,time,sys; time.sleep(1); "
+        "pathlib.Path(sys.argv[1]).write_text('escaped')"
+    )
+    parent = (
+        "import subprocess,sys,time; "
+        "subprocess.Popen([sys.executable,'-c',sys.argv[1],sys.argv[2]]); "
+        "time.sleep(30)"
+    )
+    result = ProcessTreeRunner().run(
+        [sys.executable, "-c", parent, child, str(marker)],
+        cwd=tmp_path,
+        env={},
+        timeout_s=0.2,
+    )
+    assert result.code == "process_timeout"
+    assert result.timed_out is True
+    time.sleep(1.2)
+    assert not marker.exists()
+
+
+def test_process_tree_argv_is_never_interpreted_by_a_shell(tmp_path):
+    marker = tmp_path / "injected.txt"
+    payload = f"; echo injected > {marker}"
+    result = ProcessTreeRunner().run(
+        [sys.executable, "-c", "import sys; print(sys.argv[1])", payload],
+        cwd=tmp_path,
+        env={},
+        timeout_s=10,
+    )
+    assert result.exit_code == 0
+    assert payload in result.stdout
+    assert not marker.exists()
+
+
+def test_process_tree_keyboard_interrupt_kills_descendants_and_reaps(tmp_path):
+    marker = tmp_path / "interrupt-escaped.txt"
+    child = (
+        "import pathlib,time,sys; time.sleep(1); "
+        "pathlib.Path(sys.argv[1]).write_text('escaped')"
+    )
+    parent = (
+        "import subprocess,sys,time; "
+        "subprocess.Popen([sys.executable,'-c',sys.argv[1],sys.argv[2]]); "
+        "time.sleep(30)"
+    )
+    timer = threading.Timer(0.2, _thread.interrupt_main)
+    timer.start()
+    try:
+        with pytest.raises(KeyboardInterrupt):
+            ProcessTreeRunner().run(
+                [sys.executable, "-c", parent, child, str(marker)],
+                cwd=tmp_path, env={}, timeout_s=30,
+            )
+    finally:
+        timer.cancel()
+    time.sleep(1.2)
+    assert not marker.exists()
+
+
+def test_process_tree_spawn_failure_is_sanitized(tmp_path):
+    result = ProcessTreeRunner().run(
+        [str(tmp_path / "missing-validator.exe")],
+        cwd=tmp_path, env={}, timeout_s=1,
+    )
+    assert result.code == "process_spawn_failed"
+    assert result.exit_code == 127
+    assert str(tmp_path) not in result.stderr
+
+
+def _project_manifest(root: Path) -> dict[str, tuple[int, str]]:
+    return {
+        path.relative_to(root).as_posix(): (
+            path.stat().st_ino,
+            hashlib.sha256(path.read_bytes()).hexdigest(),
+        )
+        for path in root.rglob("*")
+        if path.is_file()
+    }
+
+
+def test_validation_uses_controlled_copy_and_leaves_project_byte_identical(tmp_path):
+    project = copy_uart_fixture(tmp_path)
+    (project / ".settings/dynamic.prefs").write_bytes(b"dynamic=true\n")
+    (project / ".settings/nested").mkdir()
+    (project / ".settings/nested/ignored.prefs").write_bytes(b"nested=true\n")
+    for relative in ("build/output.o", "logs/validation.log", "generated/code.c"):
+        source = project / relative
+        source.parent.mkdir(parents=True, exist_ok=True)
+        source.write_bytes(b"must-not-be-staged")
+    control = tmp_path / "controlled-validation"
+    before = _project_manifest(project)
+    observed = {}
+
+    class FakeRunner:
+        def run(self, argv, *, cwd, env, timeout_s):
+            observed["argv"] = list(argv)
+            observed["cwd"] = cwd
+            load = Path(argv[argv.index("-Load") + 1])
+            export = Path(argv[argv.index("-ExportSrc") + 1])
+            assert load.is_relative_to(control)
+            assert cwd.is_relative_to(control)
+            assert not load.is_relative_to(project)
+            assert Path(env["TEMP"]).is_relative_to(control)
+            assert Path(env["TMP"]).is_relative_to(control)
+            staged = {
+                item.relative_to(load.parent).as_posix(): item
+                for item in load.parent.rglob("*")
+                if item.is_file()
+            }
+            required = {
+                load.name,
+                ".project",
+                ".cproject",
+                *(
+                    item.relative_to(project).as_posix()
+                    for item in (project / ".settings").iterdir()
+                    if item.is_file() and item.name.lower().endswith(".prefs")
+                ),
+            }
+            assert set(staged) == required
+            for relative in required:
+                assert staged[relative].read_bytes() == (project / relative).read_bytes()
+            load.write_bytes(b"vendor-mutated-stage")
+            export.mkdir(parents=True, exist_ok=True)
+            (export / "generated.c").write_bytes(b"generated")
+            return type("Result", (), {
+                "exit_code": 0, "stdout": "ok", "stderr": "",
+                "code": "process_exit", "timed_out": False,
+                "stdout_truncated": False, "stderr_truncated": False,
+            })()
+
+    outcome = run_validation(
+        project,
+        Path("C:/NXP/S32DS.3.6.7"),
+        workspace=control,
+        runner=FakeRunner(),
+    )
+    assert outcome.passed is True
+    assert _project_manifest(project) == before
+    assert not control.exists()
+    assert outcome.log_path == "validation.log"
+    assert all(str(project) not in item for item in outcome.command)
+
+
+class _TempWritingRunner:
+    def __init__(self) -> None:
+        self.lock = threading.Lock()
+        self.temp_dirs: list[Path] = []
+
+    def run(self, argv, *, cwd, env, timeout_s):
+        temp_dir = Path(env["TEMP"])
+        assert Path(env["TMP"]) == temp_dir
+        with self.lock:
+            self.temp_dirs.append(temp_dir)
+        (temp_dir / "vendor.tmp").write_bytes(b"vendor scratch")
+        export = Path(argv[argv.index("-ExportSrc") + 1])
+        (export / "generated.c").write_bytes(b"generated")
+        return type("Result", (), {
+            "exit_code": 0, "stdout": "ok", "stderr": "",
+            "code": "process_exit", "timed_out": False,
+            "stdout_truncated": False, "stderr_truncated": False,
+        })()
+
+
+def _run_with_external_bases(project, workspace, temp_base, log_base, runner):
+    return run_validation(
+        project, Path("C:/NXP/S32DS.3.6.7"), workspace=workspace,
+        temp_root=temp_base, log_root=log_base, runner=runner,
+    )
+
+
+def test_external_temp_and_log_bases_isolate_consecutive_validation_runs(tmp_path):
+    project = copy_uart_fixture(tmp_path)
+    workspace = tmp_path / "controlled-validation"
+    temp_base = tmp_path / "vendor-temp"
+    log_base = tmp_path / "vendor-logs"
+    workspace.mkdir()
+    temp_base.mkdir()
+    log_base.mkdir()
+    runner = _TempWritingRunner()
+
+    outcomes = [
+        _run_with_external_bases(project, workspace, temp_base, log_base, runner)
+        for _ in range(2)
+    ]
+
+    assert len(set(runner.temp_dirs)) == 2
+    assert all(path.parent == temp_base for path in runner.temp_dirs)
+    assert not tuple(temp_base.iterdir())
+    assert len({outcome.log_path for outcome in outcomes}) == 2
+    for outcome in outcomes:
+        log_path = Path(outcome.log_path)
+        assert not log_path.is_absolute()
+        assert str(tmp_path) not in outcome.log_path
+        assert (log_base / log_path).is_file()
+    assert workspace.is_dir()
+    assert not tuple(workspace.iterdir())
+
+
+def test_external_temp_and_log_bases_isolate_concurrent_validation_runs(tmp_path):
+    project = copy_uart_fixture(tmp_path)
+    workspace = tmp_path / "controlled-validation"
+    temp_base = tmp_path / "vendor-temp"
+    log_base = tmp_path / "vendor-logs"
+    workspace.mkdir()
+    temp_base.mkdir()
+    log_base.mkdir()
+    runner = _TempWritingRunner()
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        outcomes = list(pool.map(
+            lambda _index: _run_with_external_bases(
+                project, workspace, temp_base, log_base, runner
+            ),
+            range(2),
+        ))
+
+    assert len(set(runner.temp_dirs)) == 2
+    assert all(path.parent == temp_base for path in runner.temp_dirs)
+    assert not tuple(temp_base.iterdir())
+    assert len({outcome.log_path for outcome in outcomes}) == 2
+    assert all((log_base / outcome.log_path).is_file() for outcome in outcomes)
+    assert workspace.is_dir()
+    assert not tuple(workspace.iterdir())
+
+
+def test_validation_rejects_linked_source_without_launch(tmp_path):
+    project = copy_uart_fixture(tmp_path)
+    outside = tmp_path / "outside.txt"
+    outside.write_bytes(b"outside")
+    linked = project / ".settings" / "linked.prefs"
+    try:
+        linked.symlink_to(outside)
+    except OSError as exc:
+        pytest.skip(f"symlink unavailable: {exc}")
+
+    class ForbiddenRunner:
+        def run(self, *_args, **_kwargs):
+            pytest.fail("vendor launched for linked source")
+
+    with pytest.raises(CliFailure) as caught:
+        run_validation(
+            project,
+            Path("C:/NXP/S32DS.3.6.7"),
+            workspace=tmp_path / "controlled-validation",
+            runner=ForbiddenRunner(),
+        )
+    assert caught.value.code == "validation_source_unsafe"
+    assert outside.read_bytes() == b"outside"
+
+
+def test_validation_rejects_linked_workspace_root_without_launch(tmp_path):
+    project = copy_uart_fixture(tmp_path)
+    outside = tmp_path / "outside-workspace"
+    outside.mkdir()
+    linked = tmp_path / "linked-workspace"
+    try:
+        linked.symlink_to(outside, target_is_directory=True)
+    except OSError as exc:
+        pytest.skip(f"directory symlink unavailable: {exc}")
+
+    class ForbiddenRunner:
+        def run(self, *_args, **_kwargs):
+            pytest.fail("vendor launched for linked workspace")
+
+    with pytest.raises(CliFailure) as caught:
+        run_validation(
+            project, Path("C:/NXP/S32DS.3.6.7"),
+            workspace=linked, runner=ForbiddenRunner(),
+        )
+    assert caught.value.code in {"validation_source_unsafe", "validation_workspace_unsafe"}
+    assert not tuple(outside.iterdir())
+
+
+def test_validation_rejects_system_temp_workspace_before_launch(monkeypatch, tmp_path):
+    project = copy_uart_fixture(tmp_path)
+    system_temp = tmp_path / "system-temp"
+    system_temp.mkdir()
+    monkeypatch.setenv("TEMP", str(system_temp))
+    monkeypatch.setenv("TMP", str(system_temp))
+
+    class ForbiddenRunner:
+        def run(self, *_args, **_kwargs):
+            pytest.fail("vendor launched in system temp")
+
+    with pytest.raises(CliFailure) as caught:
+        run_validation(
+            project, Path("C:/NXP/S32DS.3.6.7"),
+            workspace=system_temp / "validation", runner=ForbiddenRunner(),
+        )
+    assert caught.value.code == "validation_workspace_unsafe"
+    assert not (system_temp / "validation").exists()
+
+
+def test_nonqualifying_severe_text_does_not_fail_vendor_gate():
+    text = "SEVERE: ordinary launcher warning\n[TOOL] harmless status"
+    assert find_severe_tool_problems(text) == []
+
+
+def test_validate_static_blocker_short_circuits_before_vendor_or_workspace(
+    monkeypatch, capsys, tmp_path
+):
+    project = copy_uart_fixture(tmp_path)
+    control = tmp_path / "must-not-exist"
+    blocked = SimpleNamespace(
+        status="blocked", diagnostics=[],
+        to_dict=lambda: {"status": "blocked", "diagnostics": []},
+    )
+    monkeypatch.setattr(cli, "run_static_checks", lambda *_args, **_kwargs: blocked)
+    monkeypatch.setattr(
+        cli, "find_s32ds_root",
+        lambda *_args, **_kwargs: pytest.fail("S32DS resolution ran after static blocker"),
+    )
+    monkeypatch.setattr(
+        cli, "run_validation",
+        lambda *_args, **_kwargs: pytest.fail("vendor ran after static blocker"),
+    )
+    result = cli.cmd_validate(SimpleNamespace(
+        project=project, s32ds_root="unused", workspace=control, sdk_path=None,
+    ))
+    payload = json.loads(capsys.readouterr().out)
+    assert result == 1
+    assert payload["status"] == "blocked"
+    assert payload["runtime_verification"]["static_check"]["status"] == "blocked"
+    assert "validation" not in payload
+    assert not control.exists()
+
+
+def test_vendor_mutation_of_original_project_is_detected_and_workspace_cleaned(
+    tmp_path
+):
+    project = copy_uart_fixture(tmp_path)
+    control = tmp_path / "controlled-validation"
+    source = project / ".project"
+
+    class MutatingRunner:
+        def run(self, argv, *, cwd, env, timeout_s):
+            source.write_bytes(source.read_bytes() + b"mutated")
+            export = Path(argv[argv.index("-ExportSrc") + 1])
+            (export / "generated.c").write_bytes(b"generated")
+            return SimpleNamespace(
+                exit_code=0, stdout="", stderr="", code="process_exit",
+                timed_out=False, stdout_truncated=False, stderr_truncated=False,
+            )
+
+    with pytest.raises(CliFailure) as caught:
+        run_validation(
+            project, Path("C:/NXP/S32DS.3.6.7"),
+            workspace=control, runner=MutatingRunner(),
+        )
+    assert caught.value.code == "validation_source_changed"
+    assert tuple(caught.value.details["entries"]) == (".project",)
+    assert not control.exists()
+
+
+def test_cleanup_failure_is_explicit_and_preserves_only_workspace_basename(
+    monkeypatch, tmp_path
+):
+    project = copy_uart_fixture(tmp_path)
+    control = tmp_path / "controlled-validation"
+    real_cleanup = ControlledValidationWorkspace._secure_delete_root
+
+    class PassingRunner:
+        def run(self, argv, *, cwd, env, timeout_s):
+            export = Path(argv[argv.index("-ExportSrc") + 1])
+            (export / "generated.c").write_bytes(b"generated")
+            return SimpleNamespace(
+                exit_code=0, stdout="", stderr="", code="process_exit",
+                timed_out=False, stdout_truncated=False, stderr_truncated=False,
+            )
+
+    monkeypatch.setattr(
+        ControlledValidationWorkspace, "_secure_delete_root", lambda _self: False,
+    )
+    outcome = run_validation(
+        project, Path("C:/NXP/S32DS.3.6.7"),
+        workspace=control, runner=PassingRunner(),
+    )
+    assert outcome.passed is False
+    assert outcome.cleanup_warnings[0]["code"] == "validation_cleanup_failed"
+    preserved = outcome.cleanup_warnings[0]["details"]["preserved"]
+    assert len(preserved) == 1 and not Path(preserved[0]).is_absolute()
+    monkeypatch.setattr(
+        ControlledValidationWorkspace, "_secure_delete_root", real_cleanup,
+    )
+    shutil.rmtree(control)
+
+
+def test_validation_keyboard_interrupt_cleans_workspace_and_preserves_project(tmp_path):
+    project = copy_uart_fixture(tmp_path)
+    control = tmp_path / "controlled-validation"
+    before = _project_manifest(project)
+
+    class InterruptingRunner:
+        def run(self, *_args, **_kwargs):
+            raise KeyboardInterrupt
+
+    with pytest.raises(KeyboardInterrupt):
+        run_validation(
+            project, Path("C:/NXP/S32DS.3.6.7"),
+            workspace=control, runner=InterruptingRunner(),
+        )
+    assert _project_manifest(project) == before
+    assert not control.exists()
+
+
+@pytest.mark.parametrize("operation", ["add", "delete"])
+def test_vendor_settings_inventory_drift_is_detected(operation, tmp_path):
+    project = copy_uart_fixture(tmp_path)
+    control = tmp_path / "controlled-validation"
+    settings = project / ".settings"
+    victim = settings / "org.eclipse.core.resources.prefs"
+
+    class DriftingRunner:
+        def run(self, argv, *, cwd, env, timeout_s):
+            if operation == "add":
+                (settings / "added-during-validation.prefs").write_bytes(b"new=true\n")
+            else:
+                victim.unlink()
+            return SimpleNamespace(
+                exit_code=0, stdout="", stderr="", code="process_exit",
+                timed_out=False, stdout_truncated=False, stderr_truncated=False,
+            )
+
+    with pytest.raises(CliFailure) as caught:
+        run_validation(
+            project, Path("C:/NXP/S32DS.3.6.7"),
+            workspace=control, runner=DriftingRunner(),
+        )
+    assert caught.value.code == "validation_source_changed"
+    assert not control.exists()
+
+
+def test_workspace_materializes_captured_bytes_after_source_is_deleted(tmp_path):
+    root = copy_uart_fixture(tmp_path)
+    control = tmp_path / "controlled-validation"
+    with Project.verified(root) as project:
+        inventory = project.capture_validator_inputs()
+        expected = {
+            item.relative: item.snapshot.content for item in inventory.files
+        }
+        (root / ".project").unlink()
+        workspace = ControlledValidationWorkspace(control, inventory).open()
+        try:
+            assert workspace.project_dir is not None
+            for relative, content in expected.items():
+                assert (workspace.project_dir / relative).read_bytes() == content
+        finally:
+            assert workspace.close() == []
+    assert not control.exists()
+
+
+def test_inventory_selects_dynamic_direct_preferences_and_excludes_project_outputs(
+    tmp_path,
+):
+    root = copy_uart_fixture(tmp_path)
+    (root / ".settings/dynamic.prefs").write_bytes(b"dynamic=true\n")
+    (root / ".settings/nested").mkdir()
+    (root / ".settings/nested/ignored.prefs").write_bytes(b"nested=true\n")
+    for relative in ("build/output.o", "logs/validation.log", "generated/code.c"):
+        source = root / relative
+        source.parent.mkdir(parents=True, exist_ok=True)
+        source.write_bytes(b"excluded")
+    with Project.verified(root) as project:
+        inventory = project.capture_validator_inputs()
+    relatives = {item.relative for item in inventory.files}
+    assert inventory.mex_relative in relatives
+    assert {".project", ".cproject", ".settings/dynamic.prefs"} <= relatives
+    assert not any(
+        relative.startswith(("build/", "logs/", "generated/"))
+        or relative == ".settings/nested/ignored.prefs"
+        for relative in relatives
+    )
+
+
+@pytest.mark.parametrize(
+    "relative,expected_code",
+    [
+        ("../escape.prefs", "validation_inventory_unsafe"),
+        ("/absolute.prefs", "validation_inventory_unsafe"),
+        (".settings\\escape.prefs", "validation_inventory_unsafe"),
+        ("CASE.MEX", "validation_inventory_collision"),
+    ],
+)
+def test_inventory_rejects_escape_and_casefold_collision(
+    tmp_path, relative, expected_code
+):
+    root = copy_uart_fixture(tmp_path)
+    with Project.verified(root) as project:
+        inventory = project.capture_validator_inputs()
+    first = inventory.files[0]
+    files = (
+        inventory.files + (replace(first, relative=relative),)
+        if expected_code == "validation_inventory_unsafe"
+        else (first, replace(first, relative=first.relative.swapcase()))
+    )
+    with pytest.raises(CliFailure) as caught:
+        ValidatorInputInventory(root, inventory.mex_relative, files)
+    assert caught.value.code == expected_code
+
+
+@pytest.mark.parametrize("kind", ["link", "directory"])
+def test_inventory_rejects_linked_or_nonregular_direct_preference(tmp_path, kind):
+    root = copy_uart_fixture(tmp_path)
+    unsafe = root / ".settings/unsafe.prefs"
+    if kind == "link":
+        outside = tmp_path / "outside.prefs"
+        outside.write_bytes(b"outside=true\n")
+        try:
+            unsafe.symlink_to(outside)
+        except OSError as exc:
+            pytest.skip(f"symlink unavailable: {exc}")
+    else:
+        unsafe.mkdir()
+    with Project.verified(root) as project:
+        with pytest.raises(CliFailure) as caught:
+            project.capture_validator_inputs()
+    assert caught.value.code == "validation_source_unsafe"
+
+
+@pytest.mark.parametrize("operation", ["replace", "delete", "recreate"])
+def test_inventory_capture_rejects_preference_swap_delete_or_recreation(
+    monkeypatch, tmp_path, operation
+):
+    root = copy_uart_fixture(tmp_path)
+    relative = ".settings/org.eclipse.core.resources.prefs"
+    source = root / relative
+    with Project.verified(root) as project:
+        project.metadata
+        capture = metadata_module.snapshot_project_relative
+        mutated = {"value": False}
+
+        def mutate_after_capture(target, requested, *, max_bytes):
+            snapshot = capture(target, requested, max_bytes=max_bytes)
+            if requested == relative and not mutated["value"]:
+                mutated["value"] = True
+                content = source.read_bytes()
+                if operation == "replace":
+                    replacement = source.with_suffix(".replacement")
+                    replacement.write_bytes(content + b"changed=true\n")
+                    os.replace(replacement, source)
+                elif operation == "delete":
+                    source.unlink()
+                else:
+                    source.unlink()
+                    source.write_bytes(content)
+            return snapshot
+
+        monkeypatch.setattr(
+            metadata_module, "snapshot_project_relative", mutate_after_capture
+        )
+        with pytest.raises(CliFailure) as caught:
+            project.capture_validator_inputs()
+    assert caught.value.code == "validation_inventory_changed"
+
+
+@pytest.mark.parametrize("field", ["mtime_ns", "ctime_ns", "mode"])
+def test_inventory_capture_rejects_metadata_evidence_drift(
+    monkeypatch, tmp_path, field
+):
+    root = copy_uart_fixture(tmp_path)
+    relative = ".settings/org.eclipse.core.resources.prefs"
+    with Project.verified(root) as project:
+        project.metadata
+        capture = metadata_module.snapshot_project_relative
+        captures = {relative: 0}
+
+        def drift_second_capture(target, requested, *, max_bytes):
+            snapshot = capture(target, requested, max_bytes=max_bytes)
+            if requested != relative or snapshot is None:
+                return snapshot
+            captures[relative] += 1
+            if captures[relative] == 2:
+                value = getattr(snapshot, field)
+                return replace(snapshot, **{field: 0o640 if value != 0o640 else 0o600}) if field == "mode" else replace(
+                    snapshot, **{field: value + 1}
+                )
+            return snapshot
+
+        monkeypatch.setattr(
+            metadata_module, "snapshot_project_relative", drift_second_capture
+        )
+        with pytest.raises(CliFailure) as caught:
+            project.capture_validator_inputs()
+    assert caught.value.code == "validation_inventory_changed"
+
+
+@pytest.mark.parametrize("field", ["mtime_ns", "ctime_ns", "mode"])
+def test_inventory_revalidation_compares_complete_snapshot_evidence(
+    monkeypatch, tmp_path, field
+):
+    root = copy_uart_fixture(tmp_path)
+    relative = ".settings/org.eclipse.core.resources.prefs"
+    with Project.verified(root) as project:
+        expected = project.capture_validator_inputs()
+        capture = metadata_module.snapshot_project_relative
+
+        def drift_evidence(target, requested, *, max_bytes):
+            snapshot = capture(target, requested, max_bytes=max_bytes)
+            if requested != relative or snapshot is None:
+                return snapshot
+            value = getattr(snapshot, field)
+            return replace(snapshot, **{field: 0o640 if value != 0o640 else 0o600}) if field == "mode" else replace(
+                snapshot, **{field: value + 1}
+            )
+
+        monkeypatch.setattr(
+            metadata_module, "snapshot_project_relative", drift_evidence
+        )
+        with pytest.raises(CliFailure) as caught:
+            metadata_module.revalidate_validator_input_inventory(
+                project.verified_target, expected
+            )
+    assert caught.value.code == "validation_source_changed"
+
+
+@pytest.mark.parametrize("operation", ["add", "delete"])
+def test_inventory_capture_rejects_preference_set_drift(
+    monkeypatch, tmp_path, operation
+):
+    root = copy_uart_fixture(tmp_path)
+    settings = root / ".settings"
+    victim = settings / "org.eclipse.core.resources.prefs"
+    original_names = metadata_module._settings_pref_names
+    calls = {"count": 0}
+
+    def mutate_after_listing(target):
+        names = original_names(target)
+        calls["count"] += 1
+        if calls["count"] == 1:
+            if operation == "add":
+                (settings / "added-during-capture.prefs").write_bytes(b"new=true\n")
+            else:
+                victim.unlink()
+        return names
+
+    monkeypatch.setattr(metadata_module, "_settings_pref_names", mutate_after_listing)
+    with Project.verified(root) as project:
+        with pytest.raises(CliFailure) as caught:
+            project.capture_validator_inputs()
+    assert caught.value.code == "validation_inventory_changed"
 
 
 # ---------------------------------------------------------------------------

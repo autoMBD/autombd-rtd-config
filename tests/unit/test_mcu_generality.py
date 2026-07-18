@@ -61,6 +61,7 @@ Mux0..Mux11 + source subset; 10 CGM Mux12-20 + CM7_CORE_CLK clocks are
 deferred (documented in clock.json deferred_clocks). No value is invented here.
 """
 import difflib
+from functools import partial
 import json
 import sys
 from pathlib import Path
@@ -71,7 +72,11 @@ from rtd_config.backends.s32_mex.document import MexDocument
 from rtd_config.backends.s32_mex.apply import apply_mcu_set, _ALL_SELECTABLE_CLOCKS, _MCU_SUPPORTED_RECIPES
 from rtd_config.intent import Intent
 from rtd_config.modules.mcu import McuProvider
-from tests.fixtures import copy_uart_fixture
+from tests.fixtures import copy_uart_fixture, resolved_uart_bundle
+
+_BUNDLE = resolved_uart_bundle()
+apply_mcu_set = partial(apply_mcu_set, bundle=_BUNDLE)
+McuProvider = partial(McuProvider, _BUNDLE)
 
 
 # ---------------------------------------------------------------------------
@@ -101,29 +106,17 @@ def _get_ref_point_names(doc: MexDocument) -> set[str]:
 
 
 # ---------------------------------------------------------------------------
-# Test G01: Asset _coverage section exists and is well-formed
+# Test G01: Coverage stays outside runtime assets
 # ---------------------------------------------------------------------------
 
-def test_asset_has_coverage_section():
-    """clock.json must carry _coverage inventory mapping configurable vs deferred."""
+def test_asset_excludes_development_coverage():
+    """clock.json must not publish development descriptor coverage."""
     asset_path = (
         Path(__file__).resolve().parents[2]
         / "autombd-rtd" / "assets" / "nxp" / "s32k3" / "mcu" / "clock.json"
     )
     asset = json.loads(asset_path.read_text(encoding="utf-8"))
-    assert "_coverage" in asset, (
-        "clock.json must have _coverage section (forward-harden #38)"
-    )
-    cov = asset["_coverage"]
-    assert "configurable_today" in cov, "_coverage.configurable_today missing"
-    assert "not_yet_exposed" in cov, "_coverage.not_yet_exposed missing"
-    assert isinstance(cov["configurable_today"], dict)
-    assert isinstance(cov["not_yet_exposed"], dict)
-    # not_yet_exposed must list multiple sub-categories
-    not_yet = cov["not_yet_exposed"]
-    assert len(not_yet) >= 3, (
-        f"not_yet_exposed must document 3+ categories of deferred surface; got {len(not_yet)}"
-    )
+    assert "_coverage" not in asset
 
 
 # ---------------------------------------------------------------------------
@@ -309,11 +302,11 @@ def test_plan_for_different_intents():
     }))
     assert len(plan3.changes) >= 1, f"Ref-only intent: expected >=1 change, got {len(plan3.changes)}"
 
-    # Empty intent (fallback): 1 change
+    # Empty intent: no write is planned.
     plan4 = provider.plan(Intent.from_dict({
         "module": "mcu", "action": "set", "payload": {},
     }))
-    assert len(plan4.changes) == 1, f"Empty intent: expected 1 fallback change, got {len(plan4.changes)}"
+    assert plan4.changes == []
 
 
 # ---------------------------------------------------------------------------

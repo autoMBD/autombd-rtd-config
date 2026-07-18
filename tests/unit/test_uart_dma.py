@@ -62,6 +62,8 @@ Ground truth:
 from __future__ import annotations
 
 import json
+from dataclasses import replace
+from functools import partial
 import subprocess
 import sys
 import xml.etree.ElementTree as ET
@@ -73,7 +75,11 @@ from rtd_config.backends.s32_mex.apply import apply_uart_set
 from rtd_config.backends.s32_mex.document import MexDocument
 from rtd_config.intent import Intent
 from rtd_config.modules.uart import UartProvider
-from tests.fixtures import copy_uart_fixture
+from tests.fixtures import copy_uart_fixture, resolved_uart_bundle
+
+_BUNDLE = resolved_uart_bundle()
+apply_uart_set = partial(apply_uart_set, bundle=_BUNDLE)
+UartProvider = partial(UartProvider, _BUNDLE)
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -771,26 +777,20 @@ class TestDmaAntiHardcode:
         Monkeypatches the loaded asset to use a sentinel IRQ name, then verifies
         the written Platform ISR entry carries that sentinel -- not a hardcoded literal.
         """
-        import rtd_config.backends.s32_mex.apply as apply_mod
         sentinel_irq = "SENTINEL_DMA0_IRQn"
         sentinel_handler = "Sentinel_Ch0_IRQHandler"
-
-        original_load = apply_mod._load_uart_asset
-
-        def _patched_load():
-            data = original_load()
-            data = dict(data)
-            data["dma_hw_channel_irq_map"] = {
-                "0": {"irq_name": sentinel_irq, "isr_handler": sentinel_handler},
-                "1": {"irq_name": "SENTINEL_DMA1_IRQn", "isr_handler": "Sentinel_Ch1_IRQHandler"},
-            }
-            return data
-
-        monkeypatch.setattr(apply_mod, "_load_uart_asset", _patched_load)
+        data = _BUNDLE.load_json("uart")
+        data["dma_hw_channel_irq_map"] = {
+            "0": {"irq_name": sentinel_irq, "isr_handler": sentinel_handler},
+            "1": {"irq_name": "SENTINEL_DMA1_IRQn", "isr_handler": "Sentinel_Ch1_IRQHandler"},
+        }
+        injected = replace(_BUNDLE, _cache={"uart": data})
 
         project = copy_uart_fixture(tmp_path)
         doc = MexDocument.load(project / "Uart_Example.mex")
-        result = apply_uart_set(doc, _intent(hw="LPUART_3", mode="dma", priority=2))
+        result = apply_uart_set.func(
+            doc, _intent(hw="LPUART_3", mode="dma", priority=2), bundle=injected
+        )
         assert not result.blocked, [d.to_dict() for d in result.diagnostics]
 
         # The ISR name written to the mex must match the (monkeypatched) asset
@@ -807,26 +807,20 @@ class TestDmaAntiHardcode:
 
         Same sentinel pattern as above, for the RX channel.
         """
-        import rtd_config.backends.s32_mex.apply as apply_mod
         sentinel_irq = "SENTINEL_DMA1_IRQn"
         sentinel_handler = "Sentinel_Ch1_IRQHandler"
-
-        original_load = apply_mod._load_uart_asset
-
-        def _patched_load():
-            data = original_load()
-            data = dict(data)
-            data["dma_hw_channel_irq_map"] = {
-                "0": {"irq_name": "SENTINEL_DMA0_IRQn", "isr_handler": "Sentinel_Ch0_IRQHandler"},
-                "1": {"irq_name": sentinel_irq, "isr_handler": sentinel_handler},
-            }
-            return data
-
-        monkeypatch.setattr(apply_mod, "_load_uart_asset", _patched_load)
+        data = _BUNDLE.load_json("uart")
+        data["dma_hw_channel_irq_map"] = {
+            "0": {"irq_name": "SENTINEL_DMA0_IRQn", "isr_handler": "Sentinel_Ch0_IRQHandler"},
+            "1": {"irq_name": sentinel_irq, "isr_handler": sentinel_handler},
+        }
+        injected = replace(_BUNDLE, _cache={"uart": data})
 
         project = copy_uart_fixture(tmp_path)
         doc = MexDocument.load(project / "Uart_Example.mex")
-        result = apply_uart_set(doc, _intent(hw="LPUART_3", mode="dma", priority=2))
+        result = apply_uart_set.func(
+            doc, _intent(hw="LPUART_3", mode="dma", priority=2), bundle=injected
+        )
         assert not result.blocked, [d.to_dict() for d in result.diagnostics]
 
         assert _platform_isr_setting(doc, sentinel_irq, "IsrHandler") == sentinel_handler, (
@@ -842,25 +836,17 @@ class TestDmaAntiHardcode:
         Monkeypatches the template to use "false" for all three flags, then asserts
         the WRITTEN values in the mex match the (patched) template -- not hardcoded "true".
         """
-        import rtd_config.backends.s32_mex.apply as apply_mod
-        original_load = apply_mod._load_uart_asset
-
-        def _patched_load():
-            data = original_load()
-            data = dict(data)
-            # Overwrite the template flags so they differ from the real values
-            data["mcl_dma_channel_template"] = {
-                "dmaLogicChannel_EnableGlobalConfig": "false",
-                "dmaGlobalRequest_enDmaRequest": "false",
-                "dmaLogicChannelConfig_enDmaMajorInterrupt": "false",
-            }
-            return data
-
-        monkeypatch.setattr(apply_mod, "_load_uart_asset", _patched_load)
+        data = _BUNDLE.load_json("uart")
+        data["mcl_dma_channel_template"] = {
+            "dmaLogicChannel_EnableGlobalConfig": "false",
+            "dmaGlobalRequest_enDmaRequest": "false",
+            "dmaLogicChannelConfig_enDmaMajorInterrupt": "false",
+        }
+        injected = replace(_BUNDLE, _cache={"uart": data})
 
         project = copy_uart_fixture(tmp_path)
         doc = MexDocument.load(project / "Uart_Example.mex")
-        apply_uart_set(doc, _intent(hw="LPUART_3", mode="dma"))
+        apply_uart_set.func(doc, _intent(hw="LPUART_3", mode="dma"), bundle=injected)
 
         # With the template overridden to "false", the written values must also be "false"
         # (not hardcoded "true"). If production hardcodes "true" this fails.

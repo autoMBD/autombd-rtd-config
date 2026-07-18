@@ -1,4 +1,5 @@
 {
+  "_identity": {"vendor":"NXP","family":"S32K3","device":"S32K344","package":"mapbga257","rtd_release":"7.0.1","module":"Uart","role":"module_schema"},
   "_source": "Installed-RTD-derived (S32K3 RTD 7.0.1 Uart.xdm / Platform.xdm / .epd), S32K344 IRQ header (S32K344_IRQ.h from SDK), fixture Uart_Example_S32K344 (committed: tests/fixtures/nxp/ds/s32k3/Uart_Example_S32K344). Uart.xdm is not committed in this repo; all field/enum values are fixture-verified and pinned by test_uart_apply.py::TestUartAsset and test_uart_flexio_add_channel.py::TestUartAssetFlexioEnums (LL-012, LL-012b).",
   "enum_domains": {
     "UartWordLength": [

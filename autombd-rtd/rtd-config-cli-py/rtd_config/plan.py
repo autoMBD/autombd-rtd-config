@@ -50,14 +50,32 @@ from dataclasses import dataclass, field
 
 
 @dataclass(frozen=True)
+class TargetSelector:
+    """Machine-checkable physical target for one planned XML change."""
+
+    region: str
+    path: tuple[str, ...]
+    identity: tuple[tuple[str, str], ...] = ()
+    access: str = "write"
+
+
+@dataclass(frozen=True)
 class PlannedChange:
     module: str
     owner: str
     path: str
     description: str
+    targets: tuple[TargetSelector, ...] = ()
 
     def to_dict(self) -> dict:
-        return self.__dict__.copy()
+        payload = self.__dict__.copy()
+        payload["targets"] = [{
+            "region": target.region,
+            "path": list(target.path),
+            "identity": [list(item) for item in target.identity],
+            "access": target.access,
+        } for target in self.targets]
+        return payload
 
 
 @dataclass(frozen=True)

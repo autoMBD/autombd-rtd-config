@@ -45,7 +45,10 @@
 # =================================================================================
 
 from pathlib import Path
+import pytest
+
 from rtd_config.config import RuntimeConfig
+from rtd_config.errors import CliFailure
 
 
 def test_runtime_config_defaults_to_skill_assets_dir(tmp_path):
@@ -54,4 +57,13 @@ def test_runtime_config_defaults_to_skill_assets_dir(tmp_path):
     assert config.family == "s32k3"
     assert config.device == "s32k344"
     assert config.rtd_version == "7_0_1"
-    assert config.data_root == Path("assets")
+    assert config.asset_root.is_absolute()
+    assert config.asset_root.name == "assets"
+
+
+def test_runtime_config_rejects_undocumented_data_root_alias(tmp_path):
+    with pytest.raises(CliFailure) as caught:
+        RuntimeConfig.from_dict({
+            "project": str(tmp_path), "data_root": str(tmp_path / "assets"),
+        })
+    assert caught.value.code == "invalid_arguments"

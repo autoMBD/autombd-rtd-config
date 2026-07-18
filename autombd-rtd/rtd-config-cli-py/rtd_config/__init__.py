@@ -40,8 +40,15 @@
 # File:        __init__.py
 # Author:      autoMBD <tkung.lqk@foxmail.com>
 # Date:        2026-06-03
-# Version:     0.1.7
+# Version:     0.1.8
 # Description: Package root for the RTD CfgFile CLI; exposes the package version.
 # =================================================================================
 
-__version__ = "0.1.7"
+import sys
+
+# `python -m rtd_config` imports this package before its module entry point.
+# Set the process flag here so that invocation path also leaves the verified
+# released payload byte-for-byte unchanged.
+sys.dont_write_bytecode = True
+
+__version__ = "0.1.8"

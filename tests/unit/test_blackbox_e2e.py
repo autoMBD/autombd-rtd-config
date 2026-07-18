@@ -2094,6 +2094,35 @@ class TestOpencodeExtractBlackboxResult:
         assert result["validate_status"] == "passed"
         assert result["notes"] == "all good"
 
+    def test_extracts_terminal_result_after_separate_progress_text_events(self):
+        """OpenCode 1.18 emits complete assistant text parts for progress
+        updates as well as the final answer.  Those independent parts need not
+        end with a newline, so they must not be glued to the terminal marker.
+        """
+        mod = load_module()
+        session_id = "ses_platform001terminalresult"
+        ndjson = "\n".join([
+            json.dumps({"type": "step_start", "timestamp": 4_000_000, "sessionID": session_id, "part": {"type": "step-start"}}),
+            json.dumps({"type": "text", "timestamp": 4_001_000, "sessionID": session_id, "part": {"type": "text", "text": "`set` passed. Now running `check`."}}),
+            json.dumps({"type": "tool_use", "timestamp": 4_002_000, "sessionID": session_id, "part": {"type": "tool", "tool": "bash", "state": {"status": "completed", "input": {"command": "python skill check --project . --json"}}}}),
+            json.dumps({"type": "text", "timestamp": 4_003_000, "sessionID": session_id, "part": {"type": "text", "text": "`check` passed. Now running `validate`."}}),
+            json.dumps({"type": "tool_use", "timestamp": 4_004_000, "sessionID": session_id, "part": {"type": "tool", "tool": "bash", "state": {"status": "completed", "input": {"command": "python skill validate --project . --json"}}}}),
+            json.dumps({"type": "text", "timestamp": 4_005_000, "sessionID": session_id, "part": {"type": "text", "text": 'BLACKBOX_RESULT {"configured": true, "validate_status": "passed", "notes": "platform configured"}'}}),
+            json.dumps({"type": "step_finish", "timestamp": 4_006_000, "sessionID": session_id, "part": {"type": "step-finish", "reason": "stop"}}),
+        ]) + "\n"
+        rr = mod.RunResult(
+            exit_code=0, timed_out=False, stdout=ndjson,
+            stderr="", elapsed_s=6.0, session_id=session_id,
+        )
+
+        result = mod.AGENT_ADAPTERS["opencode"].extract_result(rr)
+
+        assert result == {
+            "configured": True,
+            "validate_status": "passed",
+            "notes": "platform configured",
+        }
+
     def test_returns_none_when_no_marker(self):
         """No BLACKBOX_RESULT marker in text events -> None."""
         mod = load_module()
@@ -2104,6 +2133,36 @@ class TestOpencodeExtractBlackboxResult:
         rr = mod.RunResult(exit_code=0, timed_out=False, stdout=ndjson, stderr="", elapsed_s=1.0)
         adapter = mod.AGENT_ADAPTERS["opencode"]
         assert adapter.extract_result(rr) is None
+
+    def test_rejects_stale_result_when_terminal_text_has_no_marker(self):
+        """A marker from an earlier assistant turn is stale; the protocol
+        requires BLACKBOX_RESULT to be the terminal emitted line.
+        """
+        mod = load_module()
+        ndjson = "\n".join([
+            json.dumps({"type": "text", "timestamp": 1000, "sessionID": "ses_stale", "part": {"type": "text", "text": 'BLACKBOX_RESULT {"configured": false, "validate_status": "skipped", "notes": "stale"}\n'}}),
+            json.dumps({"type": "text", "timestamp": 2000, "sessionID": "ses_stale", "part": {"type": "text", "text": "Continuing work without a terminal result."}}),
+        ]) + "\n"
+        rr = mod.RunResult(exit_code=0, timed_out=False, stdout=ndjson, stderr="", elapsed_s=1.0)
+
+        assert mod.AGENT_ADAPTERS["opencode"].extract_result(rr) is None
+
+    def test_rejects_ambiguous_terminal_text_with_multiple_markers(self):
+        """Two terminal markers are ambiguous even when both JSON objects
+        are individually well formed.
+        """
+        mod = load_module()
+        text = "\n".join([
+            'BLACKBOX_RESULT {"configured": false, "validate_status": "skipped", "notes": "first"}',
+            'BLACKBOX_RESULT {"configured": true, "validate_status": "passed", "notes": "second"}',
+        ])
+        ndjson = json.dumps({
+            "type": "text", "timestamp": 1000, "sessionID": "ses_ambiguous",
+            "part": {"type": "text", "text": text},
+        }) + "\n"
+        rr = mod.RunResult(exit_code=0, timed_out=False, stdout=ndjson, stderr="", elapsed_s=1.0)
+
+        assert mod.AGENT_ADAPTERS["opencode"].extract_result(rr) is None
 
     def test_handles_empty_stdout(self):
         """Empty stdout (no NDJSON) -> None, no exception."""

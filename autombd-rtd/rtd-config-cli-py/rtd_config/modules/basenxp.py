@@ -47,7 +47,8 @@
 from __future__ import annotations
 
 from rtd_config.intent import Intent
-from rtd_config.plan import Plan, PlannedChange
+from rtd_config.plan import Plan, PlannedChange, TargetSelector
+from rtd_config.resources.bundles import ResolvedAssetBundle
 
 
 _GENERAL_SETTING_CHANGES = {
@@ -92,6 +93,9 @@ class BaseNxpProvider:
 
     name = "basenxp"
 
+    def __init__(self, bundle: ResolvedAssetBundle):
+        self.bundle = bundle
+
     def plan(self, intent: Intent) -> Plan:
         changes = []
         for key, (path, description) in _GENERAL_SETTING_CHANGES.items():
@@ -102,6 +106,9 @@ class BaseNxpProvider:
                 owner="basenxp",
                 path=path,
                 description=description,
+                targets=(TargetSelector(
+                    "config_set:BaseNXP", ("OsIfGeneral", path.rsplit("/", 1)[-1]),
+                ),),
             ))
         if intent.payload.get("enable_system_timer", False):
             # Basenxp-owned change 1: enable the OsIf system timer flag.
@@ -110,6 +117,9 @@ class BaseNxpProvider:
                 owner="basenxp",
                 path="/BaseNXP/BaseNXP/OsIfGeneral/OsIfUseSystemTimer",
                 description="Enable OsIf system timer (OsIfUseSystemTimer=true)",
+                targets=(TargetSelector(
+                    "config_set:BaseNXP", ("OsIfGeneral", "OsIfUseSystemTimer"),
+                ),),
             ))
             # Basenxp-owned change 2: insert one OsIfCounterConfig whose
             # OsIfSystemTimerClockRef is populated with an Mcu McuClockReferencePoint
@@ -126,6 +136,15 @@ class BaseNxpProvider:
                     "else first available); OsIfSystemTimerClockFreq as empty array "
                     "(ConfigTools ArraySetting type)"
                 ),
+                targets=tuple(
+                    TargetSelector("config_set:BaseNXP", ("OsIfCounterConfig", leaf))
+                    for leaf in (
+                        "OsIfCounterConfig_0", "Name", "OsIfSystemTimerClockRef",
+                        "OsIfSystemTimerClockFreq", "OsIfOsCounterRef",
+                    )
+                ) + (TargetSelector(
+                    "config_set:BaseNXP", ("OsIfCounterConfig",),
+                ),),
             ))
             # Cross-module dependency: BaseNXP reads (read-only) an existing Mcu
             # McuClockReferencePoint to populate OsIfSystemTimerClockRef. This
@@ -140,12 +159,9 @@ class BaseNxpProvider:
                     "McuClockReferencePoint to populate OsIfSystemTimerClockRef "
                     "(CORE_CLK preferred, else first available)"
                 ),
-            ))
-        if not changes:
-            changes.append(PlannedChange(
-                module="basenxp",
-                owner="basenxp",
-                path="/BaseNXP/BaseNXP/OsIfGeneral",
-                description="Preserve OsIf configuration used by Uart timeout",
+                targets=(TargetSelector(
+                    "config_set:Mcu", ("config_set", "Mcu", "McuClockReferencePoint"),
+                    access="read",
+                ),),
             ))
         return Plan(changes)

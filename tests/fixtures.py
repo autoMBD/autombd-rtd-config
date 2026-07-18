@@ -47,7 +47,11 @@
 from __future__ import annotations
 
 import shutil
+from functools import lru_cache
 from pathlib import Path
+
+from rtd_config.project import Project
+from rtd_config.resources.bundles import AssetBundleResolver, ResolvedAssetBundle
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -61,6 +65,21 @@ UART_FIXTURE = (
 ADC_FIXTURE = (
     REPO_ROOT / "tests" / "fixtures" / "nxp" / "ds" / "s32k3" / "Autombd_Test_Adc_S32K344"
 )
+ASSET_ROOT = REPO_ROOT / "autombd-rtd" / "assets"
+
+
+@lru_cache(maxsize=2)
+def resolved_uart_bundle() -> ResolvedAssetBundle:
+    """Resolve the production UART profile from observed fixture metadata."""
+    with Project.verified(UART_FIXTURE) as project:
+        return AssetBundleResolver(ASSET_ROOT).resolve(project.metadata)
+
+
+@lru_cache(maxsize=2)
+def resolved_adc_bundle() -> ResolvedAssetBundle:
+    """Resolve the production ADC profile from observed fixture metadata."""
+    with Project.verified(ADC_FIXTURE) as project:
+        return AssetBundleResolver(ASSET_ROOT).resolve(project.metadata)
 
 
 def copy_uart_fixture(tmp_path: Path) -> Path:

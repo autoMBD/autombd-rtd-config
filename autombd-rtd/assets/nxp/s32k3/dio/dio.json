@@ -1,4 +1,5 @@
 {
+  "_identity": {"vendor":"NXP","family":"S32K3","device":"S32K344","package":"mapbga257","rtd_release":"7.0.1","module":"Dio","role":"module_schema"},
   "_source": "Dio.xdm (RTD 7.0.1, C:\\NXP\\S32DS.3.6.7\\S32DS\\software\\PlatformSDK_S32K3\\RTD\\Dio_TS_T40D34M70I1R0\\config\\Dio.xdm) + pins.json (mscr mapping)",
   "_note": "Runtime asset for Dio channel insertion. DioPortId and DioChannelId are derived from the pin's mscr value using the rules below. All values are grounded in Dio.xdm and the Uart_Example_S32K344 fixture.",
 

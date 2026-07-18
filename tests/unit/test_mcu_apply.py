@@ -101,6 +101,7 @@ NOT written by us:
 """
 
 import difflib
+from functools import partial
 import json
 import subprocess
 import sys
@@ -110,7 +111,11 @@ from rtd_config.backends.s32_mex.document import MexDocument
 from rtd_config.backends.s32_mex.apply import apply_mcu_set
 from rtd_config.intent import Intent
 from rtd_config.modules.mcu import McuProvider
-from tests.fixtures import copy_uart_fixture
+from tests.fixtures import copy_uart_fixture, resolved_uart_bundle
+
+_BUNDLE = resolved_uart_bundle()
+apply_mcu_set = partial(apply_mcu_set, bundle=_BUNDLE)
+McuProvider = partial(McuProvider, _BUNDLE)
 
 
 # All selectable clocks verified from the Mcu.xdm INVALID rules (lines 14008-14152)
@@ -579,6 +584,28 @@ def test_mcu_pll_parameter_quick_selection_preserved(tmp_path):
         f"quick_selection must be preserved on McuPll_Parameter after apply; "
         f"tag: {tag!r}"
     )
+
+
+def test_mcu_pll1_and_both_parameter_subtrees_are_untouched(tmp_path):
+    project = copy_uart_fixture(tmp_path)
+    mex = project / "Uart_Example.mex"
+    doc = MexDocument.load(mex)
+
+    def snapshots(document, name):
+        return [
+            ET.tostring(element, encoding="utf-8")
+            for element in document.root.iter()
+            if element.tag.endswith("struct") and element.attrib.get("name") == name
+        ]
+
+    before_pll1 = snapshots(doc, "McuPll_1")
+    before_parameters = snapshots(doc, "McuPll_Parameter")
+    assert before_pll1 == [] and len(before_parameters) == 1
+
+    apply_mcu_set(doc, _std_intent())
+
+    assert snapshots(doc, "McuPll_1") == before_pll1
+    assert snapshots(doc, "McuPll_Parameter") == before_parameters
 
 
 # Test B7: McuClkMux0_Source changed to PLL_PHI0_CLK

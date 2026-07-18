@@ -149,3 +149,35 @@ def test_cli_adc_set_plan_only_does_not_modify(tmp_path):
     payload = json.loads(result.stdout)
     assert payload["command"] == "plan", payload
     assert mex.read_bytes() == original, "plan-only run must not modify the file"
+
+
+def test_cli_adc_dma_configure_passes_complete_mcl_ownership_audit(tmp_path):
+    project = copy_adc_fixture(tmp_path)
+    spec_path = tmp_path / "adc-dma-generality.json"
+    spec_path.write_text(json.dumps({
+        "unit": "ADC0",
+        "transfer": "dma",
+        "sampling_time_us": 3,
+        "groups": [{
+            "trigger": "sw",
+            "access": "streaming",
+            "conv": "continuous",
+            "num_samples": 6,
+            "channels": ["S18", "S19"],
+        }],
+    }), encoding="utf-8")
+
+    result = subprocess.run(
+        [
+            sys.executable, "-m", "rtd_config", "adc", "set",
+            "--project", str(project),
+            "--spec", str(spec_path),
+            "--configure", "--json",
+        ],
+        text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False,
+    )
+
+    assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+    payload = json.loads(result.stdout)
+    assert payload["status"] == "passed", payload
+    assert payload["changed_modules"] == ["adc", "mcl"]

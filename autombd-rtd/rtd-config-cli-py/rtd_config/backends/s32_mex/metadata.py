@@ -1,0 +1,829 @@
+# =================================================================================
+# The MIT License
+# MIT许可证
+#
+# <https://opensource.org/license/mit>
+#
+# SPDX short identifier / SPDX 短标识符：MIT
+#
+# Copyright (c) 2026 autoMBD
+# 版权所有 (c) 2026 autoMBD
+#
+# Permission is hereby granted, free of charge, to any person obtaining a
+# copy of this software and associated documentation files (the "Software"),
+# to deal in the Software without restriction, including without limitation
+# the rights to use, copy, modify, merge, publish, distribute, sublicense,
+# and/or sell copies of the Software, and to permit persons to whom the
+# Software is furnished to do so, subject to the following conditions:
+# 特此向获得本软件及相关文档（合称"本软件"）副本的任何人免费授予不受限制地利用本软
+# 件的许可，包括而不限于：使用、复制、修改、合并、发布、分发、分许可和/或销售本软
+# 件副本，并允许本软件的接收者也获得前述许可，但须遵守以下条件：
+#
+# The above copyright notice and this permission notice shall be included
+# in all copies or substantial portions of the Software.
+# 以上版权声明及本许可声明应包含在本软件的所有副本或主要部分中。
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+# NONINFRINGEMENT. IN NO EVENT SHALLTHE AUTHORS OR COPYRIGHT
+# HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+# IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+# CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+# 本软件系"按原样"提供，不包含任何形式的明示或默示保证，包括但不限于适销性、特定
+# 目的适用性及不侵权的保证。在任何情况下，无论是在合同、侵权或其他案件中，作者或版
+# 权持有人均不对因本软件、或因本软件的使用或其他利用而引起的、引发的或与之相关的任
+# 何权利主张、损害赔偿或其他责任承担责任。
+# =================================================================================
+# Project:     RTD CfgFile CLI <https://github.com/autoMBD/autombd-rtd-config>
+# File:        metadata.py
+# Author:      autoMBD <tkung.lqk@foxmail.com>
+# Date:        2026-07-13
+# Version:     0.1.0
+# Description: Parse observed S32 .mex project identity and source conflicts.
+# =================================================================================
+
+from __future__ import annotations
+
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass
+import hashlib
+from pathlib import Path, PurePosixPath
+import re
+from typing import Any
+import xml.etree.ElementTree as ET
+
+from ...errors import CliFailure
+from .document import MexDocument
+from .target import (
+    FileIdentity,
+    FileSnapshot,
+    VerifiedProjectTarget,
+    read_project_relative,
+    snapshot_project_relative,
+    snapshot_safe_relative,
+)
+
+
+_NXP_NAMESPACE_PREFIX = "http://mcuxpresso.nxp.com/XSD/mex_configuration_"
+_XSI_SCHEMA_LOCATION = "{http://www.w3.org/2001/XMLSchema-instance}schemaLocation"
+_MAX_SOURCE_BYTES = 1024 * 1024
+_MAX_VALIDATOR_MEX_BYTES = 64 * 1024 * 1024
+_AUXILIARY_SOURCES = (
+    ".project",
+    ".cproject",
+    ".settings/com.freescale.s32ds.cross.sdk.support.prefs",
+    ".settings/com.nxp.s32ds.cle.runtime.component.prefs",
+)
+DEFAULT_PACKAGE_ALIASES = {"S32K344_257BGA": "mapbga257"}
+SourceReader = Callable[[str], bytes | None]
+
+
+@dataclass(frozen=True)
+class ToolMetadata:
+    name: str
+    version: str | None
+    enabled: bool
+
+
+@dataclass(frozen=True)
+class ModuleMetadata:
+    name: str
+    type: str | None
+    type_id: str | None
+    mode: str | None
+    module_id: str | None
+    autosar_version: str | None
+    software_version: str | None
+    vendor_id: str | None
+
+
+@dataclass(frozen=True)
+class MetadataObservation:
+    field: str
+    value: str
+    source: str
+    xpath: str
+
+    def to_dict(self) -> dict[str, str]:
+        return {"field": self.field, "value": self.value, "source": self.source, "xpath": self.xpath}
+
+
+@dataclass(frozen=True)
+class MetadataConflict:
+    field: str
+    observations: tuple[MetadataObservation, ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"field": self.field, "observations": [item.to_dict() for item in self.observations]}
+
+
+@dataclass(frozen=True)
+class AuxiliarySourceEvidence:
+    relative: str
+    observed: bool
+    snapshot: FileSnapshot | None
+
+
+@dataclass(frozen=True)
+class ValidatorInputFile:
+    relative: str
+    source_relative: str
+    snapshot: FileSnapshot
+
+
+@dataclass(frozen=True)
+class ValidatorInputInventory:
+    root: Path
+    mex_relative: str
+    files: tuple[ValidatorInputFile, ...]
+
+    def __post_init__(self) -> None:
+        seen: set[str] = set()
+        for item in self.files:
+            _validate_inventory_relative(item.relative)
+            _validate_inventory_relative(item.source_relative)
+            folded = item.relative.casefold()
+            if folded in seen:
+                raise CliFailure(
+                    "validation_inventory_collision",
+                    "Validator inputs contain a duplicate or case-folded path collision.",
+                    module="backend", details={"entry": Path(item.relative).name},
+                )
+            seen.add(folded)
+        if self.mex_relative.casefold() not in seen:
+            raise ValueError("validator inventory mex path is not materialized")
+
+
+def _validate_inventory_relative(relative: str) -> None:
+    parsed = PurePosixPath(relative)
+    if (
+        not relative or parsed.is_absolute()
+        or any(part in {"", ".", ".."} for part in parsed.parts)
+        or "\\" in relative
+    ):
+        raise CliFailure(
+            "validation_inventory_unsafe",
+            "Validator input paths must be stable project-relative paths.",
+            module="backend", details={"entry": Path(relative).name},
+        )
+
+
+def _settings_pref_names(target: VerifiedProjectTarget) -> tuple[str, ...]:
+    platform = target.lease._resources.get("platform")
+    if platform is None:
+        raise CliFailure(
+            "project_identity_unavailable",
+            "The verified project lacks a safe validator inventory reader.",
+            module="backend",
+        )
+    settings = target.root / ".settings"
+    with target.lease.borrow():
+        inspection = platform.inspect(settings)
+        if not inspection.exists:
+            return ()
+        if (
+            not inspection.is_directory or inspection.is_symlink
+            or inspection.is_reparse_point or inspection.is_mount_point
+        ):
+            raise CliFailure(
+                "validation_source_unsafe",
+                "The project settings input must be a safe directory.",
+                module="backend", details={"entry": settings.name},
+            )
+        names: list[str] = []
+        for entry in platform.list_directory(settings):
+            if not entry.name.lower().endswith(".prefs"):
+                continue
+            item = platform.inspect(entry)
+            if (
+                not item.exists or not item.is_regular or item.is_directory
+                or item.is_symlink or item.is_reparse_point or item.is_mount_point
+            ):
+                raise CliFailure(
+                    "validation_source_unsafe",
+                    "Validator preference inputs must be safe regular files.",
+                    module="backend", details={"entry": entry.name},
+                )
+            names.append(entry.name)
+    folded: dict[str, str] = {}
+    for name in names:
+        key = name.casefold()
+        if key in folded:
+            raise CliFailure(
+                "validation_inventory_collision",
+                "Validator preferences contain a case-folded path collision.",
+                module="backend", details={"entry": name},
+            )
+        folded[key] = name
+    return tuple(sorted(names))
+
+
+def capture_validator_input_inventory(
+    target: VerifiedProjectTarget,
+    *,
+    selected_mex: FileSnapshot | None = None,
+    selected_source_relative: str | None = None,
+) -> ValidatorInputInventory:
+    """Capture the minimal real S32DS project exclusively from safe snapshots."""
+    if selected_mex is None:
+        selected_mex = target.mex
+        selected_source_relative = target.mex.path.relative_to(target.root).as_posix()
+    if selected_source_relative is None:
+        raise ValueError("selected_source_relative is required with a candidate snapshot")
+    _validate_inventory_relative(selected_source_relative)
+    mex_relative = target.mex.path.relative_to(target.root).as_posix()
+    required = (".project", ".cproject")
+    files = [ValidatorInputFile(mex_relative, selected_source_relative, selected_mex)]
+    for relative in required:
+        snapshot = snapshot_project_relative(
+            target, relative, max_bytes=_MAX_SOURCE_BYTES
+        )
+        if snapshot is None:
+            raise CliFailure(
+                "validation_inventory_incomplete",
+                "The S32DS project lacks required validator metadata.",
+                module="backend", details={"entry": Path(relative).name},
+            )
+        files.append(ValidatorInputFile(relative, relative, snapshot))
+
+    names_before = _settings_pref_names(target)
+    for name in names_before:
+        relative = f".settings/{name}"
+        snapshot = snapshot_project_relative(
+            target, relative, max_bytes=_MAX_SOURCE_BYTES
+        )
+        if snapshot is None:
+            raise CliFailure(
+                "validation_inventory_changed",
+                "Validator preferences changed during inventory capture.",
+                module="backend", details={"entry": name},
+            )
+        files.append(ValidatorInputFile(relative, relative, snapshot))
+    if _settings_pref_names(target) != names_before:
+        raise CliFailure(
+            "validation_inventory_changed",
+            "Validator preferences changed during inventory capture.",
+            module="backend",
+        )
+    for item in files:
+        current = snapshot_project_relative(
+            target,
+            item.source_relative,
+            max_bytes=(
+                _MAX_VALIDATOR_MEX_BYTES
+                if item.relative == mex_relative else _MAX_SOURCE_BYTES
+            ),
+        )
+        if current is None or not _same_snapshot_evidence(
+            current, item.snapshot
+        ):
+            raise CliFailure(
+                "validation_inventory_changed",
+                "Validator inputs changed during inventory capture.",
+                module="backend", details={"entry": Path(item.relative).name},
+            )
+    if _settings_pref_names(target) != names_before:
+        raise CliFailure(
+            "validation_inventory_changed",
+            "Validator preferences changed during inventory capture.",
+            module="backend",
+        )
+    return ValidatorInputInventory(target.root, mex_relative, tuple(files))
+
+
+def revalidate_validator_input_inventory(
+    target: VerifiedProjectTarget,
+    expected: ValidatorInputInventory,
+) -> None:
+    selected = snapshot_project_relative(
+        target,
+        next(
+            item.source_relative
+            for item in expected.files if item.relative == expected.mex_relative
+        ),
+        max_bytes=_MAX_VALIDATOR_MEX_BYTES,
+    )
+    if selected is None:
+        raise _validator_inventory_changed(Path(expected.mex_relative).name)
+    current = capture_validator_input_inventory(
+        target,
+        selected_mex=selected,
+        selected_source_relative=next(
+            item.source_relative
+            for item in expected.files if item.relative == expected.mex_relative
+        ),
+    )
+    if len(current.files) != len(expected.files):
+        raise _validator_inventory_changed()
+    for left, right in zip(expected.files, current.files):
+        if (
+            left.relative != right.relative
+            or left.source_relative != right.source_relative
+            or not _same_snapshot_evidence(left.snapshot, right.snapshot)
+        ):
+            raise _validator_inventory_changed(Path(left.relative).name)
+
+
+def _validator_inventory_changed(entry: str | None = None) -> CliFailure:
+    return CliFailure(
+        "validation_source_changed",
+        "Validator input sources changed during isolated validation.",
+        module="backend",
+        details={"entries": [] if entry is None else [entry]},
+    )
+
+
+@dataclass(frozen=True)
+class ProjectMetadata:
+    vendor: str | None
+    backend: str | None
+    processor: str | None
+    family: str | None
+    device: str | None
+    raw_package: str | None
+    package: str | None
+    mcu_data: str | None
+    xml_namespace: str | None
+    schema_version: str | None
+    schema_location: str | None
+    tools: tuple[ToolMetadata, ...] | None
+    modules: tuple[ModuleMetadata, ...] | None
+    rtd_release: str | None
+    conflicts: tuple[MetadataConflict, ...]
+    auxiliary_sources: tuple[AuxiliarySourceEvidence, ...] = ()
+
+    def require_consistent(self) -> "ProjectMetadata":
+        if self.conflicts:
+            raise CliFailure(
+                "project_metadata_conflict",
+                "Project metadata sources disagree; resolve the conflicts before continuing.",
+                module="backend",
+                details={"conflicts": [item.to_dict() for item in self.conflicts]},
+            )
+        return self
+
+    def require_identity(self) -> "ProjectMetadata":
+        self.require_consistent()
+        required = (
+            "vendor", "backend", "processor", "family", "device", "raw_package",
+            "package", "mcu_data", "xml_namespace", "schema_version",
+            "schema_location", "tools", "modules", "rtd_release",
+        )
+        missing = [name for name in required if getattr(self, name) is None]
+        if self.schema_identity != "official":
+            missing.append("schema_identity")
+        if missing:
+            raise CliFailure(
+                "project_metadata_unknown",
+                "Required project identity is not explicitly observed.",
+                module="backend", details={"missing_fields": missing},
+            )
+        return self
+
+    @property
+    def tools_observed(self) -> bool:
+        return self.tools is not None
+
+    @property
+    def modules_observed(self) -> bool:
+        return self.modules is not None
+
+    @property
+    def schema_identity(self) -> str | None:
+        match = re.fullmatch(
+            re.escape(_NXP_NAMESPACE_PREFIX) + r"(\d+)",
+            self.xml_namespace or "",
+        )
+        if (
+            match is None
+            or self.schema_version != match.group(1)
+            or self.schema_location
+            != f"{self.xml_namespace} {self.xml_namespace}.xsd"
+        ):
+            return None
+        return "official"
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "vendor": self.vendor, "backend": self.backend,
+            "processor": self.processor, "family": self.family, "device": self.device,
+            "raw_package": self.raw_package, "package": self.package, "mcu_data": self.mcu_data,
+            "xml_namespace": self.xml_namespace, "schema_version": self.schema_version,
+            "schema_identity": self.schema_identity,
+            "schema_location": self.schema_location,
+            "tools": None if self.tools is None else [{
+                "name": item.name,
+                "version": item.version,
+                "enabled": item.enabled,
+            } for item in self.tools],
+            "tools_observed": self.tools_observed,
+            "modules": None if self.modules is None else [{
+                "name": item.name,
+                "type": item.type,
+                "type_id": item.type_id,
+                "mode": item.mode,
+                "module_id": item.module_id,
+                "autosar_version": item.autosar_version,
+                "software_version": item.software_version,
+                "vendor_id": item.vendor_id,
+            } for item in self.modules],
+            "modules_observed": self.modules_observed,
+            "rtd_release": self.rtd_release,
+            "conflicts": [item.to_dict() for item in self.conflicts],
+        }
+
+
+class _Observations:
+    def __init__(self) -> None:
+        self._items: dict[str, list[MetadataObservation]] = {}
+
+    def add(self, field: str, value: str | None, source: str, xpath: str) -> None:
+        normalized = _normalize(field, value)
+        if normalized is None:
+            return
+        item = MetadataObservation(field, normalized, source, xpath)
+        bucket = self._items.setdefault(field, [])
+        if item not in bucket:
+            bucket.append(item)
+
+    def resolve(self, field: str) -> tuple[str | None, MetadataConflict | None]:
+        items = tuple(self._items.get(field, ()))
+        distinct = {item.value for item in items}
+        if not distinct:
+            return None, None
+        if len(distinct) == 1:
+            return next(iter(distinct)), None
+        return None, MetadataConflict(field, items)
+
+
+def _normalize(field: str, value: str | None) -> str | None:
+    if value is None:
+        return None
+    result = value.strip()
+    if not result:
+        return None
+    if field in {"processor", "device"}:
+        result = re.sub(r"^CPU_", "", result, flags=re.IGNORECASE).upper()
+    elif field == "family":
+        result = result.upper()
+    return result
+
+
+def _local_name(tag: str) -> str:
+    return tag.rsplit("}", 1)[-1]
+
+
+def _root_namespace(root: ET.Element) -> str | None:
+    match = re.match(r"^\{([^}]+)\}", root.tag)
+    return match.group(1) if match else None
+
+
+def _common_text(root: ET.Element, namespace: str | None, name: str) -> str | None:
+    if namespace is None:
+        return None
+    common = root.find(f"{{{namespace}}}common")
+    if common is None:
+        return None
+    child = common.find(f"{{{namespace}}}{name}")
+    if child is not None:
+        return child.text
+    return None
+
+
+def _version(settings: Mapping[str, str], prefix: str) -> str | None:
+    values = tuple(settings.get(prefix + suffix) for suffix in ("MajorVersion", "MinorVersion", "RevisionVersion" if prefix == "ArRelease" else "PatchVersion"))
+    return ".".join(values) if all(value is not None for value in values) else None
+
+
+def _tools_carrier(root: ET.Element, namespace: str | None) -> ET.Element | None:
+    return root.find(f"{{{namespace}}}tools") if namespace else None
+
+
+def _parse_tools(root: ET.Element, namespace: str | None) -> tuple[ToolMetadata, ...] | None:
+    tools = _tools_carrier(root, namespace)
+    if tools is None:
+        return None
+    result = []
+    for item in tools:
+        if not item.tag.startswith(f"{{{namespace}}}"):
+            continue
+        if item.attrib.get("enabled", "true").lower() != "true":
+            continue
+        name = item.attrib.get("name")
+        if name:
+            result.append(ToolMetadata(name, item.attrib.get("version"), True))
+    return tuple(result)
+
+
+def _parse_modules(root: ET.Element, namespace: str | None) -> tuple[ModuleMetadata, ...] | None:
+    tools = _tools_carrier(root, namespace)
+    if tools is None:
+        return None
+    peripherals = next(
+        (item for item in tools if item.tag == f"{{{namespace}}}periphs"),
+        None,
+    )
+    if peripherals is None:
+        return None
+    modules = []
+    if peripherals.attrib.get("enabled", "true").lower() != "true":
+        return ()
+    for item in peripherals.iter():
+        if item.tag != f"{{{namespace}}}instance" or item.attrib.get("enabled", "true").lower() != "true":
+            continue
+        name = item.attrib.get("name")
+        if not name:
+            continue
+        published = next((
+            child for child in item.iter()
+            if child.tag == f"{{{namespace}}}struct"
+            and child.attrib.get("name") == "CommonPublishedInformation"
+        ), None)
+        settings: dict[str, str] = {}
+        if published is not None:
+            settings = {
+                child.attrib["name"]: child.attrib["value"]
+                for child in published.iter()
+                if child.tag == f"{{{namespace}}}setting" and "name" in child.attrib and "value" in child.attrib
+            }
+        modules.append(ModuleMetadata(
+            name, item.attrib.get("type"), item.attrib.get("type_id"), item.attrib.get("mode"),
+            settings.get("ModuleId"), _version(settings, "ArRelease"),
+            _version(settings, "Sw"), settings.get("VendorId"),
+        ))
+    return tuple(modules)
+
+
+def _safe_source_reader(target: VerifiedProjectTarget) -> SourceReader:
+    def read(relative: str) -> bytes | None:
+        if relative not in _AUXILIARY_SOURCES:
+            raise ValueError(f"unsupported metadata source: {relative}")
+        return read_project_relative(target, relative, max_bytes=_MAX_SOURCE_BYTES)
+    return read
+
+
+def _read_sources(reader: SourceReader) -> dict[str, str]:
+    result = {}
+    for relative in _AUXILIARY_SOURCES:
+        try:
+            raw = reader(relative)
+        except CliFailure:
+            raise
+        except PermissionError as exc:
+            raise CliFailure("project_permission_denied", "Permission was denied while reading project metadata.", module="backend", details={"source": relative}) from exc
+        except OSError as exc:
+            raise CliFailure("unsafe_project_path", "A project metadata source could not be read safely.", module="backend", details={"source": relative}) from exc
+        except RuntimeError as exc:
+            raise CliFailure("project_metadata_source_changed", "A project metadata source changed while it was being read; reload and retry.", module="backend", details={"source": relative}) from exc
+        if raw is None:
+            continue
+        if not isinstance(raw, bytes):
+            raise TypeError("source_reader must return bytes or None")
+        if len(raw) > _MAX_SOURCE_BYTES:
+            raise CliFailure("project_metadata_source_too_large", "A project metadata source exceeds the one MiB limit.", module="backend", details={"source": relative, "size": len(raw)})
+        try:
+            result[relative] = raw.decode("utf-8-sig")
+        except UnicodeDecodeError as exc:
+            raise CliFailure("project_metadata_source_encoding_invalid", "A project metadata source is not valid UTF-8.", module="backend", details={"source": relative}) from exc
+    return result
+
+
+def _decode_snapshot(snapshot: FileSnapshot, relative: str) -> str:
+    try:
+        return snapshot.content.decode("utf-8-sig")
+    except UnicodeDecodeError as exc:
+        raise CliFailure(
+            "project_metadata_source_encoding_invalid",
+            "A project metadata source is not valid UTF-8.",
+            module="backend", details={"source": relative},
+        ) from exc
+
+
+def _capture_auxiliary_sources(
+    target: VerifiedProjectTarget,
+) -> tuple[dict[str, str], tuple[AuxiliarySourceEvidence, ...]]:
+    texts = {}
+    evidence = []
+    for relative in _AUXILIARY_SOURCES:
+        snapshot = snapshot_project_relative(
+            target, relative, max_bytes=_MAX_SOURCE_BYTES
+        )
+        evidence.append(AuxiliarySourceEvidence(relative, snapshot is not None, snapshot))
+        if snapshot is not None:
+            texts[relative] = _decode_snapshot(snapshot, relative)
+    return texts, tuple(evidence)
+
+
+def _synthetic_evidence(
+    raw_sources: dict[str, str],
+) -> tuple[AuxiliarySourceEvidence, ...]:
+    evidence = []
+    for relative in _AUXILIARY_SOURCES:
+        text = raw_sources.get(relative)
+        if text is None:
+            evidence.append(AuxiliarySourceEvidence(relative, False, None))
+            continue
+        content = text.encode("utf-8")
+        evidence.append(AuxiliarySourceEvidence(
+            relative, True,
+            FileSnapshot(
+                Path(relative), FileIdentity(None, None, None), len(content), 0, 0,
+                hashlib.sha256(content).hexdigest(), content,
+            ),
+        ))
+    return tuple(evidence)
+
+
+def revalidate_project_metadata(
+    target: VerifiedProjectTarget,
+    metadata: ProjectMetadata,
+) -> None:
+    _, current = _capture_auxiliary_sources(target)
+    _compare_auxiliary_sources(metadata, current)
+
+
+def revalidate_project_metadata_after_release(
+    root: Path,
+    metadata: ProjectMetadata,
+) -> None:
+    """Recheck every fixed auxiliary source after the publish-release seam."""
+    current = []
+    for expected in metadata.auxiliary_sources:
+        snapshot = snapshot_safe_relative(
+            root, expected.relative, max_bytes=_MAX_SOURCE_BYTES
+        )
+        current.append(AuxiliarySourceEvidence(
+            expected.relative, snapshot is not None, snapshot
+        ))
+    _compare_auxiliary_sources(metadata, tuple(current))
+
+
+def _compare_auxiliary_sources(
+    metadata: ProjectMetadata,
+    current: tuple[AuxiliarySourceEvidence, ...],
+) -> None:
+    if len(current) != len(metadata.auxiliary_sources):
+        raise _metadata_sources_changed()
+    for expected, actual in zip(metadata.auxiliary_sources, current):
+        if expected.relative != actual.relative or expected.observed != actual.observed:
+            raise _metadata_sources_changed()
+        if expected.snapshot is None:
+            if actual.snapshot is not None:
+                raise _metadata_sources_changed()
+            continue
+        if actual.snapshot is None or not _same_snapshot_evidence(
+            expected.snapshot, actual.snapshot
+        ):
+            raise _metadata_sources_changed()
+
+
+def _same_snapshot_evidence(left: FileSnapshot, right: FileSnapshot) -> bool:
+    """Compare all immutable evidence captured for one project input."""
+    return (
+        left.identity == right.identity
+        and left.size == right.size
+        and left.mtime_ns == right.mtime_ns
+        and left.ctime_ns == right.ctime_ns
+        and left.sha256 == right.sha256
+        and left.mode == right.mode
+    )
+
+
+def _metadata_sources_changed() -> CliFailure:
+    return CliFailure(
+        "project_metadata_source_changed",
+        "Project metadata sources changed after the observed snapshot; reload and retry.",
+        module="backend",
+    )
+
+
+def _parse_xml_source(text: str, source: str) -> ET.Element:
+    try:
+        return ET.fromstring(text)
+    except ET.ParseError as exc:
+        raise CliFailure("project_metadata_source_invalid", "A project metadata XML source is malformed.", module="backend", details={"source": source, "reason": str(exc)}) from exc
+
+
+def _add_attachment_observations(observations: _Observations, text: str, source: str) -> None:
+    values = {}
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith(("#", "!")):
+            continue
+        key, separator, value = line.partition("=")
+        if separator:
+            values[key.strip()] = value.strip()
+    attached = values.get("com.freescale.s32ds.cross.sdk.support.attachedSDKs", "")
+    for match in re.finditer(r"PlatformSDK_(S32K\d+)_([A-Z0-9]+)_M\d+_(\d+\.\d+\.\d+)_PATH", attached, re.IGNORECASE):
+        observations.add("family", match.group(1), source, "/attachedSDKs")
+        observations.add("device", match.group(2), source, "/attachedSDKs")
+        observations.add("rtd_release", match.group(3), source, "/attachedSDKs")
+
+
+def parse_project_metadata(
+    target: VerifiedProjectTarget,
+    document: MexDocument,
+    source_reader: SourceReader | None = None,
+    package_aliases: Mapping[str, str] = DEFAULT_PACKAGE_ALIASES,
+) -> ProjectMetadata:
+    if not isinstance(target, VerifiedProjectTarget):
+        raise TypeError("target must be a VerifiedProjectTarget")
+    if not isinstance(document, MexDocument) or document._source_snapshot is not target.mex:
+        raise TypeError("document must be parsed from the verified target snapshot")
+    root = document.root
+    namespace = _root_namespace(root)
+    official_match = re.fullmatch(
+        re.escape(_NXP_NAMESPACE_PREFIX) + r"(\d+)", namespace or ""
+    )
+    recognized = False
+    observations = _Observations()
+    observations.add("processor", _common_text(root, namespace, "processor"), ".mex", "/configuration/common/processor")
+    observations.add("device", root.attrib.get("name"), ".mex", "/configuration/@name")
+    raw_package = _normalize("raw_package", _common_text(root, namespace, "package"))
+    mcu_data = _normalize("mcu_data", _common_text(root, namespace, "mcu_data"))
+    if mcu_data:
+        match = re.fullmatch(r"PlatformSDK_(S32K\d+)", mcu_data, re.IGNORECASE)
+        if match:
+            observations.add("family", match.group(1), ".mex", "/configuration/common/mcu_data")
+    schema_location = _normalize("schema_location", root.attrib.get(_XSI_SCHEMA_LOCATION))
+    schema_version = root.attrib.get("version")
+    observations.add("schema_version", schema_version, ".mex", "/configuration/@version")
+    if official_match:
+        observations.add("schema_identity", "official", ".mex", "/configuration/namespace-uri()")
+        match = official_match
+        observations.add("schema_version", match.group(1) if match else None, ".mex", "/configuration/namespace-uri()")
+    valid_pair = False
+    if schema_location:
+        tokens = schema_location.split()
+        pairs = tuple(zip(tokens[::2], tokens[1::2])) if len(tokens) % 2 == 0 else ()
+        valid_pair = bool(official_match) and pairs == ((namespace, f"{namespace}.xsd"),)
+        observations.add("schema_identity", "official" if valid_pair else "invalid", ".mex", "/configuration/@xsi:schemaLocation")
+        if valid_pair:
+            observations.add("schema_version", official_match.group(1), ".mex", "/configuration/@xsi:schemaLocation")
+        else:
+            for token in tokens:
+                location_match = re.search(r"mex_configuration_(\d+)(?:\.xsd)?$", token)
+                if location_match:
+                    observations.add("schema_version", location_match.group(1), ".mex", "/configuration/@xsi:schemaLocation")
+    recognized = bool(
+        official_match
+        and root.tag == f"{{{namespace}}}configuration"
+        and valid_pair
+        and root.attrib.get("version") == official_match.group(1)
+    )
+
+    if source_reader is None:
+        sources, auxiliary_sources = _capture_auxiliary_sources(target)
+    else:
+        sources = _read_sources(source_reader)
+        auxiliary_sources = _synthetic_evidence(sources)
+    for source in (".project", ".cproject"):
+        text = sources.get(source)
+        if text is None:
+            continue
+        xml_root = _parse_xml_source(text, source)
+        if source == ".cproject":
+            for item in xml_root.iter():
+                value = item.attrib.get("value", "")
+                if re.fullmatch(r"CPU_S32K\d+", value, re.IGNORECASE):
+                    observations.add("processor", value, source, "//listOptionValue/@value")
+                    observations.add("device", value, source, "//listOptionValue/@value")
+
+    runtime_source = ".settings/com.nxp.s32ds.cle.runtime.component.prefs"
+    runtime = sources.get(runtime_source, "")
+    for line_number, line in enumerate(runtime.splitlines(), 1):
+        key, separator, value = line.partition("=")
+        if not separator:
+            continue
+        if key == "com.nxp.s32ds.cle.runtime.hardware.registry.device.id":
+            observations.add("device", value, runtime_source, f"/{key}[line={line_number}]")
+        elif key == "com.nxp.s32ds.cle.runtime.hardware.registry.family.id":
+            observations.add("family", value, runtime_source, f"/{key}[line={line_number}]")
+
+    sdk_source = ".settings/com.freescale.s32ds.cross.sdk.support.prefs"
+    _add_attachment_observations(observations, sources.get(sdk_source, ""), sdk_source)
+
+    resolved: dict[str, str | None] = {}
+    conflicts = []
+    for field in ("processor", "family", "device", "schema_version", "schema_identity", "rtd_release"):
+        value, conflict = observations.resolve(field)
+        resolved[field] = value
+        if conflict:
+            conflicts.append(conflict)
+    metadata = ProjectMetadata(
+        "NXP" if recognized else None, "s32-mex" if recognized else None,
+        resolved["processor"], resolved["family"], resolved["device"],
+        raw_package, package_aliases.get(raw_package) if raw_package else None, mcu_data,
+        namespace, resolved["schema_version"], schema_location,
+        _parse_tools(root, namespace), _parse_modules(root, namespace),
+        resolved["rtd_release"], tuple(conflicts), auxiliary_sources,
+    )
+    if source_reader is None:
+        revalidate_project_metadata(target, metadata)
+    else:
+        later = _read_sources(source_reader)
+        if _synthetic_evidence(later) != auxiliary_sources:
+            raise _metadata_sources_changed()
+    return metadata

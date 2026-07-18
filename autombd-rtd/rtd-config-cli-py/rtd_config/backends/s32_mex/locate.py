@@ -48,9 +48,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from .target import VerifiedProjectTarget, verify_project_target
 
-def find_single_mex(project: Path) -> Path:
-    matches = sorted(project.glob("*.mex"))
-    if len(matches) != 1:
-        raise ValueError(f"Expected exactly one .mex in {project}, found {len(matches)}")
-    return matches[0]
+
+def find_single_mex(project: Path) -> VerifiedProjectTarget:
+    """Return a leased, verified single-.mex project target."""
+    return verify_project_target(project)

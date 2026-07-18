@@ -47,7 +47,9 @@
 from __future__ import annotations
 
 from rtd_config.intent import Intent
-from rtd_config.plan import Plan, PlannedChange
+from rtd_config.modules.mcl import MclProvider
+from rtd_config.plan import Plan, PlannedChange, TargetSelector
+from rtd_config.resources.bundles import ResolvedAssetBundle
 
 
 class AdcProvider:
@@ -69,6 +71,9 @@ class AdcProvider:
     """
 
     name = "adc"
+
+    def __init__(self, bundle: ResolvedAssetBundle):
+        self.bundle = bundle
 
     def plan(self, intent: Intent) -> Plan:
         payload = intent.payload
@@ -114,6 +119,14 @@ class AdcProvider:
                 owner="adc",
                 path="/Adc/Adc/AdcConfigSet/AdcHwUnit",
                 description=description,
+                targets=tuple(
+                    TargetSelector("config_set:Adc", (name,))
+                    for name in (
+                        "Adc", "AdcConfigSet", "AdcHwUnit", "AdcChannel", "AdcGroup",
+                        "AdcThresholdControl", "AdcHwTrigger", "BctuHwUnit",
+                        "AdcHwConfiguration", "AutosarExt",
+                    )
+                ),
             )
         ]
 
@@ -124,17 +137,11 @@ class AdcProvider:
         # silently. Both a unit-DMA (transfer=="dma") and a BCTU FIFO-DMA
         # (bctu.fifo_dma) reuse dmaLogicChannel_Type_0, so either path declares the
         # same single Mcl dependency.
-        if transfer == "dma" or fifo_dma:
-            changes.append(PlannedChange(
-                module="mcl",
-                owner="mcl",
-                path="/Mcl/Mcl/MclConfig/dmaLogicChannel_Type",
-                description=(
-                    "Enable Mcl DMA (MclEnableDma=true) and activate the "
-                    "dmaLogicChannel_Type_0 logic channel referenced by the ADC "
-                    "unit's AdcDmaChannelId or the BCTU result FIFO's "
-                    "BctuFifoDmaChannelId for DMA transfer."
-                ),
-            ))
+        unit_dma = any(
+            str(spec.get("transfer", transfer)).strip().casefold() == "dma"
+            for spec in units
+        )
+        if transfer == "dma" or unit_dma or fifo_dma:
+            changes.append(MclProvider(self.bundle).dma_dependency("Adc"))
 
         return Plan(changes)

@@ -48,15 +48,33 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
-import tempfile
+import re
+import sys
+import traceback
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 from . import __version__
-from .config import RuntimeConfig
+from .config import (
+    DEFAULT_ASSET_ROOT,
+    RuntimeConfig,
+    validate_runtime_config_fields,
+)
 from .backends.s32_mex.document import MexDocument, MexWriteError
-from .backends.s32_mex.locate import find_single_mex
+from .backends.s32_mex.metadata import (
+    revalidate_project_metadata,
+    revalidate_project_metadata_after_release,
+)
+from .backends.s32_mex.target import (
+    PublishExpectation,
+    release_for_publish,
+    revalidate_publish_expectation,
+    revalidate_snapshot,
+)
+from .backends.s32_mex.transaction import ConfigureTransaction
+from .project import Project
 from .resources.pins import pin_options
+from .resources.bundles import AssetBundleResolver
 from .intent import Intent
 from .modules.uart import UartProvider
 from .modules.platform import PlatformProvider
@@ -66,22 +84,55 @@ from .modules.mcu import McuProvider
 from .modules.port import PortProvider
 from .modules.dio import DioProvider
 from .modules.adc import AdcProvider
+from .modules.registry import (
+    BindingSelection,
+    PhysicalRegion,
+    ProviderBinding,
+    ProviderRegistry,
+)
 from .checks.static import run_static_checks
-from .backends.s32_mex.apply import apply_uart_set, apply_uart_add_flexio_channel, apply_platform_set, apply_basenxp_set, apply_mcl_set, apply_port_set, apply_dio_set, apply_mcu_set, apply_adc_set, _load_basenxp_asset
+from .backends.s32_mex.apply import apply_uart_set, apply_uart_add_flexio_channel, apply_platform_set, apply_basenxp_set, apply_mcl_set, apply_port_set, apply_dio_set, apply_mcu_set, apply_adc_set
 from .backends.s32_mex.validation import find_s32ds_root, probe_which_root, run_validation
-from .diagnostics import Diagnostic
+from .diagnostics import Diagnostic, render_failure
+from .errors import CliFailure
 
 
-# Skill root, used to resolve committed runtime assets independently of cwd.
-# This file lives at autombd-rtd/rtd-config-cli-py/rtd_config/cli.py, so
-# parents[2] is the skill root (autombd-rtd/) that owns assets/.
-SKILL_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_ASSET_ROOT = SKILL_ROOT / "assets"
+ROOT_COMMANDS = frozenset(
+    {
+        "plan",
+        "configure",
+        "pin-options",
+        "inspect",
+        "check",
+        "validate",
+        "uart",
+        "platform",
+        "basenxp",
+        "mcl",
+        "port",
+        "dio",
+        "mcu",
+        "adc",
+    }
+)
 
 
 def emit(payload: dict) -> int:
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0 if payload.get("status") == "passed" else 1
+
+
+class RaisingArgumentParser(argparse.ArgumentParser):
+    """Argument parser whose errors participate in the CLI failure boundary."""
+
+    def error(self, message: str) -> None:
+        raise CliFailure(
+            code="invalid_arguments",
+            message=message,
+            module="cli",
+            details={"usage": self.format_usage().strip()},
+            exit_code=2,
+        )
 
 
 def _parse_bool_token(value: str) -> bool:
@@ -107,6 +158,47 @@ def _add_spec_argument(parser: argparse.ArgumentParser) -> None:
     )
 
 
+_RUNTIME_OPTIONS = (
+    ("--project", "project"),
+    ("--backend", "backend"),
+    ("--vendor", "vendor"),
+    ("--family", "family"),
+    ("--device", "device"),
+    ("--package", "package"),
+    ("--rtd-version", "rtd_version"),
+    ("--schema-version", "schema_version"),
+    ("--s32ds-root", "s32ds_root"),
+    ("--sdk-path", "sdk_path"),
+    ("--workspace", "workspace"),
+    ("--temp-root", "temp_root"),
+    ("--log-root", "log_root"),
+    ("--asset-root", "asset_root"),
+)
+
+
+def _add_runtime_arguments(
+    parser: argparse.ArgumentParser, *, include_project: bool
+) -> None:
+    parser.add_argument("--config", default=argparse.SUPPRESS, metavar="PATH")
+    for option, dest in _RUNTIME_OPTIONS:
+        if dest == "project" and not include_project:
+            continue
+        parser.add_argument(option, dest=dest, default=argparse.SUPPRESS)
+    parser.add_argument(
+        "--timeout", "--validation-timeout-s", dest="validation_timeout_s",
+        type=int, default=argparse.SUPPRESS,
+    )
+
+
+def _add_canonical_arguments(parser: argparse.ArgumentParser, *, configure: bool) -> None:
+    """Add generic request fields without defaults that could mask JSON config."""
+    parser.add_argument("--intent", required=True, metavar="PATH")
+    _add_runtime_arguments(parser, include_project=True)
+    if configure:
+        parser.add_argument("--backup", action="store_true")
+    parser.add_argument("--json", action="store_true")
+
+
 def _load_spec_payload(args: argparse.Namespace, module: str, action: str = "set") -> dict | None:
     spec_path = getattr(args, "spec", None)
     if not spec_path:
@@ -114,45 +206,183 @@ def _load_spec_payload(args: argparse.Namespace, module: str, action: str = "set
 
     try:
         raw = json.loads(Path(spec_path).read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise CliFailure(
+            code="spec_not_found",
+            message="The module spec file does not exist.",
+            module=module,
+        ) from exc
+    except PermissionError as exc:
+        raise CliFailure(
+            code="permission_denied",
+            message="Permission was denied while reading the module spec.",
+            module=module,
+        ) from exc
+    except UnicodeError as exc:
+        raise CliFailure(
+            code="spec_invalid",
+            message="The module spec is not valid UTF-8.",
+            module=module,
+        ) from exc
     except OSError as exc:
-        raise SystemExit(f"failed to read --spec {spec_path}: {exc}") from exc
+        raise CliFailure(
+            code="spec_read_failed",
+            message="The module spec could not be read.",
+            module=module,
+        ) from exc
     except json.JSONDecodeError as exc:
-        raise SystemExit(f"failed to parse --spec {spec_path} as JSON: {exc}") from exc
+        raise CliFailure(
+            code="spec_invalid",
+            message="The module spec is not valid JSON.",
+            module=module,
+            details={"line": exc.lineno, "column": exc.colno},
+        ) from exc
 
     if not isinstance(raw, dict):
-        raise SystemExit("--spec must contain a JSON object")
+        raise CliFailure("spec_invalid", "Spec must contain a JSON object.", module=module)
 
     if "payload" not in raw:
         return raw
 
     spec_module = raw.get("module")
     if spec_module is not None and spec_module != module:
-        raise SystemExit(
-            f"--spec module mismatch: expected {module!r}, got {spec_module!r}"
+        raise CliFailure(
+            "spec_invalid",
+            "The module spec does not match the selected shortcut module.",
+            module=module,
         )
 
     spec_action = raw.get("action")
     if spec_action is not None and spec_action != action:
-        raise SystemExit(
-            f"--spec action mismatch: expected {action!r}, got {spec_action!r}"
+        raise CliFailure(
+            "spec_invalid",
+            "The module spec does not match the selected shortcut action.",
+            module=module,
         )
 
     payload = raw["payload"]
     if not isinstance(payload, dict):
-        raise SystemExit("--spec payload must be a JSON object")
+        raise CliFailure("spec_invalid", "Spec payload must be a JSON object.", module=module)
     return payload
 
 
+_RUNTIME_FIELDS = (
+    "project", "backend", "vendor", "family", "device", "package",
+    "rtd_version", "schema_version", "s32ds_root", "sdk_path", "workspace",
+    "validation_timeout_s", "temp_root", "log_root", "asset_root",
+)
+_RUNTIME_PATH_FIELDS = frozenset({
+    "project", "s32ds_root", "sdk_path", "workspace", "temp_root", "log_root",
+    "asset_root",
+})
+_EXPECTED_IDENTITY_FIELDS = frozenset({
+    "vendor", "family", "device", "package", "rtd_version", "schema_version",
+})
+_RTD_VERSION_GRAMMAR = re.compile(
+    r"[A-Za-z0-9]+(?:[._-][A-Za-z0-9]+)*", re.ASCII
+)
+
+
+def _normalized_rtd_version(value: object) -> tuple[str, ...] | None:
+    token = str(value).casefold()
+    if _RTD_VERSION_GRAMMAR.fullmatch(token) is None:
+        return None
+    return tuple(
+        str(int(segment)) if segment.isdigit() else segment
+        for segment in re.split(r"[._-]", token)
+    )
+
+
+def _read_json_object(raw_path: str, *, code: str, label: str, exit_code: int = 1) -> dict:
+    """Read one bounded regular JSON file without echoing its path in failures."""
+    path = Path(raw_path)
+    try:
+        if path.is_symlink() or not path.is_file() or path.stat().st_size > 1024 * 1024:
+            raise OSError("unsafe JSON input")
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise CliFailure(
+            code, f"{label} must be a readable bounded UTF-8 JSON object.",
+            module="cli", exit_code=exit_code,
+        ) from exc
+    if not isinstance(raw, dict):
+        raise CliFailure(
+            code, f"{label} must contain a JSON object.",
+            module="cli", exit_code=exit_code,
+        )
+    return raw
+
+
+def _load_runtime_config(args: argparse.Namespace) -> tuple[RuntimeConfig, frozenset[str]]:
+    values: dict = {}
+    explicit: set[str] = set()
+    config_path = getattr(args, "config", None)
+    if config_path is not None:
+        values = _read_json_object(
+            config_path, code="invalid_arguments", label="Runtime configuration",
+            exit_code=2,
+        )
+        validate_runtime_config_fields(values)
+        explicit.update(values)
+        base = Path(config_path).resolve().parent
+        for key in _RUNTIME_PATH_FIELDS & values.keys():
+            value = values[key]
+            if isinstance(value, str) and value and not Path(value).is_absolute():
+                values[key] = base / value
+    for key in _RUNTIME_FIELDS:
+        if hasattr(args, key):
+            values[key] = getattr(args, key)
+            explicit.add(key)
+    values.setdefault("asset_root", DEFAULT_ASSET_ROOT)
+    config = RuntimeConfig.from_dict(values)
+    return config, frozenset(explicit & _EXPECTED_IDENTITY_FIELDS)
+
+
+def _load_canonical_intent(raw_path: str, *, backend: str) -> Intent:
+    raw = _read_json_object(raw_path, code="intent_invalid", label="Intent")
+    if set(raw) != {"module", "action", "payload"}:
+        raise CliFailure(
+            "intent_invalid", "Intent must contain exactly module, action, and payload.",
+            module="cli",
+        )
+    if (
+        not isinstance(raw["module"], str) or not raw["module"]
+        or not isinstance(raw["action"], str) or not raw["action"]
+        or not isinstance(raw["payload"], dict)
+    ):
+        raise CliFailure(
+            "intent_invalid", "Intent fields have invalid types.", module="cli",
+        )
+    intent = Intent.from_dict(raw)
+    # Provider lookup is deliberately deferred until exact project assets have
+    # passed preflight.  This keeps compatibility failures deterministic and
+    # prevents provider construction from preceding project verification.
+    del backend
+    return intent
+
+
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="rtd-config")
+    parser = RaisingArgumentParser(prog="rtd-config")
     parser.add_argument("--version", action="store_true")
     parser.add_argument("--json", action="store_true")
 
     subparsers = parser.add_subparsers(dest="command")
 
+    plan_parser = subparsers.add_parser("plan")
+    _add_canonical_arguments(plan_parser, configure=False)
+
+    configure_parser = subparsers.add_parser("configure")
+    _add_canonical_arguments(configure_parser, configure=True)
+
     pin_options_parser = subparsers.add_parser("pin-options")
-    pin_options_parser.add_argument("--device", default="s32k344")
-    pin_options_parser.add_argument("--package", default="default")
+    pin_options_parser.add_argument("--bundle-id")
+    pin_options_parser.add_argument("--vendor")
+    pin_options_parser.add_argument("--backend")
+    pin_options_parser.add_argument("--family")
+    pin_options_parser.add_argument("--device")
+    pin_options_parser.add_argument("--package")
+    pin_options_parser.add_argument("--rtd-release")
+    pin_options_parser.add_argument("--schema")
     pin_options_parser.add_argument("--peripheral", required=True)
     pin_options_parser.add_argument("--json", action="store_true")
 
@@ -174,7 +404,7 @@ def build_parser() -> argparse.ArgumentParser:
     uart_parser = subparsers.add_parser("uart")
     uart_actions = uart_parser.add_subparsers(dest="action")
     uart_set = uart_actions.add_parser("set")
-    uart_set.add_argument("--project", required=True)
+    _add_runtime_arguments(uart_set, include_project=True)
     uart_set.add_argument("--hw", required=False)
     # RTD 7.0.1 has no polling async-method value; interrupt and DMA are supported.
     uart_set.add_argument("--mode", default="interrupt", choices=["interrupt", "dma"])
@@ -216,7 +446,7 @@ def build_parser() -> argparse.ArgumentParser:
             "FLEXIO_CLK Mcu clock reference are ensured (idempotent)."
         ),
     )
-    uart_add_flexio.add_argument("--project", required=True)
+    _add_runtime_arguments(uart_add_flexio, include_project=True)
     uart_add_flexio.add_argument(
         "--baud", type=int, default=921600,
         help="Desired baud rate (default: 921600). Maps to FLEXIO_UART_BAUDRATE_<baud>.",
@@ -248,7 +478,7 @@ def build_parser() -> argparse.ArgumentParser:
     platform_parser = subparsers.add_parser("platform")
     platform_actions = platform_parser.add_subparsers(dest="action")
     platform_set = platform_actions.add_parser("set")
-    platform_set.add_argument("--project", required=True)
+    _add_runtime_arguments(platform_set, include_project=True)
     # Target an existing interrupt by peripheral (e.g. LPUART_3) or exact IsrName.
     platform_set.add_argument("--peripheral")
     platform_set.add_argument("--isr-name")
@@ -261,7 +491,7 @@ def build_parser() -> argparse.ArgumentParser:
     basenxp_parser = subparsers.add_parser("basenxp")
     basenxp_actions = basenxp_parser.add_subparsers(dest="action")
     basenxp_set = basenxp_actions.add_parser("set")
-    basenxp_set.add_argument("--project", required=True)
+    _add_runtime_arguments(basenxp_set, include_project=True)
     basenxp_set.add_argument(
         "--enable-system-timer",
         action="store_true",
@@ -282,7 +512,7 @@ def build_parser() -> argparse.ArgumentParser:
     mcl_parser = subparsers.add_parser("mcl")
     mcl_actions = mcl_parser.add_subparsers(dest="action")
     mcl_set = mcl_actions.add_parser("set")
-    mcl_set.add_argument("--project", required=True)
+    _add_runtime_arguments(mcl_set, include_project=True)
     mcl_set.add_argument(
         "--add-flexio-logic-channel",
         metavar="NAME",
@@ -300,7 +530,7 @@ def build_parser() -> argparse.ArgumentParser:
     port_parser = subparsers.add_parser("port")
     port_actions = port_parser.add_subparsers(dest="action")
     port_set = port_actions.add_parser("set")
-    port_set.add_argument("--project", required=True)
+    _add_runtime_arguments(port_set, include_project=True)
     port_set.add_argument(
         "--peripheral",
         help="Peripheral whose TX/RX pins to configure, e.g. LPUART_0.",
@@ -315,7 +545,7 @@ def build_parser() -> argparse.ArgumentParser:
     dio_parser = subparsers.add_parser("dio")
     dio_actions = dio_parser.add_subparsers(dest="action")
     dio_set = dio_actions.add_parser("set")
-    dio_set.add_argument("--project", required=True)
+    _add_runtime_arguments(dio_set, include_project=True)
     dio_set.add_argument(
         "--add-channel",
         metavar="NAME",
@@ -343,7 +573,7 @@ def build_parser() -> argparse.ArgumentParser:
     mcu_parser = subparsers.add_parser("mcu")
     mcu_actions = mcu_parser.add_subparsers(dest="action")
     mcu_set = mcu_actions.add_parser("set")
-    mcu_set.add_argument("--project", required=True)
+    _add_runtime_arguments(mcu_set, include_project=True)
     mcu_set.add_argument(
         "--core-clk",
         type=int,
@@ -387,7 +617,7 @@ def build_parser() -> argparse.ArgumentParser:
             "One `adc set --spec X --configure` expresses a full case."
         ),
     )
-    adc_set.add_argument("--project", required=True)
+    _add_runtime_arguments(adc_set, include_project=True)
     _add_spec_argument(adc_set)
     adc_set.add_argument("--configure", action="store_true")
     adc_set.add_argument("--backup", action="store_true")
@@ -396,7 +626,7 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def normalize_uart_intent(args: argparse.Namespace) -> Intent:
+def normalize_uart_intent(args: argparse.Namespace, bundle) -> Intent:
     """Normalize `uart set` CLI arguments into the stable JSON intent contract.
 
     Shortcut commands and JSON intents converge on this same Intent so the
@@ -408,8 +638,6 @@ def normalize_uart_intent(args: argparse.Namespace) -> Intent:
       --word-length 7/8/9/10  -> word_length via word_length_cli_to_enum
       --priority N            -> priority (ISR priority, default 2)
     """
-    from rtd_config.backends.s32_mex.apply import _load_uart_asset
-
     spec_payload = _load_spec_payload(args, "uart")
     if spec_payload is not None:
         return Intent.from_dict({"module": "uart", "action": "set", "payload": spec_payload})
@@ -434,7 +662,7 @@ def normalize_uart_intent(args: argparse.Namespace) -> Intent:
         payload["callback"] = args.callback
 
     # Map frame parameters to their .mex enum values via the uart.json asset.
-    asset = _load_uart_asset()
+    asset = bundle.load_json("uart")
     enums = asset.get("enum_domains", {})
 
     parity = getattr(args, "parity", None)
@@ -460,12 +688,20 @@ def normalize_uart_intent(args: argparse.Namespace) -> Intent:
 
 
 def cmd_pin_options(args: argparse.Namespace) -> int:
-    options = pin_options(
-        data_root=DEFAULT_ASSET_ROOT,
-        device=args.device,
-        package=args.package,
-        peripheral=args.peripheral,
+    selector = {
+        "vendor": args.vendor, "backend": args.backend, "family": args.family,
+        "device": args.device, "package": args.package,
+        "rtd_release": args.rtd_release, "schema_version": args.schema,
+    }
+    if args.bundle_id is None and any(value is None for value in selector.values()):
+        raise CliFailure(
+            "invalid_arguments", "Projectless pin-options requires a complete asset selector or --bundle-id.",
+            module="cli", exit_code=2,
+        )
+    bundle = AssetBundleResolver(DEFAULT_ASSET_ROOT).resolve_selector(
+        bundle_id=args.bundle_id, **selector
     )
+    options = pin_options(bundle=bundle, peripheral=args.peripheral)
     return emit({
         "status": "passed",
         "command": "pin-options",
@@ -475,28 +711,40 @@ def cmd_pin_options(args: argparse.Namespace) -> int:
 
 def cmd_inspect(args: argparse.Namespace) -> int:
     config = RuntimeConfig.from_dict({"project": args.project})
-    mex = find_single_mex(config.project)
-    doc = MexDocument.load(mex)
-    modules = sorted(doc.enabled_instance_names())
-    return emit({
-        "status": "passed",
-        "command": "inspect",
-        "backend": config.backend,
-        "family": config.family,
-        "device": config.device,
-        "package": config.package,
-        "rtd_version": config.rtd_version,
-        "mex_file": str(mex),
-        "modules": modules,
-        "validation_profile": f"{config.family}/{config.rtd_version}",
-    })
+    with Project.verified(config.project, config.backend) as project:
+        target = project.verified_target
+        _preflight_project(project)
+        metadata = project.metadata
+        observed = metadata.to_dict()
+        observed["module_metadata"] = observed["modules"]
+        observed["modules"] = None if metadata.modules is None else [item.name for item in metadata.modules]
+        return emit({
+            "status": "passed", "command": "inspect", "mex_file": str(target.mex.path),
+            "validation_profile": project.asset_bundle.profile_id,
+            "compatibility": {
+                "status": "passed",
+                "diagnostics": [{
+                    "severity": "info",
+                    "code": "asset_bundle_resolved",
+                    "module": "backend",
+                    "message": "Exact project asset compatibility is verified.",
+                }],
+            },
+            **observed,
+        })
 
 
 def cmd_check(args: argparse.Namespace) -> int:
     config = RuntimeConfig.from_dict({"project": args.project})
-    mex = find_single_mex(config.project)
-    result = run_static_checks(mex)
-    return emit(result.to_dict())
+    with Project.verified(config.project, config.backend) as project:
+        _preflight_project(project)
+        revalidate_project_metadata(project.verified_target, project.metadata)
+        target = project.verified_target
+        result = run_static_checks(
+            target.mex.path, doc=project.document,
+            verified_target=target, bundle=project.asset_bundle,
+        )
+        return emit(result.to_dict())
 
 
 def _intent_dict(intent: Intent) -> dict:
@@ -507,12 +755,185 @@ def _intent_dict(intent: Intent) -> dict:
     }
 
 
+def _preflight_project(
+    project: Project, *, asset_root: Path | None = None,
+    revalidate_metadata: bool = False,
+) -> Project:
+    """Resolve and cache exact project assets before provider or vendor work."""
+    if project.verified_target.lease.closed:
+        snapshot = project.verified_target.mex
+        try:
+            revalidate_publish_expectation(PublishExpectation(
+                snapshot.path, snapshot.identity, snapshot.sha256
+            ))
+            revalidate_project_metadata_after_release(project.root, project.metadata)
+        except CliFailure as exc:
+            if exc.code in {
+                "project_target_changed", "project_metadata_source_changed"
+            }:
+                raise CliFailure(
+                    "project_target_changed",
+                    "The verified project target changed during compatibility "
+                    "preflight; reload and retry.",
+                    module="backend",
+                ) from exc
+            raise
+        raise CliFailure(
+            "project_target_closed",
+            "The verified project lease is closing or closed.",
+            module="backend",
+        )
+    metadata = project.metadata.require_identity()
+    project._cache["asset_bundle"] = AssetBundleResolver(
+        asset_root or DEFAULT_ASSET_ROOT
+    ).resolve(metadata)
+    if not revalidate_metadata:
+        return project
+    try:
+        revalidate_project_metadata(project.verified_target, project.metadata)
+    except CliFailure as exc:
+        if exc.code == "project_target_closed":
+            raise CliFailure(
+                "project_target_changed",
+                "The verified project target changed during compatibility preflight; "
+                "reload and retry.",
+                module="backend",
+            ) from exc
+        raise
+    return project
+
+
+def _assert_expected_identity(
+    project: Project, config: RuntimeConfig, expected_fields: frozenset[str]
+) -> None:
+    metadata = project.metadata.require_identity()
+    metadata_names = {"rtd_version": "rtd_release"}
+    mismatches = []
+    for field in sorted(expected_fields):
+        observed = getattr(metadata, metadata_names.get(field, field))
+        expected = getattr(config, field)
+        if field == "rtd_version":
+            observed_value = _normalized_rtd_version(observed)
+            expected_value = _normalized_rtd_version(expected)
+            matches = (
+                observed_value is not None
+                and expected_value is not None
+                and observed_value == expected_value
+            )
+        else:
+            matches = str(observed).casefold() == str(expected).casefold()
+        if not matches:
+            mismatches.append(field)
+    if mismatches:
+        raise CliFailure(
+            "project_identity_mismatch",
+            "Observed project identity does not match runtime constraints.",
+            module="backend", details={"fields": mismatches},
+        )
+
+
+def _execute_canonical_request(
+    config: RuntimeConfig,
+    *,
+    configure: bool,
+    backup: bool,
+    expected_fields: frozenset[str] = frozenset(),
+    intent: Intent | None = None,
+    binding: ProviderBinding | BindingSelection | None = None,
+    shortcut_args: argparse.Namespace | None = None,
+    shortcut_module: str | None = None,
+    shortcut_cli_action: str | None = None,
+) -> int:
+    """Execute generic and shortcut requests through one registry-owned flow."""
+    project = Project.verified(config.project, config.backend)
+    try:
+        _preflight_project(
+            project, asset_root=config.asset_root, revalidate_metadata=True
+        )
+        _assert_expected_identity(project, config, expected_fields)
+        bundle = project.asset_bundle
+        if shortcut_args is not None:
+            selection = binding if isinstance(binding, BindingSelection) else None
+            if selection is not None:
+                resolved = _shortcut_binding(
+                    shortcut_args, selection.module, selection.cli_action
+                )
+                if resolved.key != selection.key:
+                    raise CliFailure(
+                        "provider_binding_changed",
+                        "The provider registry changed during command preflight.",
+                        module="backend",
+                    )
+                binding = resolved
+            elif binding is None:
+                binding = _shortcut_binding(
+                    shortcut_args, shortcut_module, shortcut_cli_action
+                )
+            intent = binding.normalizer(shortcut_args, bundle)
+        if intent is None:
+            raise CliFailure("intent_invalid", "Canonical intent is unavailable.", module="cli")
+        try:
+            registered = get_provider_registry().require_intent(
+                intent, backend=config.backend
+            )
+        except CliFailure as exc:
+            if shortcut_args is None:
+                raise CliFailure(
+                    "intent_invalid",
+                    "Intent does not select a registered provider action.",
+                    module="cli",
+                ) from exc
+            raise
+        if binding is not None and registered is not binding:
+            raise CliFailure(
+                "provider_binding_changed",
+                "The provider registry changed during command preflight.",
+                module="backend",
+            )
+        binding = registered
+        plan = binding.create_plan(bundle, intent)
+        if not configure:
+            return emit({
+                "status": "passed",
+                "command": "plan",
+                "normalized_intent": _intent_dict(intent),
+                "plan": plan.to_dict(),
+            })
+        execution_args = argparse.Namespace(backup=backup)
+        return _configure_verified_project(
+            execution_args, intent, plan, binding.apply_fn, project,
+            binding=binding, runtime_config=config,
+        )
+    finally:
+        project.close()
+
+
 def cmd_validate(args: argparse.Namespace) -> int:
     config = RuntimeConfig.from_dict({"project": args.project})
-    mex = find_single_mex(config.project)
+    project = Project.verified(config.project, config.backend)
+    try:
+        _preflight_project(project)
+        return _cmd_validate_verified(args, config, project)
+    finally:
+        project.close()
+
+
+def _cmd_validate_verified(args, config: RuntimeConfig, project: Project) -> int:
+    project.metadata.require_consistent()
+    revalidate_project_metadata(project.verified_target, project.metadata)
+    target = project.verified_target
+    mex = target.mex.path
 
     # Static check always runs first; vendor validation never substitutes for it.
-    static_result = run_static_checks(mex)
+    static_result = run_static_checks(
+        mex, doc=project.document, verified_target=target, bundle=project.asset_bundle
+    )
+    if static_result.status != "passed":
+        return emit({
+            "status": "blocked",
+            "command": "validate",
+            "runtime_verification": {"static_check": static_result.to_dict()},
+        })
 
     root = find_s32ds_root(args.s32ds_root)
     if root is None:
@@ -544,9 +965,12 @@ def cmd_validate(args: argparse.Namespace) -> int:
                     ),
                     "details": {
                         "probed_which_root": (
-                            str(_which_root) if _which_root is not None else None
+                            _which_root.name if _which_root is not None else None
                         ),
-                        "breadcrumb": _which_breadcrumb or None,
+                        "breadcrumb": (
+                            "An incomplete S32DS installation was detected."
+                            if _which_breadcrumb else None
+                        ),
                     },
                 }
             ],
@@ -556,8 +980,10 @@ def cmd_validate(args: argparse.Namespace) -> int:
     # Flow B uses a throwaway -data workspace; only honour an explicit override.
     workspace = Path(args.workspace) if args.workspace else None
     sdk_path = Path(args.sdk_path) if args.sdk_path else None
+    revalidate_snapshot(target)
+    revalidate_project_metadata(target, project.metadata)
     outcome = run_validation(
-        config.project,
+        project,
         root,
         workspace=workspace,
         sdk_path=sdk_path,
@@ -577,26 +1003,21 @@ def cmd_validate(args: argparse.Namespace) -> int:
             "severe_problems": outcome.severe_problems,
             "command": outcome.command,
             "log_path": outcome.log_path,
+            "process_code": outcome.process_code,
+            "timed_out": outcome.timed_out,
+            "stdout_truncated": outcome.stdout_truncated,
+            "stderr_truncated": outcome.stderr_truncated,
+            "output_faults": outcome.output_faults,
+            "cleanup_warnings": outcome.cleanup_warnings,
         },
     })
 
 
 def cmd_uart_set(args: argparse.Namespace) -> int:
-    intent = normalize_uart_intent(args)
-    plan = UartProvider().plan(intent)
-
-    if not args.configure:
-        return emit({
-            "status": "passed",
-            "command": "plan",
-            "normalized_intent": _intent_dict(intent),
-            "plan": plan.to_dict(),
-        })
-
-    return _configure_module(args, intent, plan, apply_uart_set)
+    return _run_registered_shortcut(args, "uart", "set")
 
 
-def normalize_uart_add_flexio_intent(args: argparse.Namespace) -> Intent:
+def normalize_uart_add_flexio_intent(args: argparse.Namespace, _bundle) -> Intent:
     """Normalize `uart add-flexio-channel` CLI arguments into the JSON intent contract."""
     payload: dict = {
         "baud": args.baud,
@@ -613,124 +1034,127 @@ def normalize_uart_add_flexio_intent(args: argparse.Namespace) -> Intent:
 
 
 def cmd_uart_add_flexio_channel(args: argparse.Namespace) -> int:
-    intent = normalize_uart_add_flexio_intent(args)
-    plan = UartProvider().plan(intent)
-
-    if not args.configure:
-        return emit({
-            "status": "passed",
-            "command": "plan",
-            "normalized_intent": _intent_dict(intent),
-            "plan": plan.to_dict(),
-        })
-
-    return _configure_module(args, intent, plan, apply_uart_add_flexio_channel)
+    return _run_registered_shortcut(args, "uart", "add-flexio-channel")
 
 
-def _configure_module(args: argparse.Namespace, intent: Intent, plan, apply_fn) -> int:
+def _configure_module(
+    args: argparse.Namespace, intent: Intent, plan, apply_fn,
+    project: Project | None = None,
+    binding: ProviderBinding | None = None,
+) -> int:
     """Shared configure pipeline: apply an owned edit, preflight, then commit.
 
     ``apply_fn(doc, intent) -> ApplyResult`` is the module's localized backend
     edit. The pipeline is module-agnostic; per-module specifics live in the
     intent payload and the apply function.
     """
-    config = RuntimeConfig.from_dict({"project": args.project})
-    mex = find_single_mex(config.project)
-    doc = MexDocument.load(mex)
-
-    apply_result = apply_fn(doc, intent)
-    if apply_result.blocked:
-        return emit({
-            "status": "blocked",
-            "command": "configure",
-            "normalized_intent": _intent_dict(intent),
-            "plan": plan.to_dict(),
-            "changed_modules": apply_result.changed_modules,
-            "diagnostics": [d.to_dict() for d in apply_result.diagnostics],
-        })
-
-    staging: Path | None = None
+    if project is None:
+        config = RuntimeConfig.from_dict({"project": args.project})
+        project = Project.verified(config.project, config.backend)
+        _preflight_project(project)
     try:
-        staging = _write_configure_staging(doc, mex)
-
-        # Runtime verification runs before the original project file is
-        # replaced. The in-memory document carries the pending edit, while the
-        # path keeps project-level checks anchored to the real single-.mex file.
-        static_result = run_static_checks(
-            mex,
-            doc=doc,
-            modified_elements=apply_result.modified_elements,
-            requested_callback=intent.payload.get("callback"),
+        return _configure_verified_project(
+            args, intent, plan, apply_fn, project, binding=binding
         )
+    finally:
+        project.close()
 
-        diagnostics = apply_result.diagnostics + static_result.diagnostics
-        status = "passed" if static_result.status == "passed" else "blocked"
-        if status == "passed":
-            # Optional safety backup of the original .mex before committing.
-            # Default behaviour creates no backup.
-            if args.backup:
-                backup = mex.with_name(mex.name + ".bak")
-                backup.write_bytes(mex.read_bytes())
-            os.replace(staging, mex)
-            staging = None
-        return emit({
-            "status": status,
+
+def _configured_vendor_runner(config: RuntimeConfig | None):
+    if config is None or config.s32ds_root is None:
+        return None
+
+    def validate_candidate(*, staging, document, project, bundle):
+        del document, bundle
+        outcome = run_validation(
+            project,
+            config.s32ds_root,
+            sdk_path=config.sdk_path,
+            workspace=config.workspace,
+            timeout_s=config.validation_timeout_s,
+            temp_root=config.temp_root,
+            log_root=config.log_root,
+            mex_file=staging,
+        )
+        # ConfigureTransaction consumes the shared validator protocol.  Keep
+        # compatible validator test doubles on that protocol as well.
+        if not hasattr(outcome, "status"):
+            outcome.status = "passed" if bool(outcome.passed) else "blocked"
+        return outcome
+
+    return validate_candidate
+
+
+def _configure_verified_project(
+    args, intent, plan, apply_fn, project: Project,
+    *, binding: ProviderBinding | None = None,
+    runtime_config: RuntimeConfig | None = None,
+) -> int:
+    try:
+        transaction_result = ConfigureTransaction(
+            project,
+            plan=plan,
+            binding=binding,
+            backup=args.backup,
+            static_runner=run_static_checks,
+            vendor_runner=_configured_vendor_runner(runtime_config),
+        ).execute(intent, apply_fn)
+        apply_result = transaction_result.apply_result
+        static_result = transaction_result.static_result
+        diagnostics = list(apply_result.diagnostics)
+        if static_result is not None:
+            diagnostics.extend(static_result.diagnostics)
+        payload = {
+            "status": transaction_result.status,
             "command": "configure",
             "normalized_intent": _intent_dict(intent),
             "plan": plan.to_dict(),
-            "changed_modules": apply_result.changed_modules,
+            "changed_modules": transaction_result.changed_modules,
+            "published": transaction_result.published,
+            "cleanup_warnings": transaction_result.cleanup_warnings,
             "diagnostics": [d.to_dict() for d in diagnostics],
-            "runtime_verification": {
+        }
+        if static_result is not None:
+            payload["runtime_verification"] = {
                 "static_check": static_result.to_dict(),
-            },
-        })
-    except MexWriteError as exc:
-        diagnostics = apply_result.diagnostics + [
-            Diagnostic(
-                severity="blocker",
-                code="narrow_mex_write_unavailable",
-                module="backend",
-                message=(
-                    "The pending .mex edit could not be written with the "
-                    "byte-faithful narrow writer. The original file was left "
-                    "unchanged."
+            }
+        vendor_result = transaction_result.vendor_result
+        if vendor_result is not None:
+            payload.setdefault("runtime_verification", {})["vendor_validation"] = {
+                "status": getattr(vendor_result, "status", "blocked"),
+                "passed": bool(getattr(vendor_result, "passed", False)),
+                "exit_code": getattr(vendor_result, "exit_code", None),
+                "severe_problems": list(
+                    getattr(vendor_result, "severe_problems", ())
                 ),
-                details={
-                    "mex_file": str(mex),
-                    "reason": str(exc),
-                },
-            )
-        ]
+                "cleanup_warnings": list(
+                    getattr(vendor_result, "cleanup_warnings", ())
+                ),
+            }
+        return emit(payload)
+    except MexWriteError as exc:
+        diagnostic = Diagnostic(
+            severity="blocker",
+            code="narrow_mex_write_unavailable",
+            module="backend",
+            message=(
+                "The pending .mex edit could not be written with the "
+                "byte-faithful narrow writer. The original file was left "
+                "unchanged."
+            ),
+            details={"reason_code": "narrow_writer_rejected", "failure_count": 1},
+        )
         return emit({
             "status": "blocked",
             "command": "configure",
             "normalized_intent": _intent_dict(intent),
             "plan": plan.to_dict(),
-            "changed_modules": apply_result.changed_modules,
-            "diagnostics": [d.to_dict() for d in diagnostics],
+            "changed_modules": [],
+            "diagnostics": [diagnostic.to_dict()],
         })
-    finally:
-        if staging is not None:
-            staging.unlink(missing_ok=True)
 
 
-def _write_configure_staging(doc: MexDocument, mex: Path) -> Path:
-    with tempfile.NamedTemporaryFile(
-        prefix=f".{mex.name}.",
-        suffix=".tmp",
-        dir=mex.parent,
-        delete=False,
-    ) as handle:
-        staging = Path(handle.name)
-    try:
-        doc.write(staging)
-    except BaseException:
-        staging.unlink(missing_ok=True)
-        raise
-    return staging
-
-
-def normalize_platform_intent(args: argparse.Namespace) -> Intent:
+def normalize_platform_intent(args: argparse.Namespace, _bundle) -> Intent:
     """Normalize `platform set` CLI arguments into the JSON intent contract."""
     spec_payload = _load_spec_payload(args, "platform")
     if spec_payload is not None:
@@ -747,21 +1171,10 @@ def normalize_platform_intent(args: argparse.Namespace) -> Intent:
 
 
 def cmd_platform_set(args: argparse.Namespace) -> int:
-    intent = normalize_platform_intent(args)
-    plan = PlatformProvider().plan(intent)
-
-    if not args.configure:
-        return emit({
-            "status": "passed",
-            "command": "plan",
-            "normalized_intent": _intent_dict(intent),
-            "plan": plan.to_dict(),
-        })
-
-    return _configure_module(args, intent, plan, apply_platform_set)
+    return _run_registered_shortcut(args, "platform", "set")
 
 
-def normalize_basenxp_intent(args: argparse.Namespace) -> Intent:
+def normalize_basenxp_intent(args: argparse.Namespace, bundle) -> Intent:
     """Normalize `basenxp set` CLI arguments into the JSON intent contract."""
     spec_payload = _load_spec_payload(args, "basenxp")
     if spec_payload is not None:
@@ -783,27 +1196,16 @@ def normalize_basenxp_intent(args: argparse.Namespace) -> Intent:
             payload[attr] = value
     get_user_id = getattr(args, "get_user_id", None)
     if get_user_id is not None:
-        enum_map = _load_basenxp_asset()["cli_enum_map"]["get_user_id"]
+        enum_map = bundle.load_json("basenxp")["cli_enum_map"]["get_user_id"]
         payload["get_user_id"] = enum_map[get_user_id]
     return Intent.from_dict({"module": "basenxp", "action": "set", "payload": payload})
 
 
 def cmd_basenxp_set(args: argparse.Namespace) -> int:
-    intent = normalize_basenxp_intent(args)
-    plan = BaseNxpProvider().plan(intent)
-
-    if not args.configure:
-        return emit({
-            "status": "passed",
-            "command": "plan",
-            "normalized_intent": _intent_dict(intent),
-            "plan": plan.to_dict(),
-        })
-
-    return _configure_module(args, intent, plan, apply_basenxp_set)
+    return _run_registered_shortcut(args, "basenxp", "set")
 
 
-def normalize_mcl_intent(args: argparse.Namespace) -> Intent:
+def normalize_mcl_intent(args: argparse.Namespace, _bundle) -> Intent:
     """Normalize `mcl set` CLI arguments into the JSON intent contract."""
     spec_payload = _load_spec_payload(args, "mcl")
     if spec_payload is not None:
@@ -817,21 +1219,10 @@ def normalize_mcl_intent(args: argparse.Namespace) -> Intent:
 
 
 def cmd_mcl_set(args: argparse.Namespace) -> int:
-    intent = normalize_mcl_intent(args)
-    plan = MclProvider().plan(intent)
-
-    if not args.configure:
-        return emit({
-            "status": "passed",
-            "command": "plan",
-            "normalized_intent": _intent_dict(intent),
-            "plan": plan.to_dict(),
-        })
-
-    return _configure_module(args, intent, plan, apply_mcl_set)
+    return _run_registered_shortcut(args, "mcl", "set")
 
 
-def normalize_port_intent(args: argparse.Namespace) -> Intent:
+def normalize_port_intent(args: argparse.Namespace, _bundle) -> Intent:
     """Normalize `port set` CLI arguments into the JSON intent contract."""
     spec_payload = _load_spec_payload(args, "port")
     if spec_payload is not None:
@@ -851,21 +1242,10 @@ def normalize_port_intent(args: argparse.Namespace) -> Intent:
 
 
 def cmd_port_set(args: argparse.Namespace) -> int:
-    intent = normalize_port_intent(args)
-    plan = PortProvider().plan(intent)
-
-    if not args.configure:
-        return emit({
-            "status": "passed",
-            "command": "plan",
-            "normalized_intent": _intent_dict(intent),
-            "plan": plan.to_dict(),
-        })
-
-    return _configure_module(args, intent, plan, apply_port_set)
+    return _run_registered_shortcut(args, "port", "set")
 
 
-def normalize_dio_intent(args: argparse.Namespace) -> Intent:
+def normalize_dio_intent(args: argparse.Namespace, _bundle) -> Intent:
     """Normalize `dio set` CLI arguments into the JSON intent contract."""
     spec_payload = _load_spec_payload(args, "dio")
     if spec_payload is not None:
@@ -884,7 +1264,7 @@ def normalize_dio_intent(args: argparse.Namespace) -> Intent:
     return Intent.from_dict({"module": "dio", "action": "set", "payload": payload})
 
 
-def normalize_mcu_intent(args: argparse.Namespace) -> Intent:
+def normalize_mcu_intent(args: argparse.Namespace, _bundle) -> Intent:
     """Normalize `mcu set` CLI arguments into the JSON intent contract."""
     spec_payload = _load_spec_payload(args, "mcu")
     if spec_payload is not None:
@@ -907,36 +1287,14 @@ def normalize_mcu_intent(args: argparse.Namespace) -> Intent:
 
 
 def cmd_dio_set(args: argparse.Namespace) -> int:
-    intent = normalize_dio_intent(args)
-    plan = DioProvider().plan(intent)
-
-    if not args.configure:
-        return emit({
-            "status": "passed",
-            "command": "plan",
-            "normalized_intent": _intent_dict(intent),
-            "plan": plan.to_dict(),
-        })
-
-    return _configure_module(args, intent, plan, apply_dio_set)
+    return _run_registered_shortcut(args, "dio", "set")
 
 
 def cmd_mcu_set(args: argparse.Namespace) -> int:
-    intent = normalize_mcu_intent(args)
-    plan = McuProvider().plan(intent)
-
-    if not args.configure:
-        return emit({
-            "status": "passed",
-            "command": "plan",
-            "normalized_intent": _intent_dict(intent),
-            "plan": plan.to_dict(),
-        })
-
-    return _configure_module(args, intent, plan, apply_mcu_set)
+    return _run_registered_shortcut(args, "mcu", "set")
 
 
-def normalize_adc_intent(args: argparse.Namespace) -> Intent:
+def normalize_adc_intent(args: argparse.Namespace, _bundle) -> Intent:
     """Normalize `adc set` CLI arguments into the JSON intent contract.
 
     The ADC config delta is expressed as a single JSON object via ``--spec``;
@@ -949,24 +1307,136 @@ def normalize_adc_intent(args: argparse.Namespace) -> Intent:
     return Intent.from_dict({"module": "adc", "action": "set", "payload": payload})
 
 
+_PROVIDER_REGISTRY: ProviderRegistry | None = None
+
+
+def get_provider_registry() -> ProviderRegistry:
+    """Return the validated single source of provider dispatch and ownership."""
+    global _PROVIDER_REGISTRY
+    if _PROVIDER_REGISTRY is None:
+        config_region = lambda owner, name: PhysicalRegion(owner, f"config_set:{name}")
+        bindings = (
+            ProviderBinding(
+                "mex", "uart", "set", "set", normalize_uart_intent,
+                UartProvider, apply_uart_set,
+                frozenset({"uart", "mcu", "port", "platform", "mcl"}), frozenset(),
+                frozenset({
+                    config_region("uart", "Uart"), config_region("mcu", "Mcu"),
+                    config_region("port", "Port"), PhysicalRegion("port", "Pins/Port"),
+                    config_region("platform", "Platform"), config_region("mcl", "Mcl"),
+                    PhysicalRegion("mcu", "Clocks/clock_settings"),
+                }),
+            ),
+            ProviderBinding(
+                "mex", "uart", "add_flexio_channel", "add-flexio-channel",
+                normalize_uart_add_flexio_intent, UartProvider,
+                apply_uart_add_flexio_channel,
+                frozenset({"uart", "mcu", "platform", "mcl"}), frozenset(),
+                frozenset({
+                    config_region("uart", "Uart"), config_region("mcu", "Mcu"),
+                    config_region("platform", "Platform"), config_region("mcl", "Mcl"),
+                    PhysicalRegion("mcu", "Clocks/clock_settings"),
+                }),
+            ),
+            ProviderBinding(
+                "mex", "platform", "set", "set", normalize_platform_intent,
+                PlatformProvider, apply_platform_set, frozenset({"platform"}), frozenset(),
+                frozenset({config_region("platform", "Platform")}),
+            ),
+            ProviderBinding(
+                "mex", "basenxp", "set", "set", normalize_basenxp_intent,
+                BaseNxpProvider, apply_basenxp_set, frozenset({"basenxp"}), frozenset({"mcu"}),
+                frozenset({config_region("basenxp", "BaseNXP")}),
+            ),
+            ProviderBinding(
+                "mex", "mcl", "set", "set", normalize_mcl_intent,
+                MclProvider, apply_mcl_set, frozenset({"mcl"}), frozenset(),
+                frozenset({config_region("mcl", "Mcl")}),
+            ),
+            ProviderBinding(
+                "mex", "port", "set", "set", normalize_port_intent,
+                PortProvider, apply_port_set, frozenset({"port"}), frozenset(),
+                frozenset({config_region("port", "Port"), PhysicalRegion("port", "Pins/Port")}),
+            ),
+            ProviderBinding(
+                "mex", "dio", "set", "set", normalize_dio_intent,
+                DioProvider, apply_dio_set, frozenset({"dio", "port"}), frozenset(),
+                frozenset({config_region("dio", "Dio"), config_region("port", "Port"), PhysicalRegion("port", "Pins/Port")}),
+            ),
+            ProviderBinding(
+                "mex", "mcu", "set", "set", normalize_mcu_intent,
+                McuProvider, apply_mcu_set, frozenset({"mcu"}), frozenset(),
+                frozenset({config_region("mcu", "Mcu"), PhysicalRegion("mcu", "Clocks/clock_settings")}),
+            ),
+            ProviderBinding(
+                "mex", "adc", "set", "set", normalize_adc_intent,
+                AdcProvider, apply_adc_set, frozenset({"adc", "mcl"}), frozenset(),
+                frozenset({config_region("adc", "Adc"), config_region("mcl", "Mcl")}),
+            ),
+        )
+        _PROVIDER_REGISTRY = ProviderRegistry(bindings)
+    return _PROVIDER_REGISTRY
+
+
+def _shortcut_binding(
+    args: argparse.Namespace, module: str | None = None, cli_action: str | None = None
+) -> ProviderBinding:
+    resolved_module = module if module is not None else getattr(args, "command", None)
+    resolved_action = (
+        cli_action if cli_action is not None else getattr(args, "action", None)
+    )
+    return get_provider_registry().lookup_shortcut(
+        resolved_module, resolved_action
+    )
+
+
+def _run_registered_shortcut(
+    args: argparse.Namespace, module: str | None = None, cli_action: str | None = None
+) -> int:
+    config, expected_fields = _load_runtime_config(args)
+    resolved_module = module if module is not None else getattr(args, "command", None)
+    resolved_cli_action = (
+        cli_action if cli_action is not None else getattr(args, "action", None)
+    )
+    registry_action = (
+        resolved_cli_action.replace("-", "_")
+        if isinstance(resolved_cli_action, str) else resolved_cli_action
+    )
+    selection = BindingSelection(
+        config.backend, resolved_module, registry_action, resolved_cli_action
+    )
+    return _execute_canonical_request(
+        config,
+        configure=bool(getattr(args, "configure", False)),
+        backup=bool(getattr(args, "backup", False)),
+        expected_fields=expected_fields,
+        binding=selection,
+        shortcut_args=args,
+        shortcut_module=module,
+        shortcut_cli_action=cli_action,
+    )
+
+
 def cmd_adc_set(args: argparse.Namespace) -> int:
-    intent = normalize_adc_intent(args)
-    plan = AdcProvider().plan(intent)
-
-    if not args.configure:
-        return emit({
-            "status": "passed",
-            "command": "plan",
-            "normalized_intent": _intent_dict(intent),
-            "plan": plan.to_dict(),
-        })
-
-    return _configure_module(args, intent, plan, apply_adc_set)
+    return _run_registered_shortcut(args, "adc", "set")
 
 
-def main(argv: list[str] | None = None) -> int:
-    parser = build_parser()
-    args = parser.parse_args(argv)
+def _run_generic(args: argparse.Namespace) -> int:
+    config, expected_fields = _load_runtime_config(args)
+    intent = _load_canonical_intent(args.intent, backend=config.backend)
+    return _execute_canonical_request(
+        config,
+        configure=args.command == "configure",
+        backup=bool(getattr(args, "backup", False)),
+        expected_fields=expected_fields,
+        intent=intent,
+    )
+
+
+def _dispatch(args: argparse.Namespace, parser: argparse.ArgumentParser) -> int:
+
+    if args.command in {"plan", "configure"}:
+        return _run_generic(args)
 
     if args.command == "pin-options":
         return cmd_pin_options(args)
@@ -980,32 +1450,13 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "validate":
         return cmd_validate(args)
 
-    if args.command == "uart" and getattr(args, "action", None) == "set":
-        return cmd_uart_set(args)
-
-    if args.command == "uart" and getattr(args, "action", None) == "add-flexio-channel":
-        return cmd_uart_add_flexio_channel(args)
-
-    if args.command == "platform" and getattr(args, "action", None) == "set":
-        return cmd_platform_set(args)
-
-    if args.command == "basenxp" and getattr(args, "action", None) == "set":
-        return cmd_basenxp_set(args)
-
-    if args.command == "mcl" and getattr(args, "action", None) == "set":
-        return cmd_mcl_set(args)
-
-    if args.command == "port" and getattr(args, "action", None) == "set":
-        return cmd_port_set(args)
-
-    if args.command == "dio" and getattr(args, "action", None) == "set":
-        return cmd_dio_set(args)
-
-    if args.command == "mcu" and getattr(args, "action", None) == "set":
-        return cmd_mcu_set(args)
-
-    if args.command == "adc" and getattr(args, "action", None) == "set":
-        return cmd_adc_set(args)
+    action = getattr(args, "action", None)
+    if (
+        args.command in {"uart", "platform", "basenxp", "mcl", "port", "dio", "mcu", "adc"}
+        and isinstance(action, str)
+        and action
+    ):
+        return _run_registered_shortcut(args)
 
     if args.version:
         return emit({
@@ -1015,5 +1466,101 @@ def main(argv: list[str] | None = None) -> int:
             "version": __version__,
         })
 
-    parser.print_help()
-    return 0
+    raise CliFailure(
+        code="invalid_arguments",
+        message="A complete command and action are required.",
+        module="cli",
+        details={
+            "command": getattr(args, "command", None),
+            "action": getattr(args, "action", None),
+            "usage": parser.format_usage().strip(),
+        },
+        exit_code=2,
+    )
+
+
+def _command_from_argv(argv: list[str]) -> str:
+    if argv == ["--version"]:
+        return "version"
+    if argv and argv[0] in ROOT_COMMANDS:
+        return argv[0]
+    return "unknown"
+
+
+def _map_exception(exc: Exception) -> CliFailure:
+    if isinstance(exc, CliFailure):
+        return exc
+    if isinstance(exc, PermissionError):
+        return CliFailure(
+            "permission_denied",
+            "The operation was denied by the operating system.",
+            module="cli",
+            details={"errno": exc.errno} if exc.errno is not None else {},
+        )
+    if isinstance(exc, FileNotFoundError):
+        filename = str(exc.filename) if exc.filename else None
+        return CliFailure(
+            "asset_not_found" if filename and "assets" in Path(filename).parts else "resource_not_found",
+            "A required runtime asset was not found."
+            if filename and "assets" in Path(filename).parts
+            else "A required file or directory was not found.",
+            module="cli",
+            details={"errno": exc.errno} if exc.errno is not None else {},
+        )
+    if isinstance(exc, json.JSONDecodeError):
+        return CliFailure(
+            "asset_invalid",
+            "A required runtime asset is not valid JSON.",
+            module="cli",
+            details={"line": exc.lineno, "column": exc.colno},
+        )
+    if isinstance(exc, UnicodeError):
+        return CliFailure(
+            "asset_invalid",
+            "A required runtime asset is not valid UTF-8.",
+            module="cli",
+        )
+    if isinstance(exc, ET.ParseError):
+        return CliFailure(
+            "project_xml_invalid",
+            "The project .mex file is malformed XML.",
+            module="backend",
+            details={"reason": str(exc)},
+        )
+    if isinstance(exc, OSError):
+        return CliFailure(
+            "io_error",
+            "The operation failed because of an operating-system I/O error.",
+            module="cli",
+            details={"errno": exc.errno} if exc.errno is not None else {},
+        )
+    return CliFailure(
+        "internal_error",
+        "An unexpected internal error occurred.",
+        module="cli",
+    )
+
+
+def main(argv: list[str] | None = None) -> int:
+    raw_argv = list(sys.argv[1:] if argv is None else argv)
+    json_mode = "--json" in raw_argv
+    debug_mode = "--debug" in raw_argv
+    parse_argv = [item for item in raw_argv if item not in {"--json", "--debug"}]
+    command = _command_from_argv(parse_argv)
+
+    try:
+        parser = build_parser()
+        args = parser.parse_args(parse_argv)
+        args.json = json_mode
+        args.debug = debug_mode
+        return _dispatch(args, parser)
+    except Exception as exc:
+        failure = _map_exception(exc)
+        payload = render_failure(failure, command)
+        if json_mode:
+            print(json.dumps(payload, ensure_ascii=False, indent=2))
+        else:
+            print(f"{failure.code}: {failure.message}", file=sys.stderr)
+        if debug_mode:
+            traceback.print_exc(file=sys.stderr)
+        return failure.exit_code

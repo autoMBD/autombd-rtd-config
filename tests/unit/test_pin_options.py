@@ -49,14 +49,20 @@ import subprocess
 import sys
 
 
-def _run_pin_options(peripheral):
+def _run_pin_options(peripheral, package="mapbga257", *extra):
     return subprocess.run(
         [
             sys.executable, "-m", "rtd_config",
             "pin-options",
-            "--device", "s32k344",
-            "--package", "default",
+            "--vendor", "NXP",
+            "--backend", "s32-mex",
+            "--family", "S32K3",
+            "--device", "S32K344",
+            "--package", package,
+            "--rtd-release", "7.0.1",
+            "--schema", "19",
             "--peripheral", peripheral,
+            *extra,
             "--json",
         ],
         text=True,
@@ -123,3 +129,27 @@ def test_pin_options_lpuart0_has_tx_and_rx():
     has_rx = any(item.get("signal") == "RX" for item in options)
     assert has_tx, "No TX signal option returned for LPUART_0"
     assert has_rx, "No RX signal option returned for LPUART_0"
+
+
+def test_pin_options_only_returns_active_package_fields():
+    payload = json.loads(_run_pin_options("LPUART_0").stdout)
+    assert payload["options"]
+    assert all(item.get("package_pin") for item in payload["options"])
+    assert all("pin_mapbga257" not in item for item in payload["options"])
+    assert all(not any(value in (None, "") for value in item.values()) for item in payload["options"])
+
+
+def test_wrong_and_unproven_packages_are_unsupported():
+    for package in ("hdqfp172", "lqfp100", "unknown"):
+        result = _run_pin_options("LPUART_0", package)
+        assert result.returncode == 1
+        assert json.loads(result.stdout)["diagnostics"][0]["code"] == "asset_bundle_unsupported"
+
+
+def test_projectless_pin_options_requires_full_selector():
+    result = subprocess.run(
+        [sys.executable, "-m", "rtd_config", "pin-options", "--peripheral", "LPUART_0", "--json"],
+        text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False,
+    )
+    assert result.returncode == 2
+    assert json.loads(result.stdout)["diagnostics"][0]["code"] == "invalid_arguments"
