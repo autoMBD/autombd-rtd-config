@@ -2,8 +2,8 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.7.1 |
-| Date | 2026-06-23 |
+| Version | 0.7.2 |
+| Date | 2026-07-15 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Long-term architecture and goals for the RTD CfgFile CLI. Holds the stable CLI/JSON contract, module-ownership rules, engineering constraints, and the minimal-system definition. Domain facts live in domain-truth; the test method lives in the test strategy; E2E cases live in the test-cases catalog. |
 
@@ -277,8 +277,8 @@ configured installation environment internally.
 
 | Date | Version | Description |
 | --- | --- | --- |
-| 2026-06-23 | 0.7.1 | Made the asset-build sequence extract the module's **complete editable surface** (G10 — the descriptor defines the surface, not the subset a test case exercises) and added a per-module `_coverage` surface-coverage inventory (configurable today vs. deferred) as an asset kind and a build-sequence output, so a deferred surface is recorded rather than left an undocumented gap. |
 | 2026-07-15 | 0.7.2 | Moved descriptor surface coverage out of runtime assets into exact-source, development-only per-module sidecars and required an inventory for all eight shipped providers. |
+| 2026-06-23 | 0.7.1 | Made the asset-build sequence extract the module's **complete editable surface** (G10 — the descriptor defines the surface, not the subset a test case exercises) and added a per-module `_coverage` surface-coverage inventory (configurable today vs. deferred) as an asset kind and a build-sequence output, so a deferred surface is recorded rather than left an undocumented gap. |
 | 2026-06-15 | 0.7.0 | Issue #7 documentation reorganization: stripped agent-discipline content (Subagent development workflow section, Documentation map section, KPI-cap/timing sentences from Tests and acceptance and Success criteria); folded content from `rtd-cfgfile-cli-implementation-plan.md` (minimal-system definition, asset build sequence steps 1–3, engineering constraints + development release boundary); updated figures path reference to `docs/specs/figures/`; updated header Description. |
 | 2026-06-14 | 0.6.3 | Fixed in-body doc path references that omitted the `docs/` prefix (`tests/…` → `docs/tests/…`, `references/…` → `docs/references/…`) so they match the doc map. |
 | 2026-06-14 | 0.6.2 | Updated the Subagent development workflow + success criteria to the TRUE black-box E2E model: an independent third-party agent CLI (not the embedded subagent, which inherits repo context/filesystem) drives the released skill against the staged fixture, and the Tester independently re-verifies the produced `.mex`. Also dropped the dangling doc-map row + diagram node for the never-created `rtd-config-subagent-validation.md` (the black-box record now lives in the harness + the acceptance report). |

@@ -36,7 +36,7 @@ BaseNXP, Platform, Port, Dio, Mcl, Uart` (equal priority) — are delivered and
 vendor-validated end to end: every E2E acceptance case passes the S32DS gate
 (exit `0`, code generated, no SEVERE `[TOOL]`) with its generated code verified.
 See the dated
-[`2026-07-15 acceptance evidence`](docs/tests/rtd-config-acceptance-report.md);
+[`2026-07-17 acceptance evidence`](docs/tests/rtd-config-acceptance-report.md);
 S32DS and isolated black-box acceptance remain separate from hosted CI because
 the vendor environment is local/licensed.
 
