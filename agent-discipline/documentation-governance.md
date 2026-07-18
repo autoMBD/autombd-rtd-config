@@ -2,8 +2,8 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.1.5 |
-| Date | 2026-06-29 |
+| Version | 0.1.6 |
+| Date | 2026-07-18 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Documentation-governance rules for the RTD CfgFile CLI project. Defines the two-category split, official tool name, changelog integrity, archive policy, and the authoritative cross-category documentation map. |
 
@@ -56,6 +56,15 @@ Changelog tables are append-only history records. Never merge, collapse, or
 summarize existing changelog rows. New rows are added at the top or bottom
 (consistently within each document).
 
+### Task-specific plans are temporary local state
+
+Task-specific execution plans, checklists, command sequences, and commit
+sequences live only under the ignored `.agent-state/plans/` directory and are
+never committed. Durable human engineering architecture and design decisions
+belong in Category A documents in agent-agnostic form. Reusable Agent workflow
+rules belong in Category B; neither category is a home for one-off execution
+state.
+
 ### Review archive is read-only
 
 `agent-discipline/review-archive-NOT-USED-NEVER-TOUCH!!!/` (formerly
@@ -104,7 +113,6 @@ paths are relative to the repository root.
 | `agent-discipline/owner-review-comments.md` | Review-comment resolutions across rounds | agent-discipline/review-archive-NOT-USED-NEVER-TOUCH!!!/ |
 | `agent-discipline/agent-lessons-learned.md` | Reviewer's running lessons log | — |
 | `agent-discipline/documentation-governance.md` | This document: governance rules + documentation map | — |
-| `agent-discipline/implementation-plans/` | Executable Agent-development plans kept outside Category A engineering documentation | Category A specs and tests |
 | `agent-discipline/review-archive-NOT-USED-NEVER-TOUCH!!!/` | Frozen review archives — never a requirements source | — |
 
 ### Standalone deliverable
@@ -136,7 +144,7 @@ flowchart TD
 
 | Date | Version | Description |
 | --- | --- | --- |
-| 2026-07-12 | 0.1.5 | Added the Category B implementation-plan directory to the authoritative documentation map. |
+| 2026-07-18 | 0.1.6 | Required task-specific execution plans to remain ignored local state under `.agent-state/plans/`; durable engineering design remains Category A and reusable Agent workflow remains Category B. |
 | 2026-07-12 | 0.1.4 | Added the runtime-safety and public-contract design to the authoritative Category A documentation map. |
 | 2026-06-29 | 0.1.3 | Issue #35: renamed the read-only review archive to `agent-discipline/review-archive-NOT-USED-NEVER-TOUCH!!!/` to make its frozen status explicit; updated all active references (purity-sweep rule, archive policy, documentation map, mermaid diagram). Frozen changelog rows retain the historical path. |
 | 2026-06-16 | 0.1.2 | Replaced the script-centered agent environment document with the lightweight external-dependency-memory skill entry. |

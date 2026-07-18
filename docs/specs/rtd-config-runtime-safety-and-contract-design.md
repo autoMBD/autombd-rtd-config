@@ -2,8 +2,8 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.1.0 |
-| Date | 2026-07-12 |
+| Version | 0.1.1 |
+| Date | 2026-07-18 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Defines project identity, asset compatibility, stable diagnostics, secure configuration transactions, provider ownership enforcement, descriptor inventory, and release integrity for the RTD CfgFile CLI. |
 
@@ -331,36 +331,52 @@ Family/device/package/RTD fields in configuration are expected constraints for
 projectless resource queries or compatibility assertions. They do not replace
 observed project metadata.
 
-## 12. Descriptor inventory and coverage sidecars
+## 12. Normalized descriptor coverage definitions
 
 ### 12.1 Storage boundary
 
-Development coverage data is not runtime input and must not be published in
-the released Skill assets. Remove `_coverage` from all runtime assets and store
-per-module sidecars under:
+Each runtime asset remains an independent released input. Development coverage
+data is not runtime input and must not be published in the released Skill
+assets. Each module has a single normalized development coverage definition:
 
 ```text
 docs/specs/rtd-config-module-coverage/<module>.json
 ```
 
-The sidecars are project engineering specifications. Runtime code does not read
-them, and the release manifest excludes them.
+These definitions are project engineering specifications. Runtime code does not
+read them, and the release manifest excludes them. There is no separate
+classification-overrides file or directory.
 
 ### 12.2 Inventory format
 
-Each sidecar records:
+Each normalized definition records:
 
 - module, RTD release, descriptor package, descriptor SHA-256, and extraction
   format version;
-- every editable descriptor item under a stable structural key;
+- every editable descriptor item under a stable structural key as exact,
+  fact-only extraction data;
 - kind (`container`, `variable`, `reference`, `list`, or equivalent descriptor
   construct);
 - type/domain/range/default when defined;
 - `INVALID`, `EDITABLE`, and `ENABLE` constraints;
 - cross-module references;
-- one classification: `configurable`, `derived`, or `deferred`;
-- implementation/asset trace for configurable or derived items;
-- reason and dependency for deferred items.
+- a SHA-256-addressed fact pool that interns repeated descriptor domains,
+  ranges, defaults, and constraints with collision verification;
+- embedded `classification_default`, `classification_rules`, and
+  `known_gap_rules`;
+- implementation/asset traces in rules for configurable or derived items;
+- reason and dependency rules for deferred items.
+
+The tool expands fact references and applies those rules to create a resolved
+coverage view in memory, or as explicitly requested temporary output. Resolved
+per-item classification, trace, summary, and known-gap lists are never committed.
+
+An asset trace proves semantic domain consistency only when its rule declares
+an asset-domain assertion with a named descriptor fact and precise JSON Pointer.
+Mode `exact` requires ordered value equality; mode `subset` requires every asset
+value to belong to the descriptor fact. The contract therefore selects either
+`exact` or `subset` explicitly. Structural and template traces do not imply a
+domain assertion.
 
 Mcu and Adc inventories are regenerated from the exact cached descriptors.
 The extraction includes the known missing Mcu reset surfaces and Adc DSPSS,
@@ -373,13 +389,14 @@ The deterministic gate verifies:
 
 - inventory keys are unique and stable;
 - every extracted editable descriptor item appears exactly once;
-- every inventory item has exactly one classification;
+- materialization gives every inventory item exactly one classification;
 - configurable/derived traces resolve to committed implementation/assets;
 - deferred items have a non-empty engineering reason;
 - descriptor identity and SHA-256 match regeneration evidence when the source
   descriptor is available;
 - runtime assets contain no `_coverage` key;
-- the release manifest contains no coverage sidecar.
+- every declared asset-domain assertion passes its exact/subset comparison;
+- the release manifest contains no development coverage definition.
 
 CI validates committed inventory/classification consistency without requiring
 an RTD installation. Descriptor regeneration and source-hash comparison are a
@@ -481,4 +498,5 @@ Mandatory tests cover:
 
 | Date | Version | Description |
 | --- | --- | --- |
+| 2026-07-18 | 0.1.1 | Replaced expanded coverage sidecars plus separate overrides with one normalized per-module development definition, pooled exact descriptor facts, in-memory resolved views, embedded rules, and explicit exact/subset asset-domain assertions. |
 | 2026-07-12 | 0.1.0 | Initial runtime-safety and public-contract design covering project identity, stable diagnostics, secure transactions, validation containment, provider ownership, generic intent, descriptor inventory, and release integrity. |

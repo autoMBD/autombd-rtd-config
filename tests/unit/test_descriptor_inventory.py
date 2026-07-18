@@ -63,6 +63,14 @@ COVERAGE_ROOT = ROOT / "docs" / "specs" / "rtd-config-module-coverage"
 RUNTIME_ROOT = ROOT / "autombd-rtd"
 
 
+def _definition(module: str) -> dict:
+    return json.loads((COVERAGE_ROOT / f"{module}.json").read_text(encoding="utf-8"))
+
+
+def _resolved(module: str) -> dict:
+    return _tool_module().materialize_coverage(_definition(module))
+
+
 def _tool_module():
     assert TOOL.is_file(), "descriptor inventory extractor is required"
     spec = importlib.util.spec_from_file_location("extract_xdm_coverage", TOOL)
@@ -185,18 +193,135 @@ def test_exact_module_extraction_retains_named_cross_module_references(tmp_path,
     ],
 )
 def test_committed_descriptor_inventory_has_golden_count_and_identity(module, count, sha256):
-    sidecar = json.loads((COVERAGE_ROOT / f"{module}.json").read_text(encoding="utf-8"))
-    assert sidecar["source"]["sha256"] == sha256
-    assert sidecar["summary"]["total"] == count == len(sidecar["items"])
+    definition = _definition(module)
+    resolved = _resolved(module)
+    assert definition["source"]["sha256"] == sha256
+    assert resolved["summary"]["total"] == count == len(resolved["items"])
     descriptor = "BaseNXP.xdm" if module == "basenxp" else f"{module.title()}.xdm"
-    assert sidecar["source"]["descriptor"] == descriptor
-    assert not any(":" in str(value) and "\\" in str(value) for value in sidecar["source"].values())
+    assert definition["source"]["descriptor"] == descriptor
+    assert not any(":" in str(value) and "\\" in str(value) for value in definition["source"].values())
 
 
 def test_repository_gate_contains_every_shipped_module_sidecar():
     assert {path.stem for path in COVERAGE_ROOT.glob("*.json")} == {
         "uart", "platform", "basenxp", "mcl", "port", "dio", "mcu", "adc",
     }
+
+
+def test_committed_coverage_is_one_normalized_v2_definition_per_module():
+    assert not (ROOT / "tools" / "xdm-coverage-overrides").exists()
+    for path in COVERAGE_ROOT.glob("*.json"):
+        definition = json.loads(path.read_text(encoding="utf-8"))
+        assert definition["format_version"] == 2
+        assert set(definition) == {
+            "format_version", "source", "fact_pool", "items",
+            "classification_default", "classification_rules", "known_gap_rules",
+        }
+        assert all(
+            not (set(item) & {"classification", "trace", "reason", "dependency"})
+            for item in definition["items"]
+        )
+        assert "summary" not in definition
+        assert "known_gaps" not in definition
+
+
+def test_temporary_execution_plans_are_local_only_and_governed():
+    assert not (ROOT / "agent-discipline" / "implementation-plans").exists()
+    governance = (ROOT / "agent-discipline" / "documentation-governance.md").read_text(
+        encoding="utf-8"
+    )
+    assert ".agent-state/plans/" in governance
+    assert "never committed" in governance
+    assert "agent-discipline/implementation-plans/" not in governance
+
+
+def test_category_a_designs_define_the_normalized_coverage_architecture():
+    paths = [
+        ROOT / "docs/specs/rtd-config-core-design.md",
+        ROOT / "docs/specs/rtd-config-runtime-safety-and-contract-design.md",
+    ]
+    combined = "\n".join(path.read_text(encoding="utf-8") for path in paths)
+    for phrase in (
+        "single normalized development coverage definition",
+        "fact pool",
+        "classification_default",
+        "classification_rules",
+        "known_gap_rules",
+        "resolved coverage view",
+        "`exact` or `subset`",
+    ):
+        assert phrase in combined
+    assert "tools/xdm-coverage-overrides" not in combined
+
+
+def test_port_normalized_definition_is_materially_smaller_than_expanded_baseline():
+    normalized_bytes = (COVERAGE_ROOT / "port.json").stat().st_size
+    expanded_baseline_bytes = 14_314_905
+    assert normalized_bytes < expanded_baseline_bytes * 0.60
+
+
+def test_fact_pool_uses_full_sha256_ids_and_expands_transparently(tmp_path):
+    tool = _tool_module()
+    source = _synthetic_xdm(tmp_path / "Synthetic.xdm")
+    extracted = tool.extract_descriptor(source, module="Synthetic")
+    normalized = tool.normalize_definition(extracted, {
+        "classification_default": {
+            "classification": "deferred",
+            "reason": "Synthetic test item.",
+            "dependency": "Synthetic implementation scope.",
+        },
+        "classification_rules": [],
+        "known_gap_rules": {},
+    })
+
+    assert normalized["fact_pool"]
+    assert all(re.fullmatch(r"[0-9A-F]{64}", fact_id) for fact_id in normalized["fact_pool"])
+    assert tool.descriptor_projection(tool.materialize_facts(normalized)) == extracted
+
+
+@pytest.mark.parametrize("mode", ["exact", "subset"])
+def test_asset_domain_assertion_accepts_precise_semantic_mapping(tmp_path, mode):
+    tool = _tool_module()
+    asset = tmp_path / "asset.json"
+    values = ["A", "B"] if mode == "exact" else ["A"]
+    asset.write_text(json.dumps({"domains": {"Mode": values}}), encoding="utf-8")
+    item = {
+        "name": "Mode",
+        "range": {"kind": "literal", "values": ["A", "B"]},
+        "asset_domain_assertions": [{
+            "descriptor_fact": "range",
+            "mode": mode,
+            "asset": "asset.json#/domains/Mode",
+        }],
+    }
+
+    tool.validate_asset_domain_assertions(item, repo_root=tmp_path)
+
+
+@pytest.mark.parametrize(
+    ("assertion", "asset_value"),
+    [
+        ({"descriptor_fact": "range", "mode": "equal", "asset": "asset.json#/domain"}, ["A"]),
+        ({"descriptor_fact": "range", "mode": "exact", "asset": "asset.json#/domain"}, {"A": 1}),
+        ({"descriptor_fact": "range", "mode": "exact", "asset": "asset.json#/domain"}, ["B"]),
+        ({"descriptor_fact": "missing", "mode": "exact", "asset": "asset.json#/domain"}, ["A"]),
+    ],
+)
+def test_asset_domain_assertion_rejects_invalid_contract_or_mismatch(
+    tmp_path, assertion, asset_value
+):
+    tool = _tool_module()
+    (tmp_path / "asset.json").write_text(
+        json.dumps({"domain": asset_value}), encoding="utf-8"
+    )
+    item = {
+        "name": "Mode",
+        "range": {"kind": "literal", "values": ["A"]},
+        "asset_domain_assertions": [assertion],
+    }
+
+    with pytest.raises(tool.InventoryError):
+        tool.validate_asset_domain_assertions(item, repo_root=tmp_path)
 
 
 @pytest.mark.parametrize(
@@ -208,7 +333,7 @@ def test_repository_gate_contains_every_shipped_module_sidecar():
 )
 def test_offline_gate_rejects_inventory_mutations(mutation):
     tool = _tool_module()
-    sidecar = json.loads((COVERAGE_ROOT / "adc.json").read_text(encoding="utf-8"))
+    sidecar = _resolved("adc")
     broken = copy.deepcopy(sidecar)
     if mutation == "duplicate_key":
         broken["items"].append(copy.deepcopy(broken["items"][0]))
@@ -273,9 +398,7 @@ def test_known_descriptor_gap_groups_are_complete_and_explicitly_deferred():
         },
     }
     for module, groups in expected.items():
-        sidecar = json.loads(
-            (COVERAGE_ROOT / f"{module}.json").read_text(encoding="utf-8")
-        )
+        sidecar = _resolved(module)
         by_key = {item["key"]: item for item in sidecar["items"]}
         assert {name: len(keys) for name, keys in sidecar["known_gaps"].items()} == groups
         assert all(
@@ -294,9 +417,7 @@ def test_recipe_fixed_and_automatic_fields_are_not_claimed_caller_configurable()
         "adc": {"AdcEnableWatchdogApi", "WdgThresholdEnable"},
     }
     for module, names in expectations.items():
-        sidecar = json.loads(
-            (COVERAGE_ROOT / f"{module}.json").read_text(encoding="utf-8")
-        )
+        sidecar = _resolved(module)
         matched = [item for item in sidecar["items"] if item["name"] in names]
         assert {item["name"] for item in matched} == names
         assert all(item["classification"] != "configurable" for item in matched)
@@ -319,16 +440,12 @@ def test_runtime_python_never_reads_development_coverage_sidecars():
 
 
 @pytest.mark.parametrize("module", ["mcu", "adc"])
-def test_module_overrides_never_classify_by_unqualified_basename(module):
-    overrides = json.loads(
-        (ROOT / f"tools/xdm-coverage-overrides/{module}.json").read_text(
-            encoding="utf-8"
-        )
-    )
-    selectors = [rule["match"] for rule in overrides["rules"]]
+def test_embedded_rules_never_classify_by_unqualified_basename(module):
+    definition = _definition(module)
+    selectors = [rule["match"] for rule in definition["classification_rules"]]
     selectors.extend(
         selector
-        for group in overrides.get("known_gap_rules", {}).values()
+        for group in definition.get("known_gap_rules", {}).values()
         for selector in group
     )
     assert all("name" not in selector and "key_regex" not in selector for selector in selectors)
@@ -339,7 +456,7 @@ def test_module_overrides_never_classify_by_unqualified_basename(module):
 
 
 def test_mcu_coverage_is_pll0_exact_and_traces_every_actual_edit():
-    sidecar = json.loads((COVERAGE_ROOT / "mcu.json").read_text(encoding="utf-8"))
+    sidecar = _resolved("mcu")
     items = sidecar["items"]
     actual = {
         "McuNoPll", "McuPll0UnderMcuControl", "McuPLLUnderMcuControl",
@@ -358,7 +475,7 @@ def test_mcu_coverage_is_pll0_exact_and_traces_every_actual_edit():
 
 
 def test_adc_created_parent_structures_are_coverage_accounted():
-    sidecar = json.loads((COVERAGE_ROOT / "adc.json").read_text(encoding="utf-8"))
+    sidecar = _resolved("adc")
     required = {
         "AdcHwUnit", "AdcChannel", "AdcGroup", "AdcGroupConversionConfiguration",
         "AdcThresholdControl", "AdcHwTrigger", "AdcHwConfiguration", "BctuHwUnit",
@@ -373,7 +490,7 @@ def test_adc_created_parent_structures_are_coverage_accounted():
 
 
 def test_adc_dma_reference_and_ctu_gate_are_coverage_accounted():
-    sidecar = json.loads((COVERAGE_ROOT / "adc.json").read_text(encoding="utf-8"))
+    sidecar = _resolved("adc")
     expected = {"AdcDmaChannelId", "CtuEnableDmaTransferMode"}
     matched = [item for item in sidecar["items"] if item["name"] in expected]
 
@@ -385,18 +502,12 @@ def test_adc_dma_reference_and_ctu_gate_are_coverage_accounted():
 @pytest.mark.parametrize(
     "module", ["uart", "platform", "basenxp", "mcl", "port", "dio"]
 )
-def test_shipped_module_override_names_are_grounded_under_the_exact_ancestor(module):
+def test_shipped_module_rule_names_are_grounded_under_the_exact_ancestor(module):
     """A basename in a broad rule must not silently classify the wrong branch."""
     tool = _tool_module()
-    overrides = json.loads(
-        (ROOT / f"tools/xdm-coverage-overrides/{module}.json").read_text(
-            encoding="utf-8"
-        )
-    )
-    sidecar = json.loads(
-        (COVERAGE_ROOT / f"{module}.json").read_text(encoding="utf-8")
-    )
-    for rule in overrides["rules"]:
+    definition = _definition(module)
+    sidecar = _resolved(module)
+    for rule in definition["classification_rules"]:
         match = rule["match"]
         prefixes = match.get("path_prefixes")
         names = match.get("names")
@@ -460,14 +571,8 @@ def test_every_literal_xdm_parent_and_leaf_emitted_by_writers_is_accounted(
 ):
     """The coverage sidecar must not defer structures the implementation emits."""
     tool = _tool_module()
-    sidecar = json.loads(
-        (COVERAGE_ROOT / f"{module}.json").read_text(encoding="utf-8")
-    )
-    overrides = json.loads(
-        (ROOT / f"tools/xdm-coverage-overrides/{module}.json").read_text(
-            encoding="utf-8"
-        )
-    )
+    sidecar = _resolved(module)
+    definition = _definition(module)
     written_names = _literal_xml_names_written_by(*writers) | additional_names
     for name in sorted(written_names):
         matched = [
@@ -476,7 +581,7 @@ def test_every_literal_xdm_parent_and_leaf_emitted_by_writers_is_accounted(
             and any(
                 rule["classification"] != "deferred"
                 and tool._matches(item, rule["match"])
-                for rule in overrides["rules"]
+                for rule in definition["classification_rules"]
             )
         ]
         assert matched, f"{module}:{name} writer output is absent from its XDM inventory"
@@ -508,9 +613,7 @@ def test_every_literal_xdm_parent_and_leaf_emitted_by_writers_is_accounted(
 def test_attribute_mutations_and_their_exact_parents_are_coverage_accounted(
     module, ancestor, names
 ):
-    sidecar = json.loads(
-        (COVERAGE_ROOT / f"{module}.json").read_text(encoding="utf-8")
-    )
+    sidecar = _resolved(module)
     for name, classification in names.items():
         matched = [
             item for item in sidecar["items"]
@@ -549,9 +652,7 @@ def test_attribute_mutations_and_their_exact_parents_are_coverage_accounted(
 def test_fixed_or_derived_writer_fields_are_not_claimed_caller_configurable(
     module, ancestor, names
 ):
-    sidecar = json.loads(
-        (COVERAGE_ROOT / f"{module}.json").read_text(encoding="utf-8")
-    )
+    sidecar = _resolved(module)
     for name, classification in names.items():
         matched = [
             item for item in sidecar["items"]
@@ -563,7 +664,7 @@ def test_fixed_or_derived_writer_fields_are_not_claimed_caller_configurable(
 
 def test_mcl_empty_scatter_gather_array_does_not_claim_its_element_subtree():
     """The writer emits only a self-closing array, never an element template."""
-    sidecar = json.loads((COVERAGE_ROOT / "mcl.json").read_text(encoding="utf-8"))
+    sidecar = _resolved("mcl")
     element_prefix = (
         "/lst[dmaLogicChannelConfig_ScatterGatherArrayType]"
         "/ctr[dmaLogicChannelConfig_ScatterGatherArrayType]"
@@ -574,11 +675,9 @@ def test_mcl_empty_scatter_gather_array_does_not_claim_its_element_subtree():
     assert len(element_subtree) == 38
     assert all(item["classification"] == "deferred" for item in element_subtree)
 
-    overrides = json.loads(
-        (ROOT / "tools/xdm-coverage-overrides/mcl.json").read_text(encoding="utf-8")
-    )
+    definition = _definition("mcl")
     scatter_rules = [
-        rule for rule in overrides["rules"]
+        rule for rule in definition["classification_rules"]
         if "dmaLogicChannelConfig_ScatterGatherArrayType"
         in rule["match"].get("names", [])
     ]

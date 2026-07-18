@@ -1,5 +1,5 @@
 {
-  "format_version": 1,
+  "format_version": 2,
   "source": {
     "module": "BaseNXP",
     "descriptor": "BaseNXP.xdm",
@@ -7,387 +7,202 @@
     "rtd_release": "7.0.1",
     "sha256": "8CD7DE06F69CADC997E8BA240E36C3EF7A67AAC6B520E04789AE0DC9B610C754"
   },
-  "items": [
-    {
-      "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]",
-      "kind": "container",
-      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]",
-      "name": "CommonPublishedInformation",
-      "type": "IDENTIFIABLE",
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current BaseNXP provider.",
-      "dependency": "A descriptor-forward BaseNXP implementation and generality tests are required before exposure."
+  "fact_pool": {
+    "0CEA8C3D1E116FCA53AB9F750D22DD85A68CB0FF81AE0B7086684876EA09D73E": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": "node:refvalid(.)",
+          "false": "Invalid or empty reference."
+        },
+        {
+          "expr": "../../../OsIfUseSystemTimer = 'true'",
+          "false": "OsIfUseSystemTimer must be enabled first before configuring OsIfSystemTimerClockRef."
+        },
+        {
+          "expr": "node:name(../../../OsIfOperatingSystemType) = 'OsIfBaremetalType'",
+          "false": "OsIfSystemTimerClockRef must be used only in baremetal mode"
+        },
+        {
+          "expr": "node:exists(../OsIfSystemTimerClockFreq) = 'true'",
+          "true": "OsIfSystemTimerClockFreq must be disabled if using OsIfSystemTimerClockRef"
+        }
+      ]
     },
-    {
-      "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]",
-      "kind": "container",
-      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]",
-      "name": "OsIfGeneral",
-      "type": "IDENTIFIABLE",
-      "classification": "configurable",
-      "trace": {
-        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/basenxp.py:BaseNxpProvider",
-        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_basenxp_set",
-        "asset": "autombd-rtd/assets/nxp/s32k3/basenxp/osif.json#/OsIfGeneral",
-        "tests": [
-          "tests/unit/test_basenxp_apply.py::test_apply_sets_arbitrary_valid_osif_general_values"
-        ]
-      }
+    "11C3F0314EF5130B087D7B112B329EE7CE6E48A3161DCEDF9EF938392CDEFE01": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": "(count(./*) = 0) and (../OsIfMulticoreSupport = 'true')",
+          "true": "This list must refer at least one ECUC partition when OsIfMulticoreSupport = 'true'"
+        },
+        {
+          "expr": "(count(./*) > 0) and (../OsIfMulticoreSupport = 'false')",
+          "true": "This list must not refer any ECUC partition when OsIfMulticoreSupport = 'false'"
+        }
+      ]
     },
-    {
-      "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]/chc[OsIfOperatingSystemType]/ctr[OsIfAutosarOsType]",
-      "kind": "container",
-      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]/chc[OsIfOperatingSystemType]/ctr[OsIfAutosarOsType]",
-      "name": "OsIfAutosarOsType",
-      "type": "IDENTIFIABLE",
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current BaseNXP provider.",
-      "dependency": "A descriptor-forward BaseNXP implementation and generality tests are required before exposure."
+    "1382FC797392728E4FE2A1BE75ECED4AB7ED19CBA178DC464BBE153CF4B15CC3": {
+      "kind": "literal",
+      "value": "VariantPreCompile"
     },
-    {
-      "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]/chc[OsIfOperatingSystemType]/ctr[OsIfBaremetalType]",
-      "kind": "container",
-      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]/chc[OsIfOperatingSystemType]/ctr[OsIfBaremetalType]",
-      "name": "OsIfBaremetalType",
-      "type": "IDENTIFIABLE",
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current BaseNXP provider.",
-      "dependency": "A descriptor-forward BaseNXP implementation and generality tests are required before exposure."
+    "1B5A4848D0E4E1FBD3A2CE9C90D08A92C4949E9D7FFA3146A4AD81BDC71154C6": {
+      "kind": "literal",
+      "value": "GET_CORE_ID"
     },
-    {
-      "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]/chc[OsIfOperatingSystemType]/ctr[OsIfFreeRtosType]",
-      "kind": "container",
-      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]/chc[OsIfOperatingSystemType]/ctr[OsIfFreeRtosType]",
-      "name": "OsIfFreeRtosType",
-      "type": "IDENTIFIABLE",
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current BaseNXP provider.",
-      "dependency": "A descriptor-forward BaseNXP implementation and generality tests are required before exposure."
+    "2F0CB7023F16E37195E645DB8DFCF7AF17974B99A55D4403FB8C22FEF149ED25": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": "../../../OsIfUseSystemTimer = 'true'",
+          "false": "OsIfUseSystemTimer must be enabled first before configuring OsIfSystemTimerClockRef."
+        },
+        {
+          "expr": "node:name(../../../OsIfOperatingSystemType) = 'OsIfBaremetalType'",
+          "false": "OsIfSystemTimerClockRef must be used only in baremetal mode"
+        },
+        {
+          "expr": "node:exists(../OsIfSystemTimerClockRef) = 'true'",
+          "true": "OsIfSystemTimerClockRef must be disabled if using OsIfSystemTimerClockFreq"
+        }
+      ]
     },
-    {
-      "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]/chc[OsIfOperatingSystemType]/ctr[OsIfZephyrOsType]",
-      "kind": "container",
-      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]/chc[OsIfOperatingSystemType]/ctr[OsIfZephyrOsType]",
-      "name": "OsIfZephyrOsType",
-      "type": "IDENTIFIABLE",
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current BaseNXP provider.",
-      "dependency": "A descriptor-forward BaseNXP implementation and generality tests are required before exposure."
+    "3855FE2A9B100FC85524E3DFE355EB74D1D03C5C6360B6E36B295AEB23B6EB6D": {
+      "kind": "literal",
+      "values": [
+        "GET_CORE_ID",
+        "GET_PARTITION_ID",
+        "GET_CUSTOM_ID"
+      ]
     },
-    {
-      "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]/lst[OsIfCounterConfig]/ctr[OsIfCounterConfig]",
-      "kind": "container",
-      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]/lst[OsIfCounterConfig]/ctr[OsIfCounterConfig]",
-      "name": "OsIfCounterConfig",
-      "type": "IDENTIFIABLE",
-      "invalid": {
+    "40EEB44BE3DC18EC1CB58865D7B89AC993FADDD1A4FCF37DD0485A54BE3F7D55": {
+      "kind": "literal",
+      "value": ""
+    },
+    "4170B9373C8DC18DF2B086A9CA07F47AA6EFF4BDE870CAF59DFA7B7F8026F227": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": "<=255"
+        },
+        {
+          "expr": ">=0"
+        }
+      ]
+    },
+    "43407099A21A756F993FE61B28AC2C68141E88A19DCFC14D85379A163B3EF27B": {
+      "kind": "literal",
+      "value": "1"
+    },
+    "456153ABD25FBF6B71B13344F9DC4C31D9D1B02CA30B1B5DA4CECB7AE00B872C": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": ">=1"
+        },
+        {
+          "expr": "<=1"
+        }
+      ]
+    },
+    "46EFE59999D4420A2C6315A6C5527D727876B1E227BFFA3414A432DDBA9C39AF": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": "node:refvalid(.)",
+          "false": "Invalid or empty reference."
+        },
+        {
+          "expr": "node:containsValue(../../../OsIfEcucPartitionRef/*, .)",
+          "false": "The ECUC partition referenced by OsIfCounterEcucPartitionRef shall be a subset of the ECUC partitions referenced by OsIfEcucPartitionRef."
+        },
+        {
+          "expr": "text:uniq(../../*/OsIfCounterEcucPartitionRef, .)",
+          "false": "OsIfCounterEcucPartitionRef must be unique across all OsIf Counters in OsIfCounterConfig (i.e. only one OsIf Counter is allowed per partition)"
+        }
+      ]
+    },
+    "48A3A71A2F24BECC708DC90F9A9A59AAF768FD2F1D7493039A2053CE77C66037": {
+      "kind": "literal",
+      "value": "7"
+    },
+    "4BE25DFF5A1DEB925D82341EF0EFCCEEB07944C9B68782D62CC1ADF56B5B5BA1": {
+      "kind": "literal",
+      "values": [
+        "AUTOMATE"
+      ]
+    },
+    "53E30AC20DEF236DC54F0F0301FA3050D4FAD7E07F9B9EC2BD3BB8CD0331FB0E": {
+      "kind": "literal",
+      "value": "true"
+    },
+    "5711C942F04FB4BD2435CF46C4EDBBACFA9967F94265C74F3378BBDB64C1606B": {
+      "kind": "literal",
+      "value": "43"
+    },
+    "57FEFDB3C23C6FB56D7FF5B08698CB5A6F45C1400B39FC2DDDFBCBCDA3A564C8": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": ">=0"
+        },
+        {
+          "expr": "<=0"
+        }
+      ]
+    },
+    "5B9B60082D4C2A2CC36444A71E1F1E2221A5C33EB24C3D44F8322A5BA1897900": {
+      "kind": "xpath"
+    },
+    "5EC346F423AA2A472541C1522F45DC7ECA1DD02F9DEC938974CF325ABF603595": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": ">=7"
+        },
+        {
+          "expr": "<=7"
+        }
+      ]
+    },
+    "6D63CFB872A2FB8BDF8593C335A64318571EA83BFE9D833925CB17E2D31F6DE2": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": "(node:value(.) = 'GET_PARTITION_ID') and not(../OsIfMulticoreSupport = 'true')",
+          "true": "OsIfMulticoreSupport must be enabled when GET_PARTITION_ID mode is selected"
+        },
+        {
+          "expr": "(node:value(.) = 'GET_PARTITION_ID') and not(node:name(../OsIfOperatingSystemType) = 'OsIfAutosarOsType')",
+          "true": "OsIfAutosarOsType must be used when GET_PARTITION_ID mode is selected"
+        }
+      ]
+    },
+    "793DC38E4AA4AA0AFFABF64C74974CCC5FB1DD1E02B24AC473D2D80968D3FF9A": {
+      "kind": "literal",
+      "value": "4"
+    },
+    "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F": {
+      "kind": "literal",
+      "value": "false"
+    },
+    "9121B26DF1DBE3EC0C2D8671DB000E3E8A25230264396C1F039C2BE5B5CE6D94": [
+      {
+        "source_tag": "da",
         "kind": "xpath",
         "tests": [
           {
-            "expr": "node:value(../../OsIfMulticoreSupport) = 'true' and not(node:exists(./OsIfCounterEcucPartitionRef))",
-            "true": "OsIfCounterEcucPartitionRef must be enabled in multicore environments"
+            "expr": "<=4294967295"
           },
           {
-            "expr": "node:name(../../OsIfOperatingSystemType) = 'OsIfAutosarOsType' and not(node:exists(./OsIfOsCounterRef))",
-            "true": "OsIfOsCounterRef must be enabled in Autosar OS mode"
-          },
-          {
-            "expr": "node:name(../../OsIfOperatingSystemType) = 'OsIfBaremetalType' and not(node:exists(./OsIfSystemTimerClockRef) or node:exists(./OsIfSystemTimerClockFreq))",
-            "true": "Either OsIfSystemTimerClockRef or OsIfSystemTimerClockFreq must be enabled in baremetal mode"
+            "expr": ">=0"
           }
         ]
       },
-      "fact_sources": {
-        "invalid": [
-          {
-            "source_tag": "a",
-            "evidence": {
-              "kind": "xpath",
-              "tests": [
-                {
-                  "expr": "node:value(../../OsIfMulticoreSupport) = 'true' and not(node:exists(./OsIfCounterEcucPartitionRef))",
-                  "true": "OsIfCounterEcucPartitionRef must be enabled in multicore environments"
-                },
-                {
-                  "expr": "node:name(../../OsIfOperatingSystemType) = 'OsIfAutosarOsType' and not(node:exists(./OsIfOsCounterRef))",
-                  "true": "OsIfOsCounterRef must be enabled in Autosar OS mode"
-                },
-                {
-                  "expr": "node:name(../../OsIfOperatingSystemType) = 'OsIfBaremetalType' and not(node:exists(./OsIfSystemTimerClockRef) or node:exists(./OsIfSystemTimerClockFreq))",
-                  "true": "Either OsIfSystemTimerClockRef or OsIfSystemTimerClockFreq must be enabled in baremetal mode"
-                }
-              ]
-            }
-          }
-        ]
-      },
-      "classification": "derived",
-      "trace": {
-        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_basenxp_set",
-        "inputs": [
-          "intent.payload",
-          "osif.json#/OsIfCounterConfig"
-        ],
-        "tests": [
-          "tests/unit/test_basenxp_apply.py::test_apply_inserts_exactly_one_counter",
-          "tests/unit/test_basenxp_apply.py::test_counter_has_required_children"
-        ]
-      }
-    },
-    {
-      "key": "list:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]/lst[OsIfCounterConfig]",
-      "kind": "list",
-      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]/lst[OsIfCounterConfig]",
-      "name": "OsIfCounterConfig",
-      "type": "MAP",
-      "invalid": {
+      {
+        "source_tag": "a",
         "kind": "xpath",
         "tests": [
-          {
-            "expr": "num:i(count(./*)) > node:when((node:value(../OsIfMulticoreSupport) = 'true') and node:exists(as:modconf('EcuC')[1]),                                                         num:i(count(as:modconf('EcuC')[1]/EcucHardware/*/EcucCoreDefinition/*/EcucCoreId)),                                                         num:i(1))",
-            "true": "The number of OsIf Counters cannot exceed the number of available ECU Cores (i.e. #EcuC/EcuHardware/EcucCoreDefinition)"
-          },
-          {
-            "expr": "(node:value(../OsIfMulticoreSupport) = 'false') and ../OsIfUseSystemTimer = 'true' and (num:i(count(./*)) != 1)",
-            "true": "The number of OsIf Counters must be exactly one when System Timer is enabled and multicore is disabled"
-          }
-        ]
-      },
-      "min": {
-        "kind": "literal",
-        "value": "0"
-      },
-      "fact_sources": {
-        "invalid": [
-          {
-            "source_tag": "da",
-            "evidence": {
-              "kind": "xpath",
-              "tests": [
-                {
-                  "expr": "num:i(count(./*)) > node:when((node:value(../OsIfMulticoreSupport) = 'true') and node:exists(as:modconf('EcuC')[1]),                                                         num:i(count(as:modconf('EcuC')[1]/EcucHardware/*/EcucCoreDefinition/*/EcucCoreId)),                                                         num:i(1))",
-                  "true": "The number of OsIf Counters cannot exceed the number of available ECU Cores (i.e. #EcuC/EcuHardware/EcucCoreDefinition)"
-                },
-                {
-                  "expr": "(node:value(../OsIfMulticoreSupport) = 'false') and ../OsIfUseSystemTimer = 'true' and (num:i(count(./*)) != 1)",
-                  "true": "The number of OsIf Counters must be exactly one when System Timer is enabled and multicore is disabled"
-                }
-              ]
-            }
-          }
-        ],
-        "min": [
-          {
-            "source_tag": "da",
-            "evidence": {
-              "kind": "literal",
-              "value": "0"
-            }
-          }
-        ]
-      },
-      "classification": "derived",
-      "trace": {
-        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_basenxp_set",
-        "inputs": [
-          "intent.payload",
-          "osif.json#/OsIfCounterConfig"
-        ],
-        "tests": [
-          "tests/unit/test_basenxp_apply.py::test_apply_inserts_exactly_one_counter",
-          "tests/unit/test_basenxp_apply.py::test_counter_has_required_children"
-        ]
-      }
-    },
-    {
-      "key": "list:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]/lst[OsIfEcucPartitionRef]",
-      "kind": "list",
-      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]/lst[OsIfEcucPartitionRef]",
-      "name": "OsIfEcucPartitionRef",
-      "invalid": {
-        "kind": "xpath",
-        "tests": [
-          {
-            "expr": "(count(./*) = 0) and (../OsIfMulticoreSupport = 'true')",
-            "true": "This list must refer at least one ECUC partition when OsIfMulticoreSupport = 'true'"
-          },
-          {
-            "expr": "(count(./*) > 0) and (../OsIfMulticoreSupport = 'false')",
-            "true": "This list must not refer any ECUC partition when OsIfMulticoreSupport = 'false'"
-          }
-        ]
-      },
-      "fact_sources": {
-        "invalid": [
-          {
-            "source_tag": "da",
-            "evidence": {
-              "kind": "xpath",
-              "tests": [
-                {
-                  "expr": "(count(./*) = 0) and (../OsIfMulticoreSupport = 'true')",
-                  "true": "This list must refer at least one ECUC partition when OsIfMulticoreSupport = 'true'"
-                },
-                {
-                  "expr": "(count(./*) > 0) and (../OsIfMulticoreSupport = 'false')",
-                  "true": "This list must not refer any ECUC partition when OsIfMulticoreSupport = 'false'"
-                }
-              ]
-            }
-          }
-        ]
-      },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current BaseNXP provider.",
-      "dependency": "A descriptor-forward BaseNXP implementation and generality tests are required before exposure."
-    },
-    {
-      "key": "reference:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]/lst[OsIfCounterConfig]/ctr[OsIfCounterConfig]/ref[OsIfCounterEcucPartitionRef]",
-      "kind": "reference",
-      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]/lst[OsIfCounterConfig]/ctr[OsIfCounterConfig]/ref[OsIfCounterEcucPartitionRef]",
-      "name": "OsIfCounterEcucPartitionRef",
-      "type": "REFERENCE",
-      "invalid": {
-        "kind": "xpath",
-        "tests": [
-          {
-            "expr": "node:refvalid(.)",
-            "false": "Invalid or empty reference."
-          },
-          {
-            "expr": "node:containsValue(../../../OsIfEcucPartitionRef/*, .)",
-            "false": "The ECUC partition referenced by OsIfCounterEcucPartitionRef shall be a subset of the ECUC partitions referenced by OsIfEcucPartitionRef."
-          },
-          {
-            "expr": "text:uniq(../../*/OsIfCounterEcucPartitionRef, .)",
-            "false": "OsIfCounterEcucPartitionRef must be unique across all OsIf Counters in OsIfCounterConfig (i.e. only one OsIf Counter is allowed per partition)"
-          }
-        ]
-      },
-      "fact_sources": {
-        "invalid": [
-          {
-            "source_tag": "a",
-            "evidence": {
-              "kind": "xpath",
-              "tests": [
-                {
-                  "expr": "node:refvalid(.)",
-                  "false": "Invalid or empty reference."
-                },
-                {
-                  "expr": "node:containsValue(../../../OsIfEcucPartitionRef/*, .)",
-                  "false": "The ECUC partition referenced by OsIfCounterEcucPartitionRef shall be a subset of the ECUC partitions referenced by OsIfEcucPartitionRef."
-                },
-                {
-                  "expr": "text:uniq(../../*/OsIfCounterEcucPartitionRef, .)",
-                  "false": "OsIfCounterEcucPartitionRef must be unique across all OsIf Counters in OsIfCounterConfig (i.e. only one OsIf Counter is allowed per partition)"
-                }
-              ]
-            }
-          }
-        ]
-      },
-      "reference": "ASPathDataOfSchema:/AUTOSAR/EcucDefs/EcuC/EcucPartitionCollection/EcucPartition",
-      "cross_references": [
-        "EcuC"
-      ],
-      "cross_modules": [
-        "EcuC"
-      ],
-      "classification": "derived",
-      "trace": {
-        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_basenxp_set",
-        "inputs": [
-          "intent.payload",
-          "osif.json#/OsIfCounterConfig"
-        ],
-        "tests": [
-          "tests/unit/test_basenxp_apply.py::test_apply_inserts_exactly_one_counter",
-          "tests/unit/test_basenxp_apply.py::test_counter_has_required_children"
-        ]
-      }
-    },
-    {
-      "key": "reference:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]/lst[OsIfCounterConfig]/ctr[OsIfCounterConfig]/ref[OsIfOsCounterRef]",
-      "kind": "reference",
-      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]/lst[OsIfCounterConfig]/ctr[OsIfCounterConfig]/ref[OsIfOsCounterRef]",
-      "name": "OsIfOsCounterRef",
-      "type": "REFERENCE",
-      "invalid": {
-        "kind": "xpath",
-        "tests": [
-          {
-            "expr": "node:refvalid(.)",
-            "false": "Invalid or empty reference."
-          },
-          {
-            "expr": "node:refvalid(.) and not(node:exists(node:ref(.)/OsSecondsPerTick))",
-            "true": "Parameter OsIfOsCounterRef/OsSecondsPerTick is required for counter objects that count timing related information."
-          },
-          {
-            "expr": "node:name(../../../OsIfOperatingSystemType) = 'OsIfAutosarOsType'",
-            "false": "Os Counter can be used only in Autosar OS mode"
-          }
-        ]
-      },
-      "fact_sources": {
-        "invalid": [
-          {
-            "source_tag": "a",
-            "evidence": {
-              "kind": "xpath",
-              "tests": [
-                {
-                  "expr": "node:refvalid(.)",
-                  "false": "Invalid or empty reference."
-                },
-                {
-                  "expr": "node:refvalid(.) and not(node:exists(node:ref(.)/OsSecondsPerTick))",
-                  "true": "Parameter OsIfOsCounterRef/OsSecondsPerTick is required for counter objects that count timing related information."
-                },
-                {
-                  "expr": "node:name(../../../OsIfOperatingSystemType) = 'OsIfAutosarOsType'",
-                  "false": "Os Counter can be used only in Autosar OS mode"
-                }
-              ]
-            }
-          }
-        ]
-      },
-      "reference": "ASPathDataOfSchema:/AUTOSAR/EcucDefs/Os/OsCounter",
-      "cross_references": [
-        "Os"
-      ],
-      "cross_modules": [
-        "Os"
-      ],
-      "classification": "derived",
-      "trace": {
-        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_basenxp_set",
-        "inputs": [
-          "intent.payload",
-          "osif.json#/OsIfCounterConfig"
-        ],
-        "tests": [
-          "tests/unit/test_basenxp_apply.py::test_apply_inserts_exactly_one_counter",
-          "tests/unit/test_basenxp_apply.py::test_counter_has_required_children"
-        ]
-      }
-    },
-    {
-      "key": "reference:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]/lst[OsIfCounterConfig]/ctr[OsIfCounterConfig]/ref[OsIfSystemTimerClockRef]",
-      "kind": "reference",
-      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]/lst[OsIfCounterConfig]/ctr[OsIfCounterConfig]/ref[OsIfSystemTimerClockRef]",
-      "name": "OsIfSystemTimerClockRef",
-      "type": "REFERENCE",
-      "invalid": {
-        "kind": "xpath",
-        "tests": [
-          {
-            "expr": "node:refvalid(.)",
-            "false": "Invalid or empty reference."
-          },
           {
             "expr": "../../../OsIfUseSystemTimer = 'true'",
             "false": "OsIfUseSystemTimer must be enabled first before configuring OsIfSystemTimerClockRef."
@@ -397,39 +212,315 @@
             "false": "OsIfSystemTimerClockRef must be used only in baremetal mode"
           },
           {
-            "expr": "node:exists(../OsIfSystemTimerClockFreq) = 'true'",
-            "true": "OsIfSystemTimerClockFreq must be disabled if using OsIfSystemTimerClockRef"
+            "expr": "node:exists(../OsIfSystemTimerClockRef) = 'true'",
+            "true": "OsIfSystemTimerClockRef must be disabled if using OsIfSystemTimerClockFreq"
           }
         ]
+      }
+    ],
+    "955D636AEA2C0B41557EA07A778B0BC815A9DDDFEE00787DF29CC18B45EB6731": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": "node:refvalid(.)",
+          "false": "Invalid or empty reference."
+        },
+        {
+          "expr": "text:uniq(../*, .)",
+          "false": "The referenced ECUC partition must be unique within the OsIfEcucPartitionRef list."
+        },
+        {
+          "expr": "node:containsValue(as:modconf('Os')[1]/OsApplication/*/OsAppEcucPartitionRef, .)",
+          "false": "The referenced ECUC partition isn't used by any OsApplication (i.e. Os/OsApplication/*/OsAppEcucPartitionRef)"
+        },
+        {
+          "expr": "node:containsValue(../../OsIfCounterConfig/*/OsIfCounterEcucPartitionRef, .)",
+          "false": "The referenced ECUC partition isn't used by any OSIF Counter (i.e. OsIfGeneral/OsIfCounterConfig/*/OsIfCounterEcucPartitionRef)."
+        }
+      ]
+    },
+    "9669DBEF0E1B9A07C80F71D5C0AC61FFA7E3E28C076C6852F341E96FBC1DC7F2": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": "num:i(count(./*)) > node:when((node:value(../OsIfMulticoreSupport) = 'true') and node:exists(as:modconf('EcuC')[1]),                                                         num:i(count(as:modconf('EcuC')[1]/EcucHardware/*/EcucCoreDefinition/*/EcucCoreId)),                                                         num:i(1))",
+          "true": "The number of OsIf Counters cannot exceed the number of available ECU Cores (i.e. #EcuC/EcuHardware/EcucCoreDefinition)"
+        },
+        {
+          "expr": "(node:value(../OsIfMulticoreSupport) = 'false') and ../OsIfUseSystemTimer = 'true' and (num:i(count(./*)) != 1)",
+          "true": "The number of OsIf Counters must be exactly one when System Timer is enabled and multicore is disabled"
+        }
+      ]
+    },
+    "9E9C5E062002EE6DAF0739912EEC1B2A2BCB2EF69AE07FFAC9B920AD72D15AAD": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": "node:refvalid(.)",
+          "false": "Invalid or empty reference."
+        },
+        {
+          "expr": "node:refvalid(.) and not(node:exists(node:ref(.)/OsSecondsPerTick))",
+          "true": "Parameter OsIfOsCounterRef/OsSecondsPerTick is required for counter objects that count timing related information."
+        },
+        {
+          "expr": "node:name(../../../OsIfOperatingSystemType) = 'OsIfAutosarOsType'",
+          "false": "Os Counter can be used only in Autosar OS mode"
+        }
+      ]
+    },
+    "AFEE9A34F2350EF85D3200578A0D22B03F3167721C6F45F18F0FC468092F1FA3": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": "node:value(../../OsIfMulticoreSupport) = 'true' and not(node:exists(./OsIfCounterEcucPartitionRef))",
+          "true": "OsIfCounterEcucPartitionRef must be enabled in multicore environments"
+        },
+        {
+          "expr": "node:name(../../OsIfOperatingSystemType) = 'OsIfAutosarOsType' and not(node:exists(./OsIfOsCounterRef))",
+          "true": "OsIfOsCounterRef must be enabled in Autosar OS mode"
+        },
+        {
+          "expr": "node:name(../../OsIfOperatingSystemType) = 'OsIfBaremetalType' and not(node:exists(./OsIfSystemTimerClockRef) or node:exists(./OsIfSystemTimerClockFreq))",
+          "true": "Either OsIfSystemTimerClockRef or OsIfSystemTimerClockFreq must be enabled in baremetal mode"
+        }
+      ]
+    },
+    "B82ED3DACF37EB454F2395ECEA12CFBD1CDDF16C0B2ECB4BBBE2A6F2A06BD075": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": "<=4294967295"
+        },
+        {
+          "expr": ">=0"
+        }
+      ]
+    },
+    "C2EF64531BE946E77DB8223ADDC9D2FC0D592BED88578FD1D6924F3BE73A9A87": {
+      "kind": "literal",
+      "value": "0"
+    },
+    "CA11DEDFC681DCD82411902D7993093C4381D3F61F1875BC10DCCB5BE5134BCB": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": ">=4"
+        },
+        {
+          "expr": "<=4"
+        }
+      ]
+    },
+    "D171CBC3328FC937AED731FE4807FA32DD9C6F9750D519BCFA3D9037C244A425": {
+      "kind": "literal",
+      "value": "AUTOMATE"
+    },
+    "D215942104611DDC5C9A3777EA29B48E729F29772E87B9949EE162F579D9DC71": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": "node:current()='true' and contains(node:value(as:modconf('Resource')[1]/ResourceGeneral/ResourceSubderivative), 's32k11')",
+          "true": "The OsIf_Software_Semaphore feature is not supported for CPU coretex M0/M0 plus. It should be disabled."
+        }
+      ]
+    },
+    "D9E49251055BB744B29FF8F461AEB3F1FD10A5BE006C21E7B84CAE8952386EF1": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": ">=43"
+        },
+        {
+          "expr": "<=43"
+        }
+      ]
+    },
+    "DA580CA6583563B83917FD2BAA430DA036521AFC4EEF4C65EB8F4C0ED38F56B2": {
+      "kind": "literal",
+      "value": "48000000"
+    },
+    "DB44DAB70655E75BCFC72524C17D9DB6FC999888E8E0E34776C5B36C0F1A4949": {
+      "kind": "literal",
+      "values": [
+        "VariantPreCompile"
+      ]
+    },
+    "F5B1D6C6A1B832E25C1DBE7BE02B38DCEB154CB5102145589DCC31423FFD8D06": {
+      "kind": "literal",
+      "value": "9"
+    },
+    "FF167184B38369D71CB01E34B30A42503147A332B3802D6E917EABE13CE09C50": {
+      "kind": "xpath",
+      "tests": [
+        {
+          "expr": ">=9"
+        },
+        {
+          "expr": "<=9"
+        }
+      ]
+    }
+  },
+  "items": [
+    {
+      "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]",
+      "kind": "container",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]",
+      "name": "CommonPublishedInformation",
+      "type": "IDENTIFIABLE"
+    },
+    {
+      "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]",
+      "kind": "container",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]",
+      "name": "OsIfGeneral",
+      "type": "IDENTIFIABLE"
+    },
+    {
+      "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]/chc[OsIfOperatingSystemType]/ctr[OsIfAutosarOsType]",
+      "kind": "container",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]/chc[OsIfOperatingSystemType]/ctr[OsIfAutosarOsType]",
+      "name": "OsIfAutosarOsType",
+      "type": "IDENTIFIABLE"
+    },
+    {
+      "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]/chc[OsIfOperatingSystemType]/ctr[OsIfBaremetalType]",
+      "kind": "container",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]/chc[OsIfOperatingSystemType]/ctr[OsIfBaremetalType]",
+      "name": "OsIfBaremetalType",
+      "type": "IDENTIFIABLE"
+    },
+    {
+      "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]/chc[OsIfOperatingSystemType]/ctr[OsIfFreeRtosType]",
+      "kind": "container",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]/chc[OsIfOperatingSystemType]/ctr[OsIfFreeRtosType]",
+      "name": "OsIfFreeRtosType",
+      "type": "IDENTIFIABLE"
+    },
+    {
+      "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]/chc[OsIfOperatingSystemType]/ctr[OsIfZephyrOsType]",
+      "kind": "container",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]/chc[OsIfOperatingSystemType]/ctr[OsIfZephyrOsType]",
+      "name": "OsIfZephyrOsType",
+      "type": "IDENTIFIABLE"
+    },
+    {
+      "key": "container:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]/lst[OsIfCounterConfig]/ctr[OsIfCounterConfig]",
+      "kind": "container",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]/lst[OsIfCounterConfig]/ctr[OsIfCounterConfig]",
+      "name": "OsIfCounterConfig",
+      "type": "IDENTIFIABLE",
+      "facts": {
+        "invalid": "AFEE9A34F2350EF85D3200578A0D22B03F3167721C6F45F18F0FC468092F1FA3"
       },
       "fact_sources": {
         "invalid": [
           {
             "source_tag": "a",
-            "evidence": {
-              "kind": "xpath",
-              "tests": [
-                {
-                  "expr": "node:refvalid(.)",
-                  "false": "Invalid or empty reference."
-                },
-                {
-                  "expr": "../../../OsIfUseSystemTimer = 'true'",
-                  "false": "OsIfUseSystemTimer must be enabled first before configuring OsIfSystemTimerClockRef."
-                },
-                {
-                  "expr": "node:name(../../../OsIfOperatingSystemType) = 'OsIfBaremetalType'",
-                  "false": "OsIfSystemTimerClockRef must be used only in baremetal mode"
-                },
-                {
-                  "expr": "node:exists(../OsIfSystemTimerClockFreq) = 'true'",
-                  "true": "OsIfSystemTimerClockFreq must be disabled if using OsIfSystemTimerClockRef"
-                }
-              ]
-            }
+            "fact": "AFEE9A34F2350EF85D3200578A0D22B03F3167721C6F45F18F0FC468092F1FA3"
           }
         ]
+      }
+    },
+    {
+      "key": "list:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]/lst[OsIfCounterConfig]",
+      "kind": "list",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]/lst[OsIfCounterConfig]",
+      "name": "OsIfCounterConfig",
+      "type": "MAP",
+      "facts": {
+        "invalid": "9669DBEF0E1B9A07C80F71D5C0AC61FFA7E3E28C076C6852F341E96FBC1DC7F2",
+        "min": "C2EF64531BE946E77DB8223ADDC9D2FC0D592BED88578FD1D6924F3BE73A9A87"
       },
+      "fact_sources": {
+        "invalid": [
+          {
+            "source_tag": "da",
+            "fact": "9669DBEF0E1B9A07C80F71D5C0AC61FFA7E3E28C076C6852F341E96FBC1DC7F2"
+          }
+        ],
+        "min": [
+          {
+            "source_tag": "da",
+            "fact": "C2EF64531BE946E77DB8223ADDC9D2FC0D592BED88578FD1D6924F3BE73A9A87"
+          }
+        ]
+      }
+    },
+    {
+      "key": "list:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]/lst[OsIfEcucPartitionRef]",
+      "kind": "list",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]/lst[OsIfEcucPartitionRef]",
+      "name": "OsIfEcucPartitionRef",
+      "facts": {
+        "invalid": "11C3F0314EF5130B087D7B112B329EE7CE6E48A3161DCEDF9EF938392CDEFE01"
+      },
+      "fact_sources": {
+        "invalid": [
+          {
+            "source_tag": "da",
+            "fact": "11C3F0314EF5130B087D7B112B329EE7CE6E48A3161DCEDF9EF938392CDEFE01"
+          }
+        ]
+      }
+    },
+    {
+      "key": "reference:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]/lst[OsIfCounterConfig]/ctr[OsIfCounterConfig]/ref[OsIfCounterEcucPartitionRef]",
+      "kind": "reference",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]/lst[OsIfCounterConfig]/ctr[OsIfCounterConfig]/ref[OsIfCounterEcucPartitionRef]",
+      "name": "OsIfCounterEcucPartitionRef",
+      "type": "REFERENCE",
+      "reference": "ASPathDataOfSchema:/AUTOSAR/EcucDefs/EcuC/EcucPartitionCollection/EcucPartition",
+      "cross_references": [
+        "EcuC"
+      ],
+      "cross_modules": [
+        "EcuC"
+      ],
+      "facts": {
+        "invalid": "46EFE59999D4420A2C6315A6C5527D727876B1E227BFFA3414A432DDBA9C39AF"
+      },
+      "fact_sources": {
+        "invalid": [
+          {
+            "source_tag": "a",
+            "fact": "46EFE59999D4420A2C6315A6C5527D727876B1E227BFFA3414A432DDBA9C39AF"
+          }
+        ]
+      }
+    },
+    {
+      "key": "reference:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]/lst[OsIfCounterConfig]/ctr[OsIfCounterConfig]/ref[OsIfOsCounterRef]",
+      "kind": "reference",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]/lst[OsIfCounterConfig]/ctr[OsIfCounterConfig]/ref[OsIfOsCounterRef]",
+      "name": "OsIfOsCounterRef",
+      "type": "REFERENCE",
+      "reference": "ASPathDataOfSchema:/AUTOSAR/EcucDefs/Os/OsCounter",
+      "cross_references": [
+        "Os"
+      ],
+      "cross_modules": [
+        "Os"
+      ],
+      "facts": {
+        "invalid": "9E9C5E062002EE6DAF0739912EEC1B2A2BCB2EF69AE07FFAC9B920AD72D15AAD"
+      },
+      "fact_sources": {
+        "invalid": [
+          {
+            "source_tag": "a",
+            "fact": "9E9C5E062002EE6DAF0739912EEC1B2A2BCB2EF69AE07FFAC9B920AD72D15AAD"
+          }
+        ]
+      }
+    },
+    {
+      "key": "reference:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]/lst[OsIfCounterConfig]/ctr[OsIfCounterConfig]/ref[OsIfSystemTimerClockRef]",
+      "kind": "reference",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]/lst[OsIfCounterConfig]/ctr[OsIfCounterConfig]/ref[OsIfSystemTimerClockRef]",
+      "name": "OsIfSystemTimerClockRef",
+      "type": "REFERENCE",
       "reference": "ASPathDataOfSchema:/AUTOSAR/EcucDefs/Mcu/McuModuleConfiguration/McuClockSettingConfig/McuClockReferencePoint",
       "cross_references": [
         "Mcu"
@@ -437,16 +528,15 @@
       "cross_modules": [
         "Mcu"
       ],
-      "classification": "derived",
-      "trace": {
-        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_basenxp_set",
-        "inputs": [
-          "intent.payload",
-          "osif.json#/OsIfCounterConfig"
-        ],
-        "tests": [
-          "tests/unit/test_basenxp_apply.py::test_apply_inserts_exactly_one_counter",
-          "tests/unit/test_basenxp_apply.py::test_counter_has_required_children"
+      "facts": {
+        "invalid": "0CEA8C3D1E116FCA53AB9F750D22DD85A68CB0FF81AE0B7086684876EA09D73E"
+      },
+      "fact_sources": {
+        "invalid": [
+          {
+            "source_tag": "a",
+            "fact": "0CEA8C3D1E116FCA53AB9F750D22DD85A68CB0FF81AE0B7086684876EA09D73E"
+          }
         ]
       }
     },
@@ -456,55 +546,6 @@
       "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]/lst[OsIfEcucPartitionRef]/ref[OsIfEcucPartitionRef]",
       "name": "OsIfEcucPartitionRef",
       "type": "REFERENCE",
-      "invalid": {
-        "kind": "xpath",
-        "tests": [
-          {
-            "expr": "node:refvalid(.)",
-            "false": "Invalid or empty reference."
-          },
-          {
-            "expr": "text:uniq(../*, .)",
-            "false": "The referenced ECUC partition must be unique within the OsIfEcucPartitionRef list."
-          },
-          {
-            "expr": "node:containsValue(as:modconf('Os')[1]/OsApplication/*/OsAppEcucPartitionRef, .)",
-            "false": "The referenced ECUC partition isn't used by any OsApplication (i.e. Os/OsApplication/*/OsAppEcucPartitionRef)"
-          },
-          {
-            "expr": "node:containsValue(../../OsIfCounterConfig/*/OsIfCounterEcucPartitionRef, .)",
-            "false": "The referenced ECUC partition isn't used by any OSIF Counter (i.e. OsIfGeneral/OsIfCounterConfig/*/OsIfCounterEcucPartitionRef)."
-          }
-        ]
-      },
-      "fact_sources": {
-        "invalid": [
-          {
-            "source_tag": "a",
-            "evidence": {
-              "kind": "xpath",
-              "tests": [
-                {
-                  "expr": "node:refvalid(.)",
-                  "false": "Invalid or empty reference."
-                },
-                {
-                  "expr": "text:uniq(../*, .)",
-                  "false": "The referenced ECUC partition must be unique within the OsIfEcucPartitionRef list."
-                },
-                {
-                  "expr": "node:containsValue(as:modconf('Os')[1]/OsApplication/*/OsAppEcucPartitionRef, .)",
-                  "false": "The referenced ECUC partition isn't used by any OsApplication (i.e. Os/OsApplication/*/OsAppEcucPartitionRef)"
-                },
-                {
-                  "expr": "node:containsValue(../../OsIfCounterConfig/*/OsIfCounterEcucPartitionRef, .)",
-                  "false": "The referenced ECUC partition isn't used by any OSIF Counter (i.e. OsIfGeneral/OsIfCounterConfig/*/OsIfCounterEcucPartitionRef)."
-                }
-              ]
-            }
-          }
-        ]
-      },
       "reference": "ASPathDataOfSchema:/AUTOSAR/EcucDefs/EcuC/EcucPartitionCollection/EcucPartition",
       "cross_references": [
         "EcuC"
@@ -512,9 +553,17 @@
       "cross_modules": [
         "EcuC"
       ],
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current BaseNXP provider.",
-      "dependency": "A descriptor-forward BaseNXP implementation and generality tests are required before exposure."
+      "facts": {
+        "invalid": "955D636AEA2C0B41557EA07A778B0BC815A9DDDFEE00787DF29CC18B45EB6731"
+      },
+      "fact_sources": {
+        "invalid": [
+          {
+            "source_tag": "a",
+            "fact": "955D636AEA2C0B41557EA07A778B0BC815A9DDDFEE00787DF29CC18B45EB6731"
+          }
+        ]
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[ArReleaseMajorVersion]",
@@ -522,51 +571,24 @@
       "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[ArReleaseMajorVersion]",
       "name": "ArReleaseMajorVersion",
       "type": "INTEGER_LABEL",
-      "default": {
-        "kind": "literal",
-        "value": "4"
-      },
-      "invalid": {
-        "kind": "xpath",
-        "tests": [
-          {
-            "expr": ">=4"
-          },
-          {
-            "expr": "<=4"
-          }
-        ]
+      "facts": {
+        "default": "793DC38E4AA4AA0AFFABF64C74974CCC5FB1DD1E02B24AC473D2D80968D3FF9A",
+        "invalid": "CA11DEDFC681DCD82411902D7993093C4381D3F61F1875BC10DCCB5BE5134BCB"
       },
       "fact_sources": {
         "default": [
           {
             "source_tag": "da",
-            "evidence": {
-              "kind": "literal",
-              "value": "4"
-            }
+            "fact": "793DC38E4AA4AA0AFFABF64C74974CCC5FB1DD1E02B24AC473D2D80968D3FF9A"
           }
         ],
         "invalid": [
           {
             "source_tag": "da",
-            "evidence": {
-              "kind": "xpath",
-              "tests": [
-                {
-                  "expr": ">=4"
-                },
-                {
-                  "expr": "<=4"
-                }
-              ]
-            }
+            "fact": "CA11DEDFC681DCD82411902D7993093C4381D3F61F1875BC10DCCB5BE5134BCB"
           }
         ]
-      },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current BaseNXP provider.",
-      "dependency": "A descriptor-forward BaseNXP implementation and generality tests are required before exposure."
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[ArReleaseMinorVersion]",
@@ -574,51 +596,24 @@
       "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[ArReleaseMinorVersion]",
       "name": "ArReleaseMinorVersion",
       "type": "INTEGER_LABEL",
-      "default": {
-        "kind": "literal",
-        "value": "9"
-      },
-      "invalid": {
-        "kind": "xpath",
-        "tests": [
-          {
-            "expr": ">=9"
-          },
-          {
-            "expr": "<=9"
-          }
-        ]
+      "facts": {
+        "default": "F5B1D6C6A1B832E25C1DBE7BE02B38DCEB154CB5102145589DCC31423FFD8D06",
+        "invalid": "FF167184B38369D71CB01E34B30A42503147A332B3802D6E917EABE13CE09C50"
       },
       "fact_sources": {
         "default": [
           {
             "source_tag": "da",
-            "evidence": {
-              "kind": "literal",
-              "value": "9"
-            }
+            "fact": "F5B1D6C6A1B832E25C1DBE7BE02B38DCEB154CB5102145589DCC31423FFD8D06"
           }
         ],
         "invalid": [
           {
             "source_tag": "da",
-            "evidence": {
-              "kind": "xpath",
-              "tests": [
-                {
-                  "expr": ">=9"
-                },
-                {
-                  "expr": "<=9"
-                }
-              ]
-            }
+            "fact": "FF167184B38369D71CB01E34B30A42503147A332B3802D6E917EABE13CE09C50"
           }
         ]
-      },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current BaseNXP provider.",
-      "dependency": "A descriptor-forward BaseNXP implementation and generality tests are required before exposure."
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[ArReleaseRevisionVersion]",
@@ -626,51 +621,24 @@
       "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[ArReleaseRevisionVersion]",
       "name": "ArReleaseRevisionVersion",
       "type": "INTEGER_LABEL",
-      "default": {
-        "kind": "literal",
-        "value": "0"
-      },
-      "invalid": {
-        "kind": "xpath",
-        "tests": [
-          {
-            "expr": ">=0"
-          },
-          {
-            "expr": "<=0"
-          }
-        ]
+      "facts": {
+        "default": "C2EF64531BE946E77DB8223ADDC9D2FC0D592BED88578FD1D6924F3BE73A9A87",
+        "invalid": "57FEFDB3C23C6FB56D7FF5B08698CB5A6F45C1400B39FC2DDDFBCBCDA3A564C8"
       },
       "fact_sources": {
         "default": [
           {
             "source_tag": "da",
-            "evidence": {
-              "kind": "literal",
-              "value": "0"
-            }
+            "fact": "C2EF64531BE946E77DB8223ADDC9D2FC0D592BED88578FD1D6924F3BE73A9A87"
           }
         ],
         "invalid": [
           {
             "source_tag": "da",
-            "evidence": {
-              "kind": "xpath",
-              "tests": [
-                {
-                  "expr": ">=0"
-                },
-                {
-                  "expr": "<=0"
-                }
-              ]
-            }
+            "fact": "57FEFDB3C23C6FB56D7FF5B08698CB5A6F45C1400B39FC2DDDFBCBCDA3A564C8"
           }
         ]
-      },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current BaseNXP provider.",
-      "dependency": "A descriptor-forward BaseNXP implementation and generality tests are required before exposure."
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[ModuleId]",
@@ -678,51 +646,24 @@
       "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[ModuleId]",
       "name": "ModuleId",
       "type": "INTEGER_LABEL",
-      "default": {
-        "kind": "literal",
-        "value": "0"
-      },
-      "invalid": {
-        "kind": "xpath",
-        "tests": [
-          {
-            "expr": ">=0"
-          },
-          {
-            "expr": "<=0"
-          }
-        ]
+      "facts": {
+        "default": "C2EF64531BE946E77DB8223ADDC9D2FC0D592BED88578FD1D6924F3BE73A9A87",
+        "invalid": "57FEFDB3C23C6FB56D7FF5B08698CB5A6F45C1400B39FC2DDDFBCBCDA3A564C8"
       },
       "fact_sources": {
         "default": [
           {
             "source_tag": "da",
-            "evidence": {
-              "kind": "literal",
-              "value": "0"
-            }
+            "fact": "C2EF64531BE946E77DB8223ADDC9D2FC0D592BED88578FD1D6924F3BE73A9A87"
           }
         ],
         "invalid": [
           {
             "source_tag": "da",
-            "evidence": {
-              "kind": "xpath",
-              "tests": [
-                {
-                  "expr": ">=0"
-                },
-                {
-                  "expr": "<=0"
-                }
-              ]
-            }
+            "fact": "57FEFDB3C23C6FB56D7FF5B08698CB5A6F45C1400B39FC2DDDFBCBCDA3A564C8"
           }
         ]
-      },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current BaseNXP provider.",
-      "dependency": "A descriptor-forward BaseNXP implementation and generality tests are required before exposure."
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[SwMajorVersion]",
@@ -730,51 +671,24 @@
       "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[SwMajorVersion]",
       "name": "SwMajorVersion",
       "type": "INTEGER_LABEL",
-      "default": {
-        "kind": "literal",
-        "value": "7"
-      },
-      "invalid": {
-        "kind": "xpath",
-        "tests": [
-          {
-            "expr": ">=7"
-          },
-          {
-            "expr": "<=7"
-          }
-        ]
+      "facts": {
+        "default": "48A3A71A2F24BECC708DC90F9A9A59AAF768FD2F1D7493039A2053CE77C66037",
+        "invalid": "5EC346F423AA2A472541C1522F45DC7ECA1DD02F9DEC938974CF325ABF603595"
       },
       "fact_sources": {
         "default": [
           {
             "source_tag": "da",
-            "evidence": {
-              "kind": "literal",
-              "value": "7"
-            }
+            "fact": "48A3A71A2F24BECC708DC90F9A9A59AAF768FD2F1D7493039A2053CE77C66037"
           }
         ],
         "invalid": [
           {
             "source_tag": "da",
-            "evidence": {
-              "kind": "xpath",
-              "tests": [
-                {
-                  "expr": ">=7"
-                },
-                {
-                  "expr": "<=7"
-                }
-              ]
-            }
+            "fact": "5EC346F423AA2A472541C1522F45DC7ECA1DD02F9DEC938974CF325ABF603595"
           }
         ]
-      },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current BaseNXP provider.",
-      "dependency": "A descriptor-forward BaseNXP implementation and generality tests are required before exposure."
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[SwMinorVersion]",
@@ -782,51 +696,24 @@
       "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[SwMinorVersion]",
       "name": "SwMinorVersion",
       "type": "INTEGER_LABEL",
-      "default": {
-        "kind": "literal",
-        "value": "0"
-      },
-      "invalid": {
-        "kind": "xpath",
-        "tests": [
-          {
-            "expr": ">=0"
-          },
-          {
-            "expr": "<=0"
-          }
-        ]
+      "facts": {
+        "default": "C2EF64531BE946E77DB8223ADDC9D2FC0D592BED88578FD1D6924F3BE73A9A87",
+        "invalid": "57FEFDB3C23C6FB56D7FF5B08698CB5A6F45C1400B39FC2DDDFBCBCDA3A564C8"
       },
       "fact_sources": {
         "default": [
           {
             "source_tag": "da",
-            "evidence": {
-              "kind": "literal",
-              "value": "0"
-            }
+            "fact": "C2EF64531BE946E77DB8223ADDC9D2FC0D592BED88578FD1D6924F3BE73A9A87"
           }
         ],
         "invalid": [
           {
             "source_tag": "da",
-            "evidence": {
-              "kind": "xpath",
-              "tests": [
-                {
-                  "expr": ">=0"
-                },
-                {
-                  "expr": "<=0"
-                }
-              ]
-            }
+            "fact": "57FEFDB3C23C6FB56D7FF5B08698CB5A6F45C1400B39FC2DDDFBCBCDA3A564C8"
           }
         ]
-      },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current BaseNXP provider.",
-      "dependency": "A descriptor-forward BaseNXP implementation and generality tests are required before exposure."
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[SwPatchVersion]",
@@ -834,51 +721,24 @@
       "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[SwPatchVersion]",
       "name": "SwPatchVersion",
       "type": "INTEGER_LABEL",
-      "default": {
-        "kind": "literal",
-        "value": "1"
-      },
-      "invalid": {
-        "kind": "xpath",
-        "tests": [
-          {
-            "expr": ">=1"
-          },
-          {
-            "expr": "<=1"
-          }
-        ]
+      "facts": {
+        "default": "43407099A21A756F993FE61B28AC2C68141E88A19DCFC14D85379A163B3EF27B",
+        "invalid": "456153ABD25FBF6B71B13344F9DC4C31D9D1B02CA30B1B5DA4CECB7AE00B872C"
       },
       "fact_sources": {
         "default": [
           {
             "source_tag": "da",
-            "evidence": {
-              "kind": "literal",
-              "value": "1"
-            }
+            "fact": "43407099A21A756F993FE61B28AC2C68141E88A19DCFC14D85379A163B3EF27B"
           }
         ],
         "invalid": [
           {
             "source_tag": "da",
-            "evidence": {
-              "kind": "xpath",
-              "tests": [
-                {
-                  "expr": ">=1"
-                },
-                {
-                  "expr": "<=1"
-                }
-              ]
-            }
+            "fact": "456153ABD25FBF6B71B13344F9DC4C31D9D1B02CA30B1B5DA4CECB7AE00B872C"
           }
         ]
-      },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current BaseNXP provider.",
-      "dependency": "A descriptor-forward BaseNXP implementation and generality tests are required before exposure."
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[VendorApiInfix]",
@@ -886,37 +746,24 @@
       "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[VendorApiInfix]",
       "name": "VendorApiInfix",
       "type": "STRING_LABEL",
-      "default": {
-        "kind": "literal",
-        "value": ""
-      },
-      "readonly": {
-        "kind": "literal",
-        "value": "true"
+      "facts": {
+        "default": "40EEB44BE3DC18EC1CB58865D7B89AC993FADDD1A4FCF37DD0485A54BE3F7D55",
+        "readonly": "53E30AC20DEF236DC54F0F0301FA3050D4FAD7E07F9B9EC2BD3BB8CD0331FB0E"
       },
       "fact_sources": {
         "default": [
           {
             "source_tag": "da",
-            "evidence": {
-              "kind": "literal",
-              "value": ""
-            }
+            "fact": "40EEB44BE3DC18EC1CB58865D7B89AC993FADDD1A4FCF37DD0485A54BE3F7D55"
           }
         ],
         "readonly": [
           {
             "source_tag": "da",
-            "evidence": {
-              "kind": "literal",
-              "value": "true"
-            }
+            "fact": "53E30AC20DEF236DC54F0F0301FA3050D4FAD7E07F9B9EC2BD3BB8CD0331FB0E"
           }
         ]
-      },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current BaseNXP provider.",
-      "dependency": "A descriptor-forward BaseNXP implementation and generality tests are required before exposure."
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[VendorId]",
@@ -924,51 +771,24 @@
       "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[CommonPublishedInformation]/var[VendorId]",
       "name": "VendorId",
       "type": "INTEGER_LABEL",
-      "default": {
-        "kind": "literal",
-        "value": "43"
-      },
-      "invalid": {
-        "kind": "xpath",
-        "tests": [
-          {
-            "expr": ">=43"
-          },
-          {
-            "expr": "<=43"
-          }
-        ]
+      "facts": {
+        "default": "5711C942F04FB4BD2435CF46C4EDBBACFA9967F94265C74F3378BBDB64C1606B",
+        "invalid": "D9E49251055BB744B29FF8F461AEB3F1FD10A5BE006C21E7B84CAE8952386EF1"
       },
       "fact_sources": {
         "default": [
           {
             "source_tag": "da",
-            "evidence": {
-              "kind": "literal",
-              "value": "43"
-            }
+            "fact": "5711C942F04FB4BD2435CF46C4EDBBACFA9967F94265C74F3378BBDB64C1606B"
           }
         ],
         "invalid": [
           {
             "source_tag": "da",
-            "evidence": {
-              "kind": "xpath",
-              "tests": [
-                {
-                  "expr": ">=43"
-                },
-                {
-                  "expr": "<=43"
-                }
-              ]
-            }
+            "fact": "D9E49251055BB744B29FF8F461AEB3F1FD10A5BE006C21E7B84CAE8952386EF1"
           }
         ]
-      },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current BaseNXP provider.",
-      "dependency": "A descriptor-forward BaseNXP implementation and generality tests are required before exposure."
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]/lst[OsIfCounterConfig]/ctr[OsIfCounterConfig]/var[OsIfSystemTimerClockFreq]",
@@ -976,99 +796,26 @@
       "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]/lst[OsIfCounterConfig]/ctr[OsIfCounterConfig]/var[OsIfSystemTimerClockFreq]",
       "name": "OsIfSystemTimerClockFreq",
       "type": "INTEGER",
-      "default": {
-        "kind": "literal",
-        "value": "48000000"
+      "facts": {
+        "default": "DA580CA6583563B83917FD2BAA430DA036521AFC4EEF4C65EB8F4C0ED38F56B2",
+        "invalid": "9121B26DF1DBE3EC0C2D8671DB000E3E8A25230264396C1F039C2BE5B5CE6D94"
       },
-      "invalid": [
-        {
-          "source_tag": "da",
-          "kind": "xpath",
-          "tests": [
-            {
-              "expr": "<=4294967295"
-            },
-            {
-              "expr": ">=0"
-            }
-          ]
-        },
-        {
-          "source_tag": "a",
-          "kind": "xpath",
-          "tests": [
-            {
-              "expr": "../../../OsIfUseSystemTimer = 'true'",
-              "false": "OsIfUseSystemTimer must be enabled first before configuring OsIfSystemTimerClockRef."
-            },
-            {
-              "expr": "node:name(../../../OsIfOperatingSystemType) = 'OsIfBaremetalType'",
-              "false": "OsIfSystemTimerClockRef must be used only in baremetal mode"
-            },
-            {
-              "expr": "node:exists(../OsIfSystemTimerClockRef) = 'true'",
-              "true": "OsIfSystemTimerClockRef must be disabled if using OsIfSystemTimerClockFreq"
-            }
-          ]
-        }
-      ],
       "fact_sources": {
         "default": [
           {
             "source_tag": "da",
-            "evidence": {
-              "kind": "literal",
-              "value": "48000000"
-            }
+            "fact": "DA580CA6583563B83917FD2BAA430DA036521AFC4EEF4C65EB8F4C0ED38F56B2"
           }
         ],
         "invalid": [
           {
             "source_tag": "da",
-            "evidence": {
-              "kind": "xpath",
-              "tests": [
-                {
-                  "expr": "<=4294967295"
-                },
-                {
-                  "expr": ">=0"
-                }
-              ]
-            }
+            "fact": "B82ED3DACF37EB454F2395ECEA12CFBD1CDDF16C0B2ECB4BBBE2A6F2A06BD075"
           },
           {
             "source_tag": "a",
-            "evidence": {
-              "kind": "xpath",
-              "tests": [
-                {
-                  "expr": "../../../OsIfUseSystemTimer = 'true'",
-                  "false": "OsIfUseSystemTimer must be enabled first before configuring OsIfSystemTimerClockRef."
-                },
-                {
-                  "expr": "node:name(../../../OsIfOperatingSystemType) = 'OsIfBaremetalType'",
-                  "false": "OsIfSystemTimerClockRef must be used only in baremetal mode"
-                },
-                {
-                  "expr": "node:exists(../OsIfSystemTimerClockRef) = 'true'",
-                  "true": "OsIfSystemTimerClockRef must be disabled if using OsIfSystemTimerClockFreq"
-                }
-              ]
-            }
+            "fact": "2F0CB7023F16E37195E645DB8DFCF7AF17974B99A55D4403FB8C22FEF149ED25"
           }
-        ]
-      },
-      "classification": "derived",
-      "trace": {
-        "derivation": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_basenxp_set",
-        "inputs": [
-          "intent.payload",
-          "osif.json#/OsIfCounterConfig"
-        ],
-        "tests": [
-          "tests/unit/test_basenxp_apply.py::test_apply_inserts_exactly_one_counter",
-          "tests/unit/test_basenxp_apply.py::test_counter_has_required_children"
         ]
       }
     },
@@ -1078,28 +825,15 @@
       "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]/var[OsIfDevErrorDetect]",
       "name": "OsIfDevErrorDetect",
       "type": "BOOLEAN",
-      "default": {
-        "kind": "literal",
-        "value": "false"
+      "facts": {
+        "default": "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F"
       },
       "fact_sources": {
         "default": [
           {
             "source_tag": "da",
-            "evidence": {
-              "kind": "literal",
-              "value": "false"
-            }
+            "fact": "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F"
           }
-        ]
-      },
-      "classification": "configurable",
-      "trace": {
-        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/basenxp.py:BaseNxpProvider",
-        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_basenxp_set",
-        "asset": "autombd-rtd/assets/nxp/s32k3/basenxp/osif.json#/OsIfGeneral",
-        "tests": [
-          "tests/unit/test_basenxp_apply.py::test_apply_sets_arbitrary_valid_osif_general_values"
         ]
       }
     },
@@ -1109,28 +843,15 @@
       "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]/var[OsIfEnableUserModeSupport]",
       "name": "OsIfEnableUserModeSupport",
       "type": "BOOLEAN",
-      "default": {
-        "kind": "literal",
-        "value": "false"
+      "facts": {
+        "default": "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F"
       },
       "fact_sources": {
         "default": [
           {
             "source_tag": "da",
-            "evidence": {
-              "kind": "literal",
-              "value": "false"
-            }
+            "fact": "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F"
           }
-        ]
-      },
-      "classification": "configurable",
-      "trace": {
-        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/basenxp.py:BaseNxpProvider",
-        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_basenxp_set",
-        "asset": "autombd-rtd/assets/nxp/s32k3/basenxp/osif.json#/OsIfGeneral",
-        "tests": [
-          "tests/unit/test_basenxp_apply.py::test_apply_sets_arbitrary_valid_osif_general_values"
         ]
       }
     },
@@ -1140,28 +861,15 @@
       "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]/var[OsIfGetPhysicalCoreIdEnable]",
       "name": "OsIfGetPhysicalCoreIdEnable",
       "type": "BOOLEAN",
-      "default": {
-        "kind": "literal",
-        "value": "false"
+      "facts": {
+        "default": "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F"
       },
       "fact_sources": {
         "default": [
           {
             "source_tag": "da",
-            "evidence": {
-              "kind": "literal",
-              "value": "false"
-            }
+            "fact": "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F"
           }
-        ]
-      },
-      "classification": "configurable",
-      "trace": {
-        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/basenxp.py:BaseNxpProvider",
-        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_basenxp_set",
-        "asset": "autombd-rtd/assets/nxp/s32k3/basenxp/osif.json#/OsIfGeneral",
-        "tests": [
-          "tests/unit/test_basenxp_apply.py::test_apply_sets_arbitrary_valid_osif_general_values"
         ]
       }
     },
@@ -1171,55 +879,22 @@
       "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]/var[OsIfInstanceId]",
       "name": "OsIfInstanceId",
       "type": "INTEGER",
-      "default": {
-        "kind": "literal",
-        "value": "0"
-      },
-      "invalid": {
-        "kind": "xpath",
-        "tests": [
-          {
-            "expr": "<=255"
-          },
-          {
-            "expr": ">=0"
-          }
-        ]
+      "facts": {
+        "default": "C2EF64531BE946E77DB8223ADDC9D2FC0D592BED88578FD1D6924F3BE73A9A87",
+        "invalid": "4170B9373C8DC18DF2B086A9CA07F47AA6EFF4BDE870CAF59DFA7B7F8026F227"
       },
       "fact_sources": {
         "default": [
           {
             "source_tag": "da",
-            "evidence": {
-              "kind": "literal",
-              "value": "0"
-            }
+            "fact": "C2EF64531BE946E77DB8223ADDC9D2FC0D592BED88578FD1D6924F3BE73A9A87"
           }
         ],
         "invalid": [
           {
             "source_tag": "da",
-            "evidence": {
-              "kind": "xpath",
-              "tests": [
-                {
-                  "expr": "<=255"
-                },
-                {
-                  "expr": ">=0"
-                }
-              ]
-            }
+            "fact": "4170B9373C8DC18DF2B086A9CA07F47AA6EFF4BDE870CAF59DFA7B7F8026F227"
           }
-        ]
-      },
-      "classification": "configurable",
-      "trace": {
-        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/basenxp.py:BaseNxpProvider",
-        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_basenxp_set",
-        "asset": "autombd-rtd/assets/nxp/s32k3/basenxp/osif.json#/OsIfGeneral",
-        "tests": [
-          "tests/unit/test_basenxp_apply.py::test_apply_sets_arbitrary_valid_osif_general_values"
         ]
       }
     },
@@ -1229,24 +904,17 @@
       "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]/var[OsIfMulticoreSupport]",
       "name": "OsIfMulticoreSupport",
       "type": "BOOLEAN",
-      "default": {
-        "kind": "literal",
-        "value": "false"
+      "facts": {
+        "default": "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F"
       },
       "fact_sources": {
         "default": [
           {
             "source_tag": "da",
-            "evidence": {
-              "kind": "literal",
-              "value": "false"
-            }
+            "fact": "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F"
           }
         ]
-      },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current BaseNXP provider.",
-      "dependency": "A descriptor-forward BaseNXP implementation and generality tests are required before exposure."
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]/var[OsIfPhysicalCoreId]",
@@ -1254,54 +922,31 @@
       "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]/var[OsIfPhysicalCoreId]",
       "name": "OsIfPhysicalCoreId",
       "type": "ENUMERATION",
-      "default": {
-        "kind": "literal",
-        "value": "AUTOMATE"
-      },
-      "range": {
-        "kind": "literal",
-        "values": [
-          "AUTOMATE"
-        ]
-      },
-      "readonly": {
-        "kind": "literal",
-        "value": "true"
+      "facts": {
+        "default": "D171CBC3328FC937AED731FE4807FA32DD9C6F9750D519BCFA3D9037C244A425",
+        "range": "4BE25DFF5A1DEB925D82341EF0EFCCEEB07944C9B68782D62CC1ADF56B5B5BA1",
+        "readonly": "53E30AC20DEF236DC54F0F0301FA3050D4FAD7E07F9B9EC2BD3BB8CD0331FB0E"
       },
       "fact_sources": {
         "default": [
           {
             "source_tag": "da",
-            "evidence": {
-              "kind": "literal",
-              "value": "AUTOMATE"
-            }
+            "fact": "D171CBC3328FC937AED731FE4807FA32DD9C6F9750D519BCFA3D9037C244A425"
           }
         ],
         "range": [
           {
             "source_tag": "da",
-            "evidence": {
-              "kind": "literal",
-              "values": [
-                "AUTOMATE"
-              ]
-            }
+            "fact": "4BE25DFF5A1DEB925D82341EF0EFCCEEB07944C9B68782D62CC1ADF56B5B5BA1"
           }
         ],
         "readonly": [
           {
             "source_tag": "da",
-            "evidence": {
-              "kind": "literal",
-              "value": "true"
-            }
+            "fact": "53E30AC20DEF236DC54F0F0301FA3050D4FAD7E07F9B9EC2BD3BB8CD0331FB0E"
           }
         ]
-      },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current BaseNXP provider.",
-      "dependency": "A descriptor-forward BaseNXP implementation and generality tests are required before exposure."
+      }
     },
     {
       "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]/var[OsIfSoftwareSemaphoredEnable]",
@@ -1309,51 +954,22 @@
       "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]/var[OsIfSoftwareSemaphoredEnable]",
       "name": "OsIfSoftwareSemaphoredEnable",
       "type": "BOOLEAN",
-      "default": {
-        "kind": "literal",
-        "value": "false"
-      },
-      "invalid": {
-        "kind": "xpath",
-        "tests": [
-          {
-            "expr": "node:current()='true' and contains(node:value(as:modconf('Resource')[1]/ResourceGeneral/ResourceSubderivative), 's32k11')",
-            "true": "The OsIf_Software_Semaphore feature is not supported for CPU coretex M0/M0 plus. It should be disabled."
-          }
-        ]
+      "facts": {
+        "default": "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F",
+        "invalid": "D215942104611DDC5C9A3777EA29B48E729F29772E87B9949EE162F579D9DC71"
       },
       "fact_sources": {
         "default": [
           {
             "source_tag": "da",
-            "evidence": {
-              "kind": "literal",
-              "value": "false"
-            }
+            "fact": "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F"
           }
         ],
         "invalid": [
           {
             "source_tag": "da",
-            "evidence": {
-              "kind": "xpath",
-              "tests": [
-                {
-                  "expr": "node:current()='true' and contains(node:value(as:modconf('Resource')[1]/ResourceGeneral/ResourceSubderivative), 's32k11')",
-                  "true": "The OsIf_Software_Semaphore feature is not supported for CPU coretex M0/M0 plus. It should be disabled."
-                }
-              ]
-            }
+            "fact": "D215942104611DDC5C9A3777EA29B48E729F29772E87B9949EE162F579D9DC71"
           }
-        ]
-      },
-      "classification": "configurable",
-      "trace": {
-        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/basenxp.py:BaseNxpProvider",
-        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_basenxp_set",
-        "asset": "autombd-rtd/assets/nxp/s32k3/basenxp/osif.json#/OsIfGeneral",
-        "tests": [
-          "tests/unit/test_basenxp_apply.py::test_apply_sets_arbitrary_valid_osif_general_values"
         ]
       }
     },
@@ -1363,28 +979,15 @@
       "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]/var[OsIfUseCustomTimer]",
       "name": "OsIfUseCustomTimer",
       "type": "BOOLEAN",
-      "default": {
-        "kind": "literal",
-        "value": "false"
+      "facts": {
+        "default": "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F"
       },
       "fact_sources": {
         "default": [
           {
             "source_tag": "da",
-            "evidence": {
-              "kind": "literal",
-              "value": "false"
-            }
+            "fact": "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F"
           }
-        ]
-      },
-      "classification": "configurable",
-      "trace": {
-        "provider": "autombd-rtd/rtd-config-cli-py/rtd_config/modules/basenxp.py:BaseNxpProvider",
-        "apply": "autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_basenxp_set",
-        "asset": "autombd-rtd/assets/nxp/s32k3/basenxp/osif.json#/OsIfGeneral",
-        "tests": [
-          "tests/unit/test_basenxp_apply.py::test_apply_sets_arbitrary_valid_osif_general_values"
         ]
       }
     },
@@ -1394,71 +997,103 @@
       "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]/var[OsIfUseGetUserId]",
       "name": "OsIfUseGetUserId",
       "type": "ENUMERATION",
-      "default": {
-        "kind": "literal",
-        "value": "GET_CORE_ID"
-      },
-      "range": {
-        "kind": "literal",
-        "values": [
-          "GET_CORE_ID",
-          "GET_PARTITION_ID",
-          "GET_CUSTOM_ID"
-        ]
-      },
-      "invalid": {
-        "kind": "xpath",
-        "tests": [
-          {
-            "expr": "(node:value(.) = 'GET_PARTITION_ID') and not(../OsIfMulticoreSupport = 'true')",
-            "true": "OsIfMulticoreSupport must be enabled when GET_PARTITION_ID mode is selected"
-          },
-          {
-            "expr": "(node:value(.) = 'GET_PARTITION_ID') and not(node:name(../OsIfOperatingSystemType) = 'OsIfAutosarOsType')",
-            "true": "OsIfAutosarOsType must be used when GET_PARTITION_ID mode is selected"
-          }
-        ]
+      "facts": {
+        "default": "1B5A4848D0E4E1FBD3A2CE9C90D08A92C4949E9D7FFA3146A4AD81BDC71154C6",
+        "invalid": "6D63CFB872A2FB8BDF8593C335A64318571EA83BFE9D833925CB17E2D31F6DE2",
+        "range": "3855FE2A9B100FC85524E3DFE355EB74D1D03C5C6360B6E36B295AEB23B6EB6D"
       },
       "fact_sources": {
         "default": [
           {
             "source_tag": "da",
-            "evidence": {
-              "kind": "literal",
-              "value": "GET_CORE_ID"
-            }
+            "fact": "1B5A4848D0E4E1FBD3A2CE9C90D08A92C4949E9D7FFA3146A4AD81BDC71154C6"
           }
         ],
         "range": [
           {
             "source_tag": "da",
-            "evidence": {
-              "kind": "literal",
-              "values": [
-                "GET_CORE_ID",
-                "GET_PARTITION_ID",
-                "GET_CUSTOM_ID"
-              ]
-            }
+            "fact": "3855FE2A9B100FC85524E3DFE355EB74D1D03C5C6360B6E36B295AEB23B6EB6D"
           }
         ],
         "invalid": [
           {
             "source_tag": "da",
-            "evidence": {
-              "kind": "xpath",
-              "tests": [
-                {
-                  "expr": "(node:value(.) = 'GET_PARTITION_ID') and not(../OsIfMulticoreSupport = 'true')",
-                  "true": "OsIfMulticoreSupport must be enabled when GET_PARTITION_ID mode is selected"
-                },
-                {
-                  "expr": "(node:value(.) = 'GET_PARTITION_ID') and not(node:name(../OsIfOperatingSystemType) = 'OsIfAutosarOsType')",
-                  "true": "OsIfAutosarOsType must be used when GET_PARTITION_ID mode is selected"
-                }
-              ]
-            }
+            "fact": "6D63CFB872A2FB8BDF8593C335A64318571EA83BFE9D833925CB17E2D31F6DE2"
           }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]/var[OsIfUseSystemTimer]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]/var[OsIfUseSystemTimer]",
+      "name": "OsIfUseSystemTimer",
+      "type": "BOOLEAN",
+      "facts": {
+        "default": "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F",
+        "invalid": "5B9B60082D4C2A2CC36444A71E1F1E2221A5C33EB24C3D44F8322A5BA1897900"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "80E6C2197B0FCC9B1B87A2B86D6A074C8BA8E65022AF67E2BB88EDD9856DBD0F"
+          }
+        ],
+        "invalid": [
+          {
+            "source_tag": "a",
+            "fact": "5B9B60082D4C2A2CC36444A71E1F1E2221A5C33EB24C3D44F8322A5BA1897900"
+          }
+        ]
+      }
+    },
+    {
+      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/var[IMPLEMENTATION_CONFIG_VARIANT]",
+      "kind": "variable",
+      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/var[IMPLEMENTATION_CONFIG_VARIANT]",
+      "name": "IMPLEMENTATION_CONFIG_VARIANT",
+      "type": "ENUMERATION",
+      "facts": {
+        "default": "1382FC797392728E4FE2A1BE75ECED4AB7ED19CBA178DC464BBE153CF4B15CC3",
+        "range": "DB44DAB70655E75BCFC72524C17D9DB6FC999888E8E0E34776C5B36C0F1A4949"
+      },
+      "fact_sources": {
+        "default": [
+          {
+            "source_tag": "da",
+            "fact": "1382FC797392728E4FE2A1BE75ECED4AB7ED19CBA178DC464BBE153CF4B15CC3"
+          }
+        ],
+        "range": [
+          {
+            "source_tag": "da",
+            "fact": "DB44DAB70655E75BCFC72524C17D9DB6FC999888E8E0E34776C5B36C0F1A4949"
+          }
+        ]
+      }
+    }
+  ],
+  "classification_default": {
+    "classification": "deferred",
+    "reason": "The descriptor item is not caller-controlled by the current BaseNXP provider.",
+    "dependency": "A descriptor-forward BaseNXP implementation and generality tests are required before exposure."
+  },
+  "classification_rules": [
+    {
+      "match": {
+        "path_prefixes": [
+          "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]"
+        ],
+        "names": [
+          "OsIfGeneral",
+          "OsIfDevErrorDetect",
+          "OsIfEnableUserModeSupport",
+          "OsIfGetPhysicalCoreIdEnable",
+          "OsIfInstanceId",
+          "OsIfSoftwareSemaphoredEnable",
+          "OsIfUseCustomTimer",
+          "OsIfUseGetUserId"
         ]
       },
       "classification": "configurable",
@@ -1472,35 +1107,17 @@
       }
     },
     {
-      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]/var[OsIfUseSystemTimer]",
-      "kind": "variable",
-      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]/var[OsIfUseSystemTimer]",
-      "name": "OsIfUseSystemTimer",
-      "type": "BOOLEAN",
-      "default": {
-        "kind": "literal",
-        "value": "false"
-      },
-      "invalid": {
-        "kind": "xpath"
-      },
-      "fact_sources": {
-        "default": [
-          {
-            "source_tag": "da",
-            "evidence": {
-              "kind": "literal",
-              "value": "false"
-            }
-          }
+      "match": {
+        "path_prefixes": [
+          "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]"
         ],
-        "invalid": [
-          {
-            "source_tag": "a",
-            "evidence": {
-              "kind": "xpath"
-            }
-          }
+        "names": [
+          "OsIfCounterConfig",
+          "OsIfCounterEcucPartitionRef",
+          "OsIfOsCounterRef",
+          "OsIfSystemTimerClockRef",
+          "OsIfSystemTimerClockFreq",
+          "OsIfUseSystemTimer"
         ]
       },
       "classification": "derived",
@@ -1515,66 +1132,7 @@
           "tests/unit/test_basenxp_apply.py::test_counter_has_required_children"
         ]
       }
-    },
-    {
-      "key": "variable:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/var[IMPLEMENTATION_CONFIG_VARIANT]",
-      "kind": "variable",
-      "path": "/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/var[IMPLEMENTATION_CONFIG_VARIANT]",
-      "name": "IMPLEMENTATION_CONFIG_VARIANT",
-      "type": "ENUMERATION",
-      "default": {
-        "kind": "literal",
-        "value": "VariantPreCompile"
-      },
-      "range": {
-        "kind": "literal",
-        "values": [
-          "VariantPreCompile"
-        ]
-      },
-      "fact_sources": {
-        "default": [
-          {
-            "source_tag": "da",
-            "evidence": {
-              "kind": "literal",
-              "value": "VariantPreCompile"
-            }
-          }
-        ],
-        "range": [
-          {
-            "source_tag": "da",
-            "evidence": {
-              "kind": "literal",
-              "values": [
-                "VariantPreCompile"
-              ]
-            }
-          }
-        ]
-      },
-      "classification": "deferred",
-      "reason": "The descriptor item is not caller-controlled by the current BaseNXP provider.",
-      "dependency": "A descriptor-forward BaseNXP implementation and generality tests are required before exposure."
     }
   ],
-  "cross_module_index": {
-    "EcuC": [
-      "reference:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]/lst[OsIfCounterConfig]/ctr[OsIfCounterConfig]/ref[OsIfCounterEcucPartitionRef]",
-      "reference:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]/lst[OsIfEcucPartitionRef]/ref[OsIfEcucPartitionRef]"
-    ],
-    "Os": [
-      "reference:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]/lst[OsIfCounterConfig]/ctr[OsIfCounterConfig]/ref[OsIfOsCounterRef]"
-    ],
-    "Mcu": [
-      "reference:/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[BaseNXP]/ctr[MODULE-DEF]/ctr[OsIfGeneral]/lst[OsIfCounterConfig]/ctr[OsIfCounterConfig]/ref[OsIfSystemTimerClockRef]"
-    ]
-  },
-  "summary": {
-    "total": 34,
-    "configurable": 8,
-    "deferred": 19,
-    "derived": 7
-  }
+  "known_gap_rules": {}
 }

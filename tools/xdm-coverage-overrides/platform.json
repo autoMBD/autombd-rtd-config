@@ -1,7 +1,0 @@
-{
-  "default":{"classification":"deferred","reason":"The descriptor item is not caller-controlled by the current Platform provider.","dependency":"A descriptor-forward Platform implementation and generality tests are required before exposure."},
-  "rules":[
-    {"match":{"path_prefixes":["/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[IntCtrlConfig]"],"names":["IsrPriority"]},"classification":"configurable","trace":{"provider":"autombd-rtd/rtd-config-cli-py/rtd_config/modules/platform.py:PlatformProvider","apply":"autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:apply_platform_set","asset":"autombd-rtd/assets/nxp/s32k3/platform/interrupts.json#/isr_priority","tests":["tests/unit/test_platform_apply.py::test_set_priority_by_peripheral"]}},
-    {"match":{"path_prefixes":["/datamodel[datamodel]/ctr[AUTOSAR]/lst[TOP-LEVEL-PACKAGES]/ctr[TS_T40D34M70I1R0]/lst[ELEMENTS]/chc[Platform]/ctr[MODULE-DEF]/lst[IntCtrlConfig]"],"names":["IntCtrlConfig","PlatformIsrConfig","IsrEnabled","IsrHandler","IsrName"]},"classification":"derived","trace":{"derivation":"autombd-rtd/rtd-config-cli-py/rtd_config/backends/s32_mex/apply.py:_build_platform_isr_struct_bytes","inputs":["intent.payload.peripheral","intent.payload.priority","interrupts.json#/isr_priority"],"tests":["tests/unit/test_platform_apply.py::test_set_priority_by_peripheral","tests/unit/test_uart_apply.py::TestPlatformIsrInsert::test_isr_inserted_for_lpuart8"]}}
-  ]
-}

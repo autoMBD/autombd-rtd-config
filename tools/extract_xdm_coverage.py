@@ -57,7 +57,7 @@ import sys
 import xml.etree.ElementTree as ET
 
 
-FORMAT_VERSION = 1
+FORMAT_VERSION = 2
 ITEM_TAGS = {"ctr": "container", "lst": "list", "var": "variable"}
 FACT_NAMES = (
     "DEFAULT", "RANGE", "INVALID", "EDITABLE", "ENABLE", "READONLY",
@@ -346,6 +346,128 @@ def classify_inventory(extracted: dict, overrides: dict) -> dict:
     return result
 
 
+def _canonical_json(value) -> bytes:
+    return json.dumps(
+        value, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    ).encode("utf-8")
+
+
+def _intern_fact(pool: dict[str, object], value) -> str:
+    canonical = _canonical_json(value)
+    fact_id = hashlib.sha256(canonical).hexdigest().upper()
+    existing = pool.get(fact_id)
+    if existing is not None and _canonical_json(existing) != canonical:
+        raise InventoryError(f"SHA-256 fact collision: {fact_id}")
+    pool.setdefault(fact_id, copy.deepcopy(value))
+    return fact_id
+
+
+def normalize_definition(extracted: dict, rules: dict) -> dict:
+    """Create the sole committed v2 definition from exact facts plus rules."""
+    default = rules.get("classification_default", rules.get("default"))
+    classification_rules = rules.get("classification_rules", rules.get("rules", []))
+    known_gap_rules = rules.get("known_gap_rules", {})
+    if not isinstance(default, dict):
+        raise InventoryError("normalized definition requires classification_default")
+    pool: dict[str, object] = {}
+    items = []
+    fact_names = {name.casefold() for name in FACT_NAMES}
+    for extracted_item in extracted["items"]:
+        item = {
+            key: copy.deepcopy(value)
+            for key, value in extracted_item.items()
+            if key not in fact_names | {"fact_sources"}
+        }
+        facts = {
+            name: _intern_fact(pool, extracted_item[name])
+            for name in sorted(fact_names) if name in extracted_item
+        }
+        if facts:
+            item["facts"] = facts
+        sources = {}
+        for name, evidence in extracted_item.get("fact_sources", {}).items():
+            sources[name] = [
+                {
+                    "source_tag": entry["source_tag"],
+                    "fact": _intern_fact(pool, entry["evidence"]),
+                }
+                for entry in evidence
+            ]
+        if sources:
+            item["fact_sources"] = sources
+        items.append(item)
+    return {
+        "format_version": FORMAT_VERSION,
+        "source": copy.deepcopy(extracted["source"]),
+        "fact_pool": dict(sorted(pool.items())),
+        "items": items,
+        "classification_default": copy.deepcopy(default),
+        "classification_rules": copy.deepcopy(classification_rules),
+        "known_gap_rules": copy.deepcopy(known_gap_rules),
+    }
+
+
+def materialize_facts(definition: dict) -> dict:
+    """Expand interned facts into the exact descriptor extraction projection."""
+    pool = definition.get("fact_pool")
+    if not isinstance(pool, dict):
+        raise InventoryError("normalized definition requires a fact_pool")
+    for fact_id, value in pool.items():
+        if re.fullmatch(r"[0-9A-F]{64}", fact_id) is None:
+            raise InventoryError("fact pool key is not a full SHA-256 ID")
+        if hashlib.sha256(_canonical_json(value)).hexdigest().upper() != fact_id:
+            raise InventoryError(f"fact pool hash differs from value: {fact_id}")
+    items = []
+    for normalized_item in definition.get("items", []):
+        item = {
+            key: copy.deepcopy(value)
+            for key, value in normalized_item.items()
+            if key not in {"facts", "fact_sources"}
+        }
+        for name, fact_id in normalized_item.get("facts", {}).items():
+            if fact_id not in pool:
+                raise InventoryError(f"unknown fact pool reference: {fact_id}")
+            item[name] = copy.deepcopy(pool[fact_id])
+        if "fact_sources" in normalized_item:
+            item["fact_sources"] = {}
+            for name, entries in normalized_item["fact_sources"].items():
+                item["fact_sources"][name] = []
+                for entry in entries:
+                    fact_id = entry.get("fact")
+                    if fact_id not in pool:
+                        raise InventoryError(f"unknown fact pool reference: {fact_id}")
+                    item["fact_sources"][name].append({
+                        "source_tag": entry.get("source_tag"),
+                        "evidence": copy.deepcopy(pool[fact_id]),
+                    })
+        items.append(item)
+    cross_module_index: dict[str, list[str]] = {}
+    for item in items:
+        for module in item.get("cross_modules", []):
+            cross_module_index.setdefault(module, []).append(item["key"])
+    return {
+        "format_version": FORMAT_VERSION,
+        "source": copy.deepcopy(definition.get("source")),
+        "items": items,
+        "cross_module_index": cross_module_index,
+    }
+
+
+def materialize_coverage(definition: dict) -> dict:
+    return classify_inventory(materialize_facts(definition), {
+        "default": definition.get("classification_default"),
+        "rules": definition.get("classification_rules", []),
+        "known_gap_rules": definition.get("known_gap_rules", {}),
+    })
+
+
+def descriptor_projection(value: dict) -> dict:
+    """Return only facts derived from the descriptor."""
+    if "fact_pool" in value:
+        return materialize_facts(value)
+    return _extraction_projection(value) if "summary" in value else copy.deepcopy(value)
+
+
 def _resolve_symbol(repo_root: Path, reference: str) -> None:
     path_text, separator, symbol = reference.partition(":")
     path = repo_root / PurePosixPath(path_text)
@@ -386,21 +508,85 @@ def _resolve_test(repo_root: Path, reference: str) -> None:
         nodes = match.body if isinstance(match, ast.ClassDef) else []
 
 
-def _resolve_asset(repo_root: Path, reference: str) -> None:
+def _resolve_asset(repo_root: Path, reference: str):
     path_text, separator, pointer = reference.partition("#")
     path = repo_root / PurePosixPath(path_text)
     if not separator or not path.is_file() or not pointer.startswith("/"):
         raise InventoryError(f"invalid asset trace: {reference}")
-    value = json.loads(path.read_text(encoding="utf-8"))
-    for token in pointer[1:].split("/"):
-        token = token.replace("~1", "/").replace("~0", "~")
-        if isinstance(value, list):
-            value = value[int(token)]
-        else:
-            value = value[token]
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+        for token in pointer[1:].split("/"):
+            token = token.replace("~1", "/").replace("~0", "~")
+            if isinstance(value, list):
+                value = value[int(token)]
+            else:
+                value = value[token]
+    except (OSError, ValueError, KeyError, IndexError, TypeError) as exc:
+        raise InventoryError(f"invalid asset trace: {reference}") from exc
+    return value
+
+
+def _literal_domain(fact, *, item_name: str, fact_name: str) -> list:
+    if not isinstance(fact, dict) or fact.get("kind") != "literal":
+        raise InventoryError(
+            f"asset assertion fact is not a literal domain: {item_name}.{fact_name}"
+        )
+    values = fact.get("values")
+    if not isinstance(values, list) or not all(
+        isinstance(value, (str, int, float, bool)) and value is not None
+        for value in values
+    ):
+        raise InventoryError(
+            f"asset assertion descriptor domain is not a scalar list: {item_name}.{fact_name}"
+        )
+    return values
+
+
+def validate_asset_domain_assertions(item: dict, *, repo_root: Path) -> None:
+    """Validate explicitly declared asset-to-descriptor domain semantics."""
+    assertions = item.get("asset_domain_assertions", [])
+    if not isinstance(assertions, list):
+        raise InventoryError("asset_domain_assertions must be a list")
+    for assertion in assertions:
+        if not isinstance(assertion, dict) or not set(assertion) <= {
+            "descriptor_fact", "mode", "asset", "item_name"
+        } or not {"descriptor_fact", "mode", "asset"} <= set(assertion):
+            raise InventoryError("asset domain assertion schema is invalid")
+        if assertion.get("item_name") not in (None, item.get("name")):
+            continue
+        mode = assertion["mode"]
+        if mode not in {"exact", "subset"}:
+            raise InventoryError(f"unsupported asset domain assertion mode: {mode}")
+        fact_name = assertion["descriptor_fact"]
+        if not isinstance(fact_name, str) or fact_name not in item:
+            raise InventoryError(f"asset assertion descriptor fact is absent: {fact_name}")
+        descriptor_values = _literal_domain(
+            item[fact_name], item_name=item.get("name", ""), fact_name=fact_name
+        )
+        asset_values = _resolve_asset(repo_root, assertion["asset"])
+        if not isinstance(asset_values, list) or not all(
+            isinstance(value, (str, int, float, bool)) and value is not None
+            for value in asset_values
+        ):
+            raise InventoryError("asset assertion target must be a scalar list")
+        matches = (
+            asset_values == descriptor_values if mode == "exact"
+            else all(value in descriptor_values for value in asset_values)
+        )
+        if not matches:
+            raise InventoryError(
+                f"asset domain assertion mismatch: {item.get('name')}.{fact_name}"
+            )
 
 
 def validate_sidecar(sidecar: dict, *, repo_root: Path) -> None:
+    if "fact_pool" in sidecar:
+        if set(sidecar) != {
+            "format_version", "source", "fact_pool", "items",
+            "classification_default", "classification_rules", "known_gap_rules",
+        }:
+            raise InventoryError("normalized definition schema is invalid")
+        sidecar = materialize_coverage(sidecar)
     if sidecar.get("format_version") != FORMAT_VERSION:
         raise InventoryError("unsupported inventory format")
     source = sidecar.get("source")
@@ -431,6 +617,7 @@ def validate_sidecar(sidecar: dict, *, repo_root: Path) -> None:
             if module not in KNOWN_MODULES:
                 raise InventoryError("inventory cross-module reference is unknown")
             observed_cross_index.setdefault(module, []).append(item["key"])
+        validate_asset_domain_assertions(item, repo_root=repo_root)
         if classification == "configurable":
             trace = item.get("trace")
             if not isinstance(trace, dict) or set(trace) != {
@@ -502,7 +689,7 @@ def _extraction_projection(sidecar: dict) -> dict:
 def verify_source(sidecar: dict, source: Path | str) -> None:
     module = sidecar.get("source", {}).get("module")
     extracted = extract_descriptor(source, module=module)
-    if _extraction_projection(sidecar) != extracted:
+    if descriptor_projection(sidecar) != extracted:
         raise InventoryError("descriptor extraction or hash differs from the sidecar")
 
 
@@ -547,7 +734,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--repo-root", type=Path, default=Path.cwd())
     parser.add_argument("--descriptor", type=Path)
     parser.add_argument("--module")
-    parser.add_argument("--overrides", type=Path)
+    parser.add_argument("--definition", type=Path)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--check", action="store_true")
     parser.add_argument("--verify-source", type=Path, metavar="SIDECAR")
@@ -560,11 +747,16 @@ def main(argv: list[str] | None = None) -> int:
             verify_source(sidecar, args.descriptor)
             return 0
         if args.descriptor is not None:
-            if not args.module or args.overrides is None:
-                raise InventoryError("generation requires --module and --overrides")
+            if not args.module:
+                raise InventoryError("generation requires --module")
+            definition_path = args.definition or args.output
+            if definition_path is None or not definition_path.is_file():
+                raise InventoryError(
+                    "generation requires an existing --definition or --output with embedded rules"
+                )
             extracted = extract_descriptor(args.descriptor, module=args.module)
-            overrides = json.loads(args.overrides.read_text(encoding="utf-8"))
-            sidecar = classify_inventory(extracted, overrides)
+            rules = json.loads(definition_path.read_text(encoding="utf-8"))
+            sidecar = normalize_definition(extracted, rules)
             validate_sidecar(sidecar, repo_root=args.repo_root)
             if args.output is None:
                 print(json.dumps(sidecar, ensure_ascii=False, indent=2))
