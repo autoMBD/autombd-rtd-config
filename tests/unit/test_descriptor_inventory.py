@@ -235,6 +235,24 @@ def test_temporary_execution_plans_are_local_only_and_governed():
     assert "agent-discipline/implementation-plans/" not in governance
 
 
+def test_governance_changelog_preserves_superseded_plan_history_in_order():
+    governance = (ROOT / "agent-discipline" / "documentation-governance.md").read_text(
+        encoding="utf-8"
+    )
+    current = (
+        "| 2026-07-18 | 0.1.6 | Required task-specific execution plans to remain "
+        "ignored local state under `.agent-state/plans/`; durable engineering design "
+        "remains Category A and reusable Agent workflow remains Category B. |"
+    )
+    historical = (
+        "| 2026-07-12 | 0.1.5 | Added the Category B implementation-plan directory "
+        "to the authoritative documentation map. |"
+    )
+
+    assert historical in governance
+    assert governance.index(current) < governance.index(historical)
+
+
 def test_category_a_designs_define_the_normalized_coverage_architecture():
     paths = [
         ROOT / "docs/specs/rtd-config-core-design.md",

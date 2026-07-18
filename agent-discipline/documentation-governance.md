@@ -145,6 +145,7 @@ flowchart TD
 | Date | Version | Description |
 | --- | --- | --- |
 | 2026-07-18 | 0.1.6 | Required task-specific execution plans to remain ignored local state under `.agent-state/plans/`; durable engineering design remains Category A and reusable Agent workflow remains Category B. |
+| 2026-07-12 | 0.1.5 | Added the Category B implementation-plan directory to the authoritative documentation map. |
 | 2026-07-12 | 0.1.4 | Added the runtime-safety and public-contract design to the authoritative Category A documentation map. |
 | 2026-06-29 | 0.1.3 | Issue #35: renamed the read-only review archive to `agent-discipline/review-archive-NOT-USED-NEVER-TOUCH!!!/` to make its frozen status explicit; updated all active references (purity-sweep rule, archive policy, documentation map, mermaid diagram). Frozen changelog rows retain the historical path. |
 | 2026-06-16 | 0.1.2 | Replaced the script-centered agent environment document with the lightweight external-dependency-memory skill entry. |
