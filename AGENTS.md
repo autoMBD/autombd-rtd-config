@@ -131,11 +131,14 @@ specific case inputs:
 - the **owner-governed E2E cases** only verify; a Worker never reads a case as its
   specification.
 
-**Surface-coverage artifact + acceptance.** Each module's committed asset carries
-a `_coverage` inventory: which editable items are configurable today vs. not yet
-exposed, each traceable to `<Module>.xdm`. A module is **not "done" merely because
-its E2E cases are green** — the Reviewer confirms the full editable surface is
-implemented, or the deferred surface is explicitly recorded in `_coverage`; an
+**Surface-coverage artifact + acceptance.** Each module's development-only
+normalized coverage definition at
+`docs/specs/rtd-config-module-coverage/<module>.json` accounts every editable
+`<Module>.xdm` item as configurable, derived, or deferred. Implemented items
+trace to the provider and runtime asset; deferred items record an explicit
+engineering reason and dependency in that definition. Runtime assets never
+carry `_coverage`, and development coverage definitions are excluded from
+release. A module is **not "done" merely because its E2E cases are green**; an
 undocumented coverage gap is a blocker.
 
 ## Agent Environment Initialization
@@ -193,8 +196,9 @@ values).
 - **Reviewer** (review-only; its sole write is the append-only lessons log): runs **only after the Tester's gate is green**, and
   reviews every development requirement the gate cannot catch — domain values
   vs each `<Module>.xdm`, **surface coverage** (the full editable surface is
-  implemented or the deferral is recorded in the asset `_coverage`; flags
-  test-case-fit implementations), uniform file header and other missed skill
+  accounted in the development-only normalized definition at
+  `docs/specs/rtd-config-module-coverage/<module>.json`; flags test-case-fit
+  implementations), uniform file header and other missed skill
   triggers, code standards, ownership/boundaries, test adequacy (coverage, not
   execution), and diff hygiene. It reads the repository (it reviews the diff)
   and appends a **lessons-learned** entry to
@@ -231,9 +235,12 @@ exposes a systemic issue.
   A module is accepted only when its deterministic tests, static checks, the
   S32DS gate (exit code 0 AND no SEVERE `[TOOL]` resource problem), and its
   E2E acceptance cases (`docs/tests/rtd-config-test-cases.md`, black-box
-  protocol) all pass, **and its surface coverage is accounted for** (the full
-  editable surface implemented, or the deferral recorded in the asset
-  `_coverage`). The E2E cases are a verification slice, **not** the development
+  protocol) all pass, **and its surface coverage is accounted for** in the
+  development-only normalized definition at
+  `docs/specs/rtd-config-module-coverage/<module>.json`: every editable item is
+  configurable, derived, or deferred; implemented items trace to provider and
+  runtime asset; deferred items state a reason and dependency. The E2E cases
+  are a verification slice, **not** the development
   scope — development is forward from `<Module>.xdm` (see *Forward, Spec-first
   development*). The minimal system's seven modules (Mcu, BaseNXP,
   Platform, Port, Dio, Mcl, Uart) are equal priority and land together;

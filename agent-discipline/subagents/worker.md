@@ -19,8 +19,12 @@ editable surface your brief covers, never fit to a specific E2E case.
   just what an E2E case needs. **Never read an E2E case as your specification.**
   Your TDD tests are **generality tests** over arbitrary valid inputs (different
   units / channels / counts / partitions — not the case literals), so the
-  implementation fails if it ever becomes case-fit. Record any deliberately
-  deferred editable items in the asset's `_coverage` inventory.
+  implementation fails if it ever becomes case-fit. Account every editable item
+  as configurable, derived, or deferred in the development-only normalized
+  definition at `docs/specs/rtd-config-module-coverage/<module>.json`;
+  implemented items trace to the provider and runtime asset, while deferred
+  items state an explicit reason and dependency. Runtime assets never carry
+  `_coverage`, and development coverage definitions are excluded from release.
 - **Narrow, byte-faithful `.mex` edits only.** Never whole-file rewrites. When you
   modify an element's content/children, remove a stale `quick_selection` from the
   nearest carrying ancestor.
