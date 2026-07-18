@@ -82,6 +82,53 @@ def _latest_changelog_row(text: str) -> tuple[str, str]:
     raise AssertionError("missing changelog row")
 
 
+def _normalized_text(text: str) -> str:
+    return " ".join(text.casefold().split())
+
+
+def test_active_agent_rules_use_development_only_coverage_definitions():
+    paths = {
+        "agents": Path("AGENTS.md"),
+        "worker": Path("agent-discipline/subagents/worker.md"),
+        "reviewer": Path("agent-discipline/subagents/reviewer.md"),
+    }
+    rules = {
+        owner: _normalized_text(path.read_text(encoding="utf-8"))
+        for owner, path in paths.items()
+    }
+    canonical = "docs/specs/rtd-config-module-coverage/<module>.json"
+    deferred_contract = re.compile(
+        r"deferred items (?:record|state) an explicit "
+        r"(?:engineering )?reason and dependency"
+    )
+    for owner, text in rules.items():
+        assert canonical in text, paths[owner]
+        assert "development-only" in text, paths[owner]
+        assert "configurable, derived, or deferred" in text, paths[owner]
+        assert "implemented items trace to the provider and runtime asset" in text, paths[owner]
+        assert deferred_contract.search(text), paths[owner]
+        assert "runtime assets never carry `_coverage`" in text, paths[owner]
+        assert "development coverage definitions are excluded from release" in text, paths[owner]
+
+    combined = " ".join(rules.values())
+    for stale in (
+        "committed asset carries",
+        "asset's `_coverage` inventory",
+        "asset `_coverage`",
+    ):
+        assert stale not in combined
+
+    for owner in ("agents", "reviewer"):
+        assert "undocumented coverage gap" in rules[owner]
+        assert "blocker" in rules[owner]
+    assert re.search(
+        r"not \W*done\W* merely because its e2e cases are green", rules["agents"]
+    )
+    assert re.search(
+        r"green e2e cases do not make a module \W*done\b", rules["reviewer"]
+    )
+
+
 def test_rtd_config_skill_documents_public_cli_and_module_surface():
     skill = Path("autombd-rtd/SKILL.md").read_text(encoding="utf-8")
     # Names the tool and its read-only CLI surface.
