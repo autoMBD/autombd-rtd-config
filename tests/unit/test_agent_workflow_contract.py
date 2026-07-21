@@ -112,7 +112,7 @@ def test_human_review_1_uses_auditable_repository_host_evidence():
     assert review["evidence"]["artifact"] == "issue_comment"
     assert review["evidence"]["approval_command"] == "/approve-test {test_sha}"
     assert review["evidence"]["change_request_command"] == (
-        "/request-test-changes {test_sha} {reason}"
+        "/request-test-changes {test_sha}\n{reason}"
     )
     assert review["evidence"]["full_sha_required"] is True
     assert review["evidence"]["top_level_comment_required"] is True
