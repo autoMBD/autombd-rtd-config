@@ -63,6 +63,15 @@ def _frontmatter(path: Path) -> str:
     return frontmatter.strip()
 
 
+def _frontmatter_fields(path: Path) -> dict[str, str]:
+    return {
+        key: value
+        for key, value in (
+            line.split(": ", 1) for line in _frontmatter(path).splitlines()
+        )
+    }
+
+
 def _reference_metadata(text: str) -> dict[str, str]:
     rows: dict[str, str] = {}
     metadata_block = text.split("\n## ", 1)[0]
@@ -272,7 +281,7 @@ def test_external_dependency_memory_skill_is_lightweight_contract():
     assert "environment-verification.json" not in skill
 
 
-def test_subagent_templates_keep_original_claude_code_frontmatter():
+def test_subagent_templates_keep_stable_frontmatter_contracts():
     expected = {
         "explorer": "\n".join((
             "name: explorer",
@@ -283,12 +292,6 @@ def test_subagent_templates_keep_original_claude_code_frontmatter():
         "worker": "\n".join((
             "name: worker",
             "description: Implements one scoped RTD CfgFile CLI engineering task (code or committed runtime asset) against a self-contained brief, using TDD. Also handles KPI optimization when the Tester reports functional PASS but KPI MISS. Use for feature/bugfix implementation and scoped KPI optimization. Not for cross-cutting design, independent review, or final acceptance.",
-            "tools: Read, Edit, Write, Bash, Grep, Glob",
-            "model: sonnet",
-        )),
-        "tester": "\n".join((
-            "name: tester",
-            "description: Owns the convergence gate. Writes/extends tests and runs the deterministic suite, S32DS headless validation, AND the isolated E2E acceptance cases, then reports an evidence-backed PASS/FAIL plus KPI evidence. E2E runs as a TRUE black box via an independent third-party agent CLI (the tools/blackbox_e2e.py harness; OpenCode by default, Codex and others via the extensible registry) against the deployed skill + fixture only — never this repository and never the embedded subagent. Tests are the sole functional acceptance criterion for \"done\"; KPI misses trigger capped Worker optimization. Use to prove a change converges.",
             "tools: Read, Edit, Write, Bash, Grep, Glob",
             "model: sonnet",
         )),
@@ -303,6 +306,36 @@ def test_subagent_templates_keep_original_claude_code_frontmatter():
     for name, expected_frontmatter in expected.items():
         path = Path("agent-discipline/subagents") / f"{name}.md"
         assert _frontmatter(path) == expected_frontmatter, name
+
+    tester_path = Path("agent-discipline/subagents/tester.md")
+    tester = _frontmatter_fields(tester_path)
+    assert tuple(tester) == ("name", "description", "tools", "model")
+    assert tester["name"] == "tester"
+    assert tester["tools"] == "Read, Edit, Write, Bash, Grep, Glob"
+    assert tester["model"] == "sonnet"
+
+    description = _normalized_text(tester["description"])
+    role_text = _normalized_text(tester_path.read_text(encoding="utf-8"))
+    static_default_runner = re.compile(
+        r"\b(?:opencode|codex|claude code)\b[^.]{0,80}\bdefault\b"
+        r"|\bdefault\b[^.]{0,80}\b(?:opencode|codex|claude code)\b"
+    )
+    assert not static_default_runner.search(role_text)
+
+    for responsibility in (
+        "owns the convergence gate",
+        "tests",
+        "deterministic",
+        "s32ds",
+        "isolated e2e",
+        "explicitly selected independent runner",
+        "candidate-bound functional and kpi evidence",
+        "without repairing production",
+    ):
+        assert responsibility in description
+
+    assert "agent platform" in role_text
+    assert "handoff" in role_text
 
 
 def test_initialize_agent_discipline_uses_native_platform_paths():
