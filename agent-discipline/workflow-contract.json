@@ -1,0 +1,163 @@
+{
+  "version": "1.0.0",
+  "title": "Platform-neutral Agent workflow contract",
+  "task_types": {
+    "M": "module capability",
+    "B": "bug",
+    "W": "workflow or discipline",
+    "T": "tests or validation",
+    "D": "specifications or documentation",
+    "N": "mechanical maintenance",
+    "I": "infrastructure or tooling"
+  },
+  "impact_flags": {
+    "PB": "public behavior",
+    "MS": "module surface",
+    "MW": "MEX write path",
+    "RA": "runtime asset",
+    "TC": "test contract",
+    "VS": "vendor or S32DS validation",
+    "EV": "black-box E2E",
+    "AR": "Agent rules",
+    "RP": "release or package",
+    "ED": "external dependency",
+    "SS": "security or safety",
+    "DO": "documentation only"
+  },
+  "state_machine": {
+    "sequence": [
+      "classify",
+      "test_authoring",
+      "human_review_gate_1",
+      "implementing",
+      "candidate",
+      "tester",
+      "rework",
+      "reviewer",
+      "final_human_review",
+      "complete"
+    ],
+    "rules": {
+      "single_machine": "Every task type uses this state machine.",
+      "gate_before_implementation": "A standard-path task cannot enter implementing until Human Review Gate 1 approves the full Test SHA.",
+      "reviewer_entry": "Reviewer entry requires Tester PASS evidence on the exact candidate SHA.",
+      "completion": "Complete requires final human approval bound to the exact candidate SHA.",
+      "rework": "Production rework updates the implementation lane and deterministically regenerates candidate; prior candidate evidence is invalid."
+    }
+  },
+  "test_paths": {
+    "standard": {
+      "requires_test_revision": true,
+      "requires_human_review_gate_1": true
+    },
+    "lightweight": {
+      "requires_test_revision": false,
+      "eligible_task_types": [
+        "D",
+        "N"
+      ],
+      "allowed_impact_flags": [
+        "DO"
+      ],
+      "required_exception_fields": [
+        "reason",
+        "residual_risk",
+        "remaining_verification"
+      ]
+    }
+  },
+  "human_review": {
+    "evidence_location": "github_issue_top_level_comment",
+    "authorized_author_type": "human",
+    "test_approval_command": "/approve-test <full-test-sha>",
+    "test_change_command": "/request-test-changes <full-test-sha> <reason>",
+    "final_approval_command": "/approve-candidate <full-candidate-sha>",
+    "invalid_evidence": [
+      "abbreviated SHA",
+      "stale SHA",
+      "reply",
+      "reaction",
+      "label",
+      "Agent-authored command",
+      "edited approval",
+      "deleted approval"
+    ],
+    "test_sha_change_invalidates_approval": true,
+    "monitor": {
+      "window_minutes": 10,
+      "same_session": true,
+      "new_session": false,
+      "no_update_action": "no-op",
+      "valid_update_action": "stop monitor before continuing"
+    }
+  },
+  "github_access": {
+    "order": [
+      "current Agent platform built-in GitHub Connector",
+      "gh CLI only when the current platform has no built-in Connector"
+    ],
+    "preflight": [
+      "record host authentication separately from Agent sandbox or network reachability",
+      "complete external-tool checks before entering the loop",
+      "pre-authorize the smallest stable command prefixes practical",
+      "do not wait for chat approval during execution"
+    ]
+  },
+  "lanes": {
+    "names": [
+      "test",
+      "implementation",
+      "candidate"
+    ],
+    "required_shas": [
+      "base_sha",
+      "test_sha",
+      "implementation_sha",
+      "candidate_sha"
+    ],
+    "rules": [
+      "Test and implementation start independently from the same exact base SHA.",
+      "Each input has an independent checkout or worktree and independent commit.",
+      "Worker input excludes owner acceptance-test implementation.",
+      "Candidate is the deterministic integration of test and implementation revisions.",
+      "A child ticket is used only for an independent deliverable, not merely for a lane.",
+      "Tester and Reviewer use the same exact candidate revision and bind evidence to that SHA.",
+      "Rework updates the implementation lane, regenerates candidate, and invalidates prior candidate evidence."
+    ],
+    "mandatory_independence": [
+      "permissions",
+      "checkout",
+      "inputs",
+      "evidence"
+    ],
+    "chat_context_is_evidence": false
+  },
+  "iteration_limits": {
+    "production_rework": 3,
+    "kpi_optimization": 3,
+    "on_limit": "Stop automatic looping and escalate for a human decision."
+  },
+  "validation_execution_checkpoints": {
+    "focused_minutes": 3,
+    "e2e_minutes": 5,
+    "evidence_collection_limit_minutes": 10,
+    "scope": "Validation execution only; authoring, implementation, exploration, and review use task-specific handoff budgets.",
+    "checkpoint_is_hard_timeout": false
+  },
+  "roles": {
+    "orchestrator": "Classifies, creates independent lanes, controls transitions, integrates candidate revisions, and escalates limits.",
+    "explorer": "Read-only investigator.",
+    "worker": "Writes production in the implementation lane without owner acceptance-test implementation.",
+    "tester": "Writes only tests or evidence and never repairs production.",
+    "reviewer": "Starts only after Tester PASS, reviews without production fixes, and may write only an appended lessons-log entry."
+  },
+  "initialization": {
+    "first_clone": "Interactive collection is allowed before lane creation.",
+    "derived_worktree": "Reuse verified non-secret initialization inputs and local dependency cache through deterministic non-interactive hydration.",
+    "missing_or_invalid_input": "Fail before lane creation; do not prompt inside a lane."
+  },
+  "profile_separation": {
+    "common_workflow": "This contract and the agent-workflow Skill are reusable and platform-neutral.",
+    "repository_profile": "AGENTS.md and role files add repository-specific domain, ownership, test, and evidence requirements without redefining this contract."
+  }
+}

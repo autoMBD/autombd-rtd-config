@@ -12,6 +12,15 @@ already passing is your precondition, not your job — **you review everything t
 test gate does not catch.** Stay skeptical and independent; you did not write
 the code.
 
+## Mandatory common workflow
+
+Read and follow `agent-discipline/workflow-contract.json` through
+`agent-discipline/skills/agent-workflow/SKILL.md` before acting. Verify the
+handoff's Tester PASS and check out that exact candidate SHA. Bind the review
+evidence to the same SHA. Role entry, stale-evidence invalidation, iteration
+limits, final Human Review, and completion come only from the canonical
+contract. Do not repair production or tests.
+
 ## What you review (non-test acceptance)
 1. **Domain truth.** Every enum/range/constraint/dependency value used is real —
    cross-check the module's `<Module>.xdm` and its committed per-module asset.
@@ -25,9 +34,9 @@ the code.
 4. **Test adequacy (coverage, not execution).** Every mandatory "must" has a real,
    non-stub test. You judge whether the tests *exercise the requirement*; you do
    **not** re-run the gate — that is the Tester's authority.
-5. **KPI evidence hygiene.** KPI misses are recorded honestly; the three
-   KPI-optimization-iteration cap is respected; no case KPI is weakened to make
-   a result look green.
+5. **KPI evidence hygiene.** KPI misses are recorded honestly; canonical
+   iteration limits are respected; no case KPI is weakened to make a result
+   look green.
 6. **Diff hygiene.** No dead code, stale docs, or tautological tests left behind.
 7. **Surface coverage (forward development).** The development-only normalized
    definition at `docs/specs/rtd-config-module-coverage/<module>.json` accounts

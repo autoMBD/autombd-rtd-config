@@ -21,6 +21,20 @@ When responding:
 - Use professional automotive engineering terminology.
 - Clearly state assumptions, constraints, risks, and dependencies.
 
+## Mandatory Agent Workflow
+
+Every tracked change and acceptance-evidence task MUST follow the versioned,
+platform-neutral contract in `agent-discipline/workflow-contract.json` through
+`agent-discipline/skills/agent-workflow/SKILL.md`. The contract exclusively owns
+task classification and impact flags, the common state machine, Human Review
+gates and monitoring, independent lanes and SHA-bound evidence, rework limits,
+validation checkpoints, initialization preflight, and common role boundaries.
+
+This file is the RTD CfgFile CLI repository profile. It adds domain, ownership,
+runtime, documentation, and acceptance requirements without redefining the
+common workflow. If profile wording appears to conflict with the canonical
+contract, stop and apply the contract before proceeding.
+
 ## Main Agent Orchestrator Responsibility
 
 The main agent is the Orchestrator for this project. Its primary duty is to
@@ -40,9 +54,9 @@ The main agent owns:
 - dispatching independent implementation, investigation, review, and validation
   subagents instead of personally doing all task-level execution;
 - ensuring independent E2E validation is a **true black box** — driven through
-  an independent third-party agent CLI (the `tools/blackbox_e2e.py` harness;
-  OpenCode by default, with Codex and others selectable via the extensible
-  registry) that sees only the deployed skill, the case prompt, and the staged
+  an explicitly selected independent third-party agent CLI using the
+  `tools/blackbox_e2e.py` extensible runner registry, with no default runner in
+  the common workflow; the runner sees only the deployed skill, case prompt, and staged
   fixture, never this repository; the embedded subagent is **not** a valid black
   box because it inherits repo context and filesystem;
 - monitoring subagent progress and per-case KPI evidence, collecting evidence,
@@ -156,18 +170,17 @@ and deterministic deployer
 (`agent-discipline/skills/initialize-agent-discipline/scripts/init_agent_env_deploy.py`)
 and must not substitute Agent-native controls or inferred answers.
 
-When an agent starts work in a freshly cloned or otherwise uninitialized
-repository — missing project-level Agent directories (`.claude/`, `.opencode/`,
-`.agents/`), subagents, or the external-dependency cache — it MUST load and
-execute this Skill before beginning any other task, so every agent operates
-from the same project discipline.
+Apply the canonical workflow's initialization preflight before creating lanes.
+For this repository, the deterministic hydration mechanism and reusable,
+non-secret input/cache boundary are defined by the initialization Skill above.
 
 ## Subagent Roles and Collaboration
 
-The orchestrator dispatches four specialized subagents defined in
-`agent-discipline/subagents/`. Every handoff is self-contained and grounds domain facts in
-`docs/specs/rtd-config-domain-truth.md` (never invent enum/pin/ID
-values).
+The common role boundaries and transition rules are mandatory from the
+canonical workflow. The four role profiles under `agent-discipline/subagents/`
+add RTD CfgFile CLI responsibilities. Every handoff is self-contained and
+grounds domain facts in `docs/specs/rtd-config-domain-truth.md`; enum, pin, and
+ID values are never invented.
 
 - **Explorer** (read-only): establishes non-inferable ground truth — RTD enum
   domains, pin-mux data, fixture state, exact S32DS commands — and, when grounding
@@ -178,16 +191,14 @@ values).
 - **Worker**: implements a module's capability **forward from the descriptor/asset
   — general over the editable surface, never fit to a specific E2E case** —
   TDD-first, within module-ownership and narrow / byte-faithful `.mex` edit rules,
-  and adds generality tests over arbitrary valid inputs. When the Tester reports a
-  KPI miss on a functionally passing case, the Worker optimizes the public
-  flow/diagnostics/assets without weakening functional correctness.
+  and adds generality tests over arbitrary valid inputs.
 - **Tester**: owns the convergence gate — runs the deterministic suite, S32DS
   validation (pass gate: exit 0 AND no SEVERE `[TOOL]`), and the E2E acceptance
   cases (`docs/tests/rtd-config-test-cases.md`). The Tester also measures each
   case against its KPI. **E2E runs as a TRUE black box** via the
   `tools/blackbox_e2e.py` harness, which deploys the released skill into a temp
-  dir and drives an **independent third-party agent CLI** (OpenCode by default,
-  with Codex and others via the extensible registry) seeing only the case's
+  dir and drives an explicitly selected **independent third-party agent CLI**
+  from the extensible registry, seeing only the case's
   Subagent Prompt + the deployed skill + the
   fixture — never this repository, and never the embedded subagent (which would
   inherit repo context + filesystem). The Tester independently re-runs the vendor
@@ -204,22 +215,9 @@ values).
   and appends a **lessons-learned** entry to
   `agent-discipline/agent-lessons-learned.md`.
 
-**Iteration loop:** `main agent → Explorer → Worker → Tester → main agent` is one
-iteration. The main agent reads the Tester's result and routes:
-
-- **tests fail →** start the next iteration (back to the Explorer);
-- **tests pass but KPI misses →** return to the Worker for KPI optimization,
-  with at most three KPI-optimization iterations for the same case;
-- **tests pass and KPI passes, or KPI still misses after three optimization
-  iterations →** record the true KPI result and dispatch the **Reviewer** for
-  non-test acceptance review.
-
-Tests are the convergence signal, owned by the Tester. KPI misses are
-optimization triggers, not permission to weaken the functional gate. The
-Reviewer is the non-test acceptance gate and the keeper of lessons learned. The
-orchestrator integrates evidence, protects scope, enforces the three-iteration
-KPI optimization cap, and intervenes when a role exceeds its time budget or
-exposes a systemic issue.
+Tests remain this repository's functional convergence signal. Route results,
+rework, KPI optimization, Reviewer entry, evidence invalidation, and human
+escalation only through the canonical workflow.
 
 ## Testing Terminology
 
@@ -246,11 +244,8 @@ exposes a systemic issue.
   Platform, Port, Dio, Mcl, Uart) are equal priority and land together;
   delivery staging lives only in `docs/roadmaps/rtd-config-roadmap.md`.
 - Each E2E case also has a KPI. The Tester records KPI evidence during isolated
-  execution. If functional validation passes but the KPI is missed, the case
-  returns to the Worker for optimization. The orchestrator allows at most three
-  KPI-optimization iterations for the same case; after the third miss, the true
-  KPI result is recorded and the case may proceed with the functional PASS
-  evidence intact.
+  execution; the canonical workflow governs optimization routing, iteration
+  limits, and human escalation.
 - Any CLI module update or fix invalidates stale E2E/KPI evidence for the
   affected module cases. This includes changes to a module provider, `.mex`
   apply path, module assets, module-facing CLI flags/intent normalization,
@@ -260,15 +255,9 @@ exposes a systemic issue.
   `tools/blackbox_e2e.py`, re-measure the KPI from the fresh run, and update
   `docs/tests/rtd-config-acceptance-report.md` with the new functional status,
   KPI status, measured seconds, edit-attempt count, run date, and session
-  evidence. If the fresh run is functional PASS but KPI MISS, the Worker KPI
-  optimization loop is mandatory for up to three iterations, with a fresh E2E
-  and KPI measurement after each iteration. Stop early only when KPI passes; if
-  all three iterations still miss, record the true final KPI result and
-  disposition in the acceptance report before review.
-- Focused independent subagent validation should converge within 3 minutes.
-  E2E subagent validation should converge within 5 minutes. A subagent run may
-  continue up to 10 minutes to expose useful problem evidence; after 10
-  minutes, the main agent intervenes and collects issue information.
+  evidence. If the fresh run is functional PASS but KPI MISS, run the canonical
+  bounded optimization path with a fresh E2E/KPI measurement after each
+  iteration, then record the true final result and human disposition.
 - All test temporary artifacts (black-box workdirs, validation throwaways)
   stay within the repository workspace — use `tests/.tmp/` as the canonical
   temp base (e.g. `--temp-base tests/.tmp` for `tools/blackbox_e2e.py`). The

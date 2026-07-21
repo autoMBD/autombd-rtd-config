@@ -2,10 +2,10 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.1.6 |
-| Date | 2026-07-18 |
+| Version | 0.1.7 |
+| Date | 2026-07-22 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
-| Description | Documentation-governance rules for the RTD CfgFile CLI project. Defines the two-category split, official tool name, changelog integrity, archive policy, and the authoritative cross-category documentation map. |
+| Description | Documentation-governance rules for the RTD CfgFile CLI project. Defines the two-category split, canonical Agent workflow boundary, changelog integrity, archive policy, and authoritative documentation map. |
 
 ## Governance rules
 
@@ -30,6 +30,17 @@ categories:
 Cross-category pointers are allowed from Category B to Category A (e.g.,
 `AGENTS.md` referencing domain-truth or test cases), but never from Category A
 to Category B.
+
+### Canonical Agent workflow
+
+`agent-discipline/workflow-contract.json` is the versioned, machine-readable
+authority for reusable Agent classification, states, Human Review gates, lanes,
+evidence, bounds, and common role boundaries. Its platform-neutral execution
+guidance is `agent-discipline/skills/agent-workflow/SKILL.md`. `AGENTS.md` and
+subagent role files are repository-specific profiles: they reference the
+canonical pair and add RTD CfgFile CLI constraints without copying or
+redefining the common workflow. Task-specific workflow records remain ignored
+local state rather than documentation.
 
 ### Specs stay at architecture altitude — milestone-free
 
@@ -104,7 +115,9 @@ paths are relative to the repository root.
 
 | Document | Role | References |
 | --- | --- | --- |
-| `AGENTS.md` | Agent charter: orchestrator duties, four roles, iteration loop, convergence gate, KPI policies, documentation discipline | domain-truth, agent-lessons-learned, test cases |
+| `AGENTS.md` | RTD CfgFile CLI Agent profile: orchestrator, domain, ownership, acceptance, and documentation rules | workflow contract, Agent workflow Skill, domain-truth, agent-lessons-learned, test cases |
+| `agent-discipline/workflow-contract.json` | Versioned machine-readable common Agent workflow contract | Agent workflow Skill |
+| `agent-discipline/skills/agent-workflow/SKILL.md` | Platform-neutral execution guidance and record template for the common workflow | workflow contract |
 | `agent-discipline/subagents/explorer.md` | Explorer role definition | AGENTS.md, domain-truth |
 | `agent-discipline/subagents/worker.md` | Worker role definition | AGENTS.md, domain-truth |
 | `agent-discipline/subagents/tester.md` | Tester role definition | AGENTS.md, test cases |
@@ -138,12 +151,16 @@ flowchart TD
   LL["agent-discipline/agent-lessons-learned"] --> AGENTS
   CT["agent-discipline/owner-review-comments"] -.archives.-> OBS["agent-discipline/review-archive-NOT-USED-NEVER-TOUCH!!!/"]
   SKILL["autombd-rtd/SKILL.md + assets/ + CLI"] -. released deliverable .-> TC
+  AGENTS --> WC["agent-discipline/workflow-contract.json"]
+  ROLES --> WC
+  AWS["agent-discipline/skills/agent-workflow"] --> WC
 ```
 
 ## Changelog
 
 | Date | Version | Description |
 | --- | --- | --- |
+| 2026-07-22 | 0.1.7 | Added the canonical machine-readable Agent workflow contract and platform-neutral execution Skill; constrained AGENTS.md and role files to repository-profile extensions. |
 | 2026-07-18 | 0.1.6 | Required task-specific execution plans to remain ignored local state under `.agent-state/plans/`; durable engineering design remains Category A and reusable Agent workflow remains Category B. |
 | 2026-07-12 | 0.1.5 | Added the Category B implementation-plan directory to the authoritative documentation map. |
 | 2026-07-12 | 0.1.4 | Added the runtime-safety and public-contract design to the authoritative Category A documentation map. |
