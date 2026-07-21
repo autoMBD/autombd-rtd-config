@@ -1,35 +1,35 @@
 # =================================================================================
-# The MIT License 
+# The MIT License
 # MIT许可证
-# 
+#
 # <https://opensource.org/license/mit>
-# 
-# SPDX short identifier / SPDX 短标识符：MIT 
-# 
+#
+# SPDX short identifier / SPDX 短标识符：MIT
+#
 # Copyright (c) 2026 autoMBD
 # 版权所有 (c) 2026 autoMBD
 #
-# Permission is hereby granted, free of charge, to any person obtaining a 
-# copy of this software and associated documentation files (the "Software"), 
-# to deal in the Software without restriction, including without limitation 
-# the rights to use, copy, modify, merge, publish, distribute, sublicense, 
-# and/or sell copies of the Software, and to permit persons to whom the 
+# Permission is hereby granted, free of charge, to any person obtaining a
+# copy of this software and associated documentation files (the "Software"),
+# to deal in the Software without restriction, including without limitation
+# the rights to use, copy, modify, merge, publish, distribute, sublicense,
+# and/or sell copies of the Software, and to permit persons to whom the
 # Software is furnished to do so, subject to the following conditions:
 # 特此向获得本软件及相关文档（合称"本软件"）副本的任何人免费授予不受限制地利用本软
 # 件的许可，包括而不限于：使用、复制、修改、合并、发布、分发、分许可和/或销售本软
 # 件副本，并允许本软件的接收者也获得前述许可，但须遵守以下条件：
-# 
-# The above copyright notice and this permission notice shall be included 
+#
+# The above copyright notice and this permission notice shall be included
 # in all copies or substantial portions of the Software.
 # 以上版权声明及本许可声明应包含在本软件的所有副本或主要部分中。
-# 
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, 
-# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF 
-# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND 
-# NONINFRINGEMENT. IN NO EVENT SHALLTHE AUTHORS OR COPYRIGHT 
-# HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER 
-# IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN 
-# CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE 
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+# NONINFRINGEMENT. IN NO EVENT SHALLTHE AUTHORS OR COPYRIGHT
+# HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+# IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+# CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 # 本软件系"按原样"提供，不包含任何形式的明示或默示保证，包括但不限于适销性、特定
 # 目的适用性及不侵权的保证。在任何情况下，无论是在合同、侵权或其他案件中，作者或版
@@ -104,6 +104,21 @@ def test_workflow_contract_uses_one_bounded_human_gated_state_machine():
     }
 
 
+def test_human_review_1_uses_auditable_repository_host_evidence():
+    contract = _contract()
+    review = contract["state_machine"]["human_review_1"]
+
+    assert review["evidence"]["provider"] == "github"
+    assert review["evidence"]["artifact"] == "issue_comment"
+    assert review["evidence"]["approval_command"] == "/approve-test {test_sha}"
+    assert set(review["evidence"]["invalidated_by"]) == {
+        "test_sha_change",
+        "comment_edit",
+        "comment_delete",
+        "request_changes",
+    }
+
+
 def test_workflow_contract_defines_ticket_lanes_exact_shas_and_role_boundaries():
     contract = _contract()
 
@@ -156,4 +171,3 @@ def test_portable_workflow_contract_has_no_vendor_specific_authority():
     assert "opencode by default" not in skill
     assert "codex by default" not in skill
     assert "claude code by default" not in skill
-
