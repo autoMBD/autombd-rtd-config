@@ -99,11 +99,21 @@ def _valid_record() -> dict:
                     "comment_id": 123456,
                     "command": f"/approve-test {_sha('b')}",
                 },
+                "monitor": {
+                    "status": "stopped",
+                    "interval_minutes": 10,
+                    "scope": "current_session",
+                },
             },
             "final": {
                 "approved": True,
                 "sha": _sha("d"),
                 "reviewer": "owner",
+                "monitor": {
+                    "status": "stopped",
+                    "interval_minutes": 10,
+                    "scope": "current_session",
+                },
             },
         },
         "counters": {"production_rework": 0, "kpi_optimization": 0},
@@ -193,6 +203,38 @@ def test_implementation_requires_human_review_1_on_frozen_test_sha():
     ),
 )
 def test_human_review_1_requires_github_comment_bound_to_test_sha(
+    mutate, expected
+):
+    record = _valid_record()
+    mutate(record)
+
+    _assert_error(record, expected)
+
+
+@pytest.mark.parametrize(
+    ("mutate", "expected"),
+    (
+        (
+            lambda record: record["human_reviews"]["test"]["monitor"].update(
+                status="active"
+            ),
+            "stop",
+        ),
+        (
+            lambda record: record["human_reviews"]["test"]["monitor"].update(
+                interval_minutes=5
+            ),
+            "10",
+        ),
+        (
+            lambda record: record["human_reviews"]["test"]["monitor"].update(
+                scope="new_session"
+            ),
+            "current session",
+        ),
+    ),
+)
+def test_approved_human_review_requires_stopped_same_session_monitor(
     mutate, expected
 ):
     record = _valid_record()

@@ -111,12 +111,69 @@ def test_human_review_1_uses_auditable_repository_host_evidence():
     assert review["evidence"]["provider"] == "github"
     assert review["evidence"]["artifact"] == "issue_comment"
     assert review["evidence"]["approval_command"] == "/approve-test {test_sha}"
+    assert review["evidence"]["change_request_command"] == (
+        "/request-test-changes {test_sha} {reason}"
+    )
+    assert review["evidence"]["full_sha_required"] is True
+    assert review["evidence"]["top_level_comment_required"] is True
+    assert review["evidence"]["authorized_actor"] == "human"
     assert set(review["evidence"]["invalidated_by"]) == {
         "test_sha_change",
         "comment_edit",
         "comment_delete",
         "request_changes",
     }
+
+
+def test_human_review_requests_start_a_same_session_ten_minute_monitor():
+    contract = _contract()
+    monitor = contract["human_review_monitor"]
+
+    assert monitor == {
+        "interval_minutes": 10,
+        "scope": "current_session",
+        "on_no_change": "no_op",
+        "on_update": "stop_then_resume",
+        "new_session": False,
+    }
+    assert contract["state_machine"]["human_review_1"]["monitor"] == (
+        "human_review_monitor"
+    )
+    assert contract["state_machine"]["final_human_review"]["monitor"] == (
+        "human_review_monitor"
+    )
+
+
+def test_github_access_prefers_builtin_connector_and_uses_gh_as_fallback():
+    contract = _contract()
+    github = contract["repository_host"]["github"]
+
+    assert github["selection_order"] == ["builtin_connector", "gh_cli"]
+    assert github["gh_cli_when"] == "builtin_connector_unavailable"
+    assert github["auth_preflight_distinguishes"] == [
+        "host_access",
+        "sandbox_access",
+    ]
+
+
+def test_subagent_validation_times_are_checkpoints_not_hard_timeouts():
+    contract = _contract()
+    timing = contract["subagent_timing"]
+    agents = _normalized(Path("AGENTS.md").read_text(encoding="utf-8"))
+
+    assert timing["focused_validation_target_minutes"] == 3
+    assert timing["e2e_validation_target_minutes"] == 5
+    assert timing["evidence_intervention_minutes"] == 10
+    assert timing["hard_timeout"] is False
+    assert timing["applies_only_to"] == "validation_execution"
+    assert set(timing["excluded_work"]) == {
+        "test_authoring",
+        "implementation",
+        "exploration",
+        "review",
+    }
+    assert "checkpoint, not a hard timeout" in agents
+    assert "task-specific handoff budget" in agents
 
 
 def test_workflow_contract_defines_ticket_lanes_exact_shas_and_role_boundaries():
