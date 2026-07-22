@@ -2,15 +2,15 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 1.0.1 |
-| Date | 2026-06-15 |
+| Version | 1.1.0 |
+| Date | 2026-07-22 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | The convergence contract for the RTD CfgFile CLI. Tests — deterministic, static, vendor validation, and isolated E2E acceptance — are the SOLE criterion for functional "done". Defines the test layers, the vendor gate, and the acceptance rule; the concrete E2E cases live in `rtd-config-test-cases.md`. |
 
 ## 1. Principle: tests are the only convergence signal
 
-This project is built by an autonomous agent workflow. The workflow stops only
-when the gate is green on **real evidence**. Therefore tests must be complete
+Tests are the sole functional convergence signal: work is accepted only when
+the gate is green on **real evidence**. Therefore tests must be complete
 (every mandatory requirement has a test), rigorous (they exercise real behavior
 and real assets — never a stub or a fabricated value), and authoritative (a
 passing gate is sufficient to accept; a failing gate blocks).
@@ -20,8 +20,7 @@ come from that module's `<Module>.xdm` and live in its provider; cross-cutting
 facts (fixture usage, the vendor command/gate) live in
 `rtd-config-domain-truth.md`. This document references both rather than
 restating them. General engineering practice (TDD, stdlib, commit-per-task,
-"diagnostics not tracebacks") is assumed of every agent and is not respecified
-here.
+"diagnostics not tracebacks") is assumed and is not respecified here.
 
 ## 2. Test layers
 
@@ -100,3 +99,4 @@ roadmap.
 | 2026-05-30 | 0.1.0 | Created RTD CfgFile CLI test strategy. |
 | 2026-06-15 | 1.0.0 | Issue #7 reorganization: deleted §4 Subagent roles in the convergence loop (agent-discipline, already canonical in AGENTS.md); removed the KPI-honesty/3rd-attempt bullet from §5 Test hygiene (agent-discipline, already in AGENTS.md); renumbered remaining sections; updated header Description to drop role/loop wording. |
 | 2026-06-15 | 1.0.1 | Issue #7 follow-up: abstracted §2.4 to drop the agent-driver specifics (third-party agent CLI / Codex / "agent self-report") — the paragraph still names the isolated black-box harness flow, with the driver detail canonical in AGENTS.md; trimmed §3 to keep the KPI as a measured metric while removing the capped optimization-loop process (agent-discipline). |
+| 2026-07-22 | 1.1.0 | Removed active Agent-governance wording while preserving the functional convergence, evidence, isolation, KPI rules, and the harness-consumed `Subagent Prompt` data column. Historical entries remain unchanged. |

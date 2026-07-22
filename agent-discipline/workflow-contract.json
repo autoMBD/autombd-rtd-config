@@ -64,8 +64,45 @@
       "rework",
       "reviewing",
       "final_human_review",
-      "complete"
+      "complete",
+      "stopped"
     ],
+    "terminal_states": ["complete", "stopped"],
+    "transitions": {
+      "classify": {
+        "test_authoring": "classified"
+      },
+      "test_authoring": {
+        "human_review_1": "test_ready",
+        "implementing": "light_path_ready"
+      },
+      "human_review_1": {
+        "implementing": "test_approved",
+        "test_authoring": "changes_requested"
+      },
+      "implementing": {
+        "candidate": "implementation_ready"
+      },
+      "candidate": {
+        "testing": "candidate_ready"
+      },
+      "testing": {
+        "reviewing": "functional_pass",
+        "rework": "functional_failure"
+      },
+      "rework": {
+        "implementing": "production_rework",
+        "stopped": "rework_cap_reached"
+      },
+      "reviewing": {
+        "final_human_review": "review_pass"
+      },
+      "final_human_review": {
+        "complete": "final_approved"
+      },
+      "complete": {},
+      "stopped": {}
+    },
     "rework_transition": "rework -> implementing -> candidate -> testing",
     "all_task_classes_use_this_machine": true,
     "human_review_1": {
@@ -75,6 +112,7 @@
       "evidence": {
         "provider": "github",
         "artifact": "issue_comment",
+        "repository": "issue.repository",
         "approval_command": "/approve-test {test_sha}",
         "change_request_command": "/request-test-changes {test_sha}\n{reason}",
         "full_sha_required": true,
@@ -90,8 +128,17 @@
     },
     "final_human_review": {
       "before": "complete",
-      "binds": "candidate_sha",
-      "monitor": "human_review_monitor"
+      "binds": "candidate_or_evidence_sha",
+      "monitor": "human_review_monitor",
+      "evidence": {
+        "provider": "github",
+        "artifact": "pull_request_review",
+        "repository": "issue.repository",
+        "authorized_actor": "human",
+        "full_sha_required": true,
+        "current_state": "APPROVED",
+        "invalidated_by": ["dismissed", "stale", "revision_change"]
+      }
     }
   },
   "human_review_monitor": {
@@ -104,6 +151,103 @@
   "limits": {
     "production_rework": 3,
     "kpi_optimization": 3
+  },
+  "revision_provenance": {
+    "identities": {
+      "test": "T[1-9][0-9]*",
+      "implementation": "W[1-9][0-9]*",
+      "candidate": "C[1-9][0-9]*",
+      "evidence": "E[1-9][0-9]*"
+    },
+    "lane_base_rule": "test.base_sha == implementation.base_sha == base_sha",
+    "candidate_rule": "candidate references exact Tn/Wn and their full SHAs",
+    "evidence_only": {
+      "kind": "evidence_only",
+      "parent": "exact_candidate_sha",
+      "allowed_paths": [
+        "agent-discipline/agent-lessons-learned.md",
+        "docs/tests/rtd-config-acceptance-report.md"
+      ],
+      "forbidden_classes": [
+        "production",
+        "workflow_contract",
+        "test_contract"
+      ]
+    }
+  },
+  "impact_routing": {
+    "PB": {
+      "required_gates": ["deterministic_tests", "isolated_e2e"],
+      "profiles": ["behavioral"]
+    },
+    "MS": {
+      "required_gates": ["descriptor_surface", "deterministic_tests", "isolated_e2e", "vendor_validation"],
+      "profiles": ["module_surface"]
+    },
+    "MW": {
+      "required_gates": ["deterministic_tests", "static_runtime_checks", "vendor_validation"],
+      "profiles": ["mex_write"]
+    },
+    "RA": {
+      "required_gates": ["asset_integrity", "deterministic_tests"],
+      "profiles": ["runtime_asset"]
+    },
+    "TC": {
+      "required_gates": ["deterministic_tests", "test_contract_review"],
+      "profiles": ["test_contract"]
+    },
+    "VS": {
+      "required_gates": ["vendor_validation"],
+      "profiles": ["vendor"]
+    },
+    "EV": {
+      "required_gates": ["isolated_e2e"],
+      "profiles": ["isolated_e2e"]
+    },
+    "AR": {
+      "required_gates": ["workflow_contract"],
+      "profiles": ["agent_rules"]
+    },
+    "RP": {
+      "required_gates": ["package_validation"],
+      "profiles": ["release"]
+    },
+    "ED": {
+      "required_gates": ["dependency_preflight"],
+      "profiles": ["external_dependency"]
+    },
+    "SS": {
+      "required_gates": ["safety_security_review"],
+      "profiles": ["safety_critical"]
+    },
+    "DO": {
+      "required_gates": ["documentation_review"],
+      "profiles": ["documentation"]
+    }
+  },
+  "correction_classes": {
+    "production_rework": {
+      "trigger_transition": "rework -> implementing",
+      "consumes": "limits.production_rework",
+      "at_limit": "allow current attempt; stop_escalate on the next failure"
+    },
+    "dependency_permission": {
+      "trigger_transition": null,
+      "consumes": null,
+      "audit_required": true,
+      "audit_field": "one non-empty audit entry per correction"
+    },
+    "test_contract": {
+      "trigger_transition": "human_review_1 -> test_authoring",
+      "consumes": null,
+      "audit_required": true,
+      "audit_field": "one non-empty audit entry per correction"
+    },
+    "kpi_optimization": {
+      "trigger_transition": null,
+      "consumes": "limits.kpi_optimization",
+      "at_limit": "stop_escalate"
+    }
   },
   "repository_host": {
     "github": {
@@ -159,6 +303,14 @@
     "chat_context_is_evidence": false
   },
   "roles": {
+    "orchestrator": {
+      "owns": [
+        "classification",
+        "state_transition",
+        "role_handoff",
+        "candidate_integration"
+      ]
+    },
     "explorer": {
       "writes": []
     },
@@ -196,5 +348,42 @@
   "profile_separation": {
     "common_workflow": "workflow-contract.json and agent-workflow Skill",
     "repository_profile": "AGENTS.md and subagent role files"
+  },
+  "handoff_templates": {
+    "orchestrator": {
+      "inputs": ["issue classification: #/task_classes and #/impact_routing", "exact base revision: #/lanes"],
+      "forbidden": ["owner Test implementation disclosure: #/roles/worker/forbidden_inputs"],
+      "outputs": ["state/transition record: #/state_machine/transitions", "role handoff with exact revisions: #/revision_provenance"],
+      "stop_conditions": ["automatic cap reached: #/correction_classes"],
+      "acceptance": ["terminal state and evidence: #/state_machine/terminal_states"]
+    },
+    "explorer": {
+      "inputs": ["scoped questions and allowed sources: #/roles/explorer"],
+      "forbidden": ["tracked writes: #/roles/explorer/writes"],
+      "outputs": ["decision-ready sourced facts: #/roles/explorer"],
+      "stop_conditions": ["unverifiable fact: #/roles/explorer"],
+      "acceptance": ["all requested facts sourced: #/roles/explorer"]
+    },
+    "worker": {
+      "inputs": ["approved Test revision and implementation base: #/revision_provenance"],
+      "forbidden": ["owner acceptance Test source: #/roles/worker/forbidden_inputs"],
+      "outputs": ["implementation revision Wn: #/revision_provenance/identities/implementation"],
+      "stop_conditions": ["scope or authority gap: #/roles/worker"],
+      "acceptance": ["Worker-owned tests and exact implementation SHA: #/revision_provenance"]
+    },
+    "tester": {
+      "inputs": ["exact Candidate Cn: #/revision_provenance/identities/candidate"],
+      "forbidden": ["production writes: #/roles/tester/production_writes"],
+      "outputs": ["candidate-bound verdict and KPI evidence: #/limits/kpi_optimization"],
+      "stop_conditions": ["validation intervention boundary: #/subagent_timing"],
+      "acceptance": ["functional evidence on exact Candidate: #/lanes"]
+    },
+    "reviewer": {
+      "inputs": ["Tester PASS on exact Candidate: #/roles/reviewer/requires"],
+      "forbidden": ["production or Test repair: #/roles/reviewer"],
+      "outputs": ["candidate-bound review and allowed lesson append: #/roles/reviewer/writes"],
+      "stop_conditions": ["Tester evidence missing or stale: #/lanes"],
+      "acceptance": ["review PASS before Final Human Review: #/state_machine/final_human_review"]
+    }
   }
 }

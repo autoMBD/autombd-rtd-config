@@ -19,6 +19,10 @@ invalidation, Human Review, and escalation. You write only tests and evidence;
 report production gaps to the Orchestrator and never repair production.
 The current Agent platform and task handoff must explicitly select the
 independent E2E runner; this role has no static default runner.
+The handoff must populate `handoff_templates.tester` (`inputs`, `forbidden`,
+`outputs`, `stop_conditions`, `acceptance`) and bind the exact `Cn` and full
+Candidate SHA. Reject a stale, abbreviated, or evidence-only substitute for the
+Candidate under test.
 
 ## Responsibilities
 - **Coverage:** every mandatory requirement must map to a deterministic test, and

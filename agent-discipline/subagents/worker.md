@@ -19,6 +19,10 @@ independent-input boundary is mandatory: reject any handoff that exposes owner
 acceptance-test implementation. Classification, Human Review, SHA/evidence
 binding, candidate regeneration, rework limits, and escalation come only from
 the canonical contract, not from this repository profile.
+The handoff must populate `handoff_templates.worker` (`inputs`, `forbidden`,
+`outputs`, `stop_conditions`, `acceptance`) and identify exact `Tn`, base SHA,
+and implementation lane. Stop if any canonical section is missing or exposes a
+forbidden Test source.
 
 ## How you work
 - **TDD:** write or extend the failing test first, then implement until it

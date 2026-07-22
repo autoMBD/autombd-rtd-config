@@ -40,7 +40,10 @@ contract:
 | `SS` | security/safety | `DO` | documentation only |
 
 All seven types use the same workflow. Classification selects additional
-repository-profile checks; it does not select a different state machine.
+repository-profile checks; it does not select a different state machine. The
+`impact_routing` table derives `gate.required_gates`, `gate.profiles`, and
+`gate.test_required`; callers may not self-declare a weaker gate. Only exact
+`N + DO` derives the lightweight path.
 
 ## 2. Complete initialization and preflight before lanes
 
@@ -67,12 +70,24 @@ independent runner used for a validation execution.
 
 ```text
 classify -> test_authoring -> human_review_1 -> implementing
-         -> candidate -> testing -> bounded rework -> reviewing
+         -> candidate -> testing -> reviewing
          -> final_human_review -> complete
+
+testing --functional_failure--> rework --production_rework--> implementing
+rework  --rework_cap_reached---------------------------------> stopped
+human_review_1 --changes_requested------------------------> test_authoring
 ```
 
-`rework` returns through the implementation lane, creates a new candidate, and
-then re-enters Tester. It is not a shortcut around either Human Review.
+The exact legal edges and events are `state_machine.transitions`. A record's
+`transition.from`, `transition.to`, and `transition.event` must name one edge;
+the target must equal the record's `state`. `rework` returns through the
+implementation lane, creates a new candidate, and then re-enters Tester. A
+Gate 1 change request instead creates the next `Tn` in `test_authoring` and does
+not consume production rework. `complete` and `stopped` are terminal.
+
+Evidence is state-dependent. A state requires only evidence already produced
+at that point; future Tester, Reviewer, Final Review, Candidate, or evidence-only
+revision data is invalid rather than silently accepted.
 
 ### Test path
 
@@ -89,10 +104,12 @@ path.
 
 ## 4. Build independent lanes
 
-Record full 40-hex `base_sha`, `test_sha`, `implementation_sha`, and
-`candidate_sha` values. The test and implementation lanes both start from the
-same exact base in independent checkouts/worktrees and produce independent
-commits. Permissions, checkout, inputs, and evidence are separate boundaries.
+Model each revision explicitly: `Tn` for Test, `Wn` for Implementation, and
+`Cn` for Candidate. Record full 40-hex SHAs. Test and Implementation both start
+from `revisions.base_sha` in independent checkouts/worktrees and produce
+independent commits. Candidate records the exact `Tn`/`Wn`, their exact parent
+SHAs, and its tree SHA. Permissions, checkout, inputs, and evidence are separate
+boundaries.
 
 The Worker must not receive or read the owner's acceptance-test implementation.
 The candidate is a deterministic integration revision made from the test and
@@ -101,8 +118,15 @@ one only for an independently deliverable objective.
 
 Tester and Reviewer operate on the same exact candidate SHA. Chat history,
 summaries, or Agent claims are not evidence. Production rework updates only the
-implementation lane and regenerates candidate. The former candidate and all
-evidence bound to it immediately become stale.
+implementation lane and regenerates Candidate. The former Candidate and all
+Tester, Reviewer, or Human Review evidence bound to it immediately become stale.
+
+After an exact Candidate, one `evidence_only` revision may carry only paths in
+`revision_provenance.evidence_only.allowed_paths`. Its parent and
+`base_candidate_sha` must equal that Candidate. A production, workflow-contract,
+or Test-contract path can never masquerade as evidence-only. Final Human Review
+binds the evidence revision when present; Tester and Reviewer remain bound to
+the exact Candidate they evaluated.
 
 ## 5. Human Review Gate 1
 
@@ -118,7 +142,8 @@ A change request is a top-level human comment beginning with the following
 command and followed by its reason:
 
 ```text
-/request-test-changes <full-test-sha> <reason>
+/request-test-changes <full-test-sha>
+<reason>
 ```
 
 Replies, reactions, labels, Agent-authored commands, abbreviated or stale SHAs,
@@ -147,10 +172,14 @@ convergence checkpoint, not a hard timeout. A validation run may continue up to
 times apply only to validation execution; test authoring, implementation,
 exploration, and review use task-specific handoff budgets.
 
-Production rework and KPI optimization each permit at most three automatic
-iterations. On reaching the applicable limit, stop the automatic loop and
-escalate for a human decision. Never reset a counter by renaming a lane or
-creating a fresh session.
+`corrections.production_rework`, `dependency_permission`, and `test_contract`
+are separate audit classes. Only the exact `rework -> implementing` transition
+increments production rework. Dependency/permission corrections and Gate 1
+Test-contract changes carry their own counts and audit entries and never consume
+that cap. Production rework and KPI optimization each permit at most three
+automatic iterations. The third attempt may execute; a subsequent functional
+failure must enter `stopped` with `stop_escalate`. Never reset a counter by
+renaming a lane or creating a fresh session.
 
 ## 7. Candidate evidence and final Human Review
 
@@ -158,9 +187,21 @@ Tester evidence includes its verdict and exact candidate SHA. Reviewer entry
 requires `PASS` on that SHA. Reviewer evidence also binds that same SHA. Any
 candidate change invalidates both.
 
-Before `complete`, obtain final authorized-human approval bound to the exact
-candidate SHA. Record the human reviewer and a stopped 10-minute current-session
-monitor. Only then may the record enter `complete`.
+Before `complete`, obtain an authorized-human GitHub PR review whose current
+state is `APPROVED`, bound to the exact Candidate SHA or its allowed
+evidence-only child. Record repository, PR number, review ID, actor,
+authorization, exact revision, non-dismissed/non-stale state, human reviewer,
+and a stopped 10-minute current-session monitor. Only then may the record enter
+`complete`.
+
+## 8. Role handoffs
+
+Use `handoff_templates` in the machine-readable contract for Orchestrator,
+Explorer, Worker, Tester, and Reviewer. Every handoff supplies the five compact
+sections `inputs`, `forbidden`, `outputs`, `stop_conditions`, and `acceptance`.
+The entries are JSON-pointer-style references to canonical workflow fields; do
+not copy and reinterpret transition, revision, gate, counter, or evidence
+authority in a role-specific prompt.
 
 ## Minimal execution template
 
@@ -172,32 +213,68 @@ with real evidence; do not treat the template itself as evidence.
   "version": 1,
   "issue": {
     "number": 123,
+    "repository": "<owner/repository>",
     "primary_type": "I",
     "impact_flags": ["AR", "TC"]
   },
   "state": "complete",
+  "transition": {
+    "from": "final_human_review",
+    "to": "complete",
+    "event": "final_approved"
+  },
   "gate": {
     "test_required": true,
-    "light_path": null
+    "light_path": null,
+    "required_gates": [
+      "deterministic_tests",
+      "test_contract_review",
+      "workflow_contract"
+    ],
+    "profiles": ["agent_rules", "test_contract"]
   },
-  "lanes": {
+  "revisions": {
     "base_sha": "<40-hex-base>",
-    "test_sha": "<40-hex-test>",
-    "implementation_base_sha": "<same-40-hex-base>",
-    "implementation_sha": "<40-hex-implementation>",
-    "candidate_sha": "<40-hex-candidate>"
+    "test": {
+      "id": "T1",
+      "sha": "<40-hex-test>",
+      "base_sha": "<40-hex-base>"
+    },
+    "implementation": {
+      "id": "W1",
+      "sha": "<40-hex-implementation>",
+      "base_sha": "<40-hex-base>"
+    },
+    "candidate": {
+      "id": "C1",
+      "sha": "<40-hex-candidate>",
+      "test_revision": "T1",
+      "implementation_revision": "W1",
+      "parents": ["<40-hex-implementation>", "<40-hex-test>"],
+      "tree_sha": "<40-hex-tree>"
+    },
+    "evidence": null
   },
   "human_reviews": {
     "test": {
+      "decision": "approved",
       "approved": true,
       "sha": "<40-hex-test>",
       "reviewer": "<human-login>",
       "evidence": {
         "provider": "github",
         "repository": "<owner/repository>",
+        "artifact": "issue_comment",
         "issue_number": 123,
-        "comment_id": "<comment-id>",
-        "command": "/approve-test <40-hex-test>"
+        "comment_id": 456,
+        "top_level": true,
+        "actor": "<human-login>",
+        "authorized_actor": true,
+        "revision_sha": "<40-hex-test>",
+        "command": "/approve-test <40-hex-test>",
+        "edited": false,
+        "deleted": false,
+        "request_changes": false
       },
       "monitor": {
         "status": "stopped",
@@ -206,9 +283,23 @@ with real evidence; do not treat the template itself as evidence.
       }
     },
     "final": {
+      "decision": "approved",
       "approved": true,
       "sha": "<40-hex-candidate>",
       "reviewer": "<human-login>",
+      "evidence": {
+        "provider": "github",
+        "repository": "<owner/repository>",
+        "artifact": "pull_request_review",
+        "pull_request_number": 789,
+        "review_id": 1011,
+        "actor": "<human-login>",
+        "authorized_actor": true,
+        "revision_sha": "<40-hex-candidate>",
+        "state": "APPROVED",
+        "dismissed": false,
+        "stale": false
+      },
       "monitor": {
         "status": "stopped",
         "interval_minutes": 10,
@@ -216,9 +307,11 @@ with real evidence; do not treat the template itself as evidence.
       }
     }
   },
-  "counters": {
-    "production_rework": 0,
-    "kpi_optimization": 0
+  "corrections": {
+    "production_rework": {"count": 0, "disposition": "continue"},
+    "dependency_permission": {"count": 0, "audit": []},
+    "test_contract": {"count": 0, "audit": []},
+    "kpi_optimization": {"count": 0, "disposition": "continue"}
   },
   "tester": {
     "status": "pass",
@@ -228,6 +321,7 @@ with real evidence; do not treat the template itself as evidence.
     "status": "pass",
     "candidate_sha": "<40-hex-candidate>"
   },
+  "stop": null,
   "exception": null
 }
 ```
@@ -236,6 +330,8 @@ Validate after every state or SHA change:
 
 ```text
 python agent-discipline/skills/agent-workflow/scripts/workflow_gate.py <record.json>
+python agent-discipline/skills/agent-workflow/scripts/workflow_gate.py \
+  --previous <previous-record.json> <current-record.json>
 ```
 
 An empty error list with exit code 0 means the recorded transition satisfies

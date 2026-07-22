@@ -20,6 +20,9 @@ handoff's Tester PASS and check out that exact candidate SHA. Bind the review
 evidence to the same SHA. Role entry, stale-evidence invalidation, iteration
 limits, final Human Review, and completion come only from the canonical
 contract. Do not repair production or tests.
+The handoff must populate `handoff_templates.reviewer` (`inputs`, `forbidden`,
+`outputs`, `stop_conditions`, `acceptance`) and include Tester PASS on the exact
+`Cn`. Reject missing or stale Candidate evidence before reading the review diff.
 
 ## What you review (non-test acceptance)
 1. **Domain truth.** Every enum/range/constraint/dependency value used is real —
