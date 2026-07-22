@@ -1118,6 +1118,7 @@ def test_category_a_active_text_is_functional_and_not_agent_governance():
     assert "sufficient to accept" not in active
     assert "sufficient to be accepted" not in active
     assert "green gate demonstrates" not in active
+    assert "a green gate accepts" not in active
 
 
 def test_cli_emits_json_and_exit_2_for_input_or_invocation_errors():
@@ -1211,7 +1212,7 @@ def _public_test_review(decision: str = "approved"):
         "current": True,
         "edited": False,
         "deleted": False,
-        "requested_changes": requested,
+        "requested_changes": False,
     }
     if requested:
         evidence["decision"] = "changes_requested"
@@ -1446,6 +1447,10 @@ def test_public_special_transitions_preserve_counters_and_revision_iterations():
         current = deepcopy(previous)
         assert gate.validate_transition(previous, current, event) == []
 
+        previous = _public_record("rework")
+        current = deepcopy(previous)
+        assert gate.validate_transition(previous, current, event) == []
+
     previous = _public_record("rework")
     current = _public_record("implementing")
     current["counters"]["production_rework"] = 2
@@ -1457,6 +1462,12 @@ def test_public_special_transitions_preserve_counters_and_revision_iterations():
     current = _public_record("stopped")
     current["counters"]["production_rework"] = 3
     assert gate.validate_transition(previous, current, "production_rework") == []
+
+    current["revisions"]["implementation"] = _public_implementation_revision(4)
+    assert any(
+        "fourth" in error or "revisions" in error
+        for error in gate.validate_transition(previous, current, "production_rework")
+    )
 
 
 def test_candidate_revised_requires_new_candidate_and_reset_results():
@@ -1528,8 +1539,34 @@ def test_public_change_request_uses_only_its_approved_extra_fields():
     assert record["human_reviews"]["test"]["approved"] is False
     evidence = record["human_reviews"]["test"]["evidence"]
     assert evidence["decision"] == "changes_requested"
+    assert evidence["requested_changes"] is False
     assert evidence["command"] == f"/request-test-changes {TEST_SHA}\n{evidence['reason']}"
     assert _load_gate().validate_record(record) == []
+
+
+def test_pending_gate_1_and_stopped_provenance_are_valid_minimal_states():
+    validate_record = _load_gate().validate_record
+    pending = _public_record("human_review_1")
+    pending["human_reviews"] = {
+        "test": {
+            "approved": False,
+            "sha": TEST_SHA,
+            "reviewer": None,
+            "evidence": None,
+            "monitor": {
+                "status": "active",
+                "interval_minutes": 10,
+                "scope": "current_session",
+            },
+        }
+    }
+    assert validate_record(pending) == []
+
+    stopped = _public_record("stopped")
+    stopped["counters"]["production_rework"] = 3
+    stopped["tester"] = {"status": "fail", "candidate_sha": CANDIDATE_SHA}
+    stopped["reviewer"] = {"status": "not_run", "candidate_sha": CANDIDATE_SHA}
+    assert validate_record(stopped) == []
 
 
 def test_public_review_diagnostics_name_the_invalid_concept():

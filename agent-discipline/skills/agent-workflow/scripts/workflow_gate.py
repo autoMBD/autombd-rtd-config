@@ -40,7 +40,7 @@
 # File:        workflow_gate.py
 # Author:      autoMBD <tkung.lqk@foxmail.com>
 # Date:        2026-07-22
-# Version:     0.4.1
+# Version:     0.4.2
 # Description: Validate stateful Agent workflow records and transitions.
 # =================================================================================
 
@@ -1197,6 +1197,22 @@ def _validate_public_test_review(
         errors.append("human_reviews.test.approved must be boolean")
     if review.get("sha") != test_sha:
         errors.append("human_reviews.test.sha must equal the current Test SHA")
+    if review.get("evidence") is None:
+        if approved is not False:
+            errors.append("pending Human Review 1 must have approved false")
+        if review.get("reviewer") is not None:
+            errors.append("pending Human Review 1 reviewer must be null")
+        _validate_public_monitor(
+            review.get("monitor"),
+            path="human_reviews.test.monitor",
+            expected_status="active",
+            errors=errors,
+        )
+        if required:
+            errors.append(
+                "human_reviews.test.evidence is required before implementation"
+            )
+        return
     _validate_required_text(
         review.get("reviewer"), "human_reviews.test.reviewer", errors
     )
@@ -1221,7 +1237,6 @@ def _validate_public_test_review(
         "current": True,
         "edited": False,
         "deleted": False,
-        "requested_changes": approved is False,
     }
     concepts = {
         "issue_number": "issue number",
@@ -1230,7 +1245,6 @@ def _validate_public_test_review(
         "current": "current",
         "edited": "edited",
         "deleted": "deleted",
-        "requested_changes": "request",
     }
     for field, expected_value in expected.items():
         if evidence.get(field) != expected_value:
@@ -1240,6 +1254,10 @@ def _validate_public_test_review(
             )
     if evidence.get("test_sha") is not None and evidence.get("test_sha") != test_sha:
         errors.append("human_reviews.test.evidence.test_sha must equal review sha")
+    if approved is True and evidence.get("requested_changes") is True:
+        errors.append(
+            "request: approved Human Review 1 cannot also request changes"
+        )
     comment_id = evidence.get("comment_id")
     if isinstance(comment_id, bool) or not isinstance(comment_id, int) or comment_id <= 0:
         errors.append(
@@ -1852,6 +1870,10 @@ def _validate_public_transition(
                 errors.append("stopped requires production rework count 3")
             if current_production != previous_production:
                 errors.append("stopped must preserve production rework count 3")
+            if current.get("revisions") != previous.get("revisions"):
+                errors.append(
+                    "stopped must preserve revisions and must not create a fourth W"
+                )
     elif current_production != previous_production:
         errors.append("counters.production_rework may change only on production_rework")
 

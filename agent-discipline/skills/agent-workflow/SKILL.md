@@ -151,6 +151,13 @@ command and followed by its reason:
 The literal template is exactly two lines: `/request-test-changes {test_sha}`
 followed by `{reason}`.
 
+Before a decision, Gate 1 may record `approved: false`, a null reviewer and
+evidence, and an active current-session monitor. Once approval or change-request
+evidence is recorded, stop the monitor. A change request is expressed by its
+`changes_requested` decision plus the exact two-line command and reason; it does
+not require `requested_changes: true`. An approval is invalid if that flag is
+true.
+
 Replies, reactions, labels, Agent-authored commands, abbreviated or stale SHAs,
 and edited or deleted approvals are invalid. A new Test SHA invalidates every
 earlier approval. The record binds the approval to the GitHub repository, issue

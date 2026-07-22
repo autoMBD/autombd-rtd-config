@@ -2,7 +2,7 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 1.1.2 |
+| Version | 1.1.3 |
 | Date | 2026-07-22 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | The layered functional-verification contract for the RTD CfgFile CLI. Defines deterministic, static, vendor-validation, and isolated-E2E evidence; the concrete E2E cases live in `rtd-config-test-cases.md`. |
@@ -78,8 +78,9 @@ roadmap.
 - No test asserts against a stub or fabricated value; if the underlying asset is
   unverified (e.g. current `pins.json`), the capability is gated until the asset
   is rebuilt from source (domain-truth §1).
-- A test failure blocks; a green gate accepts. Do not relax a test to pass — fix
-  the production gap.
+- A test failure identifies an unsatisfied engineering criterion. Passing
+  evidence does not independently define repository or release acceptance. Do
+  not relax a test to pass — fix the production gap.
 - Vendor results are recorded with the exact exit code and SEVERE `[TOOL]`
   count, never summarized as "passed" without that evidence.
 
@@ -103,3 +104,4 @@ roadmap.
 | 2026-07-22 | 1.1.0 | Removed active Agent-governance wording while preserving the functional convergence, evidence, isolation, KPI rules, and the harness-consumed `Subagent Prompt` data column. Historical entries remain unchanged. |
 | 2026-07-22 | 1.1.1 | Clarified the active text as a layered functional-evidence contract rather than repository workflow authority; a green gate proves the stated functional criteria and does not independently define review or release acceptance. |
 | 2026-07-22 | 1.1.2 | Removed the remaining green-gate-sufficient wording: passing layers are necessary engineering evidence, while repository review and release authority remain outside this test strategy. |
+| 2026-07-22 | 1.1.3 | Replaced the final green-gate-accepts sentence with engineering-evidence semantics; passing evidence does not independently define repository or release acceptance. |

@@ -108,7 +108,7 @@
       {
         "name": "stopped",
         "required_fields": ["disposition.status"],
-        "forbidden_fields": ["reviewer.candidate_sha", "human_reviews.final.evidence"]
+        "forbidden_fields": ["human_reviews.final.evidence"]
       }
     ],
     "sequence": [
@@ -136,6 +136,8 @@
       {"from": "candidate", "to": "testing", "event": "testing_started"},
       {"from": "testing", "to": "reviewing", "event": "tester_passed"},
       {"from": "testing", "to": "rework", "event": "tester_failed"},
+      {"from": "rework", "to": "rework", "event": "dependency_blocked"},
+      {"from": "rework", "to": "rework", "event": "permission_blocked"},
       {"from": "rework", "to": "implementing", "event": "production_rework"},
       {"from": "rework", "to": "stopped", "event": "production_rework"},
       {"from": "reviewing", "to": "testing", "event": "candidate_revised"},
