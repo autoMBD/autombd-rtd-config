@@ -162,6 +162,10 @@ and a matching `reason` may be used while `requested_changes` is false or absent
 Both require the exact two-line command. An approval is invalid if
 `requested_changes` is true.
 
+The outer Gate 1 `reviewer` identifies the approving human and is required only
+for `approved: true`. Pending and change-request records may keep it null; their
+human actor is proven by the current GitHub issue-comment evidence.
+
 Replies, reactions, labels, Agent-authored commands, abbreviated or stale SHAs,
 and edited or deleted approvals are invalid. A new Test SHA invalidates every
 earlier approval. The record binds the approval to the GitHub repository, issue

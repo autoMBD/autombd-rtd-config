@@ -40,7 +40,7 @@
 # File:        workflow_gate.py
 # Author:      autoMBD <tkung.lqk@foxmail.com>
 # Date:        2026-07-22
-# Version:     0.4.4
+# Version:     0.4.5
 # Description: Validate stateful Agent workflow records and transitions.
 # =================================================================================
 
@@ -1249,9 +1249,10 @@ def _validate_public_test_review(
                 "human_reviews.test.evidence is required before implementation"
             )
         return
-    _validate_required_text(
-        review.get("reviewer"), "human_reviews.test.reviewer", errors
-    )
+    if approved is True:
+        _validate_required_text(
+            review.get("reviewer"), "human_reviews.test.reviewer", errors
+        )
     evidence = _mapping(
         review.get("evidence"), "human_reviews.test.evidence", errors
     )

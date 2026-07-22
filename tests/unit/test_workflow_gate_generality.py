@@ -1575,6 +1575,7 @@ def test_active_change_request_monitor_is_atomic_but_active_approval_is_invalid(
             review["evidence"]["requested_changes"] = True
             review["evidence"].pop("decision")
             review["evidence"].pop("reason")
+        review["reviewer"] = None
         review["monitor"]["status"] = "active"
         previous["human_reviews"] = {"test": review}
         assert gate.validate_record(previous) == [], encoding
@@ -1589,6 +1590,13 @@ def test_active_change_request_monitor_is_atomic_but_active_approval_is_invalid(
     approval["human_reviews"]["test"]["monitor"]["status"] = "active"
     assert any(
         "stopped" in error
+        for error in gate.validate_record(approval)
+    )
+
+    approval = _public_record("implementing")
+    approval["human_reviews"]["test"]["reviewer"] = None
+    assert any(
+        "reviewer" in error
         for error in gate.validate_record(approval)
     )
 
