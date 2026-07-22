@@ -40,7 +40,7 @@
 # File:        workflow_gate.py
 # Author:      autoMBD <tkung.lqk@foxmail.com>
 # Date:        2026-07-22
-# Version:     0.4.3
+# Version:     0.4.4
 # Description: Validate stateful Agent workflow records and transitions.
 # =================================================================================
 
@@ -1168,11 +1168,18 @@ def _validate_public_revision(
 
 
 def _validate_public_monitor(
-    value: Any, *, path: str, expected_status: str, errors: list[str]
+    value: Any,
+    *,
+    path: str,
+    expected_status: str | tuple[str, ...],
+    errors: list[str],
 ) -> None:
     monitor = _mapping(value, path, errors)
-    if monitor.get("status") != expected_status:
-        errors.append(f"{path}.status must be {expected_status}")
+    allowed_statuses = (
+        (expected_status,) if isinstance(expected_status, str) else expected_status
+    )
+    if monitor.get("status") not in allowed_statuses:
+        errors.append(f"{path}.status must be {' or '.join(allowed_statuses)}")
     if monitor.get("interval_minutes") != 10:
         errors.append(f"{path}.interval_minutes must be 10")
     if monitor.get("scope") != "current_session":
@@ -1314,7 +1321,7 @@ def _validate_public_test_review(
     _validate_public_monitor(
         review.get("monitor"),
         path="human_reviews.test.monitor",
-        expected_status="stopped",
+        expected_status=("active", "stopped") if approved is False else "stopped",
         errors=errors,
     )
     if required and approved is not True:

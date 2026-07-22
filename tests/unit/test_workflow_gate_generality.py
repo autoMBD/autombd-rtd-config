@@ -1566,6 +1566,33 @@ def test_public_change_request_accepts_requested_flag_or_decision_reason():
     assert gate.validate_transition(previous, current, "changes_requested") == []
 
 
+def test_active_change_request_monitor_is_atomic_but_active_approval_is_invalid():
+    gate = _load_gate()
+    for encoding in ("requested_flag", "decision_reason"):
+        previous = _public_record("human_review_1")
+        review = _public_test_review("changes_requested")
+        if encoding == "requested_flag":
+            review["evidence"]["requested_changes"] = True
+            review["evidence"].pop("decision")
+            review["evidence"].pop("reason")
+        review["monitor"]["status"] = "active"
+        previous["human_reviews"] = {"test": review}
+        assert gate.validate_record(previous) == [], encoding
+
+        current = _public_record("test_authoring")
+        current["revisions"]["test"] = _public_test_revision(3, None)
+        assert gate.validate_transition(
+            previous, current, "changes_requested"
+        ) == [], encoding
+
+    approval = _public_record("implementing")
+    approval["human_reviews"]["test"]["monitor"]["status"] = "active"
+    assert any(
+        "stopped" in error
+        for error in gate.validate_record(approval)
+    )
+
+
 def test_pending_gate_1_and_stopped_provenance_are_valid_minimal_states():
     validate_record = _load_gate().validate_record
     pending = _public_record("human_review_1")

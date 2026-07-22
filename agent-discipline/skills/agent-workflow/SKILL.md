@@ -152,12 +152,15 @@ The literal template is exactly two lines: `/request-test-changes {test_sha}`
 followed by `{reason}`.
 
 Before a decision, Gate 1 may record `approved: false`, a null reviewer and
-evidence, and an active current-session monitor. Once approval or change-request
-evidence is recorded, stop the monitor. A change request has two equivalent
-encodings: `requested_changes: true` may stand alone with the reason inferred
-from command line 2, or `decision: changes_requested` and a matching `reason`
-may be used while `requested_changes` is false or absent. Both require the exact
-two-line command. An approval is invalid if `requested_changes` is true.
+evidence, and an active current-session monitor. Approval evidence requires a
+stopped monitor. At the atomic change-request boundary, the previous Gate 1
+record may still show an active monitor or may already show it stopped; the
+current `test_authoring` record carries neither review nor monitor. A change
+request has two equivalent encodings: `requested_changes: true` may stand alone
+with the reason inferred from command line 2, or `decision: changes_requested`
+and a matching `reason` may be used while `requested_changes` is false or absent.
+Both require the exact two-line command. An approval is invalid if
+`requested_changes` is true.
 
 Replies, reactions, labels, Agent-authored commands, abbreviated or stale SHAs,
 and edited or deleted approvals are invalid. A new Test SHA invalidates every
