@@ -153,7 +153,7 @@
       "evidence": {
         "provider": "github",
         "artifact": "issue_comment",
-        "repository": "issue.repository",
+        "repository": "non_empty_evidence_repository",
         "approval_command": "/approve-test {test_sha}",
         "change_request_command": "/request-test-changes {test_sha}\n{reason}",
         "full_sha_required": true,
@@ -198,8 +198,14 @@
       "implementation": "W{iteration}",
       "candidate": "C{iteration}"
     },
-    "shared_base": ["revisions.test.base_sha", "revisions.implementation.base_sha"],
-    "candidate_parents": ["revisions.test.sha", "revisions.implementation.sha"]
+    "shared_base": ["test.base_sha", "implementation.base_sha"],
+    "candidate_parents": ["test.sha", "implementation.sha"],
+    "final_evidence_revision": {
+      "reviewed_object": "candidate.sha",
+      "evidence_only": true,
+      "allowed_paths": ["agent-discipline/agent-lessons-learned.md"],
+      "production_paths_allowed": false
+    }
   },
   "revision_provenance": {
     "identities": {

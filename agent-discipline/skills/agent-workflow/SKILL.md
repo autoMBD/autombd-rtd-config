@@ -148,6 +148,9 @@ command and followed by its reason:
 <reason>
 ```
 
+The literal template is exactly two lines: `/request-test-changes {test_sha}`
+followed by `{reason}`.
+
 Replies, reactions, labels, Agent-authored commands, abbreviated or stale SHAs,
 and edited or deleted approvals are invalid. A new Test SHA invalidates every
 earlier approval. The record binds the approval to the GitHub repository, issue
@@ -251,8 +254,6 @@ with real evidence; do not treat the template itself as evidence.
   "version": 1,
   "issue": {
     "number": 123,
-    "repository": "<owner/repository>",
-    "pull_request_number": 789,
     "primary_type": "I",
     "impact_flags": ["AR", "TC"]
   },
@@ -279,11 +280,13 @@ with real evidence; do not treat the template itself as evidence.
   },
   "human_reviews": {
     "test": {
-      "decision": "approved",
+      "approved": true,
+      "sha": "<40-hex-test>",
+      "reviewer": "<human-login>",
       "evidence": {
         "provider": "github", "artifact": "issue_comment",
         "repository": "<owner/repository>", "issue_number": 123,
-        "comment_id": 456, "test_sha": "<40-hex-test>",
+        "comment_id": 456,
         "command": "/approve-test <40-hex-test>",
         "top_level": true, "actor_type": "human", "current": true,
         "edited": false, "deleted": false, "requested_changes": false
@@ -291,11 +294,13 @@ with real evidence; do not treat the template itself as evidence.
       "monitor": {"status": "stopped", "interval_minutes": 10, "scope": "current_session"}
     },
     "final": {
-      "decision": "approved",
+      "approved": true,
+      "sha": "<40-hex-candidate>",
+      "reviewer": "<human-login>",
       "evidence": {
         "provider": "github", "artifact": "pull_request_review",
         "repository": "<owner/repository>", "pull_request_number": 789,
-        "review_id": 1011, "actor": "human", "state": "approved",
+        "review_id": 1011, "actor_type": "human", "state": "approved",
         "current": true, "candidate_sha": "<40-hex-candidate>"
       },
       "monitor": {"status": "stopped", "interval_minutes": 10, "scope": "current_session"}

@@ -1115,6 +1115,9 @@ def test_category_a_active_text_is_functional_and_not_agent_governance():
     assert "agent-runner" not in active
     assert "agent-discipline" not in active
     assert "agents.md" not in active
+    assert "sufficient to accept" not in active
+    assert "sufficient to be accepted" not in active
+    assert "green gate demonstrates" not in active
 
 
 def test_cli_emits_json_and_exit_2_for_input_or_invocation_errors():
@@ -1211,9 +1214,12 @@ def _public_test_review(decision: str = "approved"):
         "requested_changes": requested,
     }
     if requested:
+        evidence["decision"] = "changes_requested"
         evidence["reason"] = reason
     return {
-        "decision": decision,
+        "approved": not requested,
+        "sha": TEST_SHA,
+        "reviewer": "human-reviewer",
         "evidence": evidence,
         "monitor": {
             "status": "stopped",
@@ -1225,14 +1231,16 @@ def _public_test_review(decision: str = "approved"):
 
 def _public_final_review(candidate_sha: str = CANDIDATE_SHA):
     return {
-        "decision": "approved",
+        "approved": True,
+        "sha": candidate_sha,
+        "reviewer": "human-reviewer",
         "evidence": {
             "provider": "github",
             "artifact": "pull_request_review",
             "repository": "org/example-repository",
             "pull_request_number": 456,
             "review_id": 6543,
-            "actor": "human",
+            "actor_type": "human",
             "state": "approved",
             "current": True,
             "candidate_sha": candidate_sha,
@@ -1250,8 +1258,6 @@ def _public_record(state: str) -> dict[str, object]:
         "version": 1,
         "issue": {
             "number": ISSUE_NUMBER,
-            "repository": "org/example-repository",
-            "pull_request_number": 456,
             "primary_type": "B",
             "impact_flags": ["PB"],
         },
@@ -1373,13 +1379,19 @@ def test_public_revision_graph_and_routing_have_exact_shape_and_derivation():
             "candidate": "C{iteration}",
         },
         "shared_base": [
-            "revisions.test.base_sha",
-            "revisions.implementation.base_sha",
+            "test.base_sha",
+            "implementation.base_sha",
         ],
         "candidate_parents": [
-            "revisions.test.sha",
-            "revisions.implementation.sha",
+            "test.sha",
+            "implementation.sha",
         ],
+        "final_evidence_revision": {
+            "reviewed_object": "candidate.sha",
+            "evidence_only": True,
+            "allowed_paths": ["agent-discipline/agent-lessons-learned.md"],
+            "production_paths_allowed": False,
+        },
     }
     routing = contract["routing"]["impact_flags"]
     assert list(routing) == ["PB", "MS", "MW", "RA", "TC", "VS", "EV", "AR", "RP", "ED", "SS", "DO"]
@@ -1478,7 +1490,7 @@ def test_public_human_review_contract_and_evidence_are_exact():
         ("test", "top_level", False),
         ("test", "actor_type", "agent"),
         ("test", "current", False),
-        ("final", "actor", "agent"),
+        ("final", "actor_type", "agent"),
         ("final", "state", "changes_requested"),
         ("final", "current", False),
         ("final", "candidate_sha", "8" * 40),
@@ -1486,6 +1498,62 @@ def test_public_human_review_contract_and_evidence_are_exact():
         record = _public_record("complete")
         record["human_reviews"][review_name]["evidence"][field] = value
         assert any(field in error for error in validate_record(record))
+
+
+def test_public_minimal_issue_and_outer_review_shape_are_authoritative():
+    validate_record = _load_gate().validate_record
+    classify = _public_record("classify")
+    assert set(classify["issue"]) == {"number", "primary_type", "impact_flags"}
+    assert validate_record(classify) == []
+
+    complete = _public_record("complete")
+    test_review = complete["human_reviews"]["test"]
+    final_review = complete["human_reviews"]["final"]
+    assert "decision" not in test_review
+    assert "decision" not in final_review
+    assert test_review["approved"] is True
+    assert test_review["sha"] == TEST_SHA
+    assert final_review["approved"] is True
+    assert final_review["sha"] == CANDIDATE_SHA
+    assert validate_record(complete) == []
+
+    complete["issue"]["repository"] = "org/example-repository"
+    complete["issue"]["pull_request_number"] = 456
+    assert validate_record(complete) == []
+
+
+def test_public_change_request_uses_only_its_approved_extra_fields():
+    record = _public_record("human_review_1")
+    record["human_reviews"] = {"test": _public_test_review("changes_requested")}
+    assert record["human_reviews"]["test"]["approved"] is False
+    evidence = record["human_reviews"]["test"]["evidence"]
+    assert evidence["decision"] == "changes_requested"
+    assert evidence["command"] == f"/request-test-changes {TEST_SHA}\n{evidence['reason']}"
+    assert _load_gate().validate_record(record) == []
+
+
+def test_public_review_diagnostics_name_the_invalid_concept():
+    validate_record = _load_gate().validate_record
+    probes = [
+        ("test", "issue_number", 999, "issue number"),
+        ("test", "comment_id", None, "comment id"),
+        ("test", "top_level", False, "top-level"),
+        ("test", "actor_type", "automation", "human"),
+        ("test", "current", False, "current"),
+        ("test", "edited", True, "edited"),
+        ("test", "deleted", True, "deleted"),
+        ("test", "requested_changes", True, "request"),
+        ("final", "pull_request_number", None, "pull request"),
+        ("final", "review_id", None, "review id"),
+        ("final", "actor_type", "automation", "human"),
+        ("final", "state", "pending", "approved"),
+        ("final", "candidate_sha", "8" * 40, "candidate"),
+    ]
+    for review_name, field, value, concept in probes:
+        record = _public_record("complete")
+        record["human_reviews"][review_name]["evidence"][field] = value
+        errors = validate_record(record)
+        assert any(concept in error.lower() for error in errors), (field, errors)
 
 
 def test_final_evidence_revision_is_candidate_bound_and_path_allowlisted():
@@ -1524,6 +1592,10 @@ def test_skill_has_bounded_structured_handoff_sections_for_all_roles():
             assert label in section
         for marker in markers:
             assert marker.lower() in section.lower()
+
+    assert "/request-test-changes {test_sha}" in text
+    assert "{reason}" in text
+    assert "two-line" in text.lower() or "exactly two lines" in text.lower()
 
 
 def test_cli_exact_json_option_and_stable_result_envelope():

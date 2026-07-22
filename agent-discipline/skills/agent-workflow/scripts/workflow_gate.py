@@ -40,7 +40,7 @@
 # File:        workflow_gate.py
 # Author:      autoMBD <tkung.lqk@foxmail.com>
 # Date:        2026-07-22
-# Version:     0.4.0
+# Version:     0.4.1
 # Description: Validate stateful Agent workflow records and transitions.
 # =================================================================================
 
@@ -1176,7 +1176,7 @@ def _validate_public_monitor(
     if monitor.get("interval_minutes") != 10:
         errors.append(f"{path}.interval_minutes must be 10")
     if monitor.get("scope") != "current_session":
-        errors.append(f"{path}.scope must be current_session")
+        errors.append(f"{path}.scope must be current_session (current session)")
 
 
 def _validate_public_test_review(
@@ -1192,49 +1192,84 @@ def _validate_public_test_review(
             errors.append("human_reviews.test.evidence is required")
         return
     review = _mapping(value, "human_reviews.test", errors)
-    decision = review.get("decision")
-    evidence = review.get("evidence")
-    if decision not in {"approved", "changes_requested"}:
-        errors.append("human_reviews.test.decision must be approved or changes_requested")
-        return
-    evidence = _mapping(evidence, "human_reviews.test.evidence", errors)
+    approved = review.get("approved")
+    if not isinstance(approved, bool):
+        errors.append("human_reviews.test.approved must be boolean")
+    if review.get("sha") != test_sha:
+        errors.append("human_reviews.test.sha must equal the current Test SHA")
+    _validate_required_text(
+        review.get("reviewer"), "human_reviews.test.reviewer", errors
+    )
+    evidence = _mapping(
+        review.get("evidence"), "human_reviews.test.evidence", errors
+    )
+    repository = evidence.get("repository")
+    _validate_required_text(
+        repository, "human_reviews.test.evidence.repository", errors
+    )
+    issue_repository = issue.get("repository")
+    if issue_repository is not None and repository != issue_repository:
+        errors.append(
+            "human_reviews.test.evidence.repository must equal issue.repository"
+        )
     expected = {
         "provider": "github",
         "artifact": "issue_comment",
-        "repository": issue.get("repository"),
         "issue_number": issue.get("number"),
-        "test_sha": test_sha,
         "top_level": True,
         "actor_type": "human",
         "current": True,
         "edited": False,
         "deleted": False,
-        "requested_changes": decision == "changes_requested",
+        "requested_changes": approved is False,
+    }
+    concepts = {
+        "issue_number": "issue number",
+        "top_level": "top-level",
+        "actor_type": "human",
+        "current": "current",
+        "edited": "edited",
+        "deleted": "deleted",
+        "requested_changes": "request",
     }
     for field, expected_value in expected.items():
         if evidence.get(field) != expected_value:
             errors.append(
+                f"{concepts.get(field, field)}: "
                 f"human_reviews.test.evidence.{field} must equal {expected_value!r}"
             )
+    if evidence.get("test_sha") is not None and evidence.get("test_sha") != test_sha:
+        errors.append("human_reviews.test.evidence.test_sha must equal review sha")
     comment_id = evidence.get("comment_id")
-    if isinstance(comment_id, bool) or not (
-        isinstance(comment_id, int) and comment_id > 0 or _is_text(comment_id)
-    ):
-        errors.append("human_reviews.test.evidence.comment_id must identify a comment")
-    if decision == "approved":
+    if isinstance(comment_id, bool) or not isinstance(comment_id, int) or comment_id <= 0:
+        errors.append(
+            "human_reviews.test.evidence.comment_id must be a usable comment id"
+        )
+    if approved is True:
         expected_command = f"/approve-test {test_sha}"
-    else:
+    elif approved is False:
+        if evidence.get("decision") != "changes_requested":
+            errors.append(
+                "human_reviews.test.evidence.decision must be changes_requested"
+            )
         reason = evidence.get("reason")
         _validate_required_text(reason, "human_reviews.test.evidence.reason", errors)
         expected_command = f"/request-test-changes {test_sha}\n{reason}"
+    else:
+        expected_command = None
     if evidence.get("command") != expected_command:
-        errors.append("human_reviews.test.evidence.command is not exact")
+        errors.append(
+            "human_reviews.test.evidence.command must be the exact approval or "
+            "two-line request command"
+        )
     _validate_public_monitor(
         review.get("monitor"),
         path="human_reviews.test.monitor",
         expected_status="stopped",
         errors=errors,
     )
+    if required and approved is not True:
+        errors.append("human_reviews.test.approved must be true before implementation")
 
 
 def _validate_public_final_review(
@@ -1262,30 +1297,63 @@ def _validate_public_final_review(
             errors.append("human_reviews.final is future evidence")
         return
     review = _mapping(value, "human_reviews.final", errors)
-    if review.get("decision") != "approved":
-        errors.append("human_reviews.final.decision must be approved")
+    if review.get("approved") is not True:
+        errors.append("human_reviews.final.approved must be true")
+    if review.get("sha") != candidate_sha:
+        errors.append("human_reviews.final.sha must equal the exact Candidate SHA")
+    _validate_required_text(
+        review.get("reviewer"), "human_reviews.final.reviewer", errors
+    )
     evidence = _mapping(review.get("evidence"), "human_reviews.final.evidence", errors)
+    repository = evidence.get("repository")
+    _validate_required_text(
+        repository, "human_reviews.final.evidence.repository", errors
+    )
+    issue_repository = issue.get("repository")
+    if issue_repository is not None and repository != issue_repository:
+        errors.append(
+            "human_reviews.final.evidence.repository must equal issue.repository"
+        )
     expected = {
         "provider": "github",
         "artifact": "pull_request_review",
-        "repository": issue.get("repository"),
-        "pull_request_number": issue.get("pull_request_number"),
-        "actor": "human",
-        "state": "approved",
+        "actor_type": "human",
         "current": True,
         "candidate_sha": candidate_sha,
+    }
+    concepts = {
+        "actor_type": "human",
+        "state": "approved",
+        "current": "current",
+        "candidate_sha": "candidate",
     }
     for field, expected_value in expected.items():
         if evidence.get(field) != expected_value:
             errors.append(
+                f"{concepts.get(field, field)}: "
                 f"human_reviews.final.evidence.{field} must equal {expected_value!r}"
             )
+    state_value = evidence.get("state")
+    if not isinstance(state_value, str) or state_value.lower() != "approved":
+        errors.append(
+            "approved: human_reviews.final.evidence.state must be approved"
+        )
     for field in ("pull_request_number", "review_id"):
         value = evidence.get(field)
         if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
             errors.append(
+                f"{'pull request' if field == 'pull_request_number' else 'review id'}: "
                 f"human_reviews.final.evidence.{field} must be a positive integer"
             )
+    issue_pull_request = issue.get("pull_request_number")
+    if (
+        issue_pull_request is not None
+        and evidence.get("pull_request_number") != issue_pull_request
+    ):
+        errors.append(
+            "human_reviews.final.evidence.pull_request_number must equal "
+            "issue.pull_request_number"
+        )
     if test_repository is not None and evidence.get("repository") != test_repository:
         errors.append(
             "human_reviews.final.evidence.repository must equal "
@@ -1319,9 +1387,10 @@ def _validate_public_record(record: Mapping[str, Any]) -> list[str]:
 
     issue = _mapping(record.get("issue"), "issue", errors)
     number = issue.get("number")
-    if isinstance(number, bool) or not isinstance(number, int):
-        errors.append("issue.number must be an integer")
-    _validate_required_text(issue.get("repository"), "issue.repository", errors)
+    if isinstance(number, bool) or not isinstance(number, int) or number <= 0:
+        errors.append("issue.number must be a usable positive issue number")
+    if issue.get("repository") is not None:
+        _validate_required_text(issue.get("repository"), "issue.repository", errors)
     primary_type = issue.get("primary_type")
     if not isinstance(primary_type, str) or primary_type not in TASK_CLASSES:
         errors.append("issue.primary_type must use a canonical primary type")
@@ -1745,6 +1814,16 @@ def _validate_public_transition(
         current_counters.get("production_rework")
         if isinstance(current_counters, Mapping) else None
     )
+    previous_kpi = (
+        previous_counters.get("kpi_optimization")
+        if isinstance(previous_counters, Mapping) else None
+    )
+    current_kpi = (
+        current_counters.get("kpi_optimization")
+        if isinstance(current_counters, Mapping) else None
+    )
+    if current_kpi != previous_kpi:
+        errors.append("counters.kpi_optimization must be preserved by transitions")
     if event == "production_rework":
         if source != "rework":
             errors.append("production_rework requires state rework")
@@ -1761,6 +1840,13 @@ def _validate_public_transition(
             current_w = _public_revision_iteration(current, "implementation")
             if not isinstance(previous_w, int) or current_w != previous_w + 1:
                 errors.append("production_rework must create the next W iteration")
+            revisions = current.get("revisions")
+            implementation = (
+                revisions.get("implementation")
+                if isinstance(revisions, Mapping) else None
+            )
+            if not isinstance(implementation, Mapping) or implementation.get("sha") is not None:
+                errors.append("production_rework must start the next uncommitted W revision")
         else:
             if previous_production != CONTRACT["limits"]["production_rework"]:
                 errors.append("stopped requires production rework count 3")
@@ -1777,12 +1863,22 @@ def _validate_public_transition(
     if event == "changes_requested" and source == "human_review_1":
         reviews = previous.get("human_reviews")
         review = reviews.get("test") if isinstance(reviews, Mapping) else None
-        if not isinstance(review, Mapping) or review.get("decision") != "changes_requested":
+        evidence = review.get("evidence") if isinstance(review, Mapping) else None
+        if (
+            not isinstance(review, Mapping)
+            or review.get("approved") is not False
+            or not isinstance(evidence, Mapping)
+            or evidence.get("decision") != "changes_requested"
+        ):
             errors.append("changes_requested requires Human Review 1 change evidence")
         previous_t = _public_revision_iteration(previous, "test")
         current_t = _public_revision_iteration(current, "test")
         if not isinstance(previous_t, int) or current_t != previous_t + 1:
             errors.append("changes_requested must create the next T iteration")
+        revisions = current.get("revisions")
+        test = revisions.get("test") if isinstance(revisions, Mapping) else None
+        if not isinstance(test, Mapping) or test.get("sha") is not None:
+            errors.append("changes_requested must start the next uncommitted T revision")
     if event == "tester_failed":
         tester = previous.get("tester")
         if not isinstance(tester, Mapping) or tester.get("status") != "fail":
@@ -1794,7 +1890,7 @@ def _validate_public_transition(
     if event == "test_approved":
         reviews = current.get("human_reviews")
         review = reviews.get("test") if isinstance(reviews, Mapping) else None
-        if not isinstance(review, Mapping) or review.get("decision") != "approved":
+        if not isinstance(review, Mapping) or review.get("approved") is not True:
             errors.append("test_approved requires approved Human Review 1 evidence")
     if event == "reviewer_passed":
         reviewer = current.get("reviewer")
@@ -1803,7 +1899,7 @@ def _validate_public_transition(
     if event == "final_approved":
         reviews = current.get("human_reviews")
         review = reviews.get("final") if isinstance(reviews, Mapping) else None
-        if not isinstance(review, Mapping) or review.get("decision") != "approved":
+        if not isinstance(review, Mapping) or review.get("approved") is not True:
             errors.append("final_approved requires approved final review evidence")
     if event == "candidate_revised":
         old_sha = _public_candidate_sha(previous)
