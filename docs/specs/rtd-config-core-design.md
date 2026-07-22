@@ -2,8 +2,8 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.7.3 |
-| Date | 2026-07-18 |
+| Version | 0.7.4 |
+| Date | 2026-07-22 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Long-term architecture and goals for the RTD CfgFile CLI. Holds the stable CLI/JSON contract, module-ownership rules, engineering constraints, and the minimal-system definition. Domain facts live in domain-truth; the test method lives in the test strategy; E2E cases live in the test-cases catalog. |
 
@@ -12,9 +12,10 @@
 RTD CfgFile CLI is a CLI-first system that edits RTD configuration files
 (S32 ConfigTools `.mex` and EB tresos `.xdm`) by vendor rules, takes
 structured requests, produces deterministic project edits, and verifies the
-result through the vendor code-generation / validation flow. Companion Agent
-Skills ship with it so AI agents can turn user requirements into intents,
-run verification, and read diagnostics without touching implementation code.
+result through the vendor code-generation / validation flow. Companion workflow
+skills ship with it so automation clients can turn user requirements into
+intents, run verification, and read diagnostics without touching implementation
+code.
 
 The **stable external contract is the CLI and its JSON I/O.** Internal Python is
 free to change behind that boundary.
@@ -24,9 +25,8 @@ no milestone, schedule, or staging information (that lives only in the roadmap).
 It does not repeat: RTD enum/pin/fixture/S32DS
 facts (see `rtd-config-domain-truth.md`), or the test method and E2E cases (see
 `docs/tests/rtd-config-test-strategy.md` and `docs/tests/rtd-config-test-cases.md`).
-General software practice (TDD, stdlib-first,
-structured-diagnostics-not-tracebacks) is assumed of every agent and is not
-respecified here.
+General software practices such as TDD, stdlib-first implementation, and
+structured diagnostics instead of tracebacks are not respecified here.
 
 ### Key terms (project-specific only)
 - **Backend** — a configuration technology (`.mex`, `.xdm`); each owns its
@@ -47,8 +47,8 @@ respecified here.
 | ID | Goal | Success signal |
 | --- | --- | --- |
 | G01 | Deterministic CLI for RTD config-file edits. | Same project + assets + version + request → same plan, edits, diagnostics, verification. |
-| G02 | Let agents configure RTD projects without driving vendor GUIs. | Agents turn requirements into JSON intents / shortcuts and complete configuration via the CLI. |
-| G03 | Support agent requirement decomposition via companion skills. | Skills guide multi-signal analysis, pins, dependencies, and validation feedback before CLI calls. |
+| G02 | Let automation clients configure RTD projects without driving vendor GUIs. | Clients turn requirements into JSON intents / shortcuts and complete configuration via the CLI. |
+| G03 | Support requirement decomposition via companion workflow skills. | Skills guide multi-signal analysis, pins, dependencies, and validation feedback before CLI calls. |
 | G04 | Preserve module ownership and explicit dependencies. | Modules/features are added without entangling write ownership or hidden dependency edits. |
 | G05 | Backend extensibility. | Backends share the intent/diagnostics/asset/test concepts; each adds only its own document core and vendor-validation integration. |
 | G06 | Device/family/module/RTD-release growth. | Assets and providers expand to new devices, families, and RTD releases without architecture change. |
@@ -75,7 +75,7 @@ Modular configuration core behind a CLI shell. Editable diagram:
 
 ```mermaid
 flowchart LR
-  UserReq["User requirements"] --> Skill["Companion Agent Skills"] --> CLI["RTD CfgFile CLI (CLI + JSON)"]
+  UserReq["User requirements"] --> Skill["Companion workflow skills"] --> CLI["RTD CfgFile CLI (CLI + JSON)"]
   CLI --> Intent["Intent / plan layer"] --> Providers["Module providers<br/>(one per RTD module)"]
   CLI --> Assets["Assets<br/>pins / schema / constraints / profiles"]
   Providers --> Assets
@@ -83,8 +83,8 @@ flowchart LR
   Project --> Verify["Runtime verification<br/>static checks + vendor validation"] --> CLI
 ```
 
-Layers: **CLI** (core commands + shortcuts that normalize to intent) → **Agent
-Skills** (workflow adapters over the public CLI, never bypassing it) → **Intent/
+Layers: **CLI** (core commands + shortcuts that normalize to intent) → **Workflow
+skills** (adapters over the public CLI, never bypassing it) → **Intent/
 plan** (normalize, resolve dependencies, diagnose, dry-run) → **Backend document
 core** (parse/index/localized-edit/byte-faithful-write) → **Module providers**
 (own plan+apply for one module) → **Shared services** (pins, schema/cache,
@@ -237,16 +237,16 @@ in the test-cases catalog.
 
 Defined by `docs/tests/rtd-config-test-strategy.md` (test layers, vendor gate,
 acceptance rule); the concrete E2E cases live in
-`docs/tests/rtd-config-test-cases.md` (scheme `RTD-MEX-*`). In short: tests are the
-sole "done" signal; a module is accepted when the deterministic suite, static
-checks, the vendor gate, and its E2E cases (black-box protocol) all
-pass; **every supported module reaches the same validated bar**. Delivery
-staging lives in the roadmap.
+`docs/tests/rtd-config-test-cases.md` (scheme `RTD-MEX-*`). Together, the
+deterministic suite, static checks, vendor gate, and black-box E2E cases provide
+the required functional evidence for a module; **every supported module reaches
+the same validated bar**. Delivery staging lives in the roadmap.
 
 ## Success criteria
 
 - core CLI commands return stable JSON; shortcuts normalize to one pipeline;
-- companion skills guide agents without private implementation details;
+- companion workflow skills guide automation clients without private
+  implementation details;
 - backend document cores configure projects through structured, narrow,
   byte-faithful edits following domain-truth;
 - providers preserve ownership; cross-module dependencies are explicit in plans;
@@ -267,7 +267,7 @@ this project:
 - **Narrow, byte-faithful `.mex` writes**: a no-edit write is byte-identical; an
   owned edit touches only changed lines; no edits outside module ownership.
 - **Never invent vendor values**; diagnostics instead of tracebacks.
-- **The released deliverable** is the self-contained `autombd-rtd/` Agent Skill
+- **The released deliverable** is the self-contained `autombd-rtd/` workflow package
   (`SKILL.md` + launcher + `assets/` + bundled CLI).
 
 ### Development release boundary
@@ -284,6 +284,7 @@ configured installation environment internally.
 
 | Date | Version | Description |
 | --- | --- | --- |
+| 2026-07-22 | 0.7.4 | Kept the active architecture client-neutral by describing companion workflow skills as public-CLI adapters and removing role-specific workflow assumptions; historical changelog entries remain unchanged. |
 | 2026-07-18 | 0.7.3 | Defined one normalized development coverage source per module with pooled descriptor facts, embedded classification/gap rules, in-memory resolved reports, and explicit exact/subset asset-domain assertions independent of runtime assets. |
 | 2026-07-15 | 0.7.2 | Moved descriptor surface coverage out of runtime assets into exact-source, development-only per-module sidecars and required an inventory for all eight shipped providers. |
 | 2026-06-23 | 0.7.1 | Made the asset-build sequence extract the module's **complete editable surface** (G10 — the descriptor defines the surface, not the subset a test case exercises) and added a per-module `_coverage` surface-coverage inventory (configurable today vs. deferred) as an asset kind and a build-sequence output, so a deferred surface is recorded rather than left an undocumented gap. |

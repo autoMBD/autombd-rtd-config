@@ -48,6 +48,7 @@ from copy import deepcopy
 import importlib.util
 import json
 from pathlib import Path
+import re
 import subprocess
 import sys
 
@@ -291,17 +292,13 @@ def test_contract_uses_the_approved_ordered_platform_neutral_schema():
 
     final_review = contract["state_machine"]["final_human_review"]
     assert final_review["before"] == "complete"
-    assert final_review["binds"] == "candidate_or_evidence_sha"
+    assert final_review["binds"] == "candidate_sha"
     assert final_review["monitor"] == "human_review_monitor"
-    assert final_review["evidence"] == {
-        "provider": "github",
-        "artifact": "pull_request_review",
-        "repository": "issue.repository",
-        "authorized_actor": "human",
-        "full_sha_required": True,
-        "current_state": "APPROVED",
-        "invalidated_by": ["dismissed", "stale", "revision_change"],
-    }
+    assert final_review["evidence"]["provider"] == "github"
+    assert final_review["evidence"]["artifact"] == "pull_request_review"
+    assert final_review["evidence"]["binds"] == "candidate_sha"
+    assert final_review["evidence"]["authorized_actor"] == "human"
+    assert "candidate_sha" in final_review["evidence"]["required_fields"]
     assert contract["limits"] == {
         "production_rework": 3,
         "kpi_optimization": 3,
@@ -691,14 +688,17 @@ def test_canonical_bad_container_members_report_errors_without_raising():
 def test_contract_exposes_executable_transitions_routing_corrections_and_handoffs():
     contract = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
 
-    transitions = contract["state_machine"]["transitions"]
-    assert transitions["implementing"]["candidate"] == "implementation_ready"
-    assert transitions["candidate"]["testing"] == "candidate_ready"
-    assert transitions["testing"]["reviewing"] == "functional_pass"
-    assert transitions["testing"]["rework"] == "functional_failure"
-    assert transitions["rework"]["implementing"] == "production_rework"
-    assert transitions["rework"]["stopped"] == "rework_cap_reached"
-    assert transitions["human_review_1"]["test_authoring"] == "changes_requested"
+    transitions = {
+        (item["from"], item["to"], item["event"])
+        for item in contract["state_machine"]["transitions"]
+    }
+    assert ("implementing", "candidate", "candidate_created") in transitions
+    assert ("candidate", "testing", "testing_started") in transitions
+    assert ("testing", "reviewing", "tester_passed") in transitions
+    assert ("testing", "rework", "tester_failed") in transitions
+    assert ("rework", "implementing", "production_rework") in transitions
+    assert ("rework", "stopped", "production_rework") in transitions
+    assert ("human_review_1", "test_authoring", "changes_requested") in transitions
     assert "stopped" in contract["state_machine"]["terminal_states"]
 
     assert set(contract["impact_routing"]) == {
@@ -1119,19 +1119,431 @@ def test_category_a_active_text_is_functional_and_not_agent_governance():
 
 def test_cli_emits_json_and_exit_2_for_input_or_invocation_errors():
     commands = [
-        ([sys.executable, str(GATE_PATH)], b"{not-json"),
-        ([sys.executable, str(GATE_PATH)], b"\xff"),
+        ([sys.executable, str(GATE_PATH), "--json", "-"], b"{not-json"),
+        ([sys.executable, str(GATE_PATH), "--json", "-"], b"\xff"),
         (
-            [sys.executable, str(GATE_PATH), "tests/.tmp/does-not-exist.json"],
+            [sys.executable, str(GATE_PATH), "--json", "tests/.tmp/does-not-exist.json"],
             None,
         ),
-        ([sys.executable, str(GATE_PATH), "one.json", "two.json"], None),
+        ([sys.executable, str(GATE_PATH)], None),
     ]
 
     for command, payload in commands:
         result = subprocess.run(command, input=payload, capture_output=True, check=False)
         assert result.returncode == 2
         body = json.loads(result.stdout.decode("utf-8"))
-        assert body["valid"] is False
+        assert body["ok"] is False
+        assert body["error_type"] == "input"
         assert body["errors"]
         assert b"Traceback" not in result.stderr
+
+
+PUBLIC_STATES = [
+    "classify",
+    "test_authoring",
+    "human_review_1",
+    "implementing",
+    "candidate",
+    "testing",
+    "rework",
+    "reviewing",
+    "final_human_review",
+    "complete",
+    "stopped",
+]
+
+
+def _public_test_revision(iteration: int = 2, sha: str | None = TEST_SHA):
+    return {
+        "identity": f"T{iteration}",
+        "iteration": iteration,
+        "base_sha": BASE_SHA,
+        "sha": sha,
+    }
+
+
+def _public_implementation_revision(
+    iteration: int = 3, sha: str | None = IMPLEMENTATION_SHA
+):
+    return {
+        "identity": f"W{iteration}",
+        "iteration": iteration,
+        "base_sha": BASE_SHA,
+        "sha": sha,
+    }
+
+
+def _public_candidate_revision(
+    iteration: int = 4, sha: str = CANDIDATE_SHA
+):
+    return {
+        "identity": f"C{iteration}",
+        "iteration": iteration,
+        "sha": sha,
+        "parents": {
+            "test_sha": TEST_SHA,
+            "implementation_sha": IMPLEMENTATION_SHA,
+        },
+    }
+
+
+def _public_test_review(decision: str = "approved"):
+    reason = "Exercise arbitrary channel and partition counts."
+    requested = decision == "changes_requested"
+    command = (
+        f"/request-test-changes {TEST_SHA}\n{reason}"
+        if requested
+        else f"/approve-test {TEST_SHA}"
+    )
+    evidence = {
+        "provider": "github",
+        "artifact": "issue_comment",
+        "repository": "org/example-repository",
+        "issue_number": ISSUE_NUMBER,
+        "comment_id": 9876,
+        "command": command,
+        "test_sha": TEST_SHA,
+        "top_level": True,
+        "actor_type": "human",
+        "current": True,
+        "edited": False,
+        "deleted": False,
+        "requested_changes": requested,
+    }
+    if requested:
+        evidence["reason"] = reason
+    return {
+        "decision": decision,
+        "evidence": evidence,
+        "monitor": {
+            "status": "stopped",
+            "interval_minutes": 10,
+            "scope": "current_session",
+        },
+    }
+
+
+def _public_final_review(candidate_sha: str = CANDIDATE_SHA):
+    return {
+        "decision": "approved",
+        "evidence": {
+            "provider": "github",
+            "artifact": "pull_request_review",
+            "repository": "org/example-repository",
+            "pull_request_number": 456,
+            "review_id": 6543,
+            "actor": "human",
+            "state": "approved",
+            "current": True,
+            "candidate_sha": candidate_sha,
+        },
+        "monitor": {
+            "status": "stopped",
+            "interval_minutes": 10,
+            "scope": "current_session",
+        },
+    }
+
+
+def _public_record(state: str) -> dict[str, object]:
+    record = {
+        "version": 1,
+        "issue": {
+            "number": ISSUE_NUMBER,
+            "repository": "org/example-repository",
+            "pull_request_number": 456,
+            "primary_type": "B",
+            "impact_flags": ["PB"],
+        },
+        "state": state,
+        "gate": {"test_required": True},
+        "revisions": {"base_sha": BASE_SHA},
+        "counters": {"production_rework": 1, "kpi_optimization": 0},
+        "exception": None,
+    }
+    revisions = record["revisions"]
+    if state in PUBLIC_STATES[1:]:
+        revisions["test"] = _public_test_revision(
+            sha=None if state == "test_authoring" else TEST_SHA
+        )
+    if state in PUBLIC_STATES[3:]:
+        revisions["implementation"] = _public_implementation_revision(
+            sha=None if state == "implementing" else IMPLEMENTATION_SHA
+        )
+        record["human_reviews"] = {"test": _public_test_review()}
+    if state in PUBLIC_STATES[4:]:
+        revisions["candidate"] = _public_candidate_revision()
+    if state == "testing":
+        record["tester"] = {"status": "pending", "candidate_sha": CANDIDATE_SHA}
+    elif state == "rework":
+        record["tester"] = {"status": "fail", "candidate_sha": CANDIDATE_SHA}
+    elif state in {"reviewing", "final_human_review", "complete"}:
+        record["tester"] = {"status": "pass", "candidate_sha": CANDIDATE_SHA}
+    if state == "reviewing":
+        record["reviewer"] = {"status": "pending", "candidate_sha": CANDIDATE_SHA}
+    elif state in {"final_human_review", "complete"}:
+        record["reviewer"] = {"status": "pass", "candidate_sha": CANDIDATE_SHA}
+    if state == "final_human_review":
+        record.setdefault("human_reviews", {})["final"] = {
+            "monitor": {
+                "status": "active",
+                "interval_minutes": 10,
+                "scope": "current_session",
+            }
+        }
+    elif state == "complete":
+        record.setdefault("human_reviews", {})["final"] = _public_final_review()
+    if state == "stopped":
+        record["disposition"] = {
+            "status": "stop_escalate",
+            "reason": "The automatic production-rework cap was reached.",
+        }
+    return record
+
+
+def _delete_path(record: dict[str, object], path: str) -> None:
+    parts = path.split(".")
+    target = record
+    for part in parts[:-1]:
+        target = target[part]
+    target.pop(parts[-1], None)
+
+
+def _set_path(record: dict[str, object], path: str, value: object) -> None:
+    parts = path.split(".")
+    target = record
+    for part in parts[:-1]:
+        target = target.setdefault(part, {})
+    target[parts[-1]] = value
+
+
+def test_public_contract_states_drive_required_and_forbidden_record_paths():
+    contract = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
+    states = contract["state_machine"]["states"]
+    assert [item["name"] for item in states] == PUBLIC_STATES
+    probes = {
+        "classify": "issue.primary_type",
+        "test_authoring": "revisions.test.identity",
+        "human_review_1": "revisions.test.sha",
+        "implementing": "human_reviews.test.evidence",
+        "candidate": "revisions.candidate.parents",
+        "testing": "tester.candidate_sha",
+        "rework": "tester.status",
+        "reviewing": "tester.candidate_sha",
+        "final_human_review": "reviewer.candidate_sha",
+        "complete": "human_reviews.final.evidence",
+        "stopped": "disposition.status",
+    }
+    for state in states:
+        assert state["required_fields"]
+        assert isinstance(state["forbidden_fields"], list)
+        assert set(state["required_fields"]).isdisjoint(state["forbidden_fields"])
+        assert probes[state["name"]] in state["required_fields"]
+
+
+def test_minimal_record_for_every_public_state_is_valid_and_rules_are_executable():
+    gate = _load_gate()
+    contract = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
+    state_rules = {item["name"]: item for item in contract["state_machine"]["states"]}
+    forbidden_value = "f" * 40
+
+    for state in PUBLIC_STATES:
+        record = _public_record(state)
+        before = deepcopy(record)
+        assert gate.validate_record(record) == [], state
+        assert record == before
+
+        for required in state_rules[state]["required_fields"]:
+            missing = deepcopy(record)
+            _delete_path(missing, required)
+            assert any(required in error for error in gate.validate_record(missing))
+
+        for forbidden in state_rules[state]["forbidden_fields"]:
+            illegal = deepcopy(record)
+            _set_path(illegal, forbidden, forbidden_value)
+            assert any(forbidden in error for error in gate.validate_record(illegal))
+
+
+def test_public_revision_graph_and_routing_have_exact_shape_and_derivation():
+    contract = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
+    assert contract["revision_graph"] == {
+        "identities": {
+            "test": "T{iteration}",
+            "implementation": "W{iteration}",
+            "candidate": "C{iteration}",
+        },
+        "shared_base": [
+            "revisions.test.base_sha",
+            "revisions.implementation.base_sha",
+        ],
+        "candidate_parents": [
+            "revisions.test.sha",
+            "revisions.implementation.sha",
+        ],
+    }
+    routing = contract["routing"]["impact_flags"]
+    assert list(routing) == ["PB", "MS", "MW", "RA", "TC", "VS", "EV", "AR", "RP", "ED", "SS", "DO"]
+    assert all(item["required_gates"] and item["profiles"] for item in routing.values())
+    flags = ["SS", "PB", "MW"]
+    assert _load_gate().derive_routing(flags) == {
+        "required_gates": sorted(
+            {gate for flag in flags for gate in routing[flag]["required_gates"]}
+        ),
+        "profiles": sorted(
+            {profile for flag in flags for profile in routing[flag]["profiles"]}
+        ),
+    }
+
+
+def test_public_forward_transitions_use_approved_events():
+    gate = _load_gate()
+    sequence = [
+        ("classify", "test_authoring", "classification_complete"),
+        ("test_authoring", "human_review_1", "test_frozen"),
+        ("human_review_1", "implementing", "test_approved"),
+        ("implementing", "candidate", "candidate_created"),
+        ("candidate", "testing", "testing_started"),
+        ("testing", "reviewing", "tester_passed"),
+        ("reviewing", "final_human_review", "reviewer_passed"),
+        ("final_human_review", "complete", "final_approved"),
+    ]
+    for source, target, event in sequence:
+        previous = _public_record(source)
+        current = _public_record(target)
+        if source == "testing":
+            previous["tester"]["status"] = "pass"
+        assert gate.validate_transition(previous, current, event) == [], event
+
+
+def test_public_special_transitions_preserve_counters_and_revision_iterations():
+    gate = _load_gate()
+
+    previous = _public_record("human_review_1")
+    previous["human_reviews"] = {"test": _public_test_review("changes_requested")}
+    current = _public_record("test_authoring")
+    current["revisions"]["test"] = _public_test_revision(3, None)
+    assert gate.validate_transition(previous, current, "changes_requested") == []
+
+    previous = _public_record("testing")
+    previous["tester"]["status"] = "fail"
+    current = _public_record("rework")
+    assert gate.validate_transition(previous, current, "tester_failed") == []
+
+    for event in ("dependency_blocked", "permission_blocked"):
+        previous = _public_record("implementing")
+        current = deepcopy(previous)
+        assert gate.validate_transition(previous, current, event) == []
+
+    previous = _public_record("rework")
+    current = _public_record("implementing")
+    current["counters"]["production_rework"] = 2
+    current["revisions"]["implementation"] = _public_implementation_revision(4, None)
+    assert gate.validate_transition(previous, current, "production_rework") == []
+
+    previous = _public_record("rework")
+    previous["counters"]["production_rework"] = 3
+    current = _public_record("stopped")
+    current["counters"]["production_rework"] = 3
+    assert gate.validate_transition(previous, current, "production_rework") == []
+
+
+def test_candidate_revised_requires_new_candidate_and_reset_results():
+    gate = _load_gate()
+    previous = _public_record("reviewing")
+    current = _public_record("testing")
+    new_sha = "7" * 40
+    current["revisions"]["candidate"] = _public_candidate_revision(5, new_sha)
+    current["tester"] = {"status": "pending", "candidate_sha": new_sha}
+    current["reviewer"] = {"status": "not_run", "candidate_sha": new_sha}
+    assert gate.validate_transition(previous, current, "candidate_revised") == []
+
+    current["reviewer"]["status"] = "pass"
+    assert any("reviewer.status" in error for error in gate.validate_transition(previous, current, "candidate_revised"))
+
+
+def test_public_human_review_contract_and_evidence_are_exact():
+    contract = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
+    gate_1 = contract["state_machine"]["human_review_1"]["evidence"]
+    assert gate_1["change_request_command"] == "/request-test-changes {test_sha}\n{reason}"
+    final = contract["state_machine"]["final_human_review"]["evidence"]
+    assert final["provider"] == "github"
+    assert final["artifact"] == "pull_request_review"
+    assert final["binds"] == "candidate_sha"
+    assert final["authorized_actor"] == "human"
+    assert {"repository", "pull_request_number", "review_id", "state", "candidate_sha"} <= set(final["required_fields"])
+    assert {"candidate_sha_change", "review_edit", "review_dismissal", "request_changes"} <= set(final["invalidated_by"])
+
+    validate_record = _load_gate().validate_record
+    for review_name, field, value in (
+        ("test", "top_level", False),
+        ("test", "actor_type", "agent"),
+        ("test", "current", False),
+        ("final", "actor", "agent"),
+        ("final", "state", "changes_requested"),
+        ("final", "current", False),
+        ("final", "candidate_sha", "8" * 40),
+    ):
+        record = _public_record("complete")
+        record["human_reviews"][review_name]["evidence"][field] = value
+        assert any(field in error for error in validate_record(record))
+
+
+def test_final_evidence_revision_is_candidate_bound_and_path_allowlisted():
+    validate_record = _load_gate().validate_record
+    record = _public_record("complete")
+    record["revisions"]["final_evidence"] = {
+        "identity": "E9",
+        "sha": EVIDENCE_SHA,
+        "reviewed_candidate_sha": CANDIDATE_SHA,
+        "changed_paths": ["agent-discipline/agent-lessons-learned.md"],
+    }
+    assert validate_record(record) == []
+
+    record["revisions"]["final_evidence"]["changed_paths"] = [
+        "agent-discipline/workflow-contract.json"
+    ]
+    assert any("changed_paths" in error for error in validate_record(record))
+
+
+def test_skill_has_bounded_structured_handoff_sections_for_all_roles():
+    text = Path("agent-discipline/skills/agent-workflow/SKILL.md").read_text(encoding="utf-8")
+    assert "## Handoff templates" in text
+    role_markers = {
+        "Orchestrator": ["classification", "exact SHA", "human review"],
+        "Explorer": ["ground truth", "read-only", "decision-ready"],
+        "Worker": ["capability", "acceptance-test implementation", "implementation SHA"],
+        "Tester": ["candidate SHA", "production repair", "pass/fail"],
+        "Reviewer": ["tester pass", "production write", "lessons"],
+    }
+    for role, markers in role_markers.items():
+        match = re.search(rf"(?ms)^### {role}(?: Handoff)?\s*$\n(.*?)(?=^### |^## |\Z)", text)
+        assert match, role
+        section = match.group(1)
+        assert len(section.split()) <= 220
+        for label in ("Inputs", "Forbidden sources", "Forbidden actions", "Outputs", "Stop conditions", "Acceptance criteria"):
+            assert label in section
+        for marker in markers:
+            assert marker.lower() in section.lower()
+
+
+def test_cli_exact_json_option_and_stable_result_envelope():
+    script = str(GATE_PATH)
+    valid = _public_record("classify")
+    invalid = deepcopy(valid)
+    invalid["issue"].pop("primary_type")
+    cases = [
+        ([sys.executable, script, "--json", "-"], json.dumps(valid).encode(), 0, None),
+        ([sys.executable, script, "--json", "-"], json.dumps(invalid).encode(), 1, "validation"),
+        ([sys.executable, script, "--json", "-"], b"{bad", 2, "input"),
+        ([sys.executable, script, "--json", "-"], b"\xff", 2, "input"),
+        ([sys.executable, script, "--json", "tests/.tmp/missing-workflow.json"], None, 2, "input"),
+        ([sys.executable, script], None, 2, "input"),
+    ]
+    for command, payload, returncode, error_type in cases:
+        result = subprocess.run(command, input=payload, capture_output=True, check=False)
+        assert result.returncode == returncode
+        body = json.loads(result.stdout.decode("utf-8"))
+        assert body["ok"] is (returncode == 0)
+        assert isinstance(body["errors"], list)
+        assert body["error_type"] == error_type
+        assert b"Traceback" not in result.stdout + result.stderr

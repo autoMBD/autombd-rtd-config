@@ -2,7 +2,7 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.35.1 |
+| Version | 0.35.2 |
 | Date | 2026-07-22 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Current pass/fail evidence for the E2E acceptance cases defined in `rtd-config-test-cases.md`. This document is the living status record the catalog points to; the catalog defines the target, this records where the tool actually stands. |
@@ -16,9 +16,10 @@
 
 ## 1. Acceptance gate status
 
-The functional gate is the **sole acceptance signal** for an E2E case (exit `0`,
-code generated, no SEVERE `[TOOL] … has the following error`, and the case pass
-criteria met). KPI is monitored separately.
+The functional status for an E2E case is derived from the complete case evidence
+(exit `0`, code generated, no SEVERE `[TOOL] … has the following error`, and the
+case pass criteria met). KPI is monitored separately. This report records that
+functional evidence; it does not define repository workflow or release authority.
 
 | Item | Status | Evidence |
 | --- | --- | --- |
@@ -120,6 +121,7 @@ history. New ADC evidence is recorded in §2 as each case is exercised.
 
 | Date | Version | Description |
 | --- | --- | --- |
+| 2026-07-22 | 0.35.2 | Clarified that the report records layered E2E functional evidence without claiming repository workflow or release authority. |
 | 2026-07-17 | 0.35.0 | Refreshed all 14 OpenCode black-box E2E/KPI cases after P1 #65–#72. Final status is 14/14 functional PASS and 14/14 KPI PASS, each with one edit and an independent S32DS pass. The evidence includes the terminal result-parser fix, the Port one-query pin fast path, and the complete ADC/Mcl DMA ownership + coverage fix; ADC-002 now passes in one edit at 28.89 s after the ownership gap had previously required a second edit. |
 | 2026-07-12 | 0.34.0 | Refreshed all 14 OpenCode black-box E2E/KPI cases after #75's P0 release-safety hardening. All functional gates pass and all KPIs pass. ADC-003 initially produced a functional PASS but a KPI MISS because the first spec omitted the target-channel group required by BCTU single conversion; `adc-spec.md` 0.1.1 now shows the complete ADC1/S10 BCTU + watchdog payload, and ADC-003 re-measured PASS at 23.59 s / 1 edit / session `ses_0ac364610ffeylFcv48cIK5TRv`. |
 | 2026-07-07 | 0.33.0 | Refreshed the post-review OpenCode black-box evidence that was stale in 0.32.0. Mcl now passes at 54.78 s / 1 edit / session `ses_0c4bcc13effejDypVDWraYJm6y`. UART-002 initially missed after the Mcl allocator fix (113.74 s), then missed the boundary after fast-path guidance (60.01 s), and passed after promoting the UART-002 reference fast path to the top of `uart-spec.md` (32.21 s / 1 edit / session `ses_0c4afe382ffeT485KxDapiIIPC`). Summary returns to 14 / 14 functional PASS and 14 / 14 KPI PASS. |

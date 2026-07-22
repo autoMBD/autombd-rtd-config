@@ -54,6 +54,63 @@
   ],
   "state_machine": {
     "name": "agent_workflow_v1",
+    "states": [
+      {
+        "name": "classify",
+        "required_fields": ["issue.primary_type"],
+        "forbidden_fields": ["revisions.candidate.sha", "tester.candidate_sha", "reviewer.candidate_sha", "human_reviews.final.evidence"]
+      },
+      {
+        "name": "test_authoring",
+        "required_fields": ["revisions.test.identity"],
+        "forbidden_fields": ["revisions.candidate.sha", "tester.candidate_sha", "reviewer.candidate_sha", "human_reviews.final.evidence"]
+      },
+      {
+        "name": "human_review_1",
+        "required_fields": ["revisions.test.sha"],
+        "forbidden_fields": ["revisions.candidate.sha", "tester.candidate_sha", "reviewer.candidate_sha", "human_reviews.final.evidence"]
+      },
+      {
+        "name": "implementing",
+        "required_fields": ["human_reviews.test.evidence"],
+        "forbidden_fields": ["revisions.candidate.sha", "tester.candidate_sha", "reviewer.candidate_sha", "human_reviews.final.evidence"]
+      },
+      {
+        "name": "candidate",
+        "required_fields": ["revisions.candidate.parents"],
+        "forbidden_fields": ["tester.candidate_sha", "reviewer.candidate_sha", "human_reviews.final.evidence"]
+      },
+      {
+        "name": "testing",
+        "required_fields": ["tester.candidate_sha"],
+        "forbidden_fields": ["human_reviews.final.evidence"]
+      },
+      {
+        "name": "rework",
+        "required_fields": ["tester.status"],
+        "forbidden_fields": ["reviewer.candidate_sha", "human_reviews.final.evidence"]
+      },
+      {
+        "name": "reviewing",
+        "required_fields": ["tester.candidate_sha"],
+        "forbidden_fields": ["human_reviews.final.evidence"]
+      },
+      {
+        "name": "final_human_review",
+        "required_fields": ["reviewer.candidate_sha"],
+        "forbidden_fields": []
+      },
+      {
+        "name": "complete",
+        "required_fields": ["human_reviews.final.evidence"],
+        "forbidden_fields": []
+      },
+      {
+        "name": "stopped",
+        "required_fields": ["disposition.status"],
+        "forbidden_fields": ["reviewer.candidate_sha", "human_reviews.final.evidence"]
+      }
+    ],
     "sequence": [
       "classify",
       "test_authoring",
@@ -68,41 +125,25 @@
       "stopped"
     ],
     "terminal_states": ["complete", "stopped"],
-    "transitions": {
-      "classify": {
-        "test_authoring": "classified"
-      },
-      "test_authoring": {
-        "human_review_1": "test_ready",
-        "implementing": "light_path_ready"
-      },
-      "human_review_1": {
-        "implementing": "test_approved",
-        "test_authoring": "changes_requested"
-      },
-      "implementing": {
-        "candidate": "implementation_ready"
-      },
-      "candidate": {
-        "testing": "candidate_ready"
-      },
-      "testing": {
-        "reviewing": "functional_pass",
-        "rework": "functional_failure"
-      },
-      "rework": {
-        "implementing": "production_rework",
-        "stopped": "rework_cap_reached"
-      },
-      "reviewing": {
-        "final_human_review": "review_pass"
-      },
-      "final_human_review": {
-        "complete": "final_approved"
-      },
-      "complete": {},
-      "stopped": {}
-    },
+    "transitions": [
+      {"from": "classify", "to": "test_authoring", "event": "classification_complete"},
+      {"from": "test_authoring", "to": "human_review_1", "event": "test_frozen"},
+      {"from": "human_review_1", "to": "implementing", "event": "test_approved"},
+      {"from": "human_review_1", "to": "test_authoring", "event": "changes_requested"},
+      {"from": "implementing", "to": "implementing", "event": "dependency_blocked"},
+      {"from": "implementing", "to": "implementing", "event": "permission_blocked"},
+      {"from": "implementing", "to": "candidate", "event": "candidate_created"},
+      {"from": "candidate", "to": "testing", "event": "testing_started"},
+      {"from": "testing", "to": "reviewing", "event": "tester_passed"},
+      {"from": "testing", "to": "rework", "event": "tester_failed"},
+      {"from": "rework", "to": "implementing", "event": "production_rework"},
+      {"from": "rework", "to": "stopped", "event": "production_rework"},
+      {"from": "reviewing", "to": "testing", "event": "candidate_revised"},
+      {"from": "reviewing", "to": "final_human_review", "event": "reviewer_passed"},
+      {"from": "final_human_review", "to": "testing", "event": "candidate_revised"},
+      {"from": "final_human_review", "to": "reviewing", "event": "changes_requested"},
+      {"from": "final_human_review", "to": "complete", "event": "final_approved"}
+    ],
     "rework_transition": "rework -> implementing -> candidate -> testing",
     "all_task_classes_use_this_machine": true,
     "human_review_1": {
@@ -128,16 +169,15 @@
     },
     "final_human_review": {
       "before": "complete",
-      "binds": "candidate_or_evidence_sha",
+      "binds": "candidate_sha",
       "monitor": "human_review_monitor",
       "evidence": {
         "provider": "github",
         "artifact": "pull_request_review",
-        "repository": "issue.repository",
+        "binds": "candidate_sha",
         "authorized_actor": "human",
-        "full_sha_required": true,
-        "current_state": "APPROVED",
-        "invalidated_by": ["dismissed", "stale", "revision_change"]
+        "required_fields": ["repository", "pull_request_number", "review_id", "state", "candidate_sha"],
+        "invalidated_by": ["candidate_sha_change", "review_edit", "review_dismissal", "request_changes"]
       }
     }
   },
@@ -151,6 +191,15 @@
   "limits": {
     "production_rework": 3,
     "kpi_optimization": 3
+  },
+  "revision_graph": {
+    "identities": {
+      "test": "T{iteration}",
+      "implementation": "W{iteration}",
+      "candidate": "C{iteration}"
+    },
+    "shared_base": ["revisions.test.base_sha", "revisions.implementation.base_sha"],
+    "candidate_parents": ["revisions.test.sha", "revisions.implementation.sha"]
   },
   "revision_provenance": {
     "identities": {
@@ -223,6 +272,22 @@
     "DO": {
       "required_gates": ["documentation_review"],
       "profiles": ["documentation"]
+    }
+  },
+  "routing": {
+    "impact_flags": {
+      "PB": {"required_gates": ["deterministic_tests", "isolated_e2e"], "profiles": ["behavioral"]},
+      "MS": {"required_gates": ["descriptor_surface", "deterministic_tests", "isolated_e2e", "vendor_validation"], "profiles": ["module_surface"]},
+      "MW": {"required_gates": ["deterministic_tests", "static_runtime_checks", "vendor_validation"], "profiles": ["mex_write"]},
+      "RA": {"required_gates": ["asset_integrity", "deterministic_tests"], "profiles": ["runtime_asset"]},
+      "TC": {"required_gates": ["deterministic_tests", "test_contract_review"], "profiles": ["test_contract"]},
+      "VS": {"required_gates": ["vendor_validation"], "profiles": ["vendor"]},
+      "EV": {"required_gates": ["isolated_e2e"], "profiles": ["isolated_e2e"]},
+      "AR": {"required_gates": ["workflow_contract"], "profiles": ["agent_rules"]},
+      "RP": {"required_gates": ["package_validation"], "profiles": ["release"]},
+      "ED": {"required_gates": ["dependency_preflight"], "profiles": ["external_dependency"]},
+      "SS": {"required_gates": ["safety_security_review"], "profiles": ["safety_critical"]},
+      "DO": {"required_gates": ["documentation_review"], "profiles": ["documentation"]}
     }
   },
   "correction_classes": {
