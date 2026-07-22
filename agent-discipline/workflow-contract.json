@@ -76,7 +76,7 @@
         "provider": "github",
         "artifact": "issue_comment",
         "approval_command": "/approve-test {test_sha}",
-        "request_changes_command": "/request-test-changes {test_sha}\n{reason}",
+        "change_request_command": "/request-test-changes {test_sha}\n{reason}",
         "full_sha_required": true,
         "top_level_comment_required": true,
         "authorized_actor": "human",

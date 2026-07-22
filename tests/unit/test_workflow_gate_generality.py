@@ -156,7 +156,8 @@ def test_contract_uses_the_approved_ordered_platform_neutral_schema():
         "test_sha_change", "comment_edit", "comment_delete", "request_changes"
     } <= set(review_1["evidence"]["invalidated_by"])
     assert review_1["evidence"]["approval_command"] == "/approve-test {test_sha}"
-    assert review_1["evidence"]["request_changes_command"] == (
+    assert "request_changes_command" not in review_1["evidence"]
+    assert review_1["evidence"]["change_request_command"] == (
         "/request-test-changes {test_sha}\n{reason}"
     )
 
@@ -314,7 +315,13 @@ def test_light_path_is_limited_to_n_do_and_records_remaining_verification():
             "remaining_verification": ["Render the changed Markdown."],
         },
     }
-    record["human_reviews"]["test"]["approved"] = False
+    record["human_reviews"]["test"] = {
+        "approved": False,
+        "sha": None,
+        "reviewer": None,
+        "evidence": None,
+        "monitor": None,
+    }
     assert validate_record(record) == []
 
     record["issue"]["impact_flags"] = ["DO", "PB"]
@@ -390,6 +397,74 @@ def test_non_null_exception_reports_every_missing_or_invalid_item():
     assert any("exception.residual_risk" in error for error in errors)
     assert any("exception.remaining_verification[1]" in error for error in errors)
     assert any("exception.remaining_verification[2]" in error for error in errors)
+
+
+def test_diagnostics_include_stable_human_readable_engineering_concepts():
+    validate_record = _load_gate().validate_record
+    cases = []
+
+    record = _complete_record()
+    record["issue"]["primary_type"] = "?"
+    cases.append(("primary type", record))
+
+    record = _complete_record()
+    record["issue"]["impact_flags"] = ["?"]
+    cases.append(("impact flag", record))
+
+    record = _complete_record()
+    record["human_reviews"]["test"]["approved"] = False
+    cases.append(("Human Review 1", record))
+
+    record = _complete_record()
+    record["human_reviews"]["test"]["evidence"]["command"] = "invalid"
+    cases.append(("approval command", record))
+
+    record = _complete_record()
+    record["human_reviews"]["test"]["evidence"]["comment_id"] = None
+    cases.append(("comment ID", record))
+
+    record = _complete_record()
+    record["human_reviews"]["test"]["monitor"]["scope"] = "new_session"
+    cases.append(("current session", record))
+
+    record = _complete_record()
+    record["counters"]["production_rework"] = 4
+    cases.append(("production rework", record))
+
+    record = _complete_record()
+    record["counters"]["kpi_optimization"] = 4
+    cases.append(("KPI optimization", record))
+
+    record = _complete_record()
+    record["exception"] = {
+        "reason": "Exceptional processing is required.",
+        "residual_risk": "",
+        "remaining_verification": ["Inspect evidence."],
+    }
+    cases.append(("residual risk", record))
+
+    record = _complete_record()
+    record["exception"] = {
+        "reason": "Exceptional processing is required.",
+        "residual_risk": "An approval may become stale.",
+        "remaining_verification": [],
+    }
+    cases.append(("remaining verification", record))
+
+    record = _complete_record()
+    record["state"] = "reviewing"
+    record["tester"]["status"] = "fail"
+    record["reviewer"]["status"] = "pending"
+    cases.append(("Tester pass", record))
+
+    record = _complete_record()
+    record["human_reviews"]["final"]["approved"] = False
+    cases.append(("Final Human Review", record))
+
+    for concept, invalid_record in cases:
+        errors = validate_record(invalid_record)
+        joined = "\n".join(errors).lower()
+        assert concept.lower() in joined, (concept, errors)
 
 
 def test_ordinary_bad_top_level_inputs_return_errors_instead_of_raising():

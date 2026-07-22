@@ -62,6 +62,20 @@ TASK_CLASSES = frozenset(item["code"] for item in CONTRACT["task_classes"])
 IMPACT_FLAGS = frozenset(item["code"] for item in CONTRACT["impact_flags"])
 STATES = tuple(CONTRACT["state_machine"]["sequence"])
 STATE_INDEX = {state: index for index, state in enumerate(STATES)}
+DIAGNOSTIC_CONCEPTS = {
+    "primary_type": "primary type",
+    "impact_flag": "impact flag",
+    "human_review_1": "Human Review 1",
+    "approval_command": "approval command",
+    "comment_id": "comment ID",
+    "current_session": "current session",
+    "production_rework": "production rework",
+    "kpi_optimization": "KPI optimization",
+    "residual_risk": "residual risk",
+    "remaining_verification": "remaining verification",
+    "tester_pass": "Tester pass",
+    "final_human_review": "Final Human Review",
+}
 
 
 def _is_text(value: Any) -> bool:
@@ -75,48 +89,70 @@ def _mapping(value: Any, path: str, errors: list[str]) -> Mapping[str, Any]:
     return {}
 
 
-def _validate_sha(value: Any, path: str, errors: list[str]) -> None:
+def _validate_sha(
+    value: Any, path: str, errors: list[str], concept: str | None = None
+) -> None:
     if not isinstance(value, str) or FULL_SHA_RE.fullmatch(value) is None:
-        errors.append(f"{path} must be a full 40-hex SHA")
+        prefix = f"{concept}: " if concept else ""
+        errors.append(f"{prefix}{path} must be a full 40-hex SHA")
 
 
-def _validate_required_text(value: Any, path: str, errors: list[str]) -> None:
+def _validate_required_text(
+    value: Any, path: str, errors: list[str], concept: str | None = None
+) -> None:
     if not _is_text(value):
-        errors.append(f"{path} must be non-empty text")
+        prefix = f"{concept}: " if concept else ""
+        errors.append(f"{prefix}{path} must be non-empty text")
 
 
 def _validate_reason_block(value: Any, path: str, errors: list[str]) -> None:
     block = _mapping(value, path, errors)
     _validate_required_text(block.get("reason"), f"{path}.reason", errors)
     _validate_required_text(
-        block.get("residual_risk"), f"{path}.residual_risk", errors
+        block.get("residual_risk"),
+        f"{path}.residual_risk",
+        errors,
+        DIAGNOSTIC_CONCEPTS["residual_risk"],
     )
     remaining = block.get("remaining_verification")
     if not isinstance(remaining, list) or not remaining:
-        errors.append(f"{path}.remaining_verification must be a non-empty list")
+        errors.append(
+            f"{DIAGNOSTIC_CONCEPTS['remaining_verification']}: "
+            f"{path}.remaining_verification "
+            "must be a non-empty list"
+        )
         return
     for index, item in enumerate(remaining):
         if not _is_text(item):
             errors.append(
-                f"{path}.remaining_verification[{index}] must be non-empty text"
+                f"{DIAGNOSTIC_CONCEPTS['remaining_verification']}: "
+                f"{path}.remaining_verification[{index}] "
+                "must be non-empty text"
             )
 
 
-def _validate_monitor(value: Any, path: str, errors: list[str]) -> None:
+def _validate_monitor(
+    value: Any, path: str, errors: list[str], concept: str
+) -> None:
     monitor = _mapping(value, path, errors)
     expected = CONTRACT["human_review_monitor"]
     if monitor.get("status") != "stopped":
-        errors.append(f"{path}.status must be stopped")
+        errors.append(f"{concept}: {path}.status must be stopped")
     if monitor.get("interval_minutes") != expected["interval_minutes"]:
         errors.append(
-            f"{path}.interval_minutes must be {expected['interval_minutes']}"
+            f"{concept}: {path}.interval_minutes must be "
+            f"{expected['interval_minutes']}"
         )
     if monitor.get("scope") != expected["scope"]:
-        errors.append(f"{path}.scope must be {expected['scope']}")
+        errors.append(
+            f"{concept}: {path}.scope must be "
+            f"{DIAGNOSTIC_CONCEPTS['current_session']} "
+            f"({expected['scope']})"
+        )
 
 
 def _validate_counter(
-    value: Any, path: str, maximum: int, errors: list[str]
+    value: Any, path: str, maximum: int, concept: str, errors: list[str]
 ) -> None:
     if (
         isinstance(value, bool)
@@ -124,7 +160,9 @@ def _validate_counter(
         or value < 0
         or value > maximum
     ):
-        errors.append(f"{path} must be an integer in 0..{maximum}")
+        errors.append(
+            f"{concept}: {path} must be an integer in 0..{maximum}"
+        )
 
 
 def _validate_test_evidence(
@@ -136,22 +174,40 @@ def _validate_test_evidence(
     errors: list[str],
 ) -> None:
     evidence = _mapping(value, path, errors)
+    review_concept = DIAGNOSTIC_CONCEPTS["human_review_1"]
     if evidence.get("provider") != "github":
-        errors.append(f"{path}.provider must be github")
-    _validate_required_text(evidence.get("repository"), f"{path}.repository", errors)
+        errors.append(f"{review_concept}: {path}.provider must be github")
+    _validate_required_text(
+        evidence.get("repository"),
+        f"{path}.repository",
+        errors,
+        review_concept,
+    )
     if evidence.get("issue_number") != issue_number:
-        errors.append(f"{path}.issue_number must equal issue.number")
+        errors.append(
+            f"{review_concept}: {path}.issue_number must equal issue.number"
+        )
     comment_id = evidence.get("comment_id")
     if isinstance(comment_id, bool) or not (
         isinstance(comment_id, int) and comment_id > 0 or _is_text(comment_id)
     ):
-        errors.append(f"{path}.comment_id must identify the GitHub issue comment")
+        errors.append(
+            f"{review_concept} {DIAGNOSTIC_CONCEPTS['comment_id']}: "
+            f"{path}.comment_id must identify "
+            "the GitHub issue comment"
+        )
     expected_command = f"/approve-test {test_sha}"
     if evidence.get("command") != expected_command:
-        errors.append(f"{path}.command must be exactly {expected_command}")
+        errors.append(
+            f"{review_concept} {DIAGNOSTIC_CONCEPTS['approval_command']}: "
+            f"{path}.command must be exactly "
+            f"{expected_command}"
+        )
     for invalidator in ("edited", "deleted", "request_changes"):
         if evidence.get(invalidator) is True:
-            errors.append(f"{path}.{invalidator} invalidates the approval")
+            errors.append(
+                f"{review_concept}: {path}.{invalidator} invalidates the approval"
+            )
 
 
 def validate_record(record: Any) -> list[str]:
@@ -181,25 +237,37 @@ def validate_record(record: Any) -> list[str]:
     primary_type = issue.get("primary_type")
     if not isinstance(primary_type, str) or primary_type not in TASK_CLASSES:
         errors.append(
-            f"issue.primary_type {primary_type!r} is invalid; "
+            f"issue.primary_type ({DIAGNOSTIC_CONCEPTS['primary_type']}) "
+            f"{primary_type!r} is invalid; "
             f"expected one of {sorted(TASK_CLASSES)}"
         )
 
     raw_flags = issue.get("impact_flags")
     flags: list[str] = []
     if not isinstance(raw_flags, list) or not raw_flags:
-        errors.append("issue.impact_flags must be a non-empty list")
+        errors.append(
+            "issue.impact_flags "
+            f"({DIAGNOSTIC_CONCEPTS['impact_flag']} list) must be a non-empty list"
+        )
     else:
         flags = [flag for flag in raw_flags if isinstance(flag, str)]
         if len(flags) != len(raw_flags):
-            errors.append("issue.impact_flags entries must be strings")
+            errors.append(
+                "issue.impact_flags "
+                f"({DIAGNOSTIC_CONCEPTS['impact_flag']}) entries must be strings"
+            )
         unknown_flags = sorted(set(flags) - IMPACT_FLAGS)
         if unknown_flags:
             errors.append(
-                f"issue.impact_flags contains invalid values: {unknown_flags}"
+                "issue.impact_flags "
+                f"({DIAGNOSTIC_CONCEPTS['impact_flag']}) contains invalid values: "
+                f"{unknown_flags}"
             )
         if len(flags) != len(set(flags)):
-            errors.append("issue.impact_flags contains duplicate values")
+            errors.append(
+                "issue.impact_flags "
+                f"({DIAGNOSTIC_CONCEPTS['impact_flag']}) contains duplicate values"
+            )
 
     gate = _mapping(record.get("gate"), "gate", errors)
     test_required = gate.get("test_required")
@@ -238,15 +306,30 @@ def validate_record(record: Any) -> list[str]:
     test_review = _mapping(
         reviews.get("test"), "human_reviews.test", errors
     )
+    test_review_concept = DIAGNOSTIC_CONCEPTS["human_review_1"]
     test_approved = test_review.get("approved")
     if not isinstance(test_approved, bool):
-        errors.append("human_reviews.test.approved must be boolean")
-    _validate_sha(test_review.get("sha"), "human_reviews.test.sha", errors)
+        errors.append(
+            f"{test_review_concept}: human_reviews.test.approved must be boolean"
+        )
+    if test_required is not False or test_approved is True:
+        _validate_sha(
+            test_review.get("sha"),
+            "human_reviews.test.sha",
+            errors,
+            test_review_concept,
+        )
     if test_approved is True:
         if test_review.get("sha") != test_sha:
-            errors.append("human_reviews.test.sha must equal lanes.test_sha")
+            errors.append(
+                f"{test_review_concept}: human_reviews.test.sha must equal "
+                "lanes.test_sha"
+            )
         _validate_required_text(
-            test_review.get("reviewer"), "human_reviews.test.reviewer", errors
+            test_review.get("reviewer"),
+            "human_reviews.test.reviewer",
+            errors,
+            test_review_concept,
         )
         _validate_test_evidence(
             test_review.get("evidence"),
@@ -256,50 +339,84 @@ def validate_record(record: Any) -> list[str]:
             errors=errors,
         )
         _validate_monitor(
-            test_review.get("monitor"), "human_reviews.test.monitor", errors
+            test_review.get("monitor"),
+            "human_reviews.test.monitor",
+            errors,
+            test_review_concept,
         )
     if test_required is True and at_least("implementing") and test_approved is not True:
         errors.append(
-            "human_reviews.test.approved must be true before implementing"
+            f"{test_review_concept}: human_reviews.test.approved must be true "
+            "before implementing"
         )
 
     final_review = _mapping(
         reviews.get("final"), "human_reviews.final", errors
     )
+    final_review_concept = DIAGNOSTIC_CONCEPTS["final_human_review"]
     final_approved = final_review.get("approved")
     if not isinstance(final_approved, bool):
-        errors.append("human_reviews.final.approved must be boolean")
-    _validate_sha(final_review.get("sha"), "human_reviews.final.sha", errors)
+        errors.append(
+            f"{final_review_concept}: human_reviews.final.approved must be boolean"
+        )
+    _validate_sha(
+        final_review.get("sha"),
+        "human_reviews.final.sha",
+        errors,
+        final_review_concept,
+    )
     if final_approved is True:
         if final_review.get("sha") != candidate_sha:
             errors.append(
-                "human_reviews.final.sha must equal lanes.candidate_sha"
+                f"{final_review_concept}: human_reviews.final.sha must equal "
+                "lanes.candidate_sha"
             )
         _validate_required_text(
-            final_review.get("reviewer"), "human_reviews.final.reviewer", errors
+            final_review.get("reviewer"),
+            "human_reviews.final.reviewer",
+            errors,
+            final_review_concept,
         )
         _validate_monitor(
-            final_review.get("monitor"), "human_reviews.final.monitor", errors
+            final_review.get("monitor"),
+            "human_reviews.final.monitor",
+            errors,
+            final_review_concept,
         )
     if state == "complete" and final_approved is not True:
-        errors.append("human_reviews.final.approved must be true before complete")
+        errors.append(
+            f"{final_review_concept}: human_reviews.final.approved must be true "
+            "before complete"
+        )
         if final_review.get("sha") != candidate_sha:
             errors.append(
-                "human_reviews.final.sha must equal lanes.candidate_sha"
+                f"{final_review_concept}: human_reviews.final.sha must equal "
+                "lanes.candidate_sha"
             )
         _validate_required_text(
-            final_review.get("reviewer"), "human_reviews.final.reviewer", errors
+            final_review.get("reviewer"),
+            "human_reviews.final.reviewer",
+            errors,
+            final_review_concept,
         )
         _validate_monitor(
-            final_review.get("monitor"), "human_reviews.final.monitor", errors
+            final_review.get("monitor"),
+            "human_reviews.final.monitor",
+            errors,
+            final_review_concept,
         )
 
     counters = _mapping(record.get("counters"), "counters", errors)
-    for field in ("production_rework", "kpi_optimization"):
+    counter_concepts = {
+        "production_rework": DIAGNOSTIC_CONCEPTS["production_rework"],
+        "kpi_optimization": DIAGNOSTIC_CONCEPTS["kpi_optimization"],
+    }
+    for field, concept in counter_concepts.items():
         _validate_counter(
             counters.get(field),
             f"counters.{field}",
             CONTRACT["limits"][field],
+            concept,
             errors,
         )
 
@@ -325,9 +442,15 @@ def validate_record(record: Any) -> list[str]:
     if reviewer.get("candidate_sha") != candidate_sha:
         errors.append("reviewer.candidate_sha must equal lanes.candidate_sha")
     if reviewer_status == "pass" and tester_status != "pass":
-        errors.append("reviewer.status pass requires tester.status pass")
+        errors.append(
+            f"{DIAGNOSTIC_CONCEPTS['tester_pass']} required: "
+            "reviewer.status pass requires tester.status pass"
+        )
     if at_least("reviewing") and tester_status != "pass":
-        errors.append(f"state {state} requires tester.status pass")
+        errors.append(
+            f"{DIAGNOSTIC_CONCEPTS['tester_pass']} required: state {state} "
+            "requires tester.status pass"
+        )
     if at_least("final_human_review") and reviewer_status != "pass":
         errors.append(f"{state} requires reviewer.status pass")
 
