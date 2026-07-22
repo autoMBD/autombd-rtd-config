@@ -303,52 +303,57 @@ def validate_record(record: Any) -> list[str]:
     candidate_sha = lanes.get("candidate_sha")
 
     reviews = _mapping(record.get("human_reviews"), "human_reviews", errors)
-    test_review = _mapping(
-        reviews.get("test"), "human_reviews.test", errors
-    )
-    test_review_concept = DIAGNOSTIC_CONCEPTS["human_review_1"]
-    test_approved = test_review.get("approved")
-    if not isinstance(test_approved, bool):
-        errors.append(
-            f"{test_review_concept}: human_reviews.test.approved must be boolean"
+    if test_required is not False:
+        test_review = _mapping(
+            reviews.get("test"), "human_reviews.test", errors
         )
-    if test_required is not False or test_approved is True:
+        test_review_concept = DIAGNOSTIC_CONCEPTS["human_review_1"]
+        test_approved = test_review.get("approved")
+        if not isinstance(test_approved, bool):
+            errors.append(
+                f"{test_review_concept}: "
+                "human_reviews.test.approved must be boolean"
+            )
         _validate_sha(
             test_review.get("sha"),
             "human_reviews.test.sha",
             errors,
             test_review_concept,
         )
-    if test_approved is True:
-        if test_review.get("sha") != test_sha:
-            errors.append(
-                f"{test_review_concept}: human_reviews.test.sha must equal "
-                "lanes.test_sha"
+        if test_approved is True:
+            if test_review.get("sha") != test_sha:
+                errors.append(
+                    f"{test_review_concept}: human_reviews.test.sha must equal "
+                    "lanes.test_sha"
+                )
+            _validate_required_text(
+                test_review.get("reviewer"),
+                "human_reviews.test.reviewer",
+                errors,
+                test_review_concept,
             )
-        _validate_required_text(
-            test_review.get("reviewer"),
-            "human_reviews.test.reviewer",
-            errors,
-            test_review_concept,
-        )
-        _validate_test_evidence(
-            test_review.get("evidence"),
-            issue_number=issue_number,
-            test_sha=test_sha,
-            path="human_reviews.test.evidence",
-            errors=errors,
-        )
-        _validate_monitor(
-            test_review.get("monitor"),
-            "human_reviews.test.monitor",
-            errors,
-            test_review_concept,
-        )
-    if test_required is True and at_least("implementing") and test_approved is not True:
-        errors.append(
-            f"{test_review_concept}: human_reviews.test.approved must be true "
-            "before implementing"
-        )
+            _validate_test_evidence(
+                test_review.get("evidence"),
+                issue_number=issue_number,
+                test_sha=test_sha,
+                path="human_reviews.test.evidence",
+                errors=errors,
+            )
+            _validate_monitor(
+                test_review.get("monitor"),
+                "human_reviews.test.monitor",
+                errors,
+                test_review_concept,
+            )
+        if (
+            test_required is True
+            and at_least("implementing")
+            and test_approved is not True
+        ):
+            errors.append(
+                f"{test_review_concept}: human_reviews.test.approved must be true "
+                "before implementing"
+            )
 
     final_review = _mapping(
         reviews.get("final"), "human_reviews.final", errors

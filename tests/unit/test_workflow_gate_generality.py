@@ -332,6 +332,46 @@ def test_light_path_is_limited_to_n_do_and_records_remaining_verification():
     assert any("gate.light_path.remaining_verification[1]" in error for error in errors)
 
 
+def test_light_path_ignores_the_entire_stale_human_review_1_block():
+    validate_record = _load_gate().validate_record
+    record = _complete_record()
+    record["issue"] = {
+        "number": ISSUE_NUMBER,
+        "primary_type": "N",
+        "impact_flags": ["DO"],
+    }
+    record["gate"] = {
+        "test_required": False,
+        "light_path": {
+            "reason": "Normalize one mechanical representation.",
+            "residual_risk": "A textual marker could move.",
+            "remaining_verification": ["Review the normalized file."],
+        },
+    }
+    record["human_reviews"]["test"] = {
+        "approved": "stale-template",
+        "sha": "not-a-sha",
+        "reviewer": "",
+        "evidence": {
+            "provider": "stale-provider",
+            "repository": "",
+            "issue_number": ISSUE_NUMBER + 9,
+            "comment_id": None,
+            "command": "/approve-test stale",
+            "edited": True,
+            "deleted": True,
+            "request_changes": True,
+        },
+        "monitor": {
+            "status": "polling",
+            "interval_minutes": 1,
+            "scope": "another_session",
+        },
+    }
+
+    assert validate_record(record) == []
+
+
 def test_each_counter_has_its_own_zero_to_three_error():
     validate_record = _load_gate().validate_record
     record = _complete_record()
