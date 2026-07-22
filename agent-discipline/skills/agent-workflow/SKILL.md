@@ -153,10 +153,11 @@ followed by `{reason}`.
 
 Before a decision, Gate 1 may record `approved: false`, a null reviewer and
 evidence, and an active current-session monitor. Once approval or change-request
-evidence is recorded, stop the monitor. A change request is expressed by its
-`changes_requested` decision plus the exact two-line command and reason; it does
-not require `requested_changes: true`. An approval is invalid if that flag is
-true.
+evidence is recorded, stop the monitor. A change request has two equivalent
+encodings: `requested_changes: true` may stand alone with the reason inferred
+from command line 2, or `decision: changes_requested` and a matching `reason`
+may be used while `requested_changes` is false or absent. Both require the exact
+two-line command. An approval is invalid if `requested_changes` is true.
 
 Replies, reactions, labels, Agent-authored commands, abbreviated or stale SHAs,
 and edited or deleted approvals are invalid. A new Test SHA invalidates every
@@ -197,6 +198,10 @@ creating a fresh session.
 Tester evidence includes its verdict and exact candidate SHA. Reviewer entry
 requires `PASS` on that SHA. Reviewer evidence also binds that same SHA. Any
 candidate change invalidates both.
+
+For `tester_passed`, the previous `testing` record remains pending and the
+current `reviewing` record carries Tester PASS plus a pending Reviewer, all
+bound to the unchanged Candidate SHA.
 
 Before `complete`, obtain a current GitHub PR review made by a human whose state
 is `approved`, bound to the exact Candidate SHA. Record repository, PR number,

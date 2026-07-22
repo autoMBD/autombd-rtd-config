@@ -1423,9 +1423,15 @@ def test_public_forward_transitions_use_approved_events():
     for source, target, event in sequence:
         previous = _public_record(source)
         current = _public_record(target)
-        if source == "testing":
-            previous["tester"]["status"] = "pass"
         assert gate.validate_transition(previous, current, event) == [], event
+
+    previous = _public_record("testing")
+    current = _public_record("reviewing")
+    current["tester"]["candidate_sha"] = "8" * 40
+    assert any(
+        "candidate" in error.lower()
+        for error in gate.validate_transition(previous, current, "tester_passed")
+    )
 
 
 def test_public_special_transitions_preserve_counters_and_revision_iterations():
@@ -1544,6 +1550,22 @@ def test_public_change_request_uses_only_its_approved_extra_fields():
     assert _load_gate().validate_record(record) == []
 
 
+def test_public_change_request_accepts_requested_flag_or_decision_reason():
+    gate = _load_gate()
+    previous = _public_record("human_review_1")
+    review = _public_test_review("changes_requested")
+    evidence = review["evidence"]
+    evidence["requested_changes"] = True
+    evidence.pop("decision")
+    evidence.pop("reason")
+    previous["human_reviews"] = {"test": review}
+    assert gate.validate_record(previous) == []
+
+    current = _public_record("test_authoring")
+    current["revisions"]["test"] = _public_test_revision(3, None)
+    assert gate.validate_transition(previous, current, "changes_requested") == []
+
+
 def test_pending_gate_1_and_stopped_provenance_are_valid_minimal_states():
     validate_record = _load_gate().validate_record
     pending = _public_record("human_review_1")
@@ -1580,6 +1602,7 @@ def test_public_review_diagnostics_name_the_invalid_concept():
         ("test", "edited", True, "edited"),
         ("test", "deleted", True, "deleted"),
         ("test", "requested_changes", True, "request"),
+        ("test", "requested_changes", None, "request"),
         ("final", "pull_request_number", None, "pull request"),
         ("final", "review_id", None, "review id"),
         ("final", "actor_type", "automation", "human"),

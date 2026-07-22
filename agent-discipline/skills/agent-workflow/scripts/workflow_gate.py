@@ -40,7 +40,7 @@
 # File:        workflow_gate.py
 # Author:      autoMBD <tkung.lqk@foxmail.com>
 # Date:        2026-07-22
-# Version:     0.4.2
+# Version:     0.4.3
 # Description: Validate stateful Agent workflow records and transitions.
 # =================================================================================
 
@@ -1179,6 +1179,35 @@ def _validate_public_monitor(
         errors.append(f"{path}.scope must be current_session (current session)")
 
 
+def _public_change_request_reason(
+    evidence: Mapping[str, Any], test_sha: Any
+) -> str | None:
+    command = evidence.get("command")
+    if not isinstance(command, str):
+        return None
+    lines = command.split("\n")
+    if (
+        len(lines) != 2
+        or lines[0] != f"/request-test-changes {test_sha}"
+        or not lines[1].strip()
+    ):
+        return None
+    command_reason = lines[1]
+    decision = evidence.get("decision")
+    stated_reason = evidence.get("reason")
+    encoding_a = (
+        evidence.get("requested_changes") is True
+        and decision in (None, "changes_requested")
+        and stated_reason in (None, command_reason)
+    )
+    encoding_b = (
+        decision == "changes_requested"
+        and stated_reason == command_reason
+        and evidence.get("requested_changes") is not True
+    )
+    return command_reason if encoding_a or encoding_b else None
+
+
 def _validate_public_test_review(
     value: Any,
     *,
@@ -1254,9 +1283,9 @@ def _validate_public_test_review(
             )
     if evidence.get("test_sha") is not None and evidence.get("test_sha") != test_sha:
         errors.append("human_reviews.test.evidence.test_sha must equal review sha")
-    if approved is True and evidence.get("requested_changes") is True:
+    if approved is True and evidence.get("requested_changes") is not False:
         errors.append(
-            "request: approved Human Review 1 cannot also request changes"
+            "request: approved Human Review 1 requires requested_changes false"
         )
     comment_id = evidence.get("comment_id")
     if isinstance(comment_id, bool) or not isinstance(comment_id, int) or comment_id <= 0:
@@ -1266,13 +1295,15 @@ def _validate_public_test_review(
     if approved is True:
         expected_command = f"/approve-test {test_sha}"
     elif approved is False:
-        if evidence.get("decision") != "changes_requested":
+        reason = _public_change_request_reason(evidence, test_sha)
+        if reason is None:
             errors.append(
-                "human_reviews.test.evidence.decision must be changes_requested"
+                "human_reviews.test.evidence must use either requested_changes "
+                "or matching changes_requested decision/reason evidence"
             )
-        reason = evidence.get("reason")
-        _validate_required_text(reason, "human_reviews.test.evidence.reason", errors)
-        expected_command = f"/request-test-changes {test_sha}\n{reason}"
+            expected_command = None
+        else:
+            expected_command = f"/request-test-changes {test_sha}\n{reason}"
     else:
         expected_command = None
     if evidence.get("command") != expected_command:
@@ -1890,7 +1921,7 @@ def _validate_public_transition(
             not isinstance(review, Mapping)
             or review.get("approved") is not False
             or not isinstance(evidence, Mapping)
-            or evidence.get("decision") != "changes_requested"
+            or _public_change_request_reason(evidence, review.get("sha")) is None
         ):
             errors.append("changes_requested requires Human Review 1 change evidence")
         previous_t = _public_revision_iteration(previous, "test")
@@ -1906,9 +1937,25 @@ def _validate_public_transition(
         if not isinstance(tester, Mapping) or tester.get("status") != "fail":
             errors.append("tester_failed requires previous tester.status fail")
     if event == "tester_passed":
-        tester = previous.get("tester")
-        if not isinstance(tester, Mapping) or tester.get("status") != "pass":
-            errors.append("tester_passed requires previous tester.status pass")
+        previous_tester = previous.get("tester")
+        current_tester = current.get("tester")
+        if (
+            not isinstance(previous_tester, Mapping)
+            or previous_tester.get("status") != "pending"
+        ):
+            errors.append("tester_passed requires previous tester.status pending")
+        if (
+            not isinstance(current_tester, Mapping)
+            or current_tester.get("status") != "pass"
+        ):
+            errors.append("tester_passed requires current tester.status pass")
+        candidate_sha = _public_candidate_sha(current)
+        if (
+            _public_candidate_sha(previous) != candidate_sha
+            or not isinstance(current_tester, Mapping)
+            or current_tester.get("candidate_sha") != candidate_sha
+        ):
+            errors.append("tester_passed must preserve the exact Candidate binding")
     if event == "test_approved":
         reviews = current.get("human_reviews")
         review = reviews.get("test") if isinstance(reviews, Mapping) else None
