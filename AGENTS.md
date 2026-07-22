@@ -35,6 +35,10 @@ runtime, documentation, and acceptance requirements without redefining the
 common workflow. If profile wording appears to conflict with the canonical
 contract, stop and apply the contract before proceeding.
 
+Each validation target in the canonical contract is a convergence checkpoint, not a hard timeout.
+It applies only to validation execution; test authoring,
+implementation, exploration, and review use a task-specific handoff budget.
+
 ## Main Agent Orchestrator Responsibility
 
 The main agent is the Orchestrator for this project. Its primary duty is to
@@ -54,7 +58,8 @@ The main agent owns:
 - dispatching independent implementation, investigation, review, and validation
   subagents instead of personally doing all task-level execution;
 - ensuring independent E2E validation is a **true black box** — driven through
-  an explicitly selected independent third-party agent CLI using the
+  an independent third-party agent CLI explicitly selected from the current
+  Agent platform's capabilities by the task handoff, using the
   `tools/blackbox_e2e.py` extensible runner registry, with no default runner in
   the common workflow; the runner sees only the deployed skill, case prompt, and staged
   fixture, never this repository; the embedded subagent is **not** a valid black

@@ -10,7 +10,8 @@ description: Classify repository work and execute the canonical test-first Agent
 Use this Skill for every repository task that changes tracked content or records
 acceptance evidence. The machine-readable authority is
 `agent-discipline/workflow-contract.json`; validate records with
-`scripts/workflow_gate.py`. This Skill explains execution. A repository profile
+`scripts/workflow_gate.py`. This Skill is platform-neutral and explains
+execution. A repository profile
 such as `AGENTS.md` may add domain and ownership constraints, but must not
 redefine the common state machine, gates, lanes, limits, or evidence rules.
 
@@ -58,14 +59,15 @@ repository-profile checks; it does not select a different state machine.
 
 For GitHub, use the current Agent platform's built-in GitHub Connector first.
 Use `gh` only when that platform has no built-in Connector. Do not choose a
-common-workflow default Agent platform or third-party runner; the repository
-profile or task handoff selects available tooling.
+common-workflow default Agent platform or third-party runner. The current Agent
+platform capabilities and the task handoff must explicitly select the
+independent runner used for a validation execution.
 
 ## 3. Execute the one state machine
 
 ```text
-classify -> test_authoring -> human_review_gate_1 -> implementing
-         -> candidate -> tester -> bounded rework -> reviewer
+classify -> test_authoring -> human_review_1 -> implementing
+         -> candidate -> testing -> bounded rework -> reviewing
          -> final_human_review -> complete
 ```
 
@@ -78,11 +80,12 @@ The standard path is mandatory unless all lightweight conditions in the
 contract apply. On the standard path, author the complete test revision before
 implementation and obtain Human Review Gate 1 approval.
 
-The lightweight no-test path is limited to `D` or `N` work whose only impact is
-`DO`. Record non-empty `reason`, `residual_risk`, and
-`remaining_verification`. It still produces a candidate, evidence, Reviewer
-result, and final Human Review. If behavior, a test contract, Agent rules,
-packaging, safety, runtime data, or tooling is affected, use the standard path.
+The lightweight no-test path is limited to `N` work whose only impact is `DO`.
+Record non-empty `reason`, `residual_risk`, and a non-empty list of
+`remaining_verification` actions. It still produces a candidate, evidence,
+Reviewer result, and final Human Review. If behavior, a test contract, Agent
+rules, packaging, safety, runtime data, or tooling is affected, use the standard
+path.
 
 ## 4. Build independent lanes
 
@@ -120,8 +123,9 @@ command and followed by its reason:
 
 Replies, reactions, labels, Agent-authored commands, abbreviated or stale SHAs,
 and edited or deleted approvals are invalid. A new Test SHA invalidates every
-earlier approval. Evidence records the comment ID and URL, author login,
-creation time, unedited/undeleted state, exact command, and bound SHA.
+earlier approval. The record binds the approval to the GitHub repository, issue
+number, top-level comment ID, authorized human reviewer, exact command, and
+current full Test SHA.
 
 After submitting any Human Review request, poll for 10 minutes in the current
 conversation/session. No update is a no-op. On a valid update, stop the monitor
@@ -137,8 +141,8 @@ monitor rule to final Human Review.
 - Reviewer starts only after Tester PASS on the candidate, performs review
   without production fixes, and may write only an append to the lessons log.
 
-The focused-validation 3-minute and E2E-validation 5-minute values are
-convergence checkpoints, not hard timeouts. A validation run may continue up to
+Each focused-validation 3-minute or E2E-validation 5-minute target is a
+convergence checkpoint, not a hard timeout. A validation run may continue up to
 10 minutes to collect useful evidence before Orchestrator intervention. These
 times apply only to validation execution; test authoring, implementation,
 exploration, and review use task-specific handoff budgets.
@@ -154,15 +158,9 @@ Tester evidence includes its verdict and exact candidate SHA. Reviewer entry
 requires `PASS` on that SHA. Reviewer evidence also binds that same SHA. Any
 candidate change invalidates both.
 
-Before `complete`, obtain a final authorized-human top-level issue comment bound
-to the exact candidate:
-
-```text
-/approve-candidate <full-candidate-sha>
-```
-
-Record the comment evidence and stopped same-session monitor exactly as for
-Gate 1. Only then may the record enter `complete`.
+Before `complete`, obtain final authorized-human approval bound to the exact
+candidate SHA. Record the human reviewer and a stopped 10-minute current-session
+monitor. Only then may the record enter `complete`.
 
 ## Minimal execution template
 
@@ -171,40 +169,66 @@ with real evidence; do not treat the template itself as evidence.
 
 ```json
 {
-  "contract_version": "1.0.0",
-  "task_type": "I",
-  "impact_flags": ["AR", "TC"],
-  "state": "candidate",
-  "test_path": "standard",
-  "base_sha": "<40-hex-base>",
-  "test_base_sha": "<same-40-hex-base>",
-  "test_sha": "<40-hex-test>",
-  "implementation_base_sha": "<same-40-hex-base>",
-  "implementation_sha": "<40-hex-implementation>",
-  "candidate_sha": "<40-hex-candidate>",
-  "test_approval": {
-    "sha": "<40-hex-test>",
-    "command": "/approve-test <40-hex-test>",
-    "location": "github_issue_top_level_comment",
-    "author_type": "human",
-    "comment_id": "<github-comment-id>",
-    "comment_url": "<github-comment-url>",
-    "author_login": "<human-login>",
-    "created_at": "<timestamp>",
-    "edited": false,
-    "deleted": false
+  "version": 1,
+  "issue": {
+    "number": 123,
+    "primary_type": "I",
+    "impact_flags": ["AR", "TC"]
   },
-  "monitors": {
-    "test_review": {
-      "window_minutes": 10,
-      "same_session": true,
-      "new_session": false,
-      "status": "stopped",
-      "valid_update_received": true
+  "state": "complete",
+  "gate": {
+    "test_required": true,
+    "light_path": null
+  },
+  "lanes": {
+    "base_sha": "<40-hex-base>",
+    "test_sha": "<40-hex-test>",
+    "implementation_base_sha": "<same-40-hex-base>",
+    "implementation_sha": "<40-hex-implementation>",
+    "candidate_sha": "<40-hex-candidate>"
+  },
+  "human_reviews": {
+    "test": {
+      "approved": true,
+      "sha": "<40-hex-test>",
+      "reviewer": "<human-login>",
+      "evidence": {
+        "provider": "github",
+        "repository": "<owner/repository>",
+        "issue_number": 123,
+        "comment_id": "<comment-id>",
+        "command": "/approve-test <40-hex-test>"
+      },
+      "monitor": {
+        "status": "stopped",
+        "interval_minutes": 10,
+        "scope": "current_session"
+      }
+    },
+    "final": {
+      "approved": true,
+      "sha": "<40-hex-candidate>",
+      "reviewer": "<human-login>",
+      "monitor": {
+        "status": "stopped",
+        "interval_minutes": 10,
+        "scope": "current_session"
+      }
     }
   },
-  "production_rework_count": 0,
-  "kpi_optimization_count": 0
+  "counters": {
+    "production_rework": 0,
+    "kpi_optimization": 0
+  },
+  "tester": {
+    "status": "pass",
+    "candidate_sha": "<40-hex-candidate>"
+  },
+  "reviewer": {
+    "status": "pass",
+    "candidate_sha": "<40-hex-candidate>"
+  },
+  "exception": null
 }
 ```
 
