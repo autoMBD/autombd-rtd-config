@@ -85,9 +85,12 @@ def _normalized(text: str) -> str:
 def test_workflow_contract_has_exact_portable_task_classes_and_impact_flags():
     contract = _contract()
 
+    assert contract["version"] == 2
     assert tuple(item["code"] for item in contract["task_classes"]) == EXPECTED_CLASSES
     assert tuple(item["code"] for item in contract["impact_flags"]) == EXPECTED_FLAGS
-    assert len({item["state_machine"] for item in contract["task_classes"]}) == 1
+    assert {item["state_machine"] for item in contract["task_classes"]} == {
+        "agent_workflow_v2"
+    }
 
 
 def test_workflow_contract_uses_one_bounded_human_gated_state_machine():

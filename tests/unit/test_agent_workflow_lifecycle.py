@@ -79,6 +79,14 @@ FORWARD_TRANSITIONS = (
     ("reviewing", "final_human_review", "reviewer_passed"),
     ("final_human_review", "complete", "final_approved"),
 )
+LIGHT_FORWARD_TRANSITIONS = (
+    ("classify", "implementing", "classification_complete"),
+    ("implementing", "candidate", "candidate_created"),
+    ("candidate", "testing", "testing_started"),
+    ("testing", "reviewing", "tester_passed"),
+    ("reviewing", "final_human_review", "reviewer_passed"),
+    ("final_human_review", "complete", "final_approved"),
+)
 BASE_SHA = "a" * 40
 TEST_SHA = "b" * 40
 IMPLEMENTATION_SHA = "c" * 40
@@ -99,6 +107,67 @@ REQUIRED_PROBES = {
     "complete": "human_reviews.final.evidence",
     "stopped": "disposition.status",
 }
+FUTURE_EVIDENCE = {
+    "classify": (
+        "revisions.test",
+        "human_reviews.test",
+        "revisions.implementation",
+        "revisions.candidate",
+        "tester",
+        "reviewer",
+        "human_reviews.final",
+        "revisions.final_evidence",
+    ),
+    "test_authoring": (
+        "human_reviews.test",
+        "revisions.implementation",
+        "revisions.candidate",
+        "tester",
+        "reviewer",
+        "human_reviews.final",
+        "revisions.final_evidence",
+    ),
+    "human_review_1": (
+        "revisions.implementation",
+        "revisions.candidate",
+        "tester",
+        "reviewer",
+        "human_reviews.final",
+        "revisions.final_evidence",
+    ),
+    "implementing": (
+        "revisions.candidate",
+        "tester",
+        "reviewer",
+        "human_reviews.final",
+        "revisions.final_evidence",
+    ),
+    "candidate": (
+        "tester",
+        "reviewer",
+        "human_reviews.final",
+        "revisions.final_evidence",
+    ),
+    "testing": (
+        "reviewer",
+        "human_reviews.final",
+        "revisions.final_evidence",
+    ),
+    "rework": (
+        "reviewer",
+        "human_reviews.final",
+        "revisions.final_evidence",
+    ),
+    "reviewing": (
+        "human_reviews.final",
+        "revisions.final_evidence",
+    ),
+    "final_human_review": ("revisions.final_evidence",),
+    "stopped": (
+        "human_reviews.final",
+        "revisions.final_evidence",
+    ),
+}
 
 
 def _contract() -> dict:
@@ -118,7 +187,7 @@ def _gate_module():
 
 def _base_record(state: str) -> dict:
     return {
-        "version": 1,
+        "version": 2,
         "issue": {
             "number": 78,
             "primary_type": "W",
@@ -150,15 +219,19 @@ def _implementation_revision(sha: str | None) -> dict:
     }
 
 
-def _candidate_revision(sha: str) -> dict:
+def _candidate_revision(sha: str, *, light_path: bool = False) -> dict:
+    parents = {
+        "implementation_sha": IMPLEMENTATION_SHA,
+    }
+    if light_path:
+        parents["base_sha"] = BASE_SHA
+    else:
+        parents["test_sha"] = TEST_SHA
     return {
         "identity": "C1",
         "iteration": 1,
         "sha": sha,
-        "parents": {
-            "test_sha": TEST_SHA,
-            "implementation_sha": IMPLEMENTATION_SHA,
-        },
+        "parents": parents,
     }
 
 
@@ -308,6 +381,72 @@ def _record_for_state(state: str) -> dict:
     return record
 
 
+def _light_record_for_state(state: str) -> dict:
+    assert state in {
+        "classify",
+        "implementing",
+        "candidate",
+        "testing",
+        "reviewing",
+        "final_human_review",
+        "complete",
+    }
+    record = _base_record(state)
+    record["issue"] = {
+        "number": 78,
+        "primary_type": "N",
+        "impact_flags": ["DO"],
+    }
+    record["gate"] = {
+        "test_required": False,
+        "light_path": {
+            "reason": "Only non-normative documentation is renamed.",
+            "residual_risk": "A stale link could remain.",
+            "remaining_verification": ["link check", "git diff --check"],
+        },
+    }
+    if state == "classify":
+        return record
+
+    record["revisions"]["implementation"] = _implementation_revision(None)
+    if state == "implementing":
+        return record
+
+    record["revisions"]["implementation"]["sha"] = IMPLEMENTATION_SHA
+    record["revisions"]["candidate"] = _candidate_revision(
+        CANDIDATE_SHA, light_path=True
+    )
+    if state == "candidate":
+        return record
+
+    record["tester"] = {
+        "status": "pending",
+        "candidate_sha": CANDIDATE_SHA,
+        "mode": "mechanical_verification",
+    }
+    if state == "testing":
+        return record
+
+    record["tester"]["status"] = "pass"
+    record["reviewer"] = {"status": "pending", "candidate_sha": CANDIDATE_SHA}
+    if state == "reviewing":
+        return record
+
+    record["reviewer"]["status"] = "pass"
+    record["human_reviews"] = {"final": _final_review(False)}
+    if state == "final_human_review":
+        return record
+
+    record["human_reviews"]["final"] = _final_review(True)
+    record["revisions"]["final_evidence"] = {
+        "identity": "F1",
+        "sha": FINAL_EVIDENCE_SHA,
+        "reviewed_candidate_sha": CANDIDATE_SHA,
+        "changed_paths": [LESSONS_PATH],
+    }
+    return record
+
+
 def _record_errors(record: dict) -> list[str]:
     result = _gate_module().validate_record(record)
     assert isinstance(result, list)
@@ -321,6 +460,32 @@ def _delete_path(record: dict, dotted_path: str) -> None:
     for field in fields[:-1]:
         owner = owner[field]
     del owner[fields[-1]]
+
+
+def _set_path(record: dict, dotted_path: str, value: object) -> None:
+    owner = record
+    fields = dotted_path.split(".")
+    for field in fields[:-1]:
+        owner = owner.setdefault(field, {})
+    owner[fields[-1]] = value
+
+
+def _key_paths(
+    value: object,
+    key: str,
+    prefix: tuple[str, ...] = (),
+) -> list[tuple[str, ...]]:
+    paths = []
+    if isinstance(value, dict):
+        for field, child in value.items():
+            child_path = (*prefix, field)
+            if field == key:
+                paths.append(child_path)
+            paths.extend(_key_paths(child, key, child_path))
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            paths.extend(_key_paths(child, key, (*prefix, str(index))))
+    return paths
 
 
 def _transition_errors(previous: dict, current: dict, event: str) -> list[str]:
@@ -346,22 +511,8 @@ def test_contract_declares_state_dependent_required_and_forbidden_fields():
         assert set(required).isdisjoint(forbidden), item["name"]
 
     by_name = {item["name"]: item for item in states}
-    for early_state in ("classify", "test_authoring", "human_review_1"):
-        forbidden = set(by_name[early_state]["forbidden_fields"])
-        assert "revisions.candidate.sha" in forbidden
-        assert "tester.candidate_sha" in forbidden
-        assert "reviewer.candidate_sha" in forbidden
-        assert "human_reviews.final.evidence" in forbidden
-
-    assert {
-        "tester.candidate_sha",
-        "reviewer.candidate_sha",
-        "human_reviews.final.evidence",
-    }.issubset(by_name["candidate"]["forbidden_fields"])
-    assert {
-        "reviewer.candidate_sha",
-        "human_reviews.final.evidence",
-    }.issubset(by_name["rework"]["forbidden_fields"])
+    for state, future_paths in FUTURE_EVIDENCE.items():
+        assert set(future_paths).issubset(by_name[state]["forbidden_fields"]), state
 
     final_change_routes = [
         transition
@@ -401,11 +552,79 @@ def test_early_states_reject_future_candidate_evidence(state):
     assert any("forbidden" in item.casefold() or state in item for item in errors)
 
 
+@pytest.mark.parametrize(
+    ("state", "future_path"),
+    tuple(
+        (state, future_path)
+        for state, future_paths in FUTURE_EVIDENCE.items()
+        for future_path in future_paths
+    ),
+)
+def test_each_state_rejects_every_future_evidence_field(state, future_path):
+    record = _record_for_state(state)
+    _set_path(record, future_path, {"unexpected": "future evidence"})
+
+    errors = _record_errors(record)
+    assert errors
+    assert any(
+        future_path in item and "forbidden" in item.casefold()
+        for item in errors
+    )
+
+
 def test_transition_validator_accepts_the_canonical_forward_path():
     for previous_state, current_state, event in FORWARD_TRANSITIONS:
         previous = _record_for_state(previous_state)
         current = _record_for_state(current_state)
         assert _transition_errors(previous, current, event) == [], event
+
+
+def test_mechanical_light_path_executes_the_canonical_skipping_sequence():
+    for state in (
+        "classify",
+        "implementing",
+        "candidate",
+        "testing",
+        "reviewing",
+        "final_human_review",
+        "complete",
+    ):
+        record = _light_record_for_state(state)
+        assert _record_errors(record) == [], state
+        assert "test" not in record["revisions"]
+        assert "test" not in record.get("human_reviews", {})
+
+    for previous_state, current_state, event in LIGHT_FORWARD_TRANSITIONS:
+        previous = _light_record_for_state(previous_state)
+        current = _light_record_for_state(current_state)
+        assert _transition_errors(previous, current, event) == [], event
+
+    candidate = _light_record_for_state("candidate")
+    assert candidate["revisions"]["candidate"]["parents"] == {
+        "base_sha": BASE_SHA,
+        "implementation_sha": IMPLEMENTATION_SHA,
+    }
+    testing = _light_record_for_state("testing")
+    assert testing["tester"]["mode"] == "mechanical_verification"
+
+
+@pytest.mark.parametrize(
+    "legacy_gate_1_path",
+    ("revisions.test", "human_reviews.test"),
+)
+def test_mechanical_light_path_forbids_skipped_test_gate_evidence(
+    legacy_gate_1_path,
+):
+    record = _light_record_for_state("complete")
+    _set_path(record, legacy_gate_1_path, {"unexpected": "skipped gate evidence"})
+
+    errors = _record_errors(record)
+    assert errors
+    assert any(
+        legacy_gate_1_path in item
+        and ("forbidden" in item.casefold() or "light path" in item.casefold())
+        for item in errors
+    )
 
 
 def test_human_review_1_change_request_returns_to_test_revision_without_rework():
@@ -485,10 +704,10 @@ def test_candidate_revision_requires_exact_test_and_implementation_parents():
         "test.base_sha",
         "implementation.base_sha",
     }
-    assert contract["candidate_parents"] == [
-        "test.sha",
-        "implementation.sha",
-    ]
+    assert contract["candidate_parents"] == {
+        "normal": ["test.sha", "implementation.sha"],
+        "mechanical_light": ["base_sha", "implementation.sha"],
+    }
 
     record = _record_for_state("complete")
     assert _record_errors(record) == []
@@ -539,17 +758,36 @@ def test_candidate_change_invalidates_tester_and_reviewer_evidence():
     assert _transition_errors(previous, current, "candidate_revised") == []
 
 
-def test_final_evidence_revision_is_path_allowlisted_without_rebinding_candidate():
-    evidence_contract = _contract()["revision_graph"]["final_evidence_revision"]
-    assert evidence_contract["reviewed_object"] == "candidate.sha"
-    assert evidence_contract["evidence_only"] is True
-    assert LESSONS_PATH in evidence_contract["allowed_paths"]
-    assert evidence_contract["production_paths_allowed"] is False
+def test_one_evidence_only_path_policy_governs_final_revision_without_rebinding():
+    contract = _contract()
+    assert _key_paths(contract, "allowed_paths") == [
+        ("revision_provenance", "evidence_only", "allowed_paths")
+    ]
+    evidence_contract = contract["revision_provenance"]["evidence_only"]
+    assert evidence_contract["kind"] == "evidence_only"
+    assert evidence_contract["parent"] == "exact_candidate_sha"
+    assert set(evidence_contract["allowed_paths"]) == {
+        LESSONS_PATH,
+        "docs/tests/rtd-config-acceptance-report.md",
+    }
+    graph_metadata = contract["revision_graph"]["final_evidence_revision"]
+    assert graph_metadata["reviewed_object"] == "candidate.sha"
+    assert graph_metadata["evidence_only"] is True
+    assert "allowed_paths" not in graph_metadata, "duplicate evidence path authority"
+    assert graph_metadata["production_paths_allowed"] is False
 
     record = _record_for_state("complete")
     assert _record_errors(record) == []
     assert record["human_reviews"]["final"]["sha"] == CANDIDATE_SHA
-    assert record["revisions"]["final_evidence"]["reviewed_candidate_sha"] == CANDIDATE_SHA
+    assert (
+        record["revisions"]["final_evidence"]["reviewed_candidate_sha"]
+        == CANDIDATE_SHA
+    )
+
+    for allowed_path in evidence_contract["allowed_paths"]:
+        allowed = copy.deepcopy(record)
+        allowed["revisions"]["final_evidence"]["changed_paths"] = [allowed_path]
+        assert _record_errors(allowed) == [], allowed_path
 
     polluted = copy.deepcopy(record)
     polluted["revisions"]["final_evidence"]["changed_paths"].append(

@@ -140,7 +140,7 @@ def _monitor() -> dict:
 
 def _review_record(state: str) -> dict:
     record = {
-        "version": 1,
+        "version": 2,
         "issue": {
             "number": 78,
             "primary_type": "W",
@@ -365,7 +365,9 @@ def test_final_human_review_rejects_stale_or_unauthorized_pr_review(
 
 
 def test_impact_flag_routing_table_is_complete_and_machine_readable():
-    routing = _contract()["routing"]["impact_flags"]
+    contract = _contract()
+    assert "routing" not in contract, "duplicate impact-routing authority"
+    routing = contract["impact_routing"]
     assert tuple(routing) == FLAGS
     for flag in FLAGS:
         entry = routing[flag]
@@ -379,7 +381,7 @@ def test_gate_derives_required_gates_and_profiles_from_each_impact_flag(flag):
     derive = getattr(module, "derive_routing", None)
     assert callable(derive), "missing machine-readable impact routing API"
 
-    expected = _contract()["routing"]["impact_flags"][flag]
+    expected = _contract()["impact_routing"][flag]
     actual = derive([flag])
     assert set(actual["required_gates"]) == set(expected["required_gates"])
     assert set(actual["profiles"]) == set(expected["profiles"])

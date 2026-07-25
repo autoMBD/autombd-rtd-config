@@ -54,6 +54,9 @@ import pytest
 GATE_PATH = Path(
     "agent-discipline/skills/agent-workflow/scripts/workflow_gate.py"
 )
+UNSUPPORTED_V1 = (
+    "workflow record version 1 is unsupported; expected canonical version 2"
+)
 
 
 def _gate_module():
@@ -72,7 +75,7 @@ def _sha(character: str) -> str:
 
 def _valid_record() -> dict:
     return {
-        "version": 1,
+        "version": 2,
         "issue": {
             "number": 321,
             "primary_type": "W",
@@ -80,12 +83,37 @@ def _valid_record() -> dict:
         },
         "state": "complete",
         "gate": {"test_required": True},
-        "lanes": {
+        "revisions": {
             "base_sha": _sha("a"),
-            "test_sha": _sha("b"),
-            "implementation_base_sha": _sha("a"),
-            "implementation_sha": _sha("c"),
-            "candidate_sha": _sha("d"),
+            "test": {
+                "identity": "T1",
+                "iteration": 1,
+                "base_sha": _sha("a"),
+                "sha": _sha("b"),
+            },
+            "implementation": {
+                "identity": "W1",
+                "iteration": 1,
+                "base_sha": _sha("a"),
+                "sha": _sha("c"),
+            },
+            "candidate": {
+                "identity": "C1",
+                "iteration": 1,
+                "sha": _sha("d"),
+                "parents": {
+                    "test_sha": _sha("b"),
+                    "implementation_sha": _sha("c"),
+                },
+            },
+            "final_evidence": {
+                "identity": "F1",
+                "sha": _sha("e"),
+                "reviewed_candidate_sha": _sha("d"),
+                "changed_paths": [
+                    "agent-discipline/agent-lessons-learned.md"
+                ],
+            },
         },
         "human_reviews": {
             "test": {
@@ -98,6 +126,13 @@ def _valid_record() -> dict:
                     "issue_number": 321,
                     "comment_id": 123456,
                     "command": f"/approve-test {_sha('b')}",
+                    "artifact": "issue_comment",
+                    "top_level": True,
+                    "actor_type": "human",
+                    "current": True,
+                    "edited": False,
+                    "deleted": False,
+                    "requested_changes": False,
                 },
                 "monitor": {
                     "status": "stopped",
@@ -109,6 +144,17 @@ def _valid_record() -> dict:
                 "approved": True,
                 "sha": _sha("d"),
                 "reviewer": "owner",
+                "evidence": {
+                    "provider": "github",
+                    "artifact": "pull_request_review",
+                    "repository": "autoMBD/autombd-rtd-config",
+                    "pull_request_number": 321,
+                    "review_id": 654321,
+                    "actor_type": "human",
+                    "state": "approved",
+                    "current": True,
+                    "candidate_sha": _sha("d"),
+                },
                 "monitor": {
                     "status": "stopped",
                     "interval_minutes": 10,
@@ -140,20 +186,91 @@ def test_valid_portable_workflow_record_passes():
     assert _errors(_valid_record()) == []
 
 
-def test_valid_mechanical_light_path_records_reduced_gate_justification():
+@pytest.mark.parametrize("legacy_marker", (None, "lanes", "transition", "corrections"))
+def test_version_1_and_all_legacy_dialects_have_one_stable_rejection(
+    legacy_marker,
+):
+    record = {"version": 1}
+    if legacy_marker is not None:
+        record[legacy_marker] = {}
+
+    assert _errors(record) == [UNSUPPORTED_V1]
+
+
+def test_v2_only_gate_exposes_no_migration_or_normalizer_api():
+    module = _gate_module()
+    public_migration_api = [
+        name
+        for name in dir(module)
+        if not name.startswith("_")
+        and ("migrat" in name.casefold() or "normaliz" in name.casefold())
+    ]
+
+    assert public_migration_api == []
+
+
+@pytest.mark.parametrize("legacy_marker", ("lanes", "transition", "corrections"))
+def test_legacy_markers_cannot_bypass_canonical_v2_validation(legacy_marker):
     record = _valid_record()
-    record["issue"] = {
-        "number": 654,
-        "primary_type": "N",
-        "impact_flags": ["DO"],
-    }
-    record["gate"] = {
-        "test_required": False,
-        "light_path": {
-            "reason": "Only non-normative documentation is renamed.",
-            "residual_risk": "A stale link could remain.",
-            "remaining_verification": ["link check", "git diff --check"],
+    record[legacy_marker] = {}
+    record["human_reviews"]["final"]["approved"] = False
+    record["human_reviews"]["final"]["evidence"] = None
+
+    errors = _errors(record)
+    assert errors
+    assert any(
+        legacy_marker in error and "legacy" in error.casefold()
+        for error in errors
+    )
+    assert any(
+        "final human review" in error.casefold()
+        or "human_reviews.final" in error
+        for error in errors
+    )
+
+
+def test_valid_mechanical_light_path_records_reduced_gate_justification():
+    record = {
+        "version": 2,
+        "issue": {
+            "number": 654,
+            "primary_type": "N",
+            "impact_flags": ["DO"],
         },
+        "state": "testing",
+        "gate": {
+            "test_required": False,
+            "light_path": {
+                "reason": "Only non-normative documentation is renamed.",
+                "residual_risk": "A stale link could remain.",
+                "remaining_verification": ["link check", "git diff --check"],
+            },
+        },
+        "revisions": {
+            "base_sha": _sha("a"),
+            "implementation": {
+                "identity": "W1",
+                "iteration": 1,
+                "base_sha": _sha("a"),
+                "sha": _sha("c"),
+            },
+            "candidate": {
+                "identity": "C1",
+                "iteration": 1,
+                "sha": _sha("d"),
+                "parents": {
+                    "base_sha": _sha("a"),
+                    "implementation_sha": _sha("c"),
+                },
+            },
+        },
+        "tester": {
+            "status": "pending",
+            "candidate_sha": _sha("d"),
+            "mode": "mechanical_verification",
+        },
+        "counters": {"production_rework": 0, "kpi_optimization": 0},
+        "exception": None,
     }
 
     assert _errors(record) == []
@@ -176,6 +293,12 @@ def test_unknown_class_or_impact_flag_is_rejected(field, value, expected):
 def test_implementation_requires_human_review_1_on_frozen_test_sha():
     record = _valid_record()
     record["state"] = "implementing"
+    del record["revisions"]["candidate"]
+    del record["revisions"]["final_evidence"]
+    record["revisions"]["implementation"]["sha"] = None
+    del record["tester"]
+    del record["reviewer"]
+    del record["human_reviews"]["final"]
     record["human_reviews"]["test"] = {
         "approved": False,
         "sha": _sha("b"),
@@ -246,12 +369,15 @@ def test_approved_human_review_requires_stopped_same_session_monitor(
 @pytest.mark.parametrize(
     ("mutate", "expected"),
     (
-        (lambda record: record["lanes"].update(test_sha="short"), "test_sha"),
         (
-            lambda record: record["lanes"].update(
-                implementation_base_sha=_sha("e")
+            lambda record: record["revisions"]["test"].update(sha="short"),
+            "test",
+        ),
+        (
+            lambda record: record["revisions"]["implementation"].update(
+                base_sha=_sha("e")
             ),
-            "base_sha",
+            "base",
         ),
         (
             lambda record: record["human_reviews"]["test"].update(sha=_sha("e")),
@@ -259,7 +385,7 @@ def test_approved_human_review_requires_stopped_same_session_monitor(
         ),
     ),
 )
-def test_malformed_or_cross_field_mismatched_lane_shas_are_rejected(
+def test_malformed_or_cross_field_mismatched_revision_shas_are_rejected(
     mutate, expected
 ):
     record = _valid_record()

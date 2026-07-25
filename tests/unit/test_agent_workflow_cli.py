@@ -60,7 +60,7 @@ BASE_SHA = "a" * 40
 
 def _classify_record() -> dict:
     return {
-        "version": 1,
+        "version": 2,
         "issue": {
             "number": 78,
             "primary_type": "W",
@@ -75,10 +75,18 @@ def _classify_record() -> dict:
 
 
 def _run(
-    record_path: str | Path, data: bytes | None = None
+    record_path: str | Path,
+    data: bytes | None = None,
+    *extra_args: str,
 ) -> subprocess.CompletedProcess[bytes]:
     return subprocess.run(
-        [sys.executable, str(GATE_PATH), "--json", str(record_path)],
+        [
+            sys.executable,
+            str(GATE_PATH),
+            "--json",
+            str(record_path),
+            *extra_args,
+        ],
         check=False,
         capture_output=True,
         input=data,
@@ -122,6 +130,49 @@ def test_cli_invalid_record_returns_exit_one_and_validation_json():
     assert payload["ok"] is False
     assert payload["errors"]
     assert payload["error_type"] == "validation"
+
+
+@pytest.mark.parametrize(
+    "extra_args",
+    (
+        ("--previous", "tests/.tmp/not-read-without-event.json"),
+        ("--event", "classification_complete"),
+    ),
+)
+def test_cli_transition_mode_requires_paired_previous_and_event(extra_args):
+    result = _run(
+        "-",
+        json.dumps(_classify_record()).encode("utf-8"),
+        *extra_args,
+    )
+    payload = _payload(result)
+
+    assert result.returncode == 2
+    assert payload["ok"] is False
+    assert payload["error_type"] == "input"
+    diagnostic = " ".join(payload["errors"]).casefold()
+    assert "--previous" in diagnostic
+    assert "--event" in diagnostic
+
+
+def test_cli_transition_mode_accepts_the_pair_before_reading_previous():
+    result = _run(
+        "-",
+        json.dumps(_classify_record()).encode("utf-8"),
+        "--previous",
+        "tests/.tmp/issue-78-definitely-missing-previous.json",
+        "--event",
+        "classification_complete",
+    )
+    payload = _payload(result)
+
+    assert result.returncode == 2
+    assert payload["ok"] is False
+    assert payload["error_type"] == "input"
+    diagnostic = " ".join(payload["errors"]).casefold()
+    assert "previous" in diagnostic
+    assert "does not exist" in diagnostic
+    assert "provided together" not in diagnostic
 
 
 @pytest.mark.parametrize("failure", ("invalid_json", "invalid_utf8", "missing_file"))
