@@ -82,7 +82,7 @@ FORWARD_TRANSITIONS = (
 LIGHT_FORWARD_TRANSITIONS = (
     ("classify", "implementing", "classification_complete"),
     ("implementing", "candidate", "candidate_created"),
-    ("candidate", "testing", "testing_started"),
+    ("candidate", "testing", "mechanical_verification_started"),
     ("testing", "reviewing", "tester_passed"),
     ("reviewing", "final_human_review", "reviewer_passed"),
     ("final_human_review", "complete", "final_approved"),
@@ -188,6 +188,7 @@ def _gate_module():
 def _base_record(state: str) -> dict:
     return {
         "version": 2,
+        "schema": "agent_workflow_v2",
         "issue": {
             "number": 78,
             "primary_type": "W",
@@ -362,7 +363,7 @@ def _record_for_state(state: str) -> dict:
 
     if state == "stopped":
         record["tester"]["status"] = "fail"
-        record["reviewer"]["status"] = "not_run"
+        del record["reviewer"]
         record["counters"]["production_rework"] = 3
         record["disposition"] = {
             "status": "stop_escalate",
@@ -373,7 +374,7 @@ def _record_for_state(state: str) -> dict:
 
     record["human_reviews"]["final"] = _final_review(True)
     record["revisions"]["final_evidence"] = {
-        "identity": "F1",
+        "identity": "E1",
         "sha": FINAL_EVIDENCE_SHA,
         "reviewed_candidate_sha": CANDIDATE_SHA,
         "changed_paths": [LESSONS_PATH],
@@ -439,7 +440,7 @@ def _light_record_for_state(state: str) -> dict:
 
     record["human_reviews"]["final"] = _final_review(True)
     record["revisions"]["final_evidence"] = {
-        "identity": "F1",
+        "identity": "E1",
         "sha": FINAL_EVIDENCE_SHA,
         "reviewed_candidate_sha": CANDIDATE_SHA,
         "changed_paths": [LESSONS_PATH],
@@ -512,7 +513,13 @@ def test_contract_declares_state_dependent_required_and_forbidden_fields():
 
     by_name = {item["name"]: item for item in states}
     for state, future_paths in FUTURE_EVIDENCE.items():
-        assert set(future_paths).issubset(by_name[state]["forbidden_fields"]), state
+        forbidden = by_name[state]["forbidden_fields"]
+        for future_path in future_paths:
+            assert any(
+                future_path == blocked
+                or future_path.startswith(f"{blocked}.")
+                for blocked in forbidden
+            ), (state, future_path)
 
     final_change_routes = [
         transition
@@ -567,7 +574,14 @@ def test_each_state_rejects_every_future_evidence_field(state, future_path):
     errors = _record_errors(record)
     assert errors
     assert any(
-        future_path in item and "forbidden" in item.casefold()
+        "forbidden" in item.casefold()
+        and any(
+            blocked_path in item
+            for blocked_path in (
+                ".".join(future_path.split(".")[:depth])
+                for depth in range(len(future_path.split(".")), 0, -1)
+            )
+        )
         for item in errors
     )
 
@@ -704,13 +718,19 @@ def test_candidate_revision_requires_exact_test_and_implementation_parents():
         "test.base_sha",
         "implementation.base_sha",
     }
-    assert contract["candidate_parents"] == {
-        "normal": ["test.sha", "implementation.sha"],
-        "mechanical_light": ["base_sha", "implementation.sha"],
-    }
-
     record = _record_for_state("complete")
     assert _record_errors(record) == []
+    assert record["revisions"]["candidate"]["parents"] == {
+        "test_sha": TEST_SHA,
+        "implementation_sha": IMPLEMENTATION_SHA,
+    }
+
+    light_record = _light_record_for_state("complete")
+    assert _record_errors(light_record) == []
+    assert light_record["revisions"]["candidate"]["parents"] == {
+        "base_sha": BASE_SHA,
+        "implementation_sha": IMPLEMENTATION_SHA,
+    }
 
     bad_base = copy.deepcopy(record)
     bad_base["revisions"]["implementation"]["base_sha"] = REVISED_CANDIDATE_SHA
@@ -751,10 +771,7 @@ def test_candidate_change_invalidates_tester_and_reviewer_evidence():
         "status": "pending",
         "candidate_sha": REVISED_CANDIDATE_SHA,
     }
-    current["reviewer"] = {
-        "status": "not_run",
-        "candidate_sha": REVISED_CANDIDATE_SHA,
-    }
+    del current["reviewer"]
     assert _transition_errors(previous, current, "candidate_revised") == []
 
 

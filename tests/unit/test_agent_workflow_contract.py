@@ -196,8 +196,14 @@ def test_workflow_contract_defines_ticket_lanes_exact_shas_and_role_boundaries()
     ]
     assert contract["roles"]["tester"]["production_writes"] == []
     assert contract["roles"]["reviewer"]["requires"] == "tester_pass"
-    assert contract["roles"]["reviewer"]["writes"] == [
-        "agent-discipline/agent-lessons-learned.md"
+    reviewer_writes = contract["roles"]["reviewer"]["writes"]
+    assert isinstance(reviewer_writes, str)
+    assert reviewer_writes.startswith("#/")
+    resolved = contract
+    for field in reviewer_writes.removeprefix("#/").split("/"):
+        resolved = resolved[field]
+    assert resolved is contract["revision_provenance"]["evidence_only"][
+        "allowed_paths"
     ]
 
 

@@ -76,6 +76,7 @@ def _sha(character: str) -> str:
 def _valid_record() -> dict:
     return {
         "version": 2,
+        "schema": "agent_workflow_v2",
         "issue": {
             "number": 321,
             "primary_type": "W",
@@ -107,7 +108,7 @@ def _valid_record() -> dict:
                 },
             },
             "final_evidence": {
-                "identity": "F1",
+                "identity": "E1",
                 "sha": _sha("e"),
                 "reviewed_candidate_sha": _sha("d"),
                 "changed_paths": [
@@ -232,6 +233,7 @@ def test_legacy_markers_cannot_bypass_canonical_v2_validation(legacy_marker):
 def test_valid_mechanical_light_path_records_reduced_gate_justification():
     record = {
         "version": 2,
+        "schema": "agent_workflow_v2",
         "issue": {
             "number": 654,
             "primary_type": "N",
@@ -305,7 +307,7 @@ def test_implementation_requires_human_review_1_on_frozen_test_sha():
         "reviewer": None,
     }
 
-    _assert_error(record, "human review 1")
+    _assert_error(record, "human_reviews.test.evidence")
 
 
 @pytest.mark.parametrize(
@@ -315,13 +317,13 @@ def test_implementation_requires_human_review_1_on_frozen_test_sha():
             lambda record: record["human_reviews"]["test"]["evidence"].update(
                 command=f"/approve-test {_sha('e')}"
             ),
-            "approval command",
+            "human_reviews.test.evidence.command",
         ),
         (
             lambda record: record["human_reviews"]["test"]["evidence"].pop(
                 "comment_id"
             ),
-            "comment id",
+            "human_reviews.test.evidence.comment_id",
         ),
     ),
 )
@@ -341,19 +343,19 @@ def test_human_review_1_requires_github_comment_bound_to_test_sha(
             lambda record: record["human_reviews"]["test"]["monitor"].update(
                 status="active"
             ),
-            "stop",
+            "human_reviews.test.monitor.status",
         ),
         (
             lambda record: record["human_reviews"]["test"]["monitor"].update(
                 interval_minutes=5
             ),
-            "10",
+            "human_reviews.test.monitor.interval_minutes",
         ),
         (
             lambda record: record["human_reviews"]["test"]["monitor"].update(
                 scope="new_session"
             ),
-            "current session",
+            "human_reviews.test.monitor.scope",
         ),
     ),
 )
@@ -371,17 +373,17 @@ def test_approved_human_review_requires_stopped_same_session_monitor(
     (
         (
             lambda record: record["revisions"]["test"].update(sha="short"),
-            "test",
+            "revisions.test.sha",
         ),
         (
             lambda record: record["revisions"]["implementation"].update(
                 base_sha=_sha("e")
             ),
-            "base",
+            "revisions.implementation.base_sha",
         ),
         (
             lambda record: record["human_reviews"]["test"].update(sha=_sha("e")),
-            "test_sha",
+            "human_reviews.test.sha",
         ),
     ),
 )
@@ -395,17 +397,17 @@ def test_malformed_or_cross_field_mismatched_revision_shas_are_rejected(
 
 
 @pytest.mark.parametrize(
-    ("counter", "expected"),
+    "counter",
     (
-        ("production_rework", "production rework"),
-        ("kpi_optimization", "kpi optimization"),
+        "production_rework",
+        "kpi_optimization",
     ),
 )
-def test_fourth_bounded_iteration_is_rejected(counter, expected):
+def test_fourth_bounded_iteration_is_rejected(counter):
     record = _valid_record()
     record["counters"][counter] = 4
 
-    _assert_error(record, expected)
+    _assert_error(record, f"counters.{counter}")
 
 
 @pytest.mark.parametrize(
@@ -421,7 +423,7 @@ def test_exception_requires_complete_justification(missing_field):
     }
     del record["exception"][missing_field]
 
-    _assert_error(record, missing_field.replace("_", " "))
+    _assert_error(record, f"exception.{missing_field}")
 
 
 def test_reviewer_cannot_pass_before_tester_is_green():
@@ -429,7 +431,7 @@ def test_reviewer_cannot_pass_before_tester_is_green():
     record["state"] = "reviewing"
     record["tester"]["status"] = "fail"
 
-    _assert_error(record, "tester pass")
+    _assert_error(record, "tester.status")
 
 
 def test_candidate_evidence_is_invalidated_by_a_different_candidate_sha():
@@ -448,7 +450,7 @@ def test_complete_state_requires_final_human_review_on_candidate():
         "reviewer": None,
     }
 
-    _assert_error(record, "final human review")
+    _assert_error(record, "human_reviews.final.approved")
 
 
 def test_validator_does_not_mutate_the_workflow_record():

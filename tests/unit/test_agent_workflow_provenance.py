@@ -141,6 +141,7 @@ def _monitor() -> dict:
 def _review_record(state: str) -> dict:
     record = {
         "version": 2,
+        "schema": "agent_workflow_v2",
         "issue": {
             "number": 78,
             "primary_type": "W",
@@ -197,7 +198,7 @@ def _review_record(state: str) -> dict:
         "monitor": _monitor(),
     }
     record["revisions"]["final_evidence"] = {
-        "identity": "F1",
+        "identity": "E1",
         "sha": FINAL_EVIDENCE_SHA,
         "reviewed_candidate_sha": CANDIDATE_SHA,
         "changed_paths": ["agent-discipline/agent-lessons-learned.md"],

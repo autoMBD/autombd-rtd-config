@@ -61,6 +61,7 @@ BASE_SHA = "a" * 40
 def _classify_record() -> dict:
     return {
         "version": 2,
+        "schema": "agent_workflow_v2",
         "issue": {
             "number": 78,
             "primary_type": "W",
