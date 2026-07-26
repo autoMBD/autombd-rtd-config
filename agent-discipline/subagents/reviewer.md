@@ -61,8 +61,8 @@ asset/provider rule, domain-truth/`.xdm` requirement, or checklist item). A less
 without a guard is incomplete.
 
 The canonical write authority is
-`revision_provenance.evidence_only.allowed_paths`; in this repository its only
-entry is this lessons file. Append it with `Edit` and treat the
+`revision_provenance.evidence_only.allowed_paths`. This role still writes only
+the lessons file named there. Append it with `Edit` and treat the
 log as **append-only**: add your new entry, never rewrite, reorder, or delete
 existing entries. You have no `Write` tool — do not recreate the file.
 

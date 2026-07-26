@@ -84,7 +84,7 @@
       {
         "name": "testing",
         "required_fields": ["tester.candidate_sha"],
-        "forbidden_fields": ["revisions.final_evidence", "human_reviews.final", "disposition"]
+        "forbidden_fields": ["revisions.final_evidence", "human_reviews.final", "reviewer", "disposition"]
       },
       {
         "name": "rework",
@@ -99,7 +99,7 @@
       {
         "name": "final_human_review",
         "required_fields": ["reviewer.candidate_sha", "human_reviews.final.monitor"],
-        "forbidden_fields": ["human_reviews.final.evidence", "disposition"]
+        "forbidden_fields": ["revisions.final_evidence", "human_reviews.final.evidence", "disposition"]
       },
       {
         "name": "complete",
@@ -219,7 +219,8 @@
       "kind": "evidence_only",
       "parent": "exact_candidate_sha",
       "allowed_paths": [
-        "agent-discipline/agent-lessons-learned.md"
+        "agent-discipline/agent-lessons-learned.md",
+        "docs/tests/rtd-config-acceptance-report.md"
       ],
       "forbidden_classes": [
         "production",

@@ -94,6 +94,9 @@ counters. `complete` and `stopped` are terminal.
 Evidence is state-dependent. A state requires only evidence already produced
 at that point; future Tester, Reviewer, Final Review, Candidate, or evidence-only
 revision data is invalid rather than silently accepted.
+Reviewer evidence begins in `reviewing`, never `testing`. A
+`candidate_revised` transition removes stale Reviewer evidence before returning
+to `testing`. Final evidence is produced only in `complete`.
 
 ### Test path
 
@@ -131,8 +134,9 @@ summaries, or Agent claims are not evidence. Production rework updates only the
 implementation lane and regenerates Candidate. The former Candidate and all
 Tester, Reviewer, or Human Review evidence bound to it immediately become stale.
 
-After an exact Candidate, `revisions.final_evidence.changed_paths` may carry
-only paths in `revision_provenance.evidence_only.allowed_paths`. Its
+Only the `complete` record may carry `revisions.final_evidence`; its
+`changed_paths` may contain only paths in
+`revision_provenance.evidence_only.allowed_paths`. Its
 `reviewed_candidate_sha` must equal that Candidate. A production,
 workflow-contract, or Test-contract path can never masquerade as final evidence.
 Tester, Reviewer, and Final Human Review remain bound to the exact Candidate

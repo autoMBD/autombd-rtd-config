@@ -685,10 +685,10 @@ def _validate_public_record(record: Mapping[str, Any]) -> list[str]:
 
     final_evidence = revisions.get("final_evidence")
     if final_evidence is not None:
-        if state not in {"final_human_review", "complete"}:
+        if state != "complete":
             errors.append(
                 "revisions.final_evidence is future evidence before "
-                "state final_human_review"
+                "state complete"
             )
         evidence = _mapping(final_evidence, "revisions.final_evidence", errors)
         _validate_revision_id(
@@ -784,11 +784,7 @@ def _validate_public_record(record: Mapping[str, Any]) -> list[str]:
     reviewer = record.get("reviewer")
     if reviewer is not None:
         reviewer = _mapping(reviewer, "reviewer", errors)
-        allowed = (
-            {"not_run"}
-            if state == "testing"
-            else {"pending", "pass", "fail", "not_run"}
-        )
+        allowed = {"pending", "pass", "fail", "not_run"}
         if reviewer.get("status") not in allowed:
             errors.append(f"reviewer.status is invalid for state {state}")
         if state in {"final_human_review", "complete"} and reviewer.get("status") != "pass":
@@ -1024,12 +1020,10 @@ def _validate_public_transition(
         reviewer = current.get("reviewer")
         if not isinstance(tester, Mapping) or tester.get("status") != "pending":
             errors.append("candidate_revised requires tester.status pending")
-        if not isinstance(reviewer, Mapping) or reviewer.get("status") != "not_run":
-            errors.append("candidate_revised requires reviewer.status not_run")
+        if reviewer is not None:
+            errors.append("candidate_revised must remove stale reviewer evidence")
         if isinstance(tester, Mapping) and tester.get("candidate_sha") != new_sha:
             errors.append("candidate_revised tester evidence must bind the new SHA")
-        if isinstance(reviewer, Mapping) and reviewer.get("candidate_sha") != new_sha:
-            errors.append("candidate_revised reviewer evidence must bind the new SHA")
         revisions = current.get("revisions")
         if isinstance(revisions, Mapping) and revisions.get("final_evidence") is not None:
             errors.append("candidate_revised invalidates revisions.final_evidence")

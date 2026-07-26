@@ -413,11 +413,15 @@ def test_candidate_revised_requires_new_candidate_and_reset_results():
     new_sha = "7" * 40
     current["revisions"]["candidate"] = _public_candidate_revision(5, new_sha)
     current["tester"] = {"status": "pending", "candidate_sha": new_sha}
-    current["reviewer"] = {"status": "not_run", "candidate_sha": new_sha}
     assert gate.validate_transition(previous, current, "candidate_revised") == []
 
-    current["reviewer"]["status"] = "pass"
-    assert any("reviewer.status" in error for error in gate.validate_transition(previous, current, "candidate_revised"))
+    current["reviewer"] = {"status": "not_run", "candidate_sha": new_sha}
+    assert any(
+        "reviewer" in error and ("future" in error or "forbidden" in error)
+        for error in gate.validate_transition(
+            previous, current, "candidate_revised"
+        )
+    )
 
 
 def test_public_human_review_contract_and_evidence_are_exact():
@@ -585,14 +589,18 @@ def test_public_review_diagnostics_name_the_invalid_concept():
 
 def test_final_evidence_revision_is_candidate_bound_and_path_allowlisted():
     validate_record = _load_gate().validate_record
-    record = _public_record("complete")
-    record["revisions"]["final_evidence"] = {
-        "identity": "E9",
-        "sha": EVIDENCE_SHA,
-        "reviewed_candidate_sha": CANDIDATE_SHA,
-        "changed_paths": ["agent-discipline/agent-lessons-learned.md"],
-    }
-    assert validate_record(record) == []
+    for path in (
+        "agent-discipline/agent-lessons-learned.md",
+        "docs/tests/rtd-config-acceptance-report.md",
+    ):
+        record = _public_record("complete")
+        record["revisions"]["final_evidence"] = {
+            "identity": "E9",
+            "sha": EVIDENCE_SHA,
+            "reviewed_candidate_sha": CANDIDATE_SHA,
+            "changed_paths": [path],
+        }
+        assert validate_record(record) == [], path
 
     record["revisions"]["final_evidence"]["changed_paths"] = [
         "agent-discipline/workflow-contract.json"
@@ -689,7 +697,8 @@ def test_contract_and_records_use_only_canonical_v2():
     assert "routing" not in contract
     assert "final_evidence_revision" not in contract["revision_graph"]
     assert contract["revision_provenance"]["evidence_only"]["allowed_paths"] == [
-        "agent-discipline/agent-lessons-learned.md"
+        "agent-discipline/agent-lessons-learned.md",
+        "docs/tests/rtd-config-acceptance-report.md",
     ]
 
 
@@ -770,6 +779,41 @@ def test_stopped_terminal_rejects_future_reviewer_final_and_evidence_revision():
     assert any(
         "revisions.final_evidence" in error
         for error in gate.validate_record(evidence)
+    )
+
+
+def test_testing_and_final_human_review_reject_future_evidence():
+    contract = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
+    state_rules = {
+        item["name"]: item for item in contract["state_machine"]["states"]
+    }
+    assert "reviewer" in state_rules["testing"]["forbidden_fields"]
+    assert (
+        "revisions.final_evidence"
+        in state_rules["final_human_review"]["forbidden_fields"]
+    )
+
+    testing = _public_record("testing")
+    testing["reviewer"] = {
+        "status": "not_run",
+        "candidate_sha": CANDIDATE_SHA,
+    }
+    assert any(
+        "reviewer" in error and "forbidden" in error
+        for error in _load_gate().validate_record(testing)
+    )
+
+    final_review = _public_record("final_human_review")
+    final_review["revisions"]["final_evidence"] = {
+        "identity": "E11",
+        "sha": EVIDENCE_SHA,
+        "reviewed_candidate_sha": CANDIDATE_SHA,
+        "changed_paths": ["agent-discipline/agent-lessons-learned.md"],
+    }
+    assert any(
+        "revisions.final_evidence" in error
+        and ("future" in error or "forbidden" in error)
+        for error in _load_gate().validate_record(final_review)
     )
 
 
