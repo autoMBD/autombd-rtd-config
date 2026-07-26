@@ -29,6 +29,10 @@ platform-neutral contract in `agent-discipline/workflow-contract.json` through
 task classification and impact flags, the common state machine, Human Review
 gates and monitoring, independent lanes and SHA-bound evidence, rework limits,
 validation checkpoints, initialization preflight, and common role boundaries.
+Only canonical schema `agent_workflow_v2` is accepted; v1 records and legacy
+record markers are unsupported. Impact routing and evidence-only write paths
+come only from `impact_routing` and
+`revision_provenance.evidence_only.allowed_paths`, respectively.
 
 This file is the RTD CfgFile CLI repository profile. It adds domain, ownership,
 runtime, documentation, and acceptance requirements without redefining the

@@ -22,7 +22,9 @@ independent E2E runner; this role has no static default runner.
 The handoff must populate `handoff_templates.tester` (`inputs`, `forbidden`,
 `outputs`, `stop_conditions`, `acceptance`) and bind the exact `Cn` and full
 Candidate SHA. Reject a stale, abbreviated, or evidence-only substitute for the
-Candidate under test.
+Candidate under test. When the canonical `N + DO` path applies, run and record
+`mechanical_verification`; do not require or invent Test-authoring/Gate 1
+evidence.
 
 ## Responsibilities
 - **Coverage:** every mandatory requirement must map to a deterministic test, and

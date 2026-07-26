@@ -33,7 +33,8 @@ to Category B.
 
 ### Canonical Agent workflow
 
-`agent-discipline/workflow-contract.json` is the versioned, machine-readable
+`agent-discipline/workflow-contract.json` is the canonical v2,
+machine-readable
 authority for reusable Agent classification, states, Human Review gates, lanes,
 evidence, bounds, and common role boundaries. Its platform-neutral execution
 guidance is `agent-discipline/skills/agent-workflow/SKILL.md`. `AGENTS.md` and

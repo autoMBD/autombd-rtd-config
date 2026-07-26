@@ -1,41 +1,42 @@
 {
-  "version": 1,
+  "version": 2,
+  "schema": "agent_workflow_v2",
   "title": "Platform-neutral Agent workflow contract",
   "task_classes": [
     {
       "code": "M",
       "name": "module_capability",
-      "state_machine": "agent_workflow_v1"
+      "state_machine": "agent_workflow_v2"
     },
     {
       "code": "B",
       "name": "bug",
-      "state_machine": "agent_workflow_v1"
+      "state_machine": "agent_workflow_v2"
     },
     {
       "code": "W",
       "name": "workflow_or_discipline",
-      "state_machine": "agent_workflow_v1"
+      "state_machine": "agent_workflow_v2"
     },
     {
       "code": "T",
       "name": "tests_or_validation",
-      "state_machine": "agent_workflow_v1"
+      "state_machine": "agent_workflow_v2"
     },
     {
       "code": "D",
       "name": "specifications_or_documentation",
-      "state_machine": "agent_workflow_v1"
+      "state_machine": "agent_workflow_v2"
     },
     {
       "code": "N",
       "name": "mechanical_maintenance",
-      "state_machine": "agent_workflow_v1"
+      "state_machine": "agent_workflow_v2"
     },
     {
       "code": "I",
       "name": "infrastructure_or_tooling",
-      "state_machine": "agent_workflow_v1"
+      "state_machine": "agent_workflow_v2"
     }
   ],
   "impact_flags": [
@@ -53,62 +54,62 @@
     {"code": "DO", "name": "documentation_only"}
   ],
   "state_machine": {
-    "name": "agent_workflow_v1",
+    "name": "agent_workflow_v2",
     "states": [
       {
         "name": "classify",
         "required_fields": ["issue.primary_type"],
-        "forbidden_fields": ["revisions.candidate.sha", "tester.candidate_sha", "reviewer.candidate_sha", "human_reviews.final.evidence"]
+        "forbidden_fields": ["revisions.test", "revisions.implementation", "revisions.candidate", "revisions.final_evidence", "human_reviews", "tester", "reviewer", "disposition"]
       },
       {
         "name": "test_authoring",
         "required_fields": ["revisions.test.identity"],
-        "forbidden_fields": ["revisions.candidate.sha", "tester.candidate_sha", "reviewer.candidate_sha", "human_reviews.final.evidence"]
+        "forbidden_fields": ["revisions.implementation", "revisions.candidate", "revisions.final_evidence", "human_reviews", "tester", "reviewer", "disposition"]
       },
       {
         "name": "human_review_1",
         "required_fields": ["revisions.test.sha"],
-        "forbidden_fields": ["revisions.candidate.sha", "tester.candidate_sha", "reviewer.candidate_sha", "human_reviews.final.evidence"]
+        "forbidden_fields": ["revisions.implementation", "revisions.candidate", "revisions.final_evidence", "human_reviews.final", "tester", "reviewer", "disposition"]
       },
       {
         "name": "implementing",
-        "required_fields": ["human_reviews.test.evidence"],
-        "forbidden_fields": ["revisions.candidate.sha", "tester.candidate_sha", "reviewer.candidate_sha", "human_reviews.final.evidence"]
+        "required_fields": ["revisions.implementation.identity"],
+        "forbidden_fields": ["revisions.candidate", "revisions.final_evidence", "human_reviews.final", "tester", "reviewer", "disposition"]
       },
       {
         "name": "candidate",
         "required_fields": ["revisions.candidate.parents"],
-        "forbidden_fields": ["tester.candidate_sha", "reviewer.candidate_sha", "human_reviews.final.evidence"]
+        "forbidden_fields": ["revisions.final_evidence", "human_reviews.final", "tester", "reviewer", "disposition"]
       },
       {
         "name": "testing",
         "required_fields": ["tester.candidate_sha"],
-        "forbidden_fields": ["human_reviews.final.evidence"]
+        "forbidden_fields": ["revisions.final_evidence", "human_reviews.final", "disposition"]
       },
       {
         "name": "rework",
         "required_fields": ["tester.status"],
-        "forbidden_fields": ["reviewer.candidate_sha", "human_reviews.final.evidence"]
+        "forbidden_fields": ["revisions.final_evidence", "human_reviews.final", "reviewer", "disposition"]
       },
       {
         "name": "reviewing",
-        "required_fields": ["tester.candidate_sha"],
-        "forbidden_fields": ["human_reviews.final.evidence"]
+        "required_fields": ["tester.candidate_sha", "reviewer.candidate_sha"],
+        "forbidden_fields": ["revisions.final_evidence", "human_reviews.final", "disposition"]
       },
       {
         "name": "final_human_review",
-        "required_fields": ["reviewer.candidate_sha"],
-        "forbidden_fields": []
+        "required_fields": ["reviewer.candidate_sha", "human_reviews.final.monitor"],
+        "forbidden_fields": ["human_reviews.final.evidence", "disposition"]
       },
       {
         "name": "complete",
         "required_fields": ["human_reviews.final.evidence"],
-        "forbidden_fields": []
+        "forbidden_fields": ["disposition"]
       },
       {
         "name": "stopped",
         "required_fields": ["disposition.status"],
-        "forbidden_fields": ["human_reviews.final.evidence"]
+        "forbidden_fields": ["revisions.final_evidence", "human_reviews.final", "reviewer"]
       }
     ],
     "sequence": [
@@ -127,6 +128,7 @@
     "terminal_states": ["complete", "stopped"],
     "transitions": [
       {"from": "classify", "to": "test_authoring", "event": "classification_complete"},
+      {"from": "classify", "to": "implementing", "event": "classification_complete", "when": "gate.test_required == false"},
       {"from": "test_authoring", "to": "human_review_1", "event": "test_frozen"},
       {"from": "human_review_1", "to": "implementing", "event": "test_approved"},
       {"from": "human_review_1", "to": "test_authoring", "event": "changes_requested"},
@@ -134,6 +136,7 @@
       {"from": "implementing", "to": "implementing", "event": "permission_blocked"},
       {"from": "implementing", "to": "candidate", "event": "candidate_created"},
       {"from": "candidate", "to": "testing", "event": "testing_started"},
+      {"from": "candidate", "to": "testing", "event": "mechanical_verification_started", "when": "gate.test_required == false"},
       {"from": "testing", "to": "reviewing", "event": "tester_passed"},
       {"from": "testing", "to": "rework", "event": "tester_failed"},
       {"from": "rework", "to": "rework", "event": "dependency_blocked"},
@@ -201,13 +204,7 @@
       "candidate": "C{iteration}"
     },
     "shared_base": ["test.base_sha", "implementation.base_sha"],
-    "candidate_parents": ["test.sha", "implementation.sha"],
-    "final_evidence_revision": {
-      "reviewed_object": "candidate.sha",
-      "evidence_only": true,
-      "allowed_paths": ["agent-discipline/agent-lessons-learned.md"],
-      "production_paths_allowed": false
-    }
+    "candidate_parents": ["test.sha", "implementation.sha"]
   },
   "revision_provenance": {
     "identities": {
@@ -222,8 +219,7 @@
       "kind": "evidence_only",
       "parent": "exact_candidate_sha",
       "allowed_paths": [
-        "agent-discipline/agent-lessons-learned.md",
-        "docs/tests/rtd-config-acceptance-report.md"
+        "agent-discipline/agent-lessons-learned.md"
       ],
       "forbidden_classes": [
         "production",
@@ -280,22 +276,6 @@
     "DO": {
       "required_gates": ["documentation_review"],
       "profiles": ["documentation"]
-    }
-  },
-  "routing": {
-    "impact_flags": {
-      "PB": {"required_gates": ["deterministic_tests", "isolated_e2e"], "profiles": ["behavioral"]},
-      "MS": {"required_gates": ["descriptor_surface", "deterministic_tests", "isolated_e2e", "vendor_validation"], "profiles": ["module_surface"]},
-      "MW": {"required_gates": ["deterministic_tests", "static_runtime_checks", "vendor_validation"], "profiles": ["mex_write"]},
-      "RA": {"required_gates": ["asset_integrity", "deterministic_tests"], "profiles": ["runtime_asset"]},
-      "TC": {"required_gates": ["deterministic_tests", "test_contract_review"], "profiles": ["test_contract"]},
-      "VS": {"required_gates": ["vendor_validation"], "profiles": ["vendor"]},
-      "EV": {"required_gates": ["isolated_e2e"], "profiles": ["isolated_e2e"]},
-      "AR": {"required_gates": ["workflow_contract"], "profiles": ["agent_rules"]},
-      "RP": {"required_gates": ["package_validation"], "profiles": ["release"]},
-      "ED": {"required_gates": ["dependency_preflight"], "profiles": ["external_dependency"]},
-      "SS": {"required_gates": ["safety_security_review"], "profiles": ["safety_critical"]},
-      "DO": {"required_gates": ["documentation_review"], "profiles": ["documentation"]}
     }
   },
   "correction_classes": {
@@ -397,9 +377,7 @@
     },
     "reviewer": {
       "requires": "tester_pass",
-      "writes": [
-        "agent-discipline/agent-lessons-learned.md"
-      ]
+      "writes": "#/revision_provenance/evidence_only/allowed_paths"
     }
   },
   "light_path": {
@@ -411,7 +389,19 @@
       "reason",
       "residual_risk",
       "remaining_verification"
-    ]
+    ],
+    "sequence": [
+      "classify",
+      "implementing",
+      "candidate",
+      "testing",
+      "reviewing",
+      "final_human_review",
+      "complete"
+    ],
+    "testing_mode": "mechanical_verification",
+    "candidate_parents": ["base_sha", "implementation_sha"],
+    "forbidden_evidence": ["revisions.test", "human_reviews.test"]
   },
   "initialization": {
     "first_clone": "interactive_collection_before_lane_creation",
@@ -424,7 +414,7 @@
   },
   "handoff_templates": {
     "orchestrator": {
-      "inputs": ["issue classification: #/task_classes and #/impact_routing", "exact base revision: #/lanes"],
+      "inputs": ["issue classification: #/task_classes and #/impact_routing", "exact base revision: #/revision_provenance"],
       "forbidden": ["owner Test implementation disclosure: #/roles/worker/forbidden_inputs"],
       "outputs": ["state/transition record: #/state_machine/transitions", "role handoff with exact revisions: #/revision_provenance"],
       "stop_conditions": ["automatic cap reached: #/correction_classes"],
@@ -438,7 +428,7 @@
       "acceptance": ["all requested facts sourced: #/roles/explorer"]
     },
     "worker": {
-      "inputs": ["approved Test revision and implementation base: #/revision_provenance"],
+      "inputs": ["approved Test revision when test_required is true, plus implementation base: #/revision_provenance"],
       "forbidden": ["owner acceptance Test source: #/roles/worker/forbidden_inputs"],
       "outputs": ["implementation revision Wn: #/revision_provenance/identities/implementation"],
       "stop_conditions": ["scope or authority gap: #/roles/worker"],
@@ -454,7 +444,7 @@
     "reviewer": {
       "inputs": ["Tester PASS on exact Candidate: #/roles/reviewer/requires"],
       "forbidden": ["production or Test repair: #/roles/reviewer"],
-      "outputs": ["candidate-bound review and allowed lesson append: #/roles/reviewer/writes"],
+      "outputs": ["candidate-bound review and allowed evidence append: #/revision_provenance/evidence_only/allowed_paths"],
       "stop_conditions": ["Tester evidence missing or stale: #/lanes"],
       "acceptance": ["review PASS before Final Human Review: #/state_machine/final_human_review"]
     }

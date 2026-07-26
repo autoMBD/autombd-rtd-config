@@ -41,7 +41,7 @@ contract:
 
 All seven types use the same workflow. Classification selects additional
 repository-profile checks; it does not select a different state machine. The
-`routing.impact_flags` derives the required gates and profiles, while the
+`impact_routing` derives the required gates and profiles, while the
 classification determines `gate.test_required`; callers may not self-declare a
 weaker gate. Only exact `N + DO` derives the lightweight path.
 
@@ -73,6 +73,10 @@ classify -> test_authoring -> human_review_1 -> implementing
          -> candidate -> testing -> reviewing
          -> final_human_review -> complete
 
+classify -> implementing -> candidate
+         -> testing(mechanical_verification) -> reviewing
+         -> final_human_review -> complete                 [N + DO only]
+
 testing --tester_failed--> rework --production_rework--> implementing
 rework  --production_rework---------------------------------> stopped
 human_review_1 --changes_requested------------------------> test_authoring
@@ -99,7 +103,10 @@ implementation and obtain Human Review Gate 1 approval.
 
 The lightweight no-test path is limited to `N` work whose only impact is `DO`.
 Record non-empty `reason`, `residual_risk`, and a non-empty list of
-`remaining_verification` actions. It still produces a candidate, evidence,
+`remaining_verification` actions. It skips Test authoring and Human Review
+Gate 1, forbids their revision/review evidence, and enters `implementing`
+directly. Its Candidate parents are the exact Base and Implementation SHAs, and
+Tester records `mode: mechanical_verification`. It still produces a candidate,
 Reviewer result, and final Human Review. If behavior, a test contract, Agent
 rules, packaging, safety, runtime data, or tooling is affected, use the standard
 path.
@@ -124,8 +131,9 @@ summaries, or Agent claims are not evidence. Production rework updates only the
 implementation lane and regenerates Candidate. The former Candidate and all
 Tester, Reviewer, or Human Review evidence bound to it immediately become stale.
 
-After an exact Candidate, `revisions.final_evidence` may carry only the lessons
-log path. Its `reviewed_candidate_sha` must equal that Candidate. A production,
+After an exact Candidate, `revisions.final_evidence.changed_paths` may carry
+only paths in `revision_provenance.evidence_only.allowed_paths`. Its
+`reviewed_candidate_sha` must equal that Candidate. A production,
 workflow-contract, or Test-contract path can never masquerade as final evidence.
 Tester, Reviewer, and Final Human Review remain bound to the exact Candidate
 they evaluated.
@@ -238,7 +246,7 @@ invalidates it. Only then may the record enter `complete`.
 
 ### Worker
 
-- Inputs: approved Test SHA, capability brief, implementation base SHA, grounded asset/descriptor facts, and ownership boundary.
+- Inputs: approved Test SHA when `test_required` is true, capability brief, implementation base SHA, grounded asset/descriptor facts, and ownership boundary.
 - Forbidden sources: owner acceptance-test implementation and E2E case literals as specification.
 - Forbidden actions: changing the frozen Test, guessing values, or repairing another provider's region.
 - Outputs: implementation SHA, Worker-owned generality tests, exact dev-test result, and scoped diff evidence.
@@ -270,7 +278,8 @@ with real evidence; do not treat the template itself as evidence.
 
 ```json
 {
-  "version": 1,
+  "version": 2,
+  "schema": "agent_workflow_v2",
   "issue": {
     "number": 123,
     "primary_type": "I",
@@ -336,6 +345,7 @@ Validate after every state or SHA change:
 
 ```text
 python agent-discipline/skills/agent-workflow/scripts/workflow_gate.py --json <record.json>
+python agent-discipline/skills/agent-workflow/scripts/workflow_gate.py --json <current.json> --previous <previous.json> --event <event>
 ```
 
 An empty error list with exit code 0 means the recorded transition satisfies

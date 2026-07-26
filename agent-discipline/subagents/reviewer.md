@@ -60,7 +60,9 @@ wrong or risky** — as: what happened → root cause → the durable guard (a t
 asset/provider rule, domain-truth/`.xdm` requirement, or checklist item). A lesson
 without a guard is incomplete.
 
-This file is the **only** file you may write. Append it with `Edit` and treat the
+The canonical write authority is
+`revision_provenance.evidence_only.allowed_paths`; in this repository its only
+entry is this lessons file. Append it with `Edit` and treat the
 log as **append-only**: add your new entry, never rewrite, reorder, or delete
 existing entries. You have no `Write` tool — do not recreate the file.
 
