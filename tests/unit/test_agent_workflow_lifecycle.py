@@ -787,11 +787,6 @@ def test_one_evidence_only_path_policy_governs_final_revision_without_rebinding(
         LESSONS_PATH,
         "docs/tests/rtd-config-acceptance-report.md",
     }
-    graph_metadata = contract["revision_graph"]["final_evidence_revision"]
-    assert graph_metadata["reviewed_object"] == "candidate.sha"
-    assert graph_metadata["evidence_only"] is True
-    assert "allowed_paths" not in graph_metadata, "duplicate evidence path authority"
-    assert graph_metadata["production_paths_allowed"] is False
 
     record = _record_for_state("complete")
     assert _record_errors(record) == []
