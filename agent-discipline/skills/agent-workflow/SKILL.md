@@ -95,15 +95,16 @@ reviewing --review_correction----------------------------> rework
 The exact legal edges and events are `state_machine.transitions`. Validate an
 edge by passing the previous record, current record, and event to
 `validate_transition`. `rework` returns through the implementation lane,
-creates `W(n+1)`, commits the already-staged `C(n+1)`, and then re-enters
-Tester. Reviewer corrections enter `rework` directly. Final Human Review
+creates `W(n+1)`, clears the old Candidate, creates the next Candidate only on
+`candidate_created`, and then re-enters Tester. Reviewer corrections enter
+`rework` directly. Final Human Review
 corrections first return to `reviewing`, then enter `rework`; neither routing
 edge increments the counter. Only the following `production_rework` edge
 increments it. There is no direct Candidate-to-Tester revision bypass. A Gate 1 change request
 instead creates the next `Tn` in `test_authoring` and does not consume
 production rework. A functional PASS with KPI MISS takes the executable
 `kpi_optimization` edge, increments that counter exactly once, and similarly
-stages `W(n+1)` and `C(n+1)`. Dependency and permission blocks preserve
+starts `W(n+1)` with no Candidate. Dependency and permission blocks preserve
 revisions and counters. `complete` and `stopped` are terminal.
 
 Evidence is state-dependent. A state requires only evidence already produced
@@ -146,10 +147,11 @@ Model each revision explicitly: `Tn` for Test, `Wn` for Implementation, and
 record full 40-hex SHAs. Test and Implementation both start from
 `revisions.base_sha` in independent checkouts/worktrees and produce independent
 commits. Candidate `parents.test_sha` and `parents.implementation_sha` bind
-those exact revisions. After a correction stages `C(n+1)` with a null SHA,
-`candidate_created` must commit that exact identity and iteration; it may not
-substitute a different Candidate. Permissions, checkout, inputs, and evidence
-are separate boundaries.
+those exact revisions. The entire `revisions.candidate` key is forbidden while
+state is `implementing`; a correction cannot keep an old Candidate or a null
+placeholder bound. `candidate_created` introduces the new Candidate only when
+moving from `implementing` to `candidate`. Permissions, checkout, inputs, and
+evidence are separate boundaries.
 
 The Worker must not receive or read the owner's acceptance-test implementation.
 The candidate is a deterministic integration revision made from the test and
@@ -204,10 +206,10 @@ Both require the exact two-line command. An approval is invalid if
 The outer Gate 1 `reviewer` identifies the approving human and is required only
 when evidence exists. A pending record without evidence keeps it null; a
 change-request record has evidence and therefore records the human reviewer.
-The evidence `actor_login` must exactly equal that outer `reviewer`, and that
-login must appear in
-`authorization.github.authorized_human_logins`; `issue.repository` must also
-exactly match the evidence repository.
+The evidence `actor_login` must exactly equal that outer `reviewer`. Top-level
+`authorization` is optional; when supplied, the login must appear in
+`authorization.github.authorized_human_logins`. `issue.repository` is also
+optional; when supplied, it must exactly match the evidence repository.
 
 Replies, reactions, labels, Agent-authored commands, abbreviated or stale SHAs,
 and edited or deleted approvals are invalid. A new Test SHA invalidates every
@@ -228,11 +230,11 @@ On `review_poll_no_change`, use exactly this progression:
 60m/0 -> 60m/0 indefinitely
 ```
 
-`interval_minutes` must equal the tier (`10m`, `30m`, or `60m`). No update is a
-no-op except for the scheduled monitor progression. Do not encode a timestamp,
-deadline, legacy timing field, or a new session. On a valid update, stop the
-monitor before continuing. Apply the same initial/reset shape to Final Human
-Review.
+`interval_minutes` must equal the tier (`10m`, `30m`, or `60m`). A no-update
+event advances only the approved count/tier schedule. Do not encode a
+timestamp, deadline, legacy timing field, or a new session. On a valid update,
+stop the monitor before continuing. Apply the same initial/reset shape to
+Final Human Review.
 
 ## 6. Roles, validation, and bounded rework
 
@@ -273,9 +275,9 @@ Before `complete`, obtain a current GitHub PR review made by a human whose state
 is `approved`, bound to the exact Candidate SHA. Record repository, PR number,
 review ID, exact actor login, Candidate SHA, and a stopped current-session
 monitor at one of the valid tiers. The actor login must equal the outer
-reviewer and be authorized by
-`authorization.github.authorized_human_logins`. A Candidate SHA change, review
-edit, dismissal, or requested change invalidates it. The
+reviewer. If top-level authorization is supplied, the actor must be authorized
+by `authorization.github.authorized_human_logins`. A Candidate SHA change,
+review edit, dismissal, or requested change invalidates it. The
 `final_approved` transition must preserve the exact Candidate revision object.
 Only then may the record enter `complete`.
 

@@ -40,7 +40,7 @@
 # File:        test_workflow_gate_generality.py
 # Author:      autoMBD <tkung.lqk@foxmail.com>
 # Date:        2026-07-26
-# Version:     0.6.0
+# Version:     0.7.0
 # Description: Generality tests for canonical Agent workflow v2 records and gates.
 # =================================================================================
 
@@ -448,11 +448,7 @@ def test_public_special_transitions_preserve_counters_and_revision_iterations():
     current = _public_record("implementing")
     current["counters"]["production_rework"] = 2
     current["revisions"]["implementation"] = _public_implementation_revision(4, None)
-    current["revisions"]["candidate"] = {
-        "identity": "C5",
-        "iteration": 5,
-        "sha": None,
-    }
+    assert "candidate" not in current["revisions"]
     assert gate.validate_transition(previous, current, "production_rework") == []
 
     previous = _public_record("rework")
@@ -964,11 +960,7 @@ def test_review_corrections_enter_counted_rework_and_direct_candidate_revision_f
     implementation["revisions"]["implementation"] = (
         _public_implementation_revision(4, None)
     )
-    implementation["revisions"]["candidate"] = {
-        "identity": "C5",
-        "iteration": 5,
-        "sha": None,
-    }
+    assert "candidate" not in implementation["revisions"]
     assert gate.validate_transition(
         rework, implementation, "production_rework"
     ) == []
@@ -993,14 +985,12 @@ def test_review_corrections_enter_counted_rework_and_direct_candidate_revision_f
         implementation, candidate, "candidate_created"
     ) == []
 
-    substituted_candidate = deepcopy(candidate)
-    substituted_candidate["revisions"]["candidate"]["identity"] = "C6"
-    substituted_candidate["revisions"]["candidate"]["iteration"] = 6
-    assert any(
-        "exact staged C iteration" in error
-        for error in gate.validate_transition(
-            implementation, substituted_candidate, "candidate_created"
-        )
+    wrong_parent = deepcopy(candidate)
+    wrong_parent["revisions"]["candidate"]["parents"][
+        "implementation_sha"
+    ] = "a" * 40
+    assert gate.validate_transition(
+        implementation, wrong_parent, "candidate_created"
     )
 
 
@@ -1084,12 +1074,7 @@ def test_kpi_optimization_is_executable_for_iterations_one_and_three_but_not_fou
         current["revisions"]["implementation"] = (
             _public_implementation_revision(4, None)
         )
-        current["revisions"]["candidate"] = {
-            "identity": "C5",
-            "iteration": 5,
-            "sha": None,
-        }
-        assert current["revisions"]["candidate"]["sha"] is None
+        assert "candidate" not in current["revisions"]
         assert "tester" not in current
         assert "reviewer" not in current
         assert gate.validate_transition(
@@ -1104,11 +1089,7 @@ def test_kpi_optimization_is_executable_for_iterations_one_and_three_but_not_fou
     fourth["revisions"]["implementation"] = (
         _public_implementation_revision(4, None)
     )
-    fourth["revisions"]["candidate"] = {
-        "identity": "C5",
-        "iteration": 5,
-        "sha": None,
-    }
+    assert "candidate" not in fourth["revisions"]
     assert any(
         "KPI" in error or "0..3" in error or "fourth" in error
         for error in gate.validate_transition(
@@ -1522,3 +1503,132 @@ def test_review_gate_creation_and_replacement_reset_to_10m_count_zero():
     assert gate.validate_transition(
         reviewing, wrong_final_reset, "reviewer_passed"
     )
+
+
+def test_repository_and_authorization_are_optional_without_human_evidence():
+    gate = _load_gate()
+    for state in ("classify", "human_review_1", "final_human_review"):
+        record = _public_record(state)
+        record["issue"].pop("repository")
+        record.pop("authorization")
+        if state == "human_review_1":
+            pending = _pending_gate_record(10, 0)
+            pending.pop("permission_preflight")
+            record = pending
+            record["issue"].pop("repository")
+            record.pop("authorization")
+        elif state == "final_human_review":
+            _use_canonical_monitors(record)
+        assert gate.validate_record(record) == [], state
+
+    minimal = _public_record("classify")
+    minimal["issue"].pop("repository")
+    minimal.pop("authorization")
+    result = subprocess.run(
+        [sys.executable, str(GATE_PATH), "--json", "-"],
+        input=json.dumps(minimal).encode(),
+        capture_output=True,
+        check=False,
+    )
+    assert result.returncode == 0
+    assert json.loads(result.stdout)["ok"] is True
+
+
+def test_optional_repository_and_authorization_fail_closed_when_supplied():
+    gate = _load_gate()
+    for missing in ("repository", "authorization"):
+        record = _public_record("complete")
+        if missing == "repository":
+            record["issue"].pop("repository")
+        else:
+            record.pop("authorization")
+        assert gate.validate_record(record) == [], missing
+
+    empty_repository = _public_record("complete")
+    empty_repository["issue"]["repository"] = ""
+    assert any(
+        "issue.repository" in error
+        for error in gate.validate_record(empty_repository)
+    )
+
+    unauthorized = _public_record("complete")
+    unauthorized["authorization"]["github"][
+        "authorized_human_logins"
+    ] = ["another-human"]
+    assert any(
+        "authorized" in error for error in gate.validate_record(unauthorized)
+    )
+
+
+def test_implementing_forbids_candidate_and_corrections_clear_old_candidate():
+    gate = _load_gate()
+    for candidate in (
+        None,
+        {},
+        {"identity": "C8", "iteration": 8, "sha": None},
+    ):
+        record = _public_record("implementing")
+        record["revisions"]["candidate"] = candidate
+        assert any(
+            "revisions.candidate" in error
+            for error in gate.validate_record(record)
+        ), candidate
+
+    rework = _secured_record("rework")
+    rework["tester"]["status"] = "pass"
+    implementation = _secured_record("implementing")
+    implementation["counters"]["production_rework"] = 2
+    implementation["revisions"]["implementation"] = (
+        _public_implementation_revision(4, None)
+    )
+    assert "candidate" not in implementation["revisions"]
+    assert gate.validate_transition(
+        rework, implementation, "production_rework"
+    ) == []
+
+    kpi_previous = _secured_record("testing")
+    kpi_previous["tester"]["status"] = "pass"
+    kpi_current = _secured_record("implementing")
+    kpi_current["counters"]["kpi_optimization"] = 1
+    kpi_current["revisions"]["implementation"] = (
+        _public_implementation_revision(4, None)
+    )
+    assert "candidate" not in kpi_current["revisions"]
+    assert gate.validate_transition(
+        kpi_previous, kpi_current, "kpi_optimization"
+    ) == []
+
+
+def test_human_review_monitor_contract_has_the_exact_executable_schedule():
+    contract = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
+    assert contract["human_review_monitor"] == {
+        "tiers": [
+            {
+                "tier": "10m",
+                "interval_minutes": 10,
+                "no_update_limit": 3,
+                "next_tier": "30m",
+            },
+            {
+                "tier": "30m",
+                "interval_minutes": 30,
+                "no_update_limit": 3,
+                "next_tier": "60m",
+            },
+            {
+                "tier": "60m",
+                "interval_minutes": 60,
+                "no_update_limit": None,
+                "next_tier": "60m",
+            },
+        ],
+        "replacement_gate": {
+            "tier": "10m",
+            "interval_minutes": 10,
+            "count": 0,
+        },
+        "scope": "current_session",
+        "on_no_change": "advance_count_or_tier",
+        "on_update": "stop_then_resume",
+        "new_session": False,
+    }

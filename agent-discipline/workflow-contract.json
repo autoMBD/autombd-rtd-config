@@ -105,7 +105,7 @@
       {
         "name": "implementing",
         "required_fields": ["revisions.implementation.identity"],
-        "forbidden_fields": ["revisions.candidate.sha", "revisions.final_evidence", "human_reviews.final", "tester", "reviewer", "disposition"]
+        "forbidden_fields": ["revisions.candidate", "revisions.final_evidence", "human_reviews.final", "tester", "reviewer", "disposition"]
       },
       {
         "name": "candidate",
@@ -238,27 +238,33 @@
     "final_approved": {"mutable_roots": ["state", "human_reviews", "revisions"]}
   },
   "human_review_monitor": {
-    "initial": {
-      "interval_minutes": 10,
+    "tiers": [
+      {
+        "tier": "10m",
+        "interval_minutes": 10,
+        "no_update_limit": 3,
+        "next_tier": "30m"
+      },
+      {
+        "tier": "30m",
+        "interval_minutes": 30,
+        "no_update_limit": 3,
+        "next_tier": "60m"
+      },
+      {
+        "tier": "60m",
+        "interval_minutes": 60,
+        "no_update_limit": null,
+        "next_tier": "60m"
+      }
+    ],
+    "replacement_gate": {
       "tier": "10m",
+      "interval_minutes": 10,
       "count": 0
     },
-    "tiers": {
-      "10m": {"interval_minutes": 10, "counts": [0, 1, 2]},
-      "30m": {"interval_minutes": 30, "counts": [0, 1, 2]},
-      "60m": {"interval_minutes": 60, "counts": [0], "unlimited": true}
-    },
-    "no_change_progression": [
-      ["10m", 0, "10m", 1],
-      ["10m", 1, "10m", 2],
-      ["10m", 2, "30m", 0],
-      ["30m", 0, "30m", 1],
-      ["30m", 1, "30m", 2],
-      ["30m", 2, "60m", 0],
-      ["60m", 0, "60m", 0]
-    ],
     "scope": "current_session",
-    "on_no_change": "no_op",
+    "on_no_change": "advance_count_or_tier",
     "on_update": "stop_then_resume",
     "new_session": false
   },
