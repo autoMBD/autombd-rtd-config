@@ -49,6 +49,7 @@ import re
 
 
 CATEGORY_A_ROOT = Path("docs")
+ACCEPTANCE_REPORT = Path("docs/tests/rtd-config-acceptance-report.md")
 HISTORICAL_HEADING = re.compile(
     r"(?im)^##\s+(?:changelog|history|revision history)\s*$"
 )
@@ -134,3 +135,20 @@ Development testing verifies the product contract.
 """
 
     assert _semantic_offenders(document) == []
+
+
+def test_acceptance_report_changelog_versions_are_newest_first():
+    text = ACCEPTANCE_REPORT.read_text(encoding="utf-8")
+    changelog = HISTORICAL_HEADING.search(text)
+    assert changelog is not None, "acceptance report is missing its changelog"
+    versions = [
+        tuple(int(part) for part in match.groups())
+        for match in re.finditer(
+            r"(?m)^\|\s*\d{4}-\d{2}-\d{2}\s*"
+            r"\|\s*(\d+)\.(\d+)\.(\d+)\s*\|",
+            text[changelog.end() :],
+        )
+    ]
+
+    assert versions, "acceptance report changelog has no semantic versions"
+    assert versions == sorted(versions, reverse=True)

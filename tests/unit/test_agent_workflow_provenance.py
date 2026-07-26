@@ -109,6 +109,7 @@ def _test_evidence() -> dict:
         "command": f"/approve-test {TEST_SHA}",
         "top_level": True,
         "actor_type": "human",
+        "actor_login": "owner",
         "current": True,
         "edited": False,
         "deleted": False,
@@ -124,17 +125,50 @@ def _final_evidence() -> dict:
         "pull_request_number": 78,
         "review_id": 7802,
         "actor_type": "human",
+        "actor_login": "owner",
         "state": "approved",
         "current": True,
         "candidate_sha": CANDIDATE_SHA,
     }
 
 
-def _monitor() -> dict:
+def _automation(*, count: int = 1, backoff_seconds: int = 10) -> dict:
     return {
-        "status": "stopped",
+        "id": "review-monitor-78",
+        "tier": "foreground",
+        "count": count,
+        "session": "current_session",
+        "backoff_seconds": backoff_seconds,
+    }
+
+
+def _monitor(
+    *,
+    status: str = "stopped",
+    count: int = 1,
+    backoff_seconds: int = 10,
+) -> dict:
+    return {
+        "status": status,
         "interval_minutes": 10,
         "scope": "current_session",
+        "automation": _automation(
+            count=count,
+            backoff_seconds=backoff_seconds,
+        ),
+    }
+
+
+def _permission_preflight() -> dict:
+    return {
+        "host": {"available": True, "fact": "github_authenticated"},
+        "sandbox": {"available": True, "fact": "network_permitted"},
+        "required_capabilities": ["read_issue", "read_review"],
+        "granted_capabilities": ["read_issue", "read_review"],
+        "hydration": {
+            "mode": "noninteractive",
+            "source": "verified_non_secret_inputs",
+        },
     }
 
 
@@ -168,6 +202,10 @@ def _review_record(state: str) -> dict:
             }
         },
         "counters": {"production_rework": 0, "kpi_optimization": 0},
+        "permission_preflight": _permission_preflight(),
+        "authorization": {
+            "github": {"authorized_human_logins": ["owner"]}
+        },
         "exception": None,
     }
     if state == "human_review_1":
@@ -213,6 +251,35 @@ def _errors(record: dict) -> list[str]:
     return result
 
 
+def _transition_errors(previous: dict, current: dict, event: str) -> list[str]:
+    validator = getattr(_gate_module(), "validate_transition", None)
+    assert callable(validator), "missing explicit workflow transition validator"
+    result = validator(previous, current, event)
+    assert isinstance(result, list)
+    assert all(isinstance(item, str) for item in result)
+    return result
+
+
+def _pending_review_record(
+    *,
+    count: int,
+    backoff_seconds: int,
+) -> dict:
+    record = _review_record("human_review_1")
+    record["human_reviews"]["test"] = {
+        "approved": False,
+        "sha": TEST_SHA,
+        "reviewer": None,
+        "evidence": None,
+        "monitor": _monitor(
+            status="active",
+            count=count,
+            backoff_seconds=backoff_seconds,
+        ),
+    }
+    return record
+
+
 def _normalized(text: str) -> str:
     return " ".join(text.casefold().split())
 
@@ -248,6 +315,54 @@ def test_gate1_change_request_is_strict_two_line_command_in_json_and_skill():
 
 def test_gate1_accepts_current_top_level_authorized_human_comment():
     assert _errors(_review_record("human_review_1")) == []
+
+
+@pytest.mark.parametrize(
+    ("review_path", "mutation", "expected"),
+    (
+        ("test", ("evidence.actor_login", "attacker"), "actor"),
+        ("test", ("reviewer", "attacker"), "reviewer"),
+        (
+            "test",
+            ("authorization.github.authorized_human_logins", ["maintainer"]),
+            "authorized",
+        ),
+        ("final", ("evidence.actor_login", "attacker"), "actor"),
+        ("final", ("reviewer", "attacker"), "reviewer"),
+        (
+            "final",
+            ("authorization.github.authorized_human_logins", ["maintainer"]),
+            "authorized",
+        ),
+    ),
+)
+def test_human_review_actor_matches_reviewer_and_authorized_policy(
+    review_path,
+    mutation,
+    expected,
+):
+    record = _review_record(
+        "human_review_1" if review_path == "test" else "complete"
+    )
+    dotted_path, value = mutation
+    if dotted_path.startswith("authorization."):
+        owner = record
+        fields = dotted_path.split(".")
+    else:
+        owner = record["human_reviews"][review_path]
+        fields = dotted_path.split(".")
+    for field in fields[:-1]:
+        owner = owner[field]
+    owner[fields[-1]] = value
+
+    errors = _errors(record)
+    assert errors
+    assert any(
+        expected in item.casefold()
+        or "login" in item.casefold()
+        or "policy" in item.casefold()
+        for item in errors
+    )
 
 
 def test_gate1_change_request_record_requires_exact_two_lines_and_reason():
@@ -363,6 +478,98 @@ def test_final_human_review_rejects_stale_or_unauthorized_pr_review(
     errors = _errors(record)
     assert errors
     assert any(expected in item.casefold() for item in errors)
+
+
+@pytest.mark.parametrize(
+    ("path", "value", "expected"),
+    (
+        ("host.available", False, "host"),
+        ("sandbox.available", False, "sandbox"),
+        (
+            "required_capabilities",
+            ["read_issue", "read_review", "write_comment"],
+            "capabil",
+        ),
+        ("hydration.mode", "interactive", "noninteractive"),
+        ("hydration.source", "", "source"),
+    ),
+)
+def test_permission_preflight_fails_closed_on_unavailable_or_unhydrated_facts(
+    path,
+    value,
+    expected,
+):
+    record = _review_record("human_review_1")
+    owner = record["permission_preflight"]
+    fields = path.split(".")
+    for field in fields[:-1]:
+        owner = owner[field]
+    owner[fields[-1]] = value
+
+    errors = _errors(record)
+    assert errors
+    assert any(expected in item.casefold() for item in errors)
+
+
+@pytest.mark.parametrize(
+    ("previous_count", "previous_backoff", "current_count", "current_backoff"),
+    (
+        (0, 10, 1, 30),
+        (1, 30, 2, 60),
+        (2, 60, 3, 60),
+    ),
+)
+def test_review_polling_uses_same_session_automation_and_legal_backoff(
+    previous_count,
+    previous_backoff,
+    current_count,
+    current_backoff,
+):
+    previous = _pending_review_record(
+        count=previous_count,
+        backoff_seconds=previous_backoff,
+    )
+    current = _pending_review_record(
+        count=current_count,
+        backoff_seconds=current_backoff,
+    )
+
+    assert _errors(previous) == []
+    assert _errors(current) == []
+    assert _transition_errors(
+        previous,
+        current,
+        "review_poll_no_change",
+    ) == []
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "expected"),
+    (
+        ("count", 2, "count"),
+        ("backoff_seconds", 60, "backoff"),
+        ("id", "different-monitor", "automation"),
+        ("tier", "background", "tier"),
+        ("session", "new_session", "session"),
+    ),
+)
+def test_review_polling_rejects_wrong_increment_backoff_or_automation_identity(
+    field,
+    value,
+    expected,
+):
+    previous = _pending_review_record(count=0, backoff_seconds=10)
+    current = _pending_review_record(count=1, backoff_seconds=30)
+    current["human_reviews"]["test"]["monitor"]["automation"][field] = value
+
+    errors = _transition_errors(previous, current, "review_poll_no_change")
+    assert errors
+    assert any(
+        expected in item.casefold()
+        or "poll" in item.casefold()
+        or "transition" in item.casefold()
+        for item in errors
+    )
 
 
 def test_impact_flag_routing_table_is_complete_and_machine_readable():

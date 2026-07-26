@@ -87,12 +87,24 @@ LIGHT_FORWARD_TRANSITIONS = (
     ("reviewing", "final_human_review", "reviewer_passed"),
     ("final_human_review", "complete", "final_approved"),
 )
+FROZEN_AUTHORITIES = (
+    "issue",
+    "base",
+    "test_identity",
+    "test_sha",
+    "implementation_identity",
+    "implementation_sha",
+    "candidate_identity",
+    "candidate_sha",
+)
 BASE_SHA = "a" * 40
 TEST_SHA = "b" * 40
 IMPLEMENTATION_SHA = "c" * 40
 CANDIDATE_SHA = "d" * 40
 REVISED_CANDIDATE_SHA = "e" * 40
 FINAL_EVIDENCE_SHA = "f" * 40
+NEXT_IMPLEMENTATION_SHA = "1" * 40
+NEXT_CANDIDATE_SHA = "2" * 40
 LESSONS_PATH = "agent-discipline/agent-lessons-learned.md"
 REQUIRED_PROBES = {
     "classify": "issue.primary_type",
@@ -185,6 +197,33 @@ def _gate_module():
     return module
 
 
+def _permission_preflight() -> dict:
+    return {
+        "host": {"available": True, "fact": "github_authenticated"},
+        "sandbox": {"available": True, "fact": "network_permitted"},
+        "required_capabilities": ["read_issue", "read_review"],
+        "granted_capabilities": ["read_issue", "read_review"],
+        "hydration": {
+            "mode": "noninteractive",
+            "source": "verified_non_secret_inputs",
+        },
+    }
+
+
+def _authorization() -> dict:
+    return {"github": {"authorized_human_logins": ["owner"]}}
+
+
+def _automation(*, count: int = 0, backoff_seconds: int = 10) -> dict:
+    return {
+        "id": "review-monitor-78",
+        "tier": "foreground",
+        "count": count,
+        "session": "current_session",
+        "backoff_seconds": backoff_seconds,
+    }
+
+
 def _base_record(state: str) -> dict:
     return {
         "version": 2,
@@ -198,6 +237,8 @@ def _base_record(state: str) -> dict:
         "gate": {"test_required": True},
         "revisions": {"base_sha": BASE_SHA},
         "counters": {"production_rework": 0, "kpi_optimization": 0},
+        "permission_preflight": _permission_preflight(),
+        "authorization": _authorization(),
         "exception": None,
     }
 
@@ -248,6 +289,7 @@ def _test_review(approved: bool) -> dict:
             "status": "active",
             "interval_minutes": 10,
             "scope": "current_session",
+            "automation": _automation(),
         }
         return review
     review["evidence"] = {
@@ -259,6 +301,7 @@ def _test_review(approved: bool) -> dict:
         "command": f"/approve-test {TEST_SHA}",
         "top_level": True,
         "actor_type": "human",
+        "actor_login": "owner",
         "current": True,
         "edited": False,
         "deleted": False,
@@ -268,6 +311,7 @@ def _test_review(approved: bool) -> dict:
         "status": "stopped",
         "interval_minutes": 10,
         "scope": "current_session",
+        "automation": _automation(count=1),
     }
     return review
 
@@ -283,6 +327,7 @@ def _test_change_request() -> dict:
         "command": f"/request-test-changes {TEST_SHA}\nclarify transition coverage",
         "top_level": True,
         "actor_type": "human",
+        "actor_login": "owner",
         "current": True,
         "edited": False,
         "deleted": False,
@@ -301,6 +346,7 @@ def _final_review(approved: bool) -> dict:
             "status": "active",
             "interval_minutes": 10,
             "scope": "current_session",
+            "automation": _automation(),
         },
     }
     if approved:
@@ -311,11 +357,13 @@ def _final_review(approved: bool) -> dict:
             "pull_request_number": 78,
             "review_id": 7802,
             "actor_type": "human",
+            "actor_login": "owner",
             "state": "approved",
             "current": True,
             "candidate_sha": CANDIDATE_SHA,
         }
         review["monitor"]["status"] = "stopped"
+        review["monitor"]["automation"]["count"] = 1
     return review
 
 
@@ -497,6 +545,102 @@ def _transition_errors(previous: dict, current: dict, event: str) -> list[str]:
     assert isinstance(result, list)
     assert all(isinstance(item, str) for item in result)
     return result
+
+
+def _next_iteration_records(
+    *,
+    counter: str,
+    counter_value: int,
+    revision_iteration: int,
+) -> tuple[dict, dict, dict]:
+    implementing = _record_for_state("implementing")
+    implementing["revisions"]["implementation"] = {
+        "identity": f"W{revision_iteration}",
+        "iteration": revision_iteration,
+        "base_sha": BASE_SHA,
+        "sha": None,
+    }
+    implementing["counters"][counter] = counter_value
+
+    candidate = _record_for_state("candidate")
+    candidate["revisions"]["implementation"] = {
+        "identity": f"W{revision_iteration}",
+        "iteration": revision_iteration,
+        "base_sha": BASE_SHA,
+        "sha": NEXT_IMPLEMENTATION_SHA,
+    }
+    candidate["revisions"]["candidate"] = {
+        "identity": f"C{revision_iteration}",
+        "iteration": revision_iteration,
+        "sha": NEXT_CANDIDATE_SHA,
+        "parents": {
+            "test_sha": TEST_SHA,
+            "implementation_sha": NEXT_IMPLEMENTATION_SHA,
+        },
+    }
+    candidate["counters"][counter] = counter_value
+
+    testing = copy.deepcopy(candidate)
+    testing["state"] = "testing"
+    testing["tester"] = {
+        "status": "pending",
+        "candidate_sha": NEXT_CANDIDATE_SHA,
+    }
+    return implementing, candidate, testing
+
+
+def _coherently_rebind(record: dict, authority: str) -> None:
+    replacement_sha = "3" * 40
+    if authority == "issue":
+        record["issue"]["number"] = 79
+        record["human_reviews"]["test"]["evidence"]["issue_number"] = 79
+        if "final" in record["human_reviews"]:
+            record["human_reviews"]["final"]["evidence"][
+                "pull_request_number"
+            ] = 79
+    elif authority == "base":
+        record["revisions"]["base_sha"] = replacement_sha
+        record["revisions"]["test"]["base_sha"] = replacement_sha
+        record["revisions"]["implementation"]["base_sha"] = replacement_sha
+    elif authority == "test_identity":
+        record["revisions"]["test"].update(identity="T2", iteration=2)
+    elif authority == "test_sha":
+        record["revisions"]["test"]["sha"] = replacement_sha
+        record["human_reviews"]["test"]["sha"] = replacement_sha
+        record["human_reviews"]["test"]["evidence"][
+            "command"
+        ] = f"/approve-test {replacement_sha}"
+        if "candidate" in record["revisions"]:
+            record["revisions"]["candidate"]["parents"][
+                "test_sha"
+            ] = replacement_sha
+    elif authority == "implementation_identity":
+        record["revisions"]["implementation"].update(identity="W2", iteration=2)
+    elif authority == "implementation_sha":
+        record["revisions"]["implementation"]["sha"] = replacement_sha
+        if "candidate" in record["revisions"]:
+            record["revisions"]["candidate"]["parents"][
+                "implementation_sha"
+            ] = replacement_sha
+    elif authority == "candidate_identity":
+        record["revisions"]["candidate"].update(identity="C2", iteration=2)
+    elif authority == "candidate_sha":
+        record["revisions"]["candidate"]["sha"] = replacement_sha
+        if "tester" in record:
+            record["tester"]["candidate_sha"] = replacement_sha
+        if "reviewer" in record:
+            record["reviewer"]["candidate_sha"] = replacement_sha
+        if "final" in record.get("human_reviews", {}):
+            record["human_reviews"]["final"]["sha"] = replacement_sha
+            evidence = record["human_reviews"]["final"]["evidence"]
+            if evidence is not None:
+                evidence["candidate_sha"] = replacement_sha
+        if "final_evidence" in record["revisions"]:
+            record["revisions"]["final_evidence"][
+                "reviewed_candidate_sha"
+            ] = replacement_sha
+    else:
+        raise AssertionError(authority)
 
 
 def test_contract_declares_state_dependent_required_and_forbidden_fields():
@@ -708,15 +852,23 @@ def test_production_rework_is_bounded_and_only_rework_to_implementation_consumes
 
 
 def test_candidate_revision_requires_exact_test_and_implementation_parents():
-    contract = _contract()["revision_graph"]
-    assert contract["identities"] == {
-        "test": "T{iteration}",
-        "implementation": "W{iteration}",
-        "candidate": "C{iteration}",
+    contract = _contract()
+    assert _key_paths(contract, "identities") == [
+        ("revision_provenance", "identities")
+    ]
+    assert _key_paths(contract, "candidate_parents") == [
+        ("revision_provenance", "candidate_parents")
+    ]
+    provenance = contract["revision_provenance"]
+    assert provenance["identities"] == {
+        "test": "T[1-9][0-9]*",
+        "implementation": "W[1-9][0-9]*",
+        "candidate": "C[1-9][0-9]*",
+        "evidence": "E[1-9][0-9]*",
     }
-    assert set(contract["shared_base"]) == {
-        "test.base_sha",
-        "implementation.base_sha",
+    assert provenance["candidate_parents"] == {
+        "normal": ["test_sha", "implementation_sha"],
+        "mechanical_light": ["base_sha", "implementation_sha"],
     }
     record = _record_for_state("complete")
     assert _record_errors(record) == []
@@ -754,25 +906,274 @@ def test_revision_identity_must_match_its_iteration(revision, invalid_identity):
     assert any("identity" in item.casefold() for item in errors)
 
 
-def test_candidate_change_invalidates_tester_and_reviewer_evidence():
-    previous = _record_for_state("reviewing")
+@pytest.mark.parametrize("previous_state", ("reviewing", "final_human_review"))
+def test_candidate_revision_cannot_bypass_counted_worker_rework(previous_state):
+    previous = _record_for_state(previous_state)
     current = copy.deepcopy(previous)
     current["state"] = "testing"
     current["revisions"]["candidate"]["identity"] = "C2"
     current["revisions"]["candidate"]["iteration"] = 2
     current["revisions"]["candidate"]["sha"] = REVISED_CANDIDATE_SHA
-
-    stale_errors = _transition_errors(previous, current, "candidate_revised")
-    assert stale_errors
-    assert any("tester" in item.casefold() for item in stale_errors)
-    assert any("reviewer" in item.casefold() for item in stale_errors)
-
     current["tester"] = {
         "status": "pending",
         "candidate_sha": REVISED_CANDIDATE_SHA,
     }
-    del current["reviewer"]
-    assert _transition_errors(previous, current, "candidate_revised") == []
+    current.pop("reviewer", None)
+    current.get("human_reviews", {}).pop("final", None)
+
+    errors = _transition_errors(previous, current, "candidate_revised")
+    assert errors
+    assert any(
+        marker in item.casefold()
+        for item in errors
+        for marker in ("transition", "rework", "worker", "implementing")
+    )
+
+    direct_routes = [
+        transition
+        for transition in _contract()["state_machine"]["transitions"]
+        if transition["from"] == previous_state
+        and transition["to"] == "testing"
+        and transition["event"] == "candidate_revised"
+    ]
+    assert direct_routes == []
+
+
+def test_review_corrections_have_a_machine_readable_route_into_counted_rework():
+    transitions = _contract()["state_machine"]["transitions"]
+    final_correction_routes = [
+        transition
+        for transition in transitions
+        if transition["from"] == "final_human_review"
+        and transition["to"] == "reviewing"
+        and "change" in transition["event"].casefold()
+    ]
+    worker_rework_routes = [
+        transition
+        for transition in transitions
+        if transition["from"] == "reviewing"
+        and transition["to"] == "rework"
+    ]
+
+    assert len(final_correction_routes) == 1
+    assert len(worker_rework_routes) == 1
+    assert worker_rework_routes[0]["event"]
+
+
+@pytest.mark.parametrize(
+    ("previous_state", "current_state", "event", "authority"),
+    tuple(
+        (previous_state, current_state, event, authority)
+        for previous_state, current_state, event, authorities in (
+            (
+                "human_review_1",
+                "implementing",
+                "test_approved",
+                FROZEN_AUTHORITIES[:4],
+            ),
+            (
+                "implementing",
+                "candidate",
+                "candidate_created",
+                FROZEN_AUTHORITIES[:5],
+            ),
+            (
+                "candidate",
+                "testing",
+                "testing_started",
+                FROZEN_AUTHORITIES,
+            ),
+            (
+                "testing",
+                "reviewing",
+                "tester_passed",
+                FROZEN_AUTHORITIES,
+            ),
+            (
+                "reviewing",
+                "final_human_review",
+                "reviewer_passed",
+                FROZEN_AUTHORITIES,
+            ),
+            (
+                "final_human_review",
+                "complete",
+                "final_approved",
+                FROZEN_AUTHORITIES,
+            ),
+        )
+        for authority in authorities
+    ),
+)
+def test_forward_transitions_cannot_rebind_frozen_revision_authority(
+    previous_state,
+    current_state,
+    event,
+    authority,
+):
+    previous = _record_for_state(previous_state)
+    current = _record_for_state(current_state)
+    _coherently_rebind(current, authority)
+
+    assert _record_errors(previous) == []
+    assert _record_errors(current) == []
+    errors = _transition_errors(previous, current, event)
+    assert errors
+    assert any(
+        marker in item.casefold()
+        for item in errors
+        for marker in ("immutable", "rebind", "changed", authority.split("_")[0])
+    )
+
+
+@pytest.mark.parametrize("authority", ("issue", "base", "test_sha"))
+def test_production_rework_cannot_adversarially_rebind_frozen_authority(
+    authority,
+):
+    previous = _record_for_state("rework")
+    current, _, _ = _next_iteration_records(
+        counter="production_rework",
+        counter_value=1,
+        revision_iteration=2,
+    )
+    _coherently_rebind(current, authority)
+
+    assert _record_errors(previous) == []
+    assert _record_errors(current) == []
+    errors = _transition_errors(previous, current, "production_rework")
+    assert errors
+    assert any(
+        marker in item.casefold()
+        for item in errors
+        for marker in ("immutable", "rebind", "changed", authority.split("_")[0])
+    )
+
+
+def test_counted_rework_builds_a_new_worker_and_candidate_before_retesting():
+    rework = _record_for_state("rework")
+    implementing, candidate, testing = _next_iteration_records(
+        counter="production_rework",
+        counter_value=1,
+        revision_iteration=2,
+    )
+
+    assert _transition_errors(rework, implementing, "production_rework") == []
+    assert _transition_errors(implementing, candidate, "candidate_created") == []
+    assert _transition_errors(candidate, testing, "testing_started") == []
+    assert implementing["revisions"]["implementation"]["identity"] == "W2"
+    assert candidate["revisions"]["candidate"]["identity"] == "C2"
+    assert candidate["revisions"]["candidate"]["parents"] == {
+        "test_sha": TEST_SHA,
+        "implementation_sha": NEXT_IMPLEMENTATION_SHA,
+    }
+    assert testing["tester"] == {
+        "status": "pending",
+        "candidate_sha": NEXT_CANDIDATE_SHA,
+    }
+    assert testing["counters"]["production_rework"] == 1
+
+
+def _kpi_miss_testing_record(*, completed_optimizations: int) -> dict:
+    record = _record_for_state("testing")
+    record["tester"] = {
+        "status": "pass",
+        "candidate_sha": CANDIDATE_SHA,
+        "kpi": {
+            "status": "miss",
+            "candidate_sha": CANDIDATE_SHA,
+            "elapsed_seconds": 90,
+            "limit_seconds": 60,
+            "edit_attempts": 1,
+        },
+    }
+    record["counters"]["kpi_optimization"] = completed_optimizations
+    return record
+
+
+@pytest.mark.parametrize(
+    ("previous_count", "current_count", "revision_iteration"),
+    ((0, 1, 2), (2, 3, 4)),
+)
+def test_kpi_optimization_consumes_exactly_one_iteration_and_retests_candidate(
+    previous_count,
+    current_count,
+    revision_iteration,
+):
+    previous = _kpi_miss_testing_record(
+        completed_optimizations=previous_count
+    )
+    implementing, candidate, testing = _next_iteration_records(
+        counter="kpi_optimization",
+        counter_value=current_count,
+        revision_iteration=revision_iteration,
+    )
+
+    assert _transition_errors(previous, implementing, "kpi_optimization") == []
+    assert _transition_errors(implementing, candidate, "candidate_created") == []
+    assert _transition_errors(candidate, testing, "testing_started") == []
+    assert implementing["counters"]["kpi_optimization"] == previous_count + 1
+    assert testing["counters"]["production_rework"] == 0
+    assert testing["tester"]["status"] == "pending"
+    assert testing["tester"]["candidate_sha"] == NEXT_CANDIDATE_SHA
+
+
+@pytest.mark.parametrize(
+    "stale_path",
+    (
+        "revisions.candidate.sha",
+        "tester.candidate_sha",
+        "reviewer",
+        "human_reviews.final",
+        "revisions.final_evidence",
+    ),
+)
+def test_kpi_optimization_invalidates_all_old_candidate_bound_evidence(
+    stale_path,
+):
+    _, _, testing = _next_iteration_records(
+        counter="kpi_optimization",
+        counter_value=1,
+        revision_iteration=2,
+    )
+    stale_values = {
+        "revisions.candidate.sha": CANDIDATE_SHA,
+        "tester.candidate_sha": CANDIDATE_SHA,
+        "reviewer": {"status": "pass", "candidate_sha": CANDIDATE_SHA},
+        "human_reviews.final": _final_review(True),
+        "revisions.final_evidence": {
+            "identity": "E1",
+            "sha": FINAL_EVIDENCE_SHA,
+            "reviewed_candidate_sha": CANDIDATE_SHA,
+            "changed_paths": [LESSONS_PATH],
+        },
+    }
+    _set_path(testing, stale_path, stale_values[stale_path])
+
+    errors = _record_errors(testing)
+    assert errors
+    assert any(
+        stale_path in item
+        or "candidate" in item.casefold()
+        or "forbidden" in item.casefold()
+        for item in errors
+    )
+
+
+def test_fourth_kpi_optimization_is_forbidden():
+    previous = _kpi_miss_testing_record(completed_optimizations=3)
+    implementing, _, _ = _next_iteration_records(
+        counter="kpi_optimization",
+        counter_value=4,
+        revision_iteration=5,
+    )
+
+    errors = _transition_errors(previous, implementing, "kpi_optimization")
+    assert errors
+    assert any(
+        marker in item.casefold()
+        for item in errors
+        for marker in ("limit", "stop", "fourth", "kpi")
+    )
 
 
 def test_one_evidence_only_path_policy_governs_final_revision_without_rebinding():

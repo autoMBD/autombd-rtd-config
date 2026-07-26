@@ -130,6 +130,7 @@ def _valid_record() -> dict:
                     "artifact": "issue_comment",
                     "top_level": True,
                     "actor_type": "human",
+                    "actor_login": "owner",
                     "current": True,
                     "edited": False,
                     "deleted": False,
@@ -139,6 +140,13 @@ def _valid_record() -> dict:
                     "status": "stopped",
                     "interval_minutes": 10,
                     "scope": "current_session",
+                    "automation": {
+                        "id": "review-monitor-321",
+                        "tier": "foreground",
+                        "count": 1,
+                        "session": "current_session",
+                        "backoff_seconds": 10,
+                    },
                 },
             },
             "final": {
@@ -152,6 +160,7 @@ def _valid_record() -> dict:
                     "pull_request_number": 321,
                     "review_id": 654321,
                     "actor_type": "human",
+                    "actor_login": "owner",
                     "state": "approved",
                     "current": True,
                     "candidate_sha": _sha("d"),
@@ -160,12 +169,32 @@ def _valid_record() -> dict:
                     "status": "stopped",
                     "interval_minutes": 10,
                     "scope": "current_session",
+                    "automation": {
+                        "id": "review-monitor-321",
+                        "tier": "foreground",
+                        "count": 1,
+                        "session": "current_session",
+                        "backoff_seconds": 10,
+                    },
                 },
             },
         },
         "counters": {"production_rework": 0, "kpi_optimization": 0},
         "tester": {"status": "pass", "candidate_sha": _sha("d")},
         "reviewer": {"status": "pass", "candidate_sha": _sha("d")},
+        "permission_preflight": {
+            "host": {"available": True, "fact": "github_authenticated"},
+            "sandbox": {"available": True, "fact": "network_permitted"},
+            "required_capabilities": ["read_issue", "read_review"],
+            "granted_capabilities": ["read_issue", "read_review"],
+            "hydration": {
+                "mode": "noninteractive",
+                "source": "verified_non_secret_inputs",
+            },
+        },
+        "authorization": {
+            "github": {"authorized_human_logins": ["owner"]}
+        },
         "exception": None,
     }
 
@@ -181,6 +210,14 @@ def _errors(record: dict) -> list[str]:
 def _assert_error(record: dict, expected: str) -> None:
     errors = _errors(record)
     assert any(expected in error.casefold() for error in errors), errors
+
+
+def _set_path(record: dict, dotted_path: str, value: object) -> None:
+    owner = record
+    fields = dotted_path.split(".")
+    for field in fields[:-1]:
+        owner = owner[field]
+    owner[fields[-1]] = value
 
 
 def test_valid_portable_workflow_record_passes():
@@ -272,10 +309,71 @@ def test_valid_mechanical_light_path_records_reduced_gate_justification():
             "mode": "mechanical_verification",
         },
         "counters": {"production_rework": 0, "kpi_optimization": 0},
+        "permission_preflight": {
+            "host": {"available": True, "fact": "local_state_available"},
+            "sandbox": {"available": True, "fact": "workspace_write"},
+            "required_capabilities": [],
+            "granted_capabilities": [],
+            "hydration": {
+                "mode": "noninteractive",
+                "source": "verified_non_secret_inputs",
+            },
+        },
+        "authorization": {
+            "github": {"authorized_human_logins": ["owner"]}
+        },
         "exception": None,
     }
 
     assert _errors(record) == []
+
+
+@pytest.mark.parametrize(
+    "unknown_path",
+    (
+        "unknown_top",
+        "issue.unknown",
+        "gate.unknown",
+        "revisions.unknown",
+        "revisions.test.unknown",
+        "revisions.implementation.unknown",
+        "revisions.candidate.unknown",
+        "revisions.candidate.parents.unknown",
+        "revisions.final_evidence.unknown",
+        "human_reviews.unknown",
+        "human_reviews.test.unknown",
+        "human_reviews.test.evidence.unknown",
+        "human_reviews.test.monitor.unknown",
+        "human_reviews.test.monitor.automation.unknown",
+        "human_reviews.final.unknown",
+        "human_reviews.final.evidence.unknown",
+        "human_reviews.final.monitor.unknown",
+        "counters.unknown",
+        "tester.unknown",
+        "reviewer.unknown",
+        "permission_preflight.unknown",
+        "permission_preflight.host.unknown",
+        "permission_preflight.sandbox.unknown",
+        "permission_preflight.hydration.unknown",
+        "authorization.unknown",
+        "authorization.github.unknown",
+        "permission_preflight.timestamp",
+        "human_reviews.test.monitor.deadline",
+        "human_reviews.test.monitor.automation.timestamp",
+    ),
+)
+def test_canonical_v2_rejects_unknown_fields_at_every_nesting_level(
+    unknown_path,
+):
+    record = _valid_record()
+    _set_path(record, unknown_path, True)
+
+    errors = _errors(record)
+    assert errors
+    assert any(
+        unknown_path in error and "unknown" in error.casefold()
+        for error in errors
+    )
 
 
 @pytest.mark.parametrize(
