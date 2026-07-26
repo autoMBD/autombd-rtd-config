@@ -40,7 +40,7 @@
 # File:        test_workflow_gate_generality.py
 # Author:      autoMBD <tkung.lqk@foxmail.com>
 # Date:        2026-07-26
-# Version:     0.4.0
+# Version:     0.5.0
 # Description: Generality tests for canonical Agent workflow v2 records and gates.
 # =================================================================================
 
@@ -144,6 +144,7 @@ def _public_test_review(decision: str = "approved"):
         "test_sha": TEST_SHA,
         "top_level": True,
         "actor_type": "human",
+        "actor_login": "human-reviewer",
         "current": True,
         "edited": False,
         "deleted": False,
@@ -161,6 +162,11 @@ def _public_test_review(decision: str = "approved"):
             "status": "stopped",
             "interval_minutes": 10,
             "scope": "current_session",
+            "automation": {
+                "id": "test-review-monitor",
+                "tier_minutes": 10,
+                "count": 1,
+            },
         },
     }
 
@@ -177,6 +183,7 @@ def _public_final_review(candidate_sha: str = CANDIDATE_SHA):
             "pull_request_number": 456,
             "review_id": 6543,
             "actor_type": "human",
+            "actor_login": "human-reviewer",
             "state": "approved",
             "current": True,
             "candidate_sha": candidate_sha,
@@ -185,6 +192,11 @@ def _public_final_review(candidate_sha: str = CANDIDATE_SHA):
             "status": "stopped",
             "interval_minutes": 10,
             "scope": "current_session",
+            "automation": {
+                "id": "final-review-monitor",
+                "tier_minutes": 10,
+                "count": 1,
+            },
         },
     }
 
@@ -195,14 +207,29 @@ def _public_record(state: str) -> dict[str, object]:
         "schema": "agent_workflow_v2",
         "issue": {
             "number": ISSUE_NUMBER,
+            "repository": "org/example-repository",
             "primary_type": "B",
             "impact_flags": ["PB"],
+            "authorized_humans": ["human-reviewer", "release-approver"],
         },
         "state": state,
         "gate": {"test_required": True},
         "revisions": {"base_sha": BASE_SHA},
         "counters": {"production_rework": 1, "kpi_optimization": 0},
         "exception": None,
+        "permission_preflight": {
+            "host": {
+                "available": True,
+                "evidence": "host capability preflight passed",
+            },
+            "sandbox": {
+                "available": True,
+                "evidence": "sandbox capability preflight passed",
+            },
+            "required_capabilities": ["git_write", "github_read"],
+            "granted_capabilities": ["git_write", "github_read"],
+            "hydration": {"mode": "noninteractive", "status": "complete"},
+        },
     }
     revisions = record["revisions"]
     if state in PUBLIC_STATES[1:]:
@@ -232,6 +259,11 @@ def _public_record(state: str) -> dict[str, object]:
                 "status": "active",
                 "interval_minutes": 10,
                 "scope": "current_session",
+                "automation": {
+                    "id": "final-review-monitor",
+                    "tier_minutes": 10,
+                    "count": 1,
+                },
             }
         }
     elif state == "complete":
@@ -241,6 +273,41 @@ def _public_record(state: str) -> dict[str, object]:
             "status": "stop_escalate",
             "reason": "The automatic production-rework cap was reached.",
         }
+    return record
+
+
+def _secured_record(state: str) -> dict[str, object]:
+    record = _public_record(state)
+    record["issue"]["repository"] = "org/example-repository"
+    record["issue"]["authorized_humans"] = [
+        "human-reviewer",
+        "release-approver",
+    ]
+    record["permission_preflight"] = {
+        "host": {"available": True, "evidence": "host capability preflight passed"},
+        "sandbox": {
+            "available": True,
+            "evidence": "sandbox capability preflight passed",
+        },
+        "required_capabilities": ["git_write", "github_read"],
+        "granted_capabilities": ["git_write", "github_read"],
+        "hydration": {"mode": "noninteractive", "status": "complete"},
+    }
+    reviews = record.get("human_reviews", {})
+    for name in ("test", "final"):
+        review = reviews.get(name)
+        if not isinstance(review, dict):
+            continue
+        evidence = review.get("evidence")
+        if isinstance(evidence, dict):
+            evidence["actor_login"] = review["reviewer"]
+        monitor = review.get("monitor")
+        if isinstance(monitor, dict):
+            monitor["automation"] = {
+                "id": f"{name}-review-monitor",
+                "tier_minutes": monitor["interval_minutes"],
+                "count": 1,
+            }
     return record
 
 
@@ -309,20 +376,10 @@ def test_minimal_record_for_every_public_state_is_valid_and_rules_are_executable
 
 def test_public_revision_graph_and_routing_have_exact_shape_and_derivation():
     contract = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
-    assert contract["revision_graph"] == {
-        "identities": {
-            "test": "T{iteration}",
-            "implementation": "W{iteration}",
-            "candidate": "C{iteration}",
-        },
-        "shared_base": [
-            "test.base_sha",
-            "implementation.base_sha",
-        ],
-        "candidate_parents": [
-            "test.sha",
-            "implementation.sha",
-        ],
+    assert "revision_graph" not in contract
+    assert contract["revision_provenance"]["candidate_parents"] == {
+        "standard": ["test_sha", "implementation_sha"],
+        "light": ["base_sha", "implementation_sha"],
     }
     routing = contract["impact_routing"]
     assert list(routing) == ["PB", "MS", "MW", "RA", "TC", "VS", "EV", "AR", "RP", "ED", "SS", "DO"]
@@ -391,6 +448,11 @@ def test_public_special_transitions_preserve_counters_and_revision_iterations():
     current = _public_record("implementing")
     current["counters"]["production_rework"] = 2
     current["revisions"]["implementation"] = _public_implementation_revision(4, None)
+    current["revisions"]["candidate"] = {
+        "identity": "C5",
+        "iteration": 5,
+        "sha": None,
+    }
     assert gate.validate_transition(previous, current, "production_rework") == []
 
     previous = _public_record("rework")
@@ -406,18 +468,15 @@ def test_public_special_transitions_preserve_counters_and_revision_iterations():
     )
 
 
-def test_candidate_revised_requires_new_candidate_and_reset_results():
+def test_direct_candidate_revised_is_not_a_legal_bypass():
     gate = _load_gate()
     previous = _public_record("reviewing")
     current = _public_record("testing")
     new_sha = "7" * 40
     current["revisions"]["candidate"] = _public_candidate_revision(5, new_sha)
     current["tester"] = {"status": "pending", "candidate_sha": new_sha}
-    assert gate.validate_transition(previous, current, "candidate_revised") == []
-
-    current["reviewer"] = {"status": "not_run", "candidate_sha": new_sha}
     assert any(
-        "reviewer" in error and ("future" in error or "forbidden" in error)
+        "not legal" in error
         for error in gate.validate_transition(
             previous, current, "candidate_revised"
         )
@@ -454,7 +513,13 @@ def test_public_human_review_contract_and_evidence_are_exact():
 def test_public_minimal_issue_and_outer_review_shape_are_authoritative():
     validate_record = _load_gate().validate_record
     classify = _public_record("classify")
-    assert set(classify["issue"]) == {"number", "primary_type", "impact_flags"}
+    assert set(classify["issue"]) == {
+        "number",
+        "repository",
+        "primary_type",
+        "impact_flags",
+        "authorized_humans",
+    }
     assert validate_record(classify) == []
 
     complete = _public_record("complete")
@@ -509,7 +574,6 @@ def test_active_change_request_monitor_is_atomic_but_active_approval_is_invalid(
             review["evidence"]["requested_changes"] = True
             review["evidence"].pop("decision")
             review["evidence"].pop("reason")
-        review["reviewer"] = None
         review["monitor"]["status"] = "active"
         previous["human_reviews"] = {"test": review}
         assert gate.validate_record(previous) == [], encoding
@@ -548,6 +612,11 @@ def test_pending_gate_1_and_stopped_provenance_are_valid_minimal_states():
                 "status": "active",
                 "interval_minutes": 10,
                 "scope": "current_session",
+                "automation": {
+                    "id": "test-review-monitor",
+                    "tier_minutes": 10,
+                    "count": 1,
+                },
             },
         }
     }
@@ -660,6 +729,8 @@ def _light_record(state: str) -> dict[str, object]:
     record = _public_record(state)
     record["issue"] = {
         "number": ISSUE_NUMBER,
+        "repository": "org/example-repository",
+        "authorized_humans": ["human-reviewer", "release-approver"],
         "primary_type": "N",
         "impact_flags": ["DO"],
     }
@@ -695,7 +766,7 @@ def test_contract_and_records_use_only_canonical_v2():
     assert contract["schema"] == "agent_workflow_v2"
     assert contract["state_machine"]["name"] == "agent_workflow_v2"
     assert "routing" not in contract
-    assert "final_evidence_revision" not in contract["revision_graph"]
+    assert "revision_graph" not in contract
     assert contract["revision_provenance"]["evidence_only"]["allowed_paths"] == [
         "agent-discipline/agent-lessons-learned.md",
         "docs/tests/rtd-config-acceptance-report.md",
@@ -836,3 +907,317 @@ def test_cli_previous_event_pair_is_checked_before_file_reads():
             ],
             "error_type": "input",
         }
+
+
+def test_contract_exposes_per_event_mutation_matrix_and_no_direct_candidate_bypass():
+    contract = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
+    events = {
+        (item["from"], item["to"], item["event"])
+        for item in contract["state_machine"]["transitions"]
+    }
+    assert ("reviewing", "testing", "candidate_revised") not in events
+    assert ("final_human_review", "testing", "candidate_revised") not in events
+    assert ("reviewing", "rework", "review_correction") in events
+    assert ("final_human_review", "rework", "review_correction") in events
+    assert ("testing", "implementing", "kpi_optimization") in events
+    matrix = contract["transition_mutation_matrix"]
+    assert set(matrix) == {item[2] for item in events}
+    assert all(
+        isinstance(rule["mutable_roots"], list)
+        and "issue" not in rule["mutable_roots"]
+        for rule in matrix.values()
+    )
+
+
+def test_review_corrections_enter_counted_rework_and_direct_candidate_revision_fails():
+    gate = _load_gate()
+    for source in ("reviewing", "final_human_review"):
+        previous = _secured_record(source)
+        if source == "reviewing":
+            previous["reviewer"]["status"] = "fail"
+        current = _secured_record("rework")
+        current["tester"]["status"] = "pass"
+        assert gate.validate_transition(
+            previous, current, "review_correction"
+        ) == [], source
+
+        bypass = _secured_record("testing")
+        bypass["revisions"]["candidate"] = _public_candidate_revision(
+            5, "7" * 40
+        )
+        bypass["tester"] = {"status": "pending", "candidate_sha": "7" * 40}
+        assert gate.validate_transition(
+            previous, bypass, "candidate_revised"
+        )
+
+    rework = _secured_record("rework")
+    rework["tester"]["status"] = "pass"
+    implementation = _secured_record("implementing")
+    implementation["counters"]["production_rework"] = 2
+    implementation["revisions"]["implementation"] = (
+        _public_implementation_revision(4, None)
+    )
+    implementation["revisions"]["candidate"] = {
+        "identity": "C5",
+        "iteration": 5,
+        "sha": None,
+    }
+    assert gate.validate_transition(
+        rework, implementation, "production_rework"
+    ) == []
+
+    committed_implementation_sha = "e" * 40
+    committed_candidate_sha = "f" * 40
+    candidate = _secured_record("candidate")
+    candidate["counters"]["production_rework"] = 2
+    candidate["revisions"]["implementation"] = (
+        _public_implementation_revision(4, committed_implementation_sha)
+    )
+    candidate["revisions"]["candidate"] = {
+        "identity": "C5",
+        "iteration": 5,
+        "sha": committed_candidate_sha,
+        "parents": {
+            "test_sha": TEST_SHA,
+            "implementation_sha": committed_implementation_sha,
+        },
+    }
+    assert gate.validate_transition(
+        implementation, candidate, "candidate_created"
+    ) == []
+
+    substituted_candidate = deepcopy(candidate)
+    substituted_candidate["revisions"]["candidate"]["identity"] = "C6"
+    substituted_candidate["revisions"]["candidate"]["iteration"] = 6
+    assert any(
+        "exact staged C iteration" in error
+        for error in gate.validate_transition(
+            implementation, substituted_candidate, "candidate_created"
+        )
+    )
+
+
+def test_mutation_matrix_freezes_issue_base_test_and_final_candidate_binding():
+    gate = _load_gate()
+    previous = _secured_record("candidate")
+    current = _secured_record("testing")
+    for mutation in ("issue", "base", "test"):
+        illegal = deepcopy(current)
+        if mutation == "issue":
+            illegal["issue"]["number"] += 1
+        elif mutation == "base":
+            illegal["revisions"]["base_sha"] = "a" * 40
+            illegal["revisions"]["implementation"]["base_sha"] = "a" * 40
+            illegal["revisions"]["test"]["base_sha"] = "a" * 40
+        else:
+            illegal["revisions"]["test"] = _public_test_revision(7, "b" * 40)
+        assert any(
+            "mutation matrix" in error or "frozen" in error
+            for error in gate.validate_transition(
+                previous, illegal, "testing_started"
+            )
+        ), mutation
+
+    final_previous = _secured_record("final_human_review")
+    final_current = _secured_record("complete")
+    new_candidate = "c" * 40
+    final_current["revisions"]["candidate"]["sha"] = new_candidate
+    final_current["human_reviews"]["final"] = _public_final_review(new_candidate)
+    final_current["human_reviews"]["final"]["evidence"]["actor_login"] = (
+        "human-reviewer"
+    )
+    final_current["human_reviews"]["final"]["monitor"]["automation"] = {
+        "id": "final-review-monitor",
+        "tier_minutes": 10,
+        "count": 1,
+    }
+    final_current["tester"]["candidate_sha"] = new_candidate
+    final_current["reviewer"]["candidate_sha"] = new_candidate
+    assert any(
+        "Candidate" in error or "mutation matrix" in error
+        for error in gate.validate_transition(
+            final_previous, final_current, "final_approved"
+        )
+    )
+
+
+def test_human_review_actor_login_matches_reviewer_and_repository_policy():
+    gate = _load_gate()
+    assert gate.validate_record(_secured_record("complete")) == []
+    for review_name, value in (
+        ("test", "spoofed-login"),
+        ("final", "release-approver"),
+    ):
+        record = _secured_record("complete")
+        record["human_reviews"][review_name]["evidence"]["actor_login"] = value
+        errors = gate.validate_record(record)
+        assert any(
+            "actor_login" in error and "reviewer" in error for error in errors
+        )
+
+    unauthorized = _secured_record("complete")
+    unauthorized["issue"]["authorized_humans"] = ["release-approver"]
+    assert any(
+        "authorized" in error
+        for error in gate.validate_record(unauthorized)
+    )
+
+
+def test_kpi_optimization_is_executable_for_iterations_one_and_three_but_not_four():
+    gate = _load_gate()
+    for previous_count in (0, 2):
+        previous = _secured_record("testing")
+        previous["tester"]["status"] = "pass"
+        previous["counters"]["kpi_optimization"] = previous_count
+        current = _secured_record("implementing")
+        current["counters"]["kpi_optimization"] = previous_count + 1
+        current["revisions"]["implementation"] = (
+            _public_implementation_revision(4, None)
+        )
+        current["revisions"]["candidate"] = {
+            "identity": "C5",
+            "iteration": 5,
+            "sha": None,
+        }
+        assert current["revisions"]["candidate"]["sha"] is None
+        assert "tester" not in current
+        assert "reviewer" not in current
+        assert gate.validate_transition(
+            previous, current, "kpi_optimization"
+        ) == [], previous_count
+
+    previous = _secured_record("testing")
+    previous["tester"]["status"] = "pass"
+    previous["counters"]["kpi_optimization"] = 3
+    fourth = _secured_record("implementing")
+    fourth["counters"]["kpi_optimization"] = 4
+    fourth["revisions"]["implementation"] = (
+        _public_implementation_revision(4, None)
+    )
+    fourth["revisions"]["candidate"] = {
+        "identity": "C5",
+        "iteration": 5,
+        "sha": None,
+    }
+    assert any(
+        "KPI" in error or "0..3" in error or "fourth" in error
+        for error in gate.validate_transition(
+            previous, fourth, "kpi_optimization"
+        )
+    )
+
+
+def test_canonical_record_is_closed_at_every_nested_mapping():
+    gate = _load_gate()
+    probes = [
+        ("record", lambda record: record.__setitem__("mystery", True)),
+        ("issue", lambda record: record["issue"].__setitem__("mystery", True)),
+        ("gate", lambda record: record["gate"].__setitem__("mystery", True)),
+        (
+            "revision",
+            lambda record: record["revisions"]["test"].__setitem__(
+                "mystery", True
+            ),
+        ),
+        (
+            "parents",
+            lambda record: record["revisions"]["candidate"]["parents"].__setitem__(
+                "mystery", "d" * 40
+            ),
+        ),
+        (
+            "review evidence",
+            lambda record: record["human_reviews"]["final"]["evidence"].__setitem__(
+                "mystery", True
+            ),
+        ),
+        (
+            "monitor automation",
+            lambda record: record["human_reviews"]["final"]["monitor"][
+                "automation"
+            ].__setitem__("mystery", True),
+        ),
+        (
+            "permission host",
+            lambda record: record["permission_preflight"]["host"].__setitem__(
+                "mystery", True
+            ),
+        ),
+    ]
+    for label, mutate in probes:
+        record = _secured_record("complete")
+        mutate(record)
+        assert any(
+            "unknown field" in error for error in gate.validate_record(record)
+        ), label
+
+
+def test_revision_identity_and_parent_shape_come_from_one_canonical_authority():
+    contract = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
+    assert "revision_graph" not in contract
+    provenance = contract["revision_provenance"]
+    assert provenance["candidate_parents"] == {
+        "standard": ["test_sha", "implementation_sha"],
+        "light": ["base_sha", "implementation_sha"],
+    }
+    assert contract["light_path"].get("candidate_parents") is None
+
+
+def test_permission_preflight_and_monitor_backoff_are_fail_closed():
+    gate = _load_gate()
+    assert gate.validate_record(_secured_record("complete")) == []
+    for field in ("host", "sandbox", "required_capabilities", "hydration"):
+        record = _secured_record("complete")
+        record["permission_preflight"].pop(field)
+        assert any(
+            f"permission_preflight.{field}" in error
+            for error in gate.validate_record(record)
+        )
+
+    denied = _secured_record("complete")
+    denied["permission_preflight"]["granted_capabilities"] = ["github_read"]
+    assert any("git_write" in error for error in gate.validate_record(denied))
+
+    for tier, count in ((10, 1), (30, 2), (60, 3), (60, 27)):
+        record = _secured_record("complete")
+        monitor = record["human_reviews"]["final"]["monitor"]
+        monitor["interval_minutes"] = tier
+        monitor["automation"]["tier_minutes"] = tier
+        monitor["automation"]["count"] = count
+        assert gate.validate_record(record) == [], (tier, count)
+
+    for tier, count in ((20, 1), (30, 1), (60, 2)):
+        record = _secured_record("complete")
+        monitor = record["human_reviews"]["final"]["monitor"]
+        monitor["interval_minutes"] = tier
+        monitor["automation"]["tier_minutes"] = tier
+        monitor["automation"]["count"] = count
+        assert gate.validate_record(record), (tier, count)
+
+    for forbidden_time_field in ("timestamp", "deadline"):
+        record = _secured_record("complete")
+        record["human_reviews"]["final"]["monitor"][forbidden_time_field] = (
+            "2026-07-26T12:00:00Z"
+        )
+        assert any(
+            "unknown field" in error
+            for error in gate.validate_record(record)
+        ), forbidden_time_field
+
+
+def test_acceptance_report_changelog_is_semver_newest_first_without_content_loss():
+    text = Path("docs/tests/rtd-config-acceptance-report.md").read_text(
+        encoding="utf-8"
+    )
+    row_351 = (
+        "| 2026-07-22 | 0.35.1 | Removed active runner-governance terminology "
+        "from the KPI metric description without changing the measured window "
+        "or any functional/KPI evidence. Historical entries remain unchanged. |"
+    )
+    assert text.count(row_351) == 1
+    positions = [text.index(f"| 2026-07-{date} | {version} |") for date, version in (
+        ("22", "0.35.2"),
+        ("22", "0.35.1"),
+        ("17", "0.35.0"),
+    )]
+    assert positions == sorted(positions)

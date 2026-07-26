@@ -2,6 +2,35 @@
   "version": 2,
   "schema": "agent_workflow_v2",
   "title": "Platform-neutral Agent workflow contract",
+  "record_schema": {
+    "allowed_fields": {
+      "record": ["version", "schema", "issue", "state", "gate", "revisions", "counters", "exception", "human_reviews", "tester", "reviewer", "disposition", "permission_preflight"],
+      "issue": ["number", "repository", "pull_request_number", "primary_type", "impact_flags", "authorized_humans"],
+      "gate": ["test_required", "light_path"],
+      "gate.light_path": ["reason", "residual_risk", "remaining_verification"],
+      "revisions": ["base_sha", "test", "implementation", "candidate", "final_evidence"],
+      "revisions.test": ["identity", "iteration", "base_sha", "sha"],
+      "revisions.implementation": ["identity", "iteration", "base_sha", "sha"],
+      "revisions.candidate": ["identity", "iteration", "sha", "parents"],
+      "revisions.candidate.parents": ["test_sha", "implementation_sha", "base_sha"],
+      "revisions.final_evidence": ["identity", "sha", "reviewed_candidate_sha", "changed_paths"],
+      "counters": ["production_rework", "kpi_optimization"],
+      "human_reviews": ["test", "final"],
+      "human_reviews.test": ["approved", "sha", "reviewer", "evidence", "monitor"],
+      "human_reviews.test.evidence": ["provider", "artifact", "repository", "issue_number", "comment_id", "command", "test_sha", "top_level", "actor_type", "actor_login", "current", "edited", "deleted", "requested_changes", "decision", "reason"],
+      "human_reviews.final": ["approved", "sha", "reviewer", "evidence", "monitor"],
+      "human_reviews.final.evidence": ["provider", "artifact", "repository", "pull_request_number", "review_id", "actor_type", "actor_login", "state", "current", "candidate_sha"],
+      "monitor": ["status", "interval_minutes", "scope", "automation"],
+      "monitor.automation": ["id", "tier_minutes", "count"],
+      "tester": ["status", "candidate_sha", "mode"],
+      "reviewer": ["status", "candidate_sha"],
+      "disposition": ["status", "reason"],
+      "exception": ["reason", "residual_risk", "remaining_verification"],
+      "permission_preflight": ["host", "sandbox", "required_capabilities", "granted_capabilities", "hydration"],
+      "permission_preflight.fact": ["available", "evidence"],
+      "permission_preflight.hydration": ["mode", "status"]
+    }
+  },
   "task_classes": [
     {
       "code": "M",
@@ -74,7 +103,7 @@
       {
         "name": "implementing",
         "required_fields": ["revisions.implementation.identity"],
-        "forbidden_fields": ["revisions.candidate", "revisions.final_evidence", "human_reviews.final", "tester", "reviewer", "disposition"]
+        "forbidden_fields": ["revisions.candidate.sha", "revisions.final_evidence", "human_reviews.final", "tester", "reviewer", "disposition"]
       },
       {
         "name": "candidate",
@@ -139,14 +168,14 @@
       {"from": "candidate", "to": "testing", "event": "mechanical_verification_started", "when": "gate.test_required == false"},
       {"from": "testing", "to": "reviewing", "event": "tester_passed"},
       {"from": "testing", "to": "rework", "event": "tester_failed"},
+      {"from": "testing", "to": "implementing", "event": "kpi_optimization"},
       {"from": "rework", "to": "rework", "event": "dependency_blocked"},
       {"from": "rework", "to": "rework", "event": "permission_blocked"},
       {"from": "rework", "to": "implementing", "event": "production_rework"},
       {"from": "rework", "to": "stopped", "event": "production_rework"},
-      {"from": "reviewing", "to": "testing", "event": "candidate_revised"},
+      {"from": "reviewing", "to": "rework", "event": "review_correction"},
       {"from": "reviewing", "to": "final_human_review", "event": "reviewer_passed"},
-      {"from": "final_human_review", "to": "testing", "event": "candidate_revised"},
-      {"from": "final_human_review", "to": "reviewing", "event": "changes_requested"},
+      {"from": "final_human_review", "to": "rework", "event": "review_correction"},
       {"from": "final_human_review", "to": "complete", "event": "final_approved"}
     ],
     "rework_transition": "rework -> implementing -> candidate -> testing",
@@ -181,13 +210,33 @@
         "artifact": "pull_request_review",
         "binds": "candidate_sha",
         "authorized_actor": "human",
-        "required_fields": ["repository", "pull_request_number", "review_id", "state", "candidate_sha"],
+        "required_fields": ["repository", "pull_request_number", "review_id", "actor_login", "state", "candidate_sha"],
         "invalidated_by": ["candidate_sha_change", "review_edit", "review_dismissal", "request_changes"]
       }
     }
   },
+  "transition_mutation_matrix": {
+    "classification_complete": {"mutable_roots": ["state", "revisions"]},
+    "test_frozen": {"mutable_roots": ["state", "revisions", "human_reviews"]},
+    "test_approved": {"mutable_roots": ["state", "revisions", "human_reviews"]},
+    "changes_requested": {"mutable_roots": ["state", "revisions", "human_reviews"]},
+    "dependency_blocked": {"mutable_roots": []},
+    "permission_blocked": {"mutable_roots": ["permission_preflight"]},
+    "candidate_created": {"mutable_roots": ["state", "revisions"]},
+    "testing_started": {"mutable_roots": ["state", "tester"]},
+    "mechanical_verification_started": {"mutable_roots": ["state", "tester"]},
+    "tester_passed": {"mutable_roots": ["state", "tester", "reviewer"]},
+    "tester_failed": {"mutable_roots": ["state", "tester"]},
+    "kpi_optimization": {"mutable_roots": ["state", "revisions", "counters", "tester", "reviewer", "human_reviews"]},
+    "production_rework": {"mutable_roots": ["state", "revisions", "counters", "tester", "disposition"]},
+    "review_correction": {"mutable_roots": ["state", "reviewer", "human_reviews"]},
+    "reviewer_passed": {"mutable_roots": ["state", "reviewer", "human_reviews"]},
+    "final_approved": {"mutable_roots": ["state", "human_reviews", "revisions"]}
+  },
   "human_review_monitor": {
-    "interval_minutes": 10,
+    "backoff_minutes": [10, 30, 60],
+    "terminal_tier_minutes": 60,
+    "terminal_tier_unlimited": true,
     "scope": "current_session",
     "on_no_change": "no_op",
     "on_update": "stop_then_resume",
@@ -197,15 +246,6 @@
     "production_rework": 3,
     "kpi_optimization": 3
   },
-  "revision_graph": {
-    "identities": {
-      "test": "T{iteration}",
-      "implementation": "W{iteration}",
-      "candidate": "C{iteration}"
-    },
-    "shared_base": ["test.base_sha", "implementation.base_sha"],
-    "candidate_parents": ["test.sha", "implementation.sha"]
-  },
   "revision_provenance": {
     "identities": {
       "test": "T[1-9][0-9]*",
@@ -214,7 +254,10 @@
       "evidence": "E[1-9][0-9]*"
     },
     "lane_base_rule": "test.base_sha == implementation.base_sha == base_sha",
-    "candidate_rule": "candidate references exact Tn/Wn and their full SHAs",
+    "candidate_parents": {
+      "standard": ["test_sha", "implementation_sha"],
+      "light": ["base_sha", "implementation_sha"]
+    },
     "evidence_only": {
       "kind": "evidence_only",
       "parent": "exact_candidate_sha",
@@ -298,9 +341,9 @@
       "audit_field": "one non-empty audit entry per correction"
     },
     "kpi_optimization": {
-      "trigger_transition": null,
+      "trigger_transition": "testing -> implementing",
       "consumes": "limits.kpi_optimization",
-      "at_limit": "stop_escalate"
+      "at_limit": "reject fourth optimization"
     }
   },
   "repository_host": {
@@ -401,13 +444,18 @@
       "complete"
     ],
     "testing_mode": "mechanical_verification",
-    "candidate_parents": ["base_sha", "implementation_sha"],
     "forbidden_evidence": ["revisions.test", "human_reviews.test"]
   },
   "initialization": {
     "first_clone": "interactive_collection_before_lane_creation",
     "derived_worktree": "deterministic_non_interactive_hydration_from_verified_non_secret_inputs",
     "missing_or_invalid_input": "fail_before_lane_creation"
+  },
+  "permission_preflight": {
+    "separate_facts": ["host", "sandbox"],
+    "required_fact_fields": ["available", "evidence"],
+    "capability_rule": "required_capabilities subset of granted_capabilities",
+    "hydration": {"mode": "noninteractive", "status": "complete"}
   },
   "profile_separation": {
     "common_workflow": "workflow-contract.json and agent-workflow Skill",

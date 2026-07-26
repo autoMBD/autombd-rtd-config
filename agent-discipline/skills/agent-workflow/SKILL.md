@@ -55,8 +55,12 @@ weaker gate. Only exact `N + DO` derives the lightweight path.
 - Missing, expired, or unusable initialization input is a fail-fast condition
   before lane creation. Never prompt for it from inside a lane.
 - Preflight every external tool before the loop. Record host authentication and
-  Agent sandbox/network reachability as separate facts; one does not prove the
-  other.
+  Agent sandbox/network reachability as separate `host` and `sandbox` facts;
+  each needs an `available: true` result and non-empty evidence, because one
+  does not prove the other.
+- Record `required_capabilities` and `granted_capabilities`; every required
+  capability must be granted. Record deterministic derived-worktree hydration
+  as `{"mode": "noninteractive", "status": "complete"}`.
 - Pre-authorize the smallest stable command prefixes practical. An executing
   lane must not pause waiting for a chat permission approval.
 
@@ -80,23 +84,37 @@ classify -> implementing -> candidate
 testing --tester_failed--> rework --production_rework--> implementing
 rework  --production_rework---------------------------------> stopped
 human_review_1 --changes_requested------------------------> test_authoring
-reviewing|final_human_review --candidate_revised----------> testing
+testing --kpi_optimization-------------------------------> implementing
+reviewing|final_human_review --review_correction----------> rework
 ```
 
 The exact legal edges and events are `state_machine.transitions`. Validate an
 edge by passing the previous record, current record, and event to
 `validate_transition`. `rework` returns through the implementation lane,
-creates a new candidate, and then re-enters Tester. A Gate 1 change request
+creates `W(n+1)`, commits the already-staged `C(n+1)`, and then re-enters
+Tester. Reviewer or Final Human Review corrections must take this counted path;
+there is no direct Candidate-to-Tester revision bypass. A Gate 1 change request
 instead creates the next `Tn` in `test_authoring` and does not consume
-production rework. Dependency and permission blocks preserve revisions and
-counters. `complete` and `stopped` are terminal.
+production rework. A functional PASS with KPI MISS takes the executable
+`kpi_optimization` edge, increments that counter exactly once, and similarly
+stages `W(n+1)` and `C(n+1)`. Dependency and permission blocks preserve
+revisions and counters. `complete` and `stopped` are terminal.
 
 Evidence is state-dependent. A state requires only evidence already produced
 at that point; future Tester, Reviewer, Final Review, Candidate, or evidence-only
 revision data is invalid rather than silently accepted.
 Reviewer evidence begins in `reviewing`, never `testing`. A
-`candidate_revised` transition removes stale Reviewer evidence before returning
-to `testing`. Final evidence is produced only in `complete`.
+review correction invalidates Reviewer and Final Human Review evidence before
+the counted rework cycle. KPI optimization invalidates the old Candidate's
+Tester, Reviewer, and Final Human Review evidence. Final evidence is produced
+only in `complete`.
+
+Every event is governed by `transition_mutation_matrix`: top-level changes
+outside that event's allowlist are invalid. Issue and gate provenance and the
+Base SHA are immutable after classification; Test provenance changes only on
+its explicit Test-lane events. Version 2 is a closed schema at every nested
+record object, so unknown fields are rejected. Revision identity and Candidate
+parent keys are defined only by `revision_provenance`.
 
 ### Test path
 
@@ -121,8 +139,10 @@ Model each revision explicitly: `Tn` for Test, `Wn` for Implementation, and
 record full 40-hex SHAs. Test and Implementation both start from
 `revisions.base_sha` in independent checkouts/worktrees and produce independent
 commits. Candidate `parents.test_sha` and `parents.implementation_sha` bind
-those exact revisions. Permissions, checkout, inputs, and evidence are separate
-boundaries.
+those exact revisions. After a correction stages `C(n+1)` with a null SHA,
+`candidate_created` must commit that exact identity and iteration; it may not
+substitute a different Candidate. Permissions, checkout, inputs, and evidence
+are separate boundaries.
 
 The Worker must not receive or read the owner's acceptance-test implementation.
 The candidate is a deterministic integration revision made from the test and
@@ -175,8 +195,11 @@ Both require the exact two-line command. An approval is invalid if
 `requested_changes` is true.
 
 The outer Gate 1 `reviewer` identifies the approving human and is required only
-for `approved: true`. Pending and change-request records may keep it null; their
-human actor is proven by the current GitHub issue-comment evidence.
+when evidence exists. A pending record without evidence keeps it null; a
+change-request record has evidence and therefore records the human reviewer.
+The evidence `actor_login` must exactly equal that outer `reviewer`, and that
+login must appear in `issue.authorized_humans`; `issue.repository` must also
+exactly match the evidence repository.
 
 Replies, reactions, labels, Agent-authored commands, abbreviated or stale SHAs,
 and edited or deleted approvals are invalid. A new Test SHA invalidates every
@@ -184,10 +207,13 @@ earlier approval. The record binds the approval to the GitHub repository, issue
 number, top-level comment ID, authorized human reviewer, exact command, and
 current full Test SHA.
 
-After submitting any Human Review request, poll for 10 minutes in the current
-conversation/session. No update is a no-op. On a valid update, stop the monitor
-before continuing. Do not create a new session for polling. Apply the same
-monitor rule to final Human Review.
+After submitting any Human Review request, use the same-session automation
+identity with backoff tiers of exactly 10, then 30, then 60 minutes. Record
+automation tier/count as 10:1, 30:2, and 60:3 or greater; the 60-minute tier is
+unlimited until a valid update. Do not encode a timestamp or deadline. No
+update is a no-op. On a valid update, stop the monitor before continuing. Do
+not create a new session for polling. Apply the same monitor rule to final
+Human Review.
 
 ## 6. Roles, validation, and bounded rework
 
@@ -209,8 +235,10 @@ Only the exact `rework -> implementing` production-rework transition increments
 Test-contract changes never consume that counter. Production rework and KPI
 optimization each permit at most three automatic iterations. At count three,
 the next production-rework disposition enters `stopped` with `stop_escalate`;
-the counter never becomes four. Never reset a counter by renaming a lane or
-creating a fresh session.
+the counter never becomes four. KPI optimization supports iterations one
+through three and rejects a fourth edge. Each successful KPI edge increments
+exactly once and invalidates the prior Candidate-bound evidence before work
+resumes. Never reset a counter by renaming a lane or creating a fresh session.
 
 ## 7. Candidate evidence and final Human Review
 
@@ -224,9 +252,12 @@ bound to the unchanged Candidate SHA.
 
 Before `complete`, obtain a current GitHub PR review made by a human whose state
 is `approved`, bound to the exact Candidate SHA. Record repository, PR number,
-review ID, actor, Candidate SHA, and a stopped 10-minute current-session
-monitor. A Candidate SHA change, review edit, dismissal, or requested change
-invalidates it. Only then may the record enter `complete`.
+review ID, exact actor login, Candidate SHA, and a stopped current-session
+monitor at one of the valid tiers. The actor login must equal the outer
+reviewer and be authorized by `issue.authorized_humans`. A Candidate SHA
+change, review edit, dismissal, or requested change invalidates it. The
+`final_approved` transition must preserve the exact Candidate revision object.
+Only then may the record enter `complete`.
 
 ## Handoff templates
 
@@ -286,6 +317,8 @@ with real evidence; do not treat the template itself as evidence.
   "schema": "agent_workflow_v2",
   "issue": {
     "number": 123,
+    "repository": "<owner/repository>",
+    "authorized_humans": ["<human-login>"],
     "primary_type": "I",
     "impact_flags": ["AR", "TC"]
   },
@@ -320,10 +353,15 @@ with real evidence; do not treat the template itself as evidence.
         "repository": "<owner/repository>", "issue_number": 123,
         "comment_id": 456,
         "command": "/approve-test <40-hex-test>",
-        "top_level": true, "actor_type": "human", "current": true,
+        "top_level": true, "actor_type": "human",
+        "actor_login": "<human-login>", "current": true,
         "edited": false, "deleted": false, "requested_changes": false
       },
-      "monitor": {"status": "stopped", "interval_minutes": 10, "scope": "current_session"}
+      "monitor": {
+        "status": "stopped", "interval_minutes": 10,
+        "scope": "current_session",
+        "automation": {"id": "<monitor-id>", "tier_minutes": 10, "count": 1}
+      }
     },
     "final": {
       "approved": true,
@@ -332,13 +370,25 @@ with real evidence; do not treat the template itself as evidence.
       "evidence": {
         "provider": "github", "artifact": "pull_request_review",
         "repository": "<owner/repository>", "pull_request_number": 789,
-        "review_id": 1011, "actor_type": "human", "state": "approved",
+        "review_id": 1011, "actor_type": "human",
+        "actor_login": "<human-login>", "state": "approved",
         "current": true, "candidate_sha": "<40-hex-candidate>"
       },
-      "monitor": {"status": "stopped", "interval_minutes": 10, "scope": "current_session"}
+      "monitor": {
+        "status": "stopped", "interval_minutes": 10,
+        "scope": "current_session",
+        "automation": {"id": "<monitor-id>", "tier_minutes": 10, "count": 1}
+      }
     }
   },
   "counters": {"production_rework": 0, "kpi_optimization": 0},
+  "permission_preflight": {
+    "host": {"available": true, "evidence": "<host-check>"},
+    "sandbox": {"available": true, "evidence": "<sandbox-check>"},
+    "required_capabilities": ["git_write", "github_read"],
+    "granted_capabilities": ["git_write", "github_read"],
+    "hydration": {"mode": "noninteractive", "status": "complete"}
+  },
   "tester": {"status": "pass", "candidate_sha": "<40-hex-candidate>"},
   "reviewer": {"status": "pass", "candidate_sha": "<40-hex-candidate>"},
   "exception": null
