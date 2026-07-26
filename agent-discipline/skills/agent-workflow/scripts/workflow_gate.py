@@ -40,7 +40,7 @@
 # File:        workflow_gate.py
 # Author:      autoMBD <tkung.lqk@foxmail.com>
 # Date:        2026-07-22
-# Version:     0.6.0
+# Version:     0.7.0
 # Description: Validate stateful Agent workflow records and transitions.
 # =================================================================================
 
@@ -191,26 +191,6 @@ def _validate_reason_block(value: Any, path: str, errors: list[str]) -> None:
             )
 
 
-def _validate_monitor(
-    value: Any, path: str, errors: list[str], concept: str
-) -> None:
-    monitor = _mapping(value, path, errors)
-    expected = CONTRACT["human_review_monitor"]
-    if monitor.get("status") != "stopped":
-        errors.append(f"{concept}: {path}.status must be stopped")
-    if monitor.get("interval_minutes") != expected["interval_minutes"]:
-        errors.append(
-            f"{concept}: {path}.interval_minutes must be "
-            f"{expected['interval_minutes']}"
-        )
-    if monitor.get("scope") != expected["scope"]:
-        errors.append(
-            f"{concept}: {path}.scope must be "
-            f"{DIAGNOSTIC_CONCEPTS['current_session']} "
-            f"({expected['scope']})"
-        )
-
-
 def _validate_counter(
     value: Any, path: str, maximum: int, concept: str, errors: list[str]
 ) -> None:
@@ -264,6 +244,8 @@ def _validate_closed_schema(record: Mapping[str, Any], errors: list[str]) -> Non
     _validate_closed_mapping(record, "record", "record", errors)
     fixed = {
         "issue": "issue",
+        "authorization": "authorization",
+        "authorization.github": "authorization.github",
         "gate": "gate",
         "gate.light_path": "gate.light_path",
         "revisions": "revisions",
@@ -313,11 +295,10 @@ def _validate_capability_list(
 ) -> list[str]:
     if (
         not isinstance(value, list)
-        or not value
         or any(not _is_text(item) for item in value)
         or len(value) != len(set(value))
     ):
-        errors.append(f"{path} must be a non-empty list of unique capabilities")
+        errors.append(f"{path} must be a list of unique capabilities")
         return []
     return value
 
@@ -331,8 +312,8 @@ def _validate_permission_preflight(value: Any, errors: list[str]) -> None:
         if fact.get("available") is not True:
             errors.append(f"permission_preflight.{name}.available must be true")
         _validate_required_text(
-            fact.get("evidence"),
-            f"permission_preflight.{name}.evidence",
+            fact.get("fact"),
+            f"permission_preflight.{name}.fact",
             errors,
         )
     required = _validate_capability_list(
@@ -406,10 +387,12 @@ def _validate_public_monitor(
     if monitor.get("status") not in allowed_statuses:
         errors.append(f"{path}.status must be {' or '.join(allowed_statuses)}")
     interval = monitor.get("interval_minutes")
-    backoff = CONTRACT["human_review_monitor"]["backoff_minutes"]
-    if interval not in backoff:
+    tiers = CONTRACT["human_review_monitor"]["tiers"]
+    tier_name = f"{interval}m"
+    tier_rule = tiers.get(tier_name)
+    if not isinstance(tier_rule, Mapping):
         errors.append(
-            f"{path}.interval_minutes must use the 10 -> 30 -> 60 backoff"
+            f"{path}.interval_minutes must be 10, 30, or 60"
         )
     if monitor.get("scope") != CONTRACT["human_review_monitor"]["scope"]:
         errors.append(f"{path}.scope must be current_session (current session)")
@@ -417,24 +400,27 @@ def _validate_public_monitor(
     _validate_required_text(
         automation.get("id"), f"{path}.automation.id", errors
     )
-    if automation.get("tier_minutes") != interval:
+    if automation.get("tier") != tier_name:
         errors.append(
-            f"{path}.automation.tier_minutes must equal interval_minutes"
+            f"{path}.automation.tier must match interval_minutes"
         )
     count = automation.get("count")
-    valid_count = (
-        isinstance(count, int)
-        and not isinstance(count, bool)
-        and (
-            (interval == 10 and count == 1)
-            or (interval == 30 and count == 2)
-            or (interval == 60 and count >= 3)
-        )
+    valid_counts = (
+        tier_rule.get("counts")
+        if isinstance(tier_rule, Mapping)
+        else []
     )
-    if not valid_count:
+    if (
+        isinstance(count, bool)
+        or not isinstance(count, int)
+        or count not in valid_counts
+    ):
         errors.append(
-            f"{path}.automation.count must follow tiers 10:1, 30:2, "
-            "or 60:3+ (60 is unlimited)"
+            f"{path}.automation.count is invalid for tier {tier_name}"
+        )
+    if automation.get("session") != "current_session":
+        errors.append(
+            f"{path}.automation.session must be current_session"
         )
 
 
@@ -470,7 +456,7 @@ def _public_change_request_reason(
 def _validate_authorized_review_actor(
     review: Mapping[str, Any],
     evidence: Mapping[str, Any],
-    issue: Mapping[str, Any],
+    authorized_human_logins: Any,
     path: str,
     errors: list[str],
 ) -> None:
@@ -484,11 +470,13 @@ def _validate_authorized_review_actor(
         errors.append(
             f"{path}.evidence.actor_login must exactly match {path}.reviewer"
         )
-    authorized = issue.get("authorized_humans")
-    if isinstance(authorized, list) and actor_login not in authorized:
+    if (
+        isinstance(authorized_human_logins, list)
+        and actor_login not in authorized_human_logins
+    ):
         errors.append(
             f"{path}.evidence.actor_login is not authorized by "
-            "issue.authorized_humans"
+            "authorization.github.authorized_human_logins"
         )
 
 
@@ -497,6 +485,7 @@ def _validate_public_test_review(
     *,
     required: bool,
     issue: Mapping[str, Any],
+    authorized_human_logins: Any,
     test_sha: Any,
     errors: list[str],
 ) -> None:
@@ -530,7 +519,11 @@ def _validate_public_test_review(
         review.get("evidence"), "human_reviews.test.evidence", errors
     )
     _validate_authorized_review_actor(
-        review, evidence, issue, "human_reviews.test", errors
+        review,
+        evidence,
+        authorized_human_logins,
+        "human_reviews.test",
+        errors,
     )
     repository = evidence.get("repository")
     _validate_required_text(
@@ -610,6 +603,7 @@ def _validate_public_final_review(
     *,
     state: str,
     issue: Mapping[str, Any],
+    authorized_human_logins: Any,
     candidate_sha: Any,
     test_repository: Any,
     errors: list[str],
@@ -639,7 +633,11 @@ def _validate_public_final_review(
     )
     evidence = _mapping(review.get("evidence"), "human_reviews.final.evidence", errors)
     _validate_authorized_review_actor(
-        review, evidence, issue, "human_reviews.final", errors
+        review,
+        evidence,
+        authorized_human_logins,
+        "human_reviews.final",
+        errors,
     )
     repository = evidence.get("repository")
     _validate_required_text(
@@ -731,15 +729,24 @@ def _validate_public_record(record: Mapping[str, Any]) -> list[str]:
     if isinstance(number, bool) or not isinstance(number, int) or number <= 0:
         errors.append("issue.number must be a usable positive issue number")
     _validate_required_text(issue.get("repository"), "issue.repository", errors)
-    authorized_humans = issue.get("authorized_humans")
+    authorization = _mapping(
+        record.get("authorization"), "authorization", errors
+    )
+    github_authorization = _mapping(
+        authorization.get("github"), "authorization.github", errors
+    )
+    authorized_human_logins = github_authorization.get(
+        "authorized_human_logins"
+    )
     if (
-        not isinstance(authorized_humans, list)
-        or not authorized_humans
-        or any(not _is_text(login) for login in authorized_humans)
-        or len(authorized_humans) != len(set(authorized_humans))
+        not isinstance(authorized_human_logins, list)
+        or not authorized_human_logins
+        or any(not _is_text(login) for login in authorized_human_logins)
+        or len(authorized_human_logins) != len(set(authorized_human_logins))
     ):
         errors.append(
-            "issue.authorized_humans must be a non-empty list of unique logins"
+            "authorization.github.authorized_human_logins must be a "
+            "non-empty list of unique logins"
         )
     primary_type = issue.get("primary_type")
     if not isinstance(primary_type, str) or primary_type not in TASK_CLASSES:
@@ -843,7 +850,9 @@ def _validate_public_record(record: Mapping[str, Any]) -> list[str]:
                 errors,
             )
         )
-        parent_profile = "light" if test_required is False else "standard"
+        parent_profile = (
+            "mechanical_light" if test_required is False else "normal"
+        )
         parent_fields = CONTRACT["revision_provenance"]["candidate_parents"][
             parent_profile
         ]
@@ -926,7 +935,10 @@ def _validate_public_record(record: Mapping[str, Any]) -> list[str]:
             name,
             errors,
         )
-    _validate_permission_preflight(record.get("permission_preflight"), errors)
+    if record.get("permission_preflight") is not None:
+        _validate_permission_preflight(
+            record.get("permission_preflight"), errors
+        )
 
     reviews = record.get("human_reviews")
     reviews_map = reviews if isinstance(reviews, Mapping) else {}
@@ -943,6 +955,7 @@ def _validate_public_record(record: Mapping[str, Any]) -> list[str]:
         reviews_map.get("test"),
         required=test_review_required,
         issue=issue,
+        authorized_human_logins=authorized_human_logins,
         test_sha=test_sha,
         errors=errors,
     )
@@ -955,6 +968,7 @@ def _validate_public_record(record: Mapping[str, Any]) -> list[str]:
         reviews_map.get("final"),
         state=state,
         issue=issue,
+        authorized_human_logins=authorized_human_logins,
         candidate_sha=candidate_sha,
         test_repository=test_repository,
         errors=errors,
@@ -1055,6 +1069,51 @@ def _public_candidate_revision(
     return candidate if isinstance(candidate, Mapping) else None
 
 
+def _public_review_monitor(
+    snapshot: Mapping[str, Any], review_name: str
+) -> Mapping[str, Any] | None:
+    reviews = snapshot.get("human_reviews")
+    review = reviews.get(review_name) if isinstance(reviews, Mapping) else None
+    monitor = review.get("monitor") if isinstance(review, Mapping) else None
+    return monitor if isinstance(monitor, Mapping) else None
+
+
+def _monitor_progression_state(
+    monitor: Mapping[str, Any] | None,
+) -> tuple[Any, Any, Any, Any]:
+    automation = (
+        monitor.get("automation")
+        if isinstance(monitor, Mapping)
+        else None
+    )
+    if not isinstance(automation, Mapping):
+        return None, None, None, None
+    return (
+        automation.get("tier"),
+        automation.get("count"),
+        automation.get("id"),
+        automation.get("session"),
+    )
+
+
+def _validate_initial_monitor(
+    monitor: Mapping[str, Any] | None,
+    path: str,
+    errors: list[str],
+) -> None:
+    tier, count, _, _ = _monitor_progression_state(monitor)
+    initial = CONTRACT["human_review_monitor"]["initial"]
+    if (
+        not isinstance(monitor, Mapping)
+        or monitor.get("interval_minutes") != initial["interval_minutes"]
+        or tier != initial["tier"]
+        or count != initial["count"]
+    ):
+        errors.append(
+            f"{path} must reset to 10m/count0"
+        )
+
+
 def _validate_transition_mutation_matrix(
     previous: Mapping[str, Any],
     current: Mapping[str, Any],
@@ -1073,6 +1132,10 @@ def _validate_transition_mutation_matrix(
             )
     if previous.get("issue") != current.get("issue"):
         errors.append("issue provenance is frozen across every transition")
+    if previous.get("authorization") != current.get("authorization"):
+        errors.append(
+            "authorization provenance is frozen across every transition"
+        )
     if previous.get("gate") != current.get("gate"):
         errors.append("gate classification is frozen across every transition")
     previous_revisions = previous.get("revisions")
@@ -1141,6 +1204,60 @@ def _validate_public_transition(
             errors.append(
                 f"candidate -> testing must use {expected_event!r} when "
                 f"gate.test_required is {str(test_required).lower()}"
+            )
+    if event == "test_frozen":
+        _validate_initial_monitor(
+            _public_review_monitor(current, "test"),
+            "human_reviews.test.monitor",
+            errors,
+        )
+    if event == "reviewer_passed":
+        _validate_initial_monitor(
+            _public_review_monitor(current, "final"),
+            "human_reviews.final.monitor",
+            errors,
+        )
+    if event == "review_poll_no_change":
+        previous_monitor = _public_review_monitor(previous, "test")
+        current_monitor = _public_review_monitor(current, "test")
+        (
+            previous_tier,
+            previous_count,
+            previous_id,
+            previous_session,
+        ) = _monitor_progression_state(previous_monitor)
+        (
+            current_tier,
+            current_count,
+            current_id,
+            current_session,
+        ) = _monitor_progression_state(current_monitor)
+        allowed = {
+            tuple(item)
+            for item in CONTRACT["human_review_monitor"][
+                "no_change_progression"
+            ]
+        }
+        if (
+            previous_tier,
+            previous_count,
+            current_tier,
+            current_count,
+        ) not in allowed:
+            errors.append(
+                "review_poll_no_change must follow the exact "
+                "10m -> 30m -> 60m schedule"
+            )
+        if previous_id != current_id:
+            errors.append(
+                "review_poll_no_change must preserve automation.id"
+            )
+        if (
+            previous_session != current_session
+            or current_session != "current_session"
+        ):
+            errors.append(
+                "review_poll_no_change must preserve current_session"
             )
     if event == "candidate_created":
         previous_candidate = _public_candidate_revision(previous)
@@ -1336,6 +1453,34 @@ def _validate_public_transition(
         test = revisions.get("test") if isinstance(revisions, Mapping) else None
         if not isinstance(test, Mapping) or test.get("sha") is not None:
             errors.append("changes_requested must start the next uncommitted T revision")
+    if event == "changes_requested" and source == "final_human_review":
+        if current.get("revisions") != previous.get("revisions"):
+            errors.append(
+                "Final changes_requested must preserve exact revisions"
+            )
+        if current.get("tester") != previous.get("tester"):
+            errors.append(
+                "Final changes_requested must preserve Tester evidence"
+            )
+        current_reviewer = current.get("reviewer")
+        if (
+            not isinstance(current_reviewer, Mapping)
+            or current_reviewer.get("status") != "fail"
+            or current_reviewer.get("candidate_sha")
+            != _public_candidate_sha(previous)
+        ):
+            errors.append(
+                "Final changes_requested must return candidate-bound "
+                "reviewer.status fail"
+            )
+        current_reviews = current.get("human_reviews")
+        if (
+            isinstance(current_reviews, Mapping)
+            and current_reviews.get("final") is not None
+        ):
+            errors.append(
+                "Final changes_requested must invalidate Final Human Review"
+            )
     if event == "tester_failed":
         tester = previous.get("tester")
         if not isinstance(tester, Mapping) or tester.get("status") != "fail":

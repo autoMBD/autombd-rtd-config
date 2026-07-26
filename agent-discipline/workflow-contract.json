@@ -4,8 +4,10 @@
   "title": "Platform-neutral Agent workflow contract",
   "record_schema": {
     "allowed_fields": {
-      "record": ["version", "schema", "issue", "state", "gate", "revisions", "counters", "exception", "human_reviews", "tester", "reviewer", "disposition", "permission_preflight"],
-      "issue": ["number", "repository", "pull_request_number", "primary_type", "impact_flags", "authorized_humans"],
+      "record": ["version", "schema", "issue", "authorization", "state", "gate", "revisions", "counters", "exception", "human_reviews", "tester", "reviewer", "disposition", "permission_preflight"],
+      "issue": ["number", "repository", "pull_request_number", "primary_type", "impact_flags"],
+      "authorization": ["github"],
+      "authorization.github": ["authorized_human_logins"],
       "gate": ["test_required", "light_path"],
       "gate.light_path": ["reason", "residual_risk", "remaining_verification"],
       "revisions": ["base_sha", "test", "implementation", "candidate", "final_evidence"],
@@ -21,14 +23,14 @@
       "human_reviews.final": ["approved", "sha", "reviewer", "evidence", "monitor"],
       "human_reviews.final.evidence": ["provider", "artifact", "repository", "pull_request_number", "review_id", "actor_type", "actor_login", "state", "current", "candidate_sha"],
       "monitor": ["status", "interval_minutes", "scope", "automation"],
-      "monitor.automation": ["id", "tier_minutes", "count"],
+      "monitor.automation": ["id", "tier", "count", "session"],
       "tester": ["status", "candidate_sha", "mode"],
       "reviewer": ["status", "candidate_sha"],
       "disposition": ["status", "reason"],
       "exception": ["reason", "residual_risk", "remaining_verification"],
       "permission_preflight": ["host", "sandbox", "required_capabilities", "granted_capabilities", "hydration"],
-      "permission_preflight.fact": ["available", "evidence"],
-      "permission_preflight.hydration": ["mode", "status"]
+      "permission_preflight.fact": ["available", "fact"],
+      "permission_preflight.hydration": ["mode", "source"]
     }
   },
   "task_classes": [
@@ -159,6 +161,7 @@
       {"from": "classify", "to": "test_authoring", "event": "classification_complete"},
       {"from": "classify", "to": "implementing", "event": "classification_complete", "when": "gate.test_required == false"},
       {"from": "test_authoring", "to": "human_review_1", "event": "test_frozen"},
+      {"from": "human_review_1", "to": "human_review_1", "event": "review_poll_no_change"},
       {"from": "human_review_1", "to": "implementing", "event": "test_approved"},
       {"from": "human_review_1", "to": "test_authoring", "event": "changes_requested"},
       {"from": "implementing", "to": "implementing", "event": "dependency_blocked"},
@@ -175,7 +178,7 @@
       {"from": "rework", "to": "stopped", "event": "production_rework"},
       {"from": "reviewing", "to": "rework", "event": "review_correction"},
       {"from": "reviewing", "to": "final_human_review", "event": "reviewer_passed"},
-      {"from": "final_human_review", "to": "rework", "event": "review_correction"},
+      {"from": "final_human_review", "to": "reviewing", "event": "changes_requested"},
       {"from": "final_human_review", "to": "complete", "event": "final_approved"}
     ],
     "rework_transition": "rework -> implementing -> candidate -> testing",
@@ -218,8 +221,9 @@
   "transition_mutation_matrix": {
     "classification_complete": {"mutable_roots": ["state", "revisions"]},
     "test_frozen": {"mutable_roots": ["state", "revisions", "human_reviews"]},
+    "review_poll_no_change": {"mutable_roots": ["human_reviews"]},
     "test_approved": {"mutable_roots": ["state", "revisions", "human_reviews"]},
-    "changes_requested": {"mutable_roots": ["state", "revisions", "human_reviews"]},
+    "changes_requested": {"mutable_roots": ["state", "revisions", "human_reviews", "reviewer"]},
     "dependency_blocked": {"mutable_roots": []},
     "permission_blocked": {"mutable_roots": ["permission_preflight"]},
     "candidate_created": {"mutable_roots": ["state", "revisions"]},
@@ -234,9 +238,25 @@
     "final_approved": {"mutable_roots": ["state", "human_reviews", "revisions"]}
   },
   "human_review_monitor": {
-    "backoff_minutes": [10, 30, 60],
-    "terminal_tier_minutes": 60,
-    "terminal_tier_unlimited": true,
+    "initial": {
+      "interval_minutes": 10,
+      "tier": "10m",
+      "count": 0
+    },
+    "tiers": {
+      "10m": {"interval_minutes": 10, "counts": [0, 1, 2]},
+      "30m": {"interval_minutes": 30, "counts": [0, 1, 2]},
+      "60m": {"interval_minutes": 60, "counts": [0], "unlimited": true}
+    },
+    "no_change_progression": [
+      ["10m", 0, "10m", 1],
+      ["10m", 1, "10m", 2],
+      ["10m", 2, "30m", 0],
+      ["30m", 0, "30m", 1],
+      ["30m", 1, "30m", 2],
+      ["30m", 2, "60m", 0],
+      ["60m", 0, "60m", 0]
+    ],
     "scope": "current_session",
     "on_no_change": "no_op",
     "on_update": "stop_then_resume",
@@ -255,8 +275,8 @@
     },
     "lane_base_rule": "test.base_sha == implementation.base_sha == base_sha",
     "candidate_parents": {
-      "standard": ["test_sha", "implementation_sha"],
-      "light": ["base_sha", "implementation_sha"]
+      "normal": ["test_sha", "implementation_sha"],
+      "mechanical_light": ["base_sha", "implementation_sha"]
     },
     "evidence_only": {
       "kind": "evidence_only",
@@ -453,9 +473,12 @@
   },
   "permission_preflight": {
     "separate_facts": ["host", "sandbox"],
-    "required_fact_fields": ["available", "evidence"],
+    "required_fact_fields": ["available", "fact"],
     "capability_rule": "required_capabilities subset of granted_capabilities",
-    "hydration": {"mode": "noninteractive", "status": "complete"}
+    "hydration": {
+      "mode": "noninteractive",
+      "source": "verified_non_secret_inputs"
+    }
   },
   "profile_separation": {
     "common_workflow": "workflow-contract.json and agent-workflow Skill",

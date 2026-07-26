@@ -40,7 +40,7 @@
 # File:        test_workflow_gate_generality.py
 # Author:      autoMBD <tkung.lqk@foxmail.com>
 # Date:        2026-07-26
-# Version:     0.5.0
+# Version:     0.6.0
 # Description: Generality tests for canonical Agent workflow v2 records and gates.
 # =================================================================================
 
@@ -164,8 +164,9 @@ def _public_test_review(decision: str = "approved"):
             "scope": "current_session",
             "automation": {
                 "id": "test-review-monitor",
-                "tier_minutes": 10,
-                "count": 1,
+                "tier": "10m",
+                "count": 0,
+                "session": "current_session",
             },
         },
     }
@@ -194,8 +195,9 @@ def _public_final_review(candidate_sha: str = CANDIDATE_SHA):
             "scope": "current_session",
             "automation": {
                 "id": "final-review-monitor",
-                "tier_minutes": 10,
-                "count": 1,
+                "tier": "10m",
+                "count": 0,
+                "session": "current_session",
             },
         },
     }
@@ -210,26 +212,20 @@ def _public_record(state: str) -> dict[str, object]:
             "repository": "org/example-repository",
             "primary_type": "B",
             "impact_flags": ["PB"],
-            "authorized_humans": ["human-reviewer", "release-approver"],
+        },
+        "authorization": {
+            "github": {
+                "authorized_human_logins": [
+                    "human-reviewer",
+                    "release-approver",
+                ]
+            }
         },
         "state": state,
         "gate": {"test_required": True},
         "revisions": {"base_sha": BASE_SHA},
         "counters": {"production_rework": 1, "kpi_optimization": 0},
         "exception": None,
-        "permission_preflight": {
-            "host": {
-                "available": True,
-                "evidence": "host capability preflight passed",
-            },
-            "sandbox": {
-                "available": True,
-                "evidence": "sandbox capability preflight passed",
-            },
-            "required_capabilities": ["git_write", "github_read"],
-            "granted_capabilities": ["git_write", "github_read"],
-            "hydration": {"mode": "noninteractive", "status": "complete"},
-        },
     }
     revisions = record["revisions"]
     if state in PUBLIC_STATES[1:]:
@@ -261,8 +257,9 @@ def _public_record(state: str) -> dict[str, object]:
                 "scope": "current_session",
                 "automation": {
                     "id": "final-review-monitor",
-                    "tier_minutes": 10,
-                    "count": 1,
+                    "tier": "10m",
+                    "count": 0,
+                    "session": "current_session",
                 },
             }
         }
@@ -278,20 +275,18 @@ def _public_record(state: str) -> dict[str, object]:
 
 def _secured_record(state: str) -> dict[str, object]:
     record = _public_record(state)
-    record["issue"]["repository"] = "org/example-repository"
-    record["issue"]["authorized_humans"] = [
-        "human-reviewer",
-        "release-approver",
-    ]
     record["permission_preflight"] = {
-        "host": {"available": True, "evidence": "host capability preflight passed"},
+        "host": {"available": True, "fact": "github_authenticated"},
         "sandbox": {
             "available": True,
-            "evidence": "sandbox capability preflight passed",
+            "fact": "network_permitted",
         },
-        "required_capabilities": ["git_write", "github_read"],
-        "granted_capabilities": ["git_write", "github_read"],
-        "hydration": {"mode": "noninteractive", "status": "complete"},
+        "required_capabilities": ["read_issue", "read_review"],
+        "granted_capabilities": ["read_issue", "read_review"],
+        "hydration": {
+            "mode": "noninteractive",
+            "source": "verified_non_secret_inputs",
+        },
     }
     reviews = record.get("human_reviews", {})
     for name in ("test", "final"):
@@ -305,8 +300,9 @@ def _secured_record(state: str) -> dict[str, object]:
         if isinstance(monitor, dict):
             monitor["automation"] = {
                 "id": f"{name}-review-monitor",
-                "tier_minutes": monitor["interval_minutes"],
-                "count": 1,
+                "tier": f"{monitor['interval_minutes']}m",
+                "count": 0,
+                "session": "current_session",
             }
     return record
 
@@ -378,8 +374,8 @@ def test_public_revision_graph_and_routing_have_exact_shape_and_derivation():
     contract = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
     assert "revision_graph" not in contract
     assert contract["revision_provenance"]["candidate_parents"] == {
-        "standard": ["test_sha", "implementation_sha"],
-        "light": ["base_sha", "implementation_sha"],
+        "normal": ["test_sha", "implementation_sha"],
+        "mechanical_light": ["base_sha", "implementation_sha"],
     }
     routing = contract["impact_routing"]
     assert list(routing) == ["PB", "MS", "MW", "RA", "TC", "VS", "EV", "AR", "RP", "ED", "SS", "DO"]
@@ -409,7 +405,11 @@ def test_public_forward_transitions_use_approved_events():
     ]
     for source, target, event in sequence:
         previous = _public_record(source)
-        current = _public_record(target)
+        if event == "test_frozen":
+            current = _pending_gate_record(10, 0)
+            current.pop("permission_preflight")
+        else:
+            current = _public_record(target)
         assert gate.validate_transition(previous, current, event) == [], event
 
     previous = _public_record("testing")
@@ -518,7 +518,9 @@ def test_public_minimal_issue_and_outer_review_shape_are_authoritative():
         "repository",
         "primary_type",
         "impact_flags",
-        "authorized_humans",
+    }
+    assert set(classify["authorization"]["github"]) == {
+        "authorized_human_logins"
     }
     assert validate_record(classify) == []
 
@@ -614,8 +616,9 @@ def test_pending_gate_1_and_stopped_provenance_are_valid_minimal_states():
                 "scope": "current_session",
                 "automation": {
                     "id": "test-review-monitor",
-                    "tier_minutes": 10,
-                    "count": 1,
+                    "tier": "10m",
+                    "count": 0,
+                    "session": "current_session",
                 },
             },
         }
@@ -730,7 +733,6 @@ def _light_record(state: str) -> dict[str, object]:
     record["issue"] = {
         "number": ISSUE_NUMBER,
         "repository": "org/example-repository",
-        "authorized_humans": ["human-reviewer", "release-approver"],
         "primary_type": "N",
         "impact_flags": ["DO"],
     }
@@ -918,7 +920,12 @@ def test_contract_exposes_per_event_mutation_matrix_and_no_direct_candidate_bypa
     assert ("reviewing", "testing", "candidate_revised") not in events
     assert ("final_human_review", "testing", "candidate_revised") not in events
     assert ("reviewing", "rework", "review_correction") in events
-    assert ("final_human_review", "rework", "review_correction") in events
+    assert (
+        "final_human_review",
+        "reviewing",
+        "changes_requested",
+    ) in events
+    assert ("final_human_review", "rework", "review_correction") not in events
     assert ("testing", "implementing", "kpi_optimization") in events
     matrix = contract["transition_mutation_matrix"]
     assert set(matrix) == {item[2] for item in events}
@@ -931,27 +938,27 @@ def test_contract_exposes_per_event_mutation_matrix_and_no_direct_candidate_bypa
 
 def test_review_corrections_enter_counted_rework_and_direct_candidate_revision_fails():
     gate = _load_gate()
-    for source in ("reviewing", "final_human_review"):
-        previous = _secured_record(source)
-        if source == "reviewing":
-            previous["reviewer"]["status"] = "fail"
-        current = _secured_record("rework")
-        current["tester"]["status"] = "pass"
-        assert gate.validate_transition(
-            previous, current, "review_correction"
-        ) == [], source
+    final = _secured_record("final_human_review")
+    reviewing = _secured_record("reviewing")
+    reviewing["reviewer"]["status"] = "fail"
+    assert gate.validate_transition(
+        final, reviewing, "changes_requested"
+    ) == []
 
+    rework = _secured_record("rework")
+    rework["tester"]["status"] = "pass"
+    assert gate.validate_transition(
+        reviewing, rework, "review_correction"
+    ) == []
+
+    for source in (reviewing, final):
         bypass = _secured_record("testing")
         bypass["revisions"]["candidate"] = _public_candidate_revision(
             5, "7" * 40
         )
         bypass["tester"] = {"status": "pending", "candidate_sha": "7" * 40}
-        assert gate.validate_transition(
-            previous, bypass, "candidate_revised"
-        )
+        assert gate.validate_transition(source, bypass, "candidate_revised")
 
-    rework = _secured_record("rework")
-    rework["tester"]["status"] = "pass"
     implementation = _secured_record("implementing")
     implementation["counters"]["production_rework"] = 2
     implementation["revisions"]["implementation"] = (
@@ -1028,8 +1035,9 @@ def test_mutation_matrix_freezes_issue_base_test_and_final_candidate_binding():
     )
     final_current["human_reviews"]["final"]["monitor"]["automation"] = {
         "id": "final-review-monitor",
-        "tier_minutes": 10,
-        "count": 1,
+        "tier": "10m",
+        "count": 0,
+        "session": "current_session",
     }
     final_current["tester"]["candidate_sha"] = new_candidate
     final_current["reviewer"]["candidate_sha"] = new_candidate
@@ -1056,7 +1064,9 @@ def test_human_review_actor_login_matches_reviewer_and_repository_policy():
         )
 
     unauthorized = _secured_record("complete")
-    unauthorized["issue"]["authorized_humans"] = ["release-approver"]
+    unauthorized["authorization"]["github"][
+        "authorized_human_logins"
+    ] = ["release-approver"]
     assert any(
         "authorized" in error
         for error in gate.validate_record(unauthorized)
@@ -1157,8 +1167,8 @@ def test_revision_identity_and_parent_shape_come_from_one_canonical_authority():
     assert "revision_graph" not in contract
     provenance = contract["revision_provenance"]
     assert provenance["candidate_parents"] == {
-        "standard": ["test_sha", "implementation_sha"],
-        "light": ["base_sha", "implementation_sha"],
+        "normal": ["test_sha", "implementation_sha"],
+        "mechanical_light": ["base_sha", "implementation_sha"],
     }
     assert contract["light_path"].get("candidate_parents") is None
 
@@ -1175,22 +1185,22 @@ def test_permission_preflight_and_monitor_backoff_are_fail_closed():
         )
 
     denied = _secured_record("complete")
-    denied["permission_preflight"]["granted_capabilities"] = ["github_read"]
-    assert any("git_write" in error for error in gate.validate_record(denied))
+    denied["permission_preflight"]["granted_capabilities"] = ["read_review"]
+    assert any("read_issue" in error for error in gate.validate_record(denied))
 
-    for tier, count in ((10, 1), (30, 2), (60, 3), (60, 27)):
+    for tier, count in ((10, 0), (10, 2), (30, 0), (30, 2), (60, 0)):
         record = _secured_record("complete")
         monitor = record["human_reviews"]["final"]["monitor"]
         monitor["interval_minutes"] = tier
-        monitor["automation"]["tier_minutes"] = tier
+        monitor["automation"]["tier"] = f"{tier}m"
         monitor["automation"]["count"] = count
         assert gate.validate_record(record) == [], (tier, count)
 
-    for tier, count in ((20, 1), (30, 1), (60, 2)):
+    for tier, count in ((20, 0), (10, 3), (30, 3), (60, 2)):
         record = _secured_record("complete")
         monitor = record["human_reviews"]["final"]["monitor"]
         monitor["interval_minutes"] = tier
-        monitor["automation"]["tier_minutes"] = tier
+        monitor["automation"]["tier"] = f"{tier}m"
         monitor["automation"]["count"] = count
         assert gate.validate_record(record), (tier, count)
 
@@ -1221,3 +1231,294 @@ def test_acceptance_report_changelog_is_semver_newest_first_without_content_loss
         ("17", "0.35.0"),
     )]
     assert positions == sorted(positions)
+
+
+def _use_canonical_authorization(record: dict[str, object]) -> None:
+    record["authorization"] = {
+        "github": {
+            "authorized_human_logins": [
+                "human-reviewer",
+                "release-approver",
+            ]
+        }
+    }
+
+
+def _canonical_permission_preflight() -> dict[str, object]:
+    return {
+        "host": {
+            "available": True,
+            "fact": "github_authenticated",
+        },
+        "sandbox": {
+            "available": True,
+            "fact": "network_permitted",
+        },
+        "required_capabilities": ["read_issue", "read_review"],
+        "granted_capabilities": ["read_issue", "read_review"],
+        "hydration": {
+            "mode": "noninteractive",
+            "source": "verified_non_secret_inputs",
+        },
+    }
+
+
+def test_authorization_policy_has_one_canonical_top_level_location():
+    gate = _load_gate()
+    record = _public_record("complete")
+    _use_canonical_authorization(record)
+    record.pop("permission_preflight", None)
+    assert gate.validate_record(record) == []
+
+    duplicate = deepcopy(record)
+    duplicate["issue"]["authorized_humans"] = ["human-reviewer"]
+    assert any(
+        "unknown field" in error
+        for error in gate.validate_record(duplicate)
+    )
+
+
+def test_permission_preflight_is_optional_but_fail_closed_when_present():
+    gate = _load_gate()
+    absent = _public_record("complete")
+    _use_canonical_authorization(absent)
+    absent.pop("permission_preflight", None)
+    assert gate.validate_record(absent) == []
+
+    present = deepcopy(absent)
+    present["permission_preflight"] = _canonical_permission_preflight()
+    assert gate.validate_record(present) == []
+
+    empty_capabilities = deepcopy(present)
+    empty_capabilities["permission_preflight"]["required_capabilities"] = []
+    empty_capabilities["permission_preflight"]["granted_capabilities"] = []
+    assert gate.validate_record(empty_capabilities) == []
+
+    for path, field in (
+        ("host", "fact"),
+        ("sandbox", "fact"),
+        ("hydration", "source"),
+    ):
+        invalid = deepcopy(present)
+        invalid["permission_preflight"][path][field] = ""
+        assert any(
+            f"permission_preflight.{path}.{field}" in error
+            for error in gate.validate_record(invalid)
+        )
+
+
+def test_candidate_parent_modes_use_canonical_normal_and_mechanical_light_names():
+    contract = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
+    assert contract["revision_provenance"]["candidate_parents"] == {
+        "normal": ["test_sha", "implementation_sha"],
+        "mechanical_light": ["base_sha", "implementation_sha"],
+    }
+
+
+def _canonical_monitor(
+    interval_minutes: int = 10,
+    count: int = 0,
+    *,
+    status: str = "stopped",
+    monitor_id: str = "review-monitor-arbitrary",
+    session: str = "current_session",
+) -> dict[str, object]:
+    return {
+        "status": status,
+        "interval_minutes": interval_minutes,
+        "scope": "current_session",
+        "automation": {
+            "id": monitor_id,
+            "tier": f"{interval_minutes}m",
+            "count": count,
+            "session": session,
+        },
+    }
+
+
+def _use_canonical_monitors(record: dict[str, object]) -> None:
+    reviews = record.get("human_reviews")
+    if not isinstance(reviews, dict):
+        return
+    for review in reviews.values():
+        if not isinstance(review, dict) or "monitor" not in review:
+            continue
+        status = review["monitor"]["status"]
+        review["monitor"] = _canonical_monitor(status=status)
+
+
+def test_monitor_record_shape_and_tier_state_space_are_canonical():
+    gate = _load_gate()
+    for interval, counts in ((10, range(3)), (30, range(3)), (60, (0,))):
+        for count in counts:
+            record = _secured_record("complete")
+            _use_canonical_monitors(record)
+            record["human_reviews"]["final"]["monitor"] = _canonical_monitor(
+                interval, count
+            )
+            assert gate.validate_record(record) == [], (interval, count)
+
+    invalid_states = (
+        (15, "15m", 0),
+        (10, "30m", 0),
+        (10, "10m", 3),
+        (30, "30m", 3),
+        (60, "60m", 1),
+    )
+    for interval, tier, count in invalid_states:
+        record = _secured_record("complete")
+        _use_canonical_monitors(record)
+        monitor = record["human_reviews"]["final"]["monitor"]
+        monitor["interval_minutes"] = interval
+        monitor["automation"]["tier"] = tier
+        monitor["automation"]["count"] = count
+        assert gate.validate_record(record), (interval, tier, count)
+
+
+def test_monitor_automation_has_only_canonical_fields_and_session():
+    gate = _load_gate()
+    contract = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
+    assert contract["record_schema"]["allowed_fields"]["monitor.automation"] == [
+        "id",
+        "tier",
+        "count",
+        "session",
+    ]
+
+    for legacy_field in ("tier_minutes", "backoff_seconds", "foreground"):
+        record = _secured_record("complete")
+        _use_canonical_monitors(record)
+        record["human_reviews"]["final"]["monitor"]["automation"][
+            legacy_field
+        ] = 30
+        assert any(
+            "unknown field" in error
+            for error in gate.validate_record(record)
+        ), legacy_field
+
+    wrong_session = _secured_record("complete")
+    _use_canonical_monitors(wrong_session)
+    wrong_session["human_reviews"]["final"]["monitor"]["automation"][
+        "session"
+    ] = "replacement_session"
+    assert any(
+        "session" in error
+        for error in gate.validate_record(wrong_session)
+    )
+
+
+def _pending_gate_record(
+    interval_minutes: int,
+    count: int,
+    *,
+    monitor_id: str = "review-monitor-arbitrary",
+    session: str = "current_session",
+) -> dict[str, object]:
+    record = _secured_record("human_review_1")
+    record["human_reviews"] = {
+        "test": {
+            "approved": False,
+            "sha": TEST_SHA,
+            "reviewer": None,
+            "evidence": None,
+            "monitor": _canonical_monitor(
+                interval_minutes,
+                count,
+                status="active",
+                monitor_id=monitor_id,
+                session=session,
+            ),
+        }
+    }
+    return record
+
+
+def test_review_poll_no_change_progression_is_exact_and_same_session():
+    gate = _load_gate()
+    legal = (
+        ((10, 0), (10, 1)),
+        ((10, 1), (10, 2)),
+        ((10, 2), (30, 0)),
+        ((30, 0), (30, 1)),
+        ((30, 1), (30, 2)),
+        ((30, 2), (60, 0)),
+        ((60, 0), (60, 0)),
+    )
+    for (before_interval, before_count), (
+        after_interval,
+        after_count,
+    ) in legal:
+        previous = _pending_gate_record(before_interval, before_count)
+        current = _pending_gate_record(after_interval, after_count)
+        assert gate.validate_transition(
+            previous, current, "review_poll_no_change"
+        ) == [], (
+            before_interval,
+            before_count,
+            after_interval,
+            after_count,
+        )
+
+    invalid = (
+        ((10, 0), (30, 0)),
+        ((10, 1), (10, 0)),
+        ((10, 2), (10, 2)),
+        ((30, 2), (30, 0)),
+        ((60, 0), (10, 0)),
+    )
+    for (before_interval, before_count), (
+        after_interval,
+        after_count,
+    ) in invalid:
+        previous = _pending_gate_record(before_interval, before_count)
+        current = _pending_gate_record(after_interval, after_count)
+        assert gate.validate_transition(
+            previous, current, "review_poll_no_change"
+        ), (
+            before_interval,
+            before_count,
+            after_interval,
+            after_count,
+        )
+
+    previous = _pending_gate_record(10, 0)
+    for field, value in (
+        ("id", "replacement-monitor"),
+        ("session", "replacement_session"),
+    ):
+        current = _pending_gate_record(10, 1)
+        current["human_reviews"]["test"]["monitor"]["automation"][field] = (
+            value
+        )
+        assert gate.validate_transition(
+            previous, current, "review_poll_no_change"
+        ), field
+
+
+def test_review_gate_creation_and_replacement_reset_to_10m_count_zero():
+    gate = _load_gate()
+    test_authoring = _secured_record("test_authoring")
+    pending_test_review = _pending_gate_record(10, 0)
+    assert gate.validate_transition(
+        test_authoring, pending_test_review, "test_frozen"
+    ) == []
+
+    wrong_test_reset = _pending_gate_record(30, 0)
+    assert gate.validate_transition(
+        test_authoring, wrong_test_reset, "test_frozen"
+    )
+
+    reviewing = _secured_record("reviewing")
+    final_review = _secured_record("final_human_review")
+    _use_canonical_monitors(final_review)
+    assert gate.validate_transition(
+        reviewing, final_review, "reviewer_passed"
+    ) == []
+
+    wrong_final_reset = deepcopy(final_review)
+    wrong_final_reset["human_reviews"]["final"]["monitor"] = (
+        _canonical_monitor(30, 0, status="active")
+    )
+    assert gate.validate_transition(
+        reviewing, wrong_final_reset, "reviewer_passed"
+    )
