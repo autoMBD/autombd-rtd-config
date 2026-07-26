@@ -214,13 +214,12 @@ def _authorization() -> dict:
     return {"github": {"authorized_human_logins": ["owner"]}}
 
 
-def _automation(*, count: int = 0, backoff_seconds: int = 10) -> dict:
+def _automation(*, tier: str = "10m", count: int = 0) -> dict:
     return {
         "id": "review-monitor-78",
-        "tier": "foreground",
+        "tier": tier,
         "count": count,
         "session": "current_session",
-        "backoff_seconds": backoff_seconds,
     }
 
 
@@ -311,7 +310,7 @@ def _test_review(approved: bool) -> dict:
         "status": "stopped",
         "interval_minutes": 10,
         "scope": "current_session",
-        "automation": _automation(count=1),
+        "automation": _automation(),
     }
     return review
 
@@ -735,6 +734,32 @@ def test_transition_validator_accepts_the_canonical_forward_path():
         previous = _record_for_state(previous_state)
         current = _record_for_state(current_state)
         assert _transition_errors(previous, current, event) == [], event
+
+    previous = _record_for_state("reviewing")
+    current = _record_for_state("final_human_review")
+    monitor = current["human_reviews"]["final"]["monitor"]
+
+    assert monitor == {
+        "status": "active",
+        "interval_minutes": 10,
+        "scope": "current_session",
+        "automation": {
+            "id": "review-monitor-78",
+            "tier": "10m",
+            "count": 0,
+            "session": "current_session",
+        },
+    }
+    assert _transition_errors(previous, current, "reviewer_passed") == []
+
+    for path, value in (
+        ("interval_minutes", 30),
+        ("automation.tier", "30m"),
+        ("automation.count", 1),
+    ):
+        invalid = copy.deepcopy(current)
+        _set_path(invalid["human_reviews"]["final"]["monitor"], path, value)
+        assert _transition_errors(previous, invalid, "reviewer_passed")
 
 
 def test_mechanical_light_path_executes_the_canonical_skipping_sequence():

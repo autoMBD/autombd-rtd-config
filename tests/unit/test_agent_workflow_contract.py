@@ -128,14 +128,38 @@ def test_human_review_1_uses_auditable_repository_host_evidence():
     }
 
 
-def test_human_review_requests_start_a_same_session_ten_minute_monitor():
+def test_human_review_monitor_declares_executable_minute_schedule_and_reset():
     contract = _contract()
     monitor = contract["human_review_monitor"]
 
     assert monitor == {
-        "interval_minutes": 10,
+        "tiers": [
+            {
+                "tier": "10m",
+                "interval_minutes": 10,
+                "no_update_limit": 3,
+                "next_tier": "30m",
+            },
+            {
+                "tier": "30m",
+                "interval_minutes": 30,
+                "no_update_limit": 3,
+                "next_tier": "60m",
+            },
+            {
+                "tier": "60m",
+                "interval_minutes": 60,
+                "no_update_limit": None,
+                "next_tier": "60m",
+            },
+        ],
+        "replacement_gate": {
+            "tier": "10m",
+            "interval_minutes": 10,
+            "count": 0,
+        },
         "scope": "current_session",
-        "on_no_change": "no_op",
+        "on_no_change": "advance_count_or_tier",
         "on_update": "stop_then_resume",
         "new_session": False,
     }

@@ -132,29 +132,29 @@ def _final_evidence() -> dict:
     }
 
 
-def _automation(*, count: int = 1, backoff_seconds: int = 10) -> dict:
+def _automation(*, tier: str = "10m", count: int = 0) -> dict:
     return {
         "id": "review-monitor-78",
-        "tier": "foreground",
+        "tier": tier,
         "count": count,
         "session": "current_session",
-        "backoff_seconds": backoff_seconds,
     }
 
 
 def _monitor(
     *,
     status: str = "stopped",
-    count: int = 1,
-    backoff_seconds: int = 10,
+    interval_minutes: int = 10,
+    tier: str = "10m",
+    count: int = 0,
 ) -> dict:
     return {
         "status": status,
-        "interval_minutes": 10,
+        "interval_minutes": interval_minutes,
         "scope": "current_session",
         "automation": _automation(
+            tier=tier,
             count=count,
-            backoff_seconds=backoff_seconds,
         ),
     }
 
@@ -262,8 +262,9 @@ def _transition_errors(previous: dict, current: dict, event: str) -> list[str]:
 
 def _pending_review_record(
     *,
+    interval_minutes: int,
+    tier: str,
     count: int,
-    backoff_seconds: int,
 ) -> dict:
     record = _review_record("human_review_1")
     record["human_reviews"]["test"] = {
@@ -273,8 +274,9 @@ def _pending_review_record(
         "evidence": None,
         "monitor": _monitor(
             status="active",
+            interval_minutes=interval_minutes,
+            tier=tier,
             count=count,
-            backoff_seconds=backoff_seconds,
         ),
     }
     return record
@@ -512,26 +514,41 @@ def test_permission_preflight_fails_closed_on_unavailable_or_unhydrated_facts(
 
 
 @pytest.mark.parametrize(
-    ("previous_count", "previous_backoff", "current_count", "current_backoff"),
     (
-        (0, 10, 1, 30),
-        (1, 30, 2, 60),
-        (2, 60, 3, 60),
+        "previous_interval",
+        "previous_tier",
+        "previous_count",
+        "current_interval",
+        "current_tier",
+        "current_count",
+    ),
+    (
+        (10, "10m", 0, 10, "10m", 1),
+        (10, "10m", 1, 10, "10m", 2),
+        (10, "10m", 2, 30, "30m", 0),
+        (30, "30m", 0, 30, "30m", 1),
+        (30, "30m", 1, 30, "30m", 2),
+        (30, "30m", 2, 60, "60m", 0),
+        (60, "60m", 0, 60, "60m", 0),
     ),
 )
-def test_review_polling_uses_same_session_automation_and_legal_backoff(
+def test_review_polling_uses_same_session_automation_and_legal_minute_schedule(
+    previous_interval,
+    previous_tier,
     previous_count,
-    previous_backoff,
+    current_interval,
+    current_tier,
     current_count,
-    current_backoff,
 ):
     previous = _pending_review_record(
+        interval_minutes=previous_interval,
+        tier=previous_tier,
         count=previous_count,
-        backoff_seconds=previous_backoff,
     )
     current = _pending_review_record(
+        interval_minutes=current_interval,
+        tier=current_tier,
         count=current_count,
-        backoff_seconds=current_backoff,
     )
 
     assert _errors(previous) == []
@@ -543,33 +560,81 @@ def test_review_polling_uses_same_session_automation_and_legal_backoff(
     ) == []
 
 
-@pytest.mark.parametrize(
-    ("field", "value", "expected"),
-    (
-        ("count", 2, "count"),
-        ("backoff_seconds", 60, "backoff"),
-        ("id", "different-monitor", "automation"),
-        ("tier", "background", "tier"),
-        ("session", "new_session", "session"),
-    ),
-)
-def test_review_polling_rejects_wrong_increment_backoff_or_automation_identity(
-    field,
-    value,
-    expected,
-):
-    previous = _pending_review_record(count=0, backoff_seconds=10)
-    current = _pending_review_record(count=1, backoff_seconds=30)
-    current["human_reviews"]["test"]["monitor"]["automation"][field] = value
-
-    errors = _transition_errors(previous, current, "review_poll_no_change")
-    assert errors
-    assert any(
-        expected in item.casefold()
-        or "poll" in item.casefold()
-        or "transition" in item.casefold()
-        for item in errors
+def test_review_polling_rejects_every_wrong_schedule_or_automation_transition():
+    previous = _pending_review_record(
+        interval_minutes=10,
+        tier="10m",
+        count=0,
     )
+    current = _pending_review_record(
+        interval_minutes=10,
+        tier="10m",
+        count=1,
+    )
+    for path, value, expected in (
+        ("interval_minutes", 30, "interval"),
+        ("automation.tier", "30m", "tier"),
+        ("automation.count", 2, "count"),
+        ("automation.id", "different-monitor", "automation"),
+        ("automation.session", "new_session", "session"),
+    ):
+        invalid = copy.deepcopy(current)
+        owner = invalid["human_reviews"]["test"]["monitor"]
+        fields = path.split(".")
+        for field in fields[:-1]:
+            owner = owner[field]
+        owner[fields[-1]] = value
+
+        errors = _transition_errors(
+            previous,
+            invalid,
+            "review_poll_no_change",
+        )
+        assert errors
+        assert any(
+            expected in item.casefold()
+            or "poll" in item.casefold()
+            or "transition" in item.casefold()
+            for item in errors
+        )
+
+    for schedule in (
+        (10, "10m", 2, 10, "10m", 3),
+        (10, "10m", 2, 30, "30m", 1),
+        (30, "30m", 2, 30, "30m", 3),
+        (30, "30m", 2, 60, "60m", 1),
+        (60, "60m", 0, 60, "60m", 1),
+    ):
+        (
+            previous_interval,
+            previous_tier,
+            previous_count,
+            current_interval,
+            current_tier,
+            current_count,
+        ) = schedule
+        invalid_previous = _pending_review_record(
+            interval_minutes=previous_interval,
+            tier=previous_tier,
+            count=previous_count,
+        )
+        invalid_current = _pending_review_record(
+            interval_minutes=current_interval,
+            tier=current_tier,
+            count=current_count,
+        )
+
+        errors = _transition_errors(
+            invalid_previous,
+            invalid_current,
+            "review_poll_no_change",
+        )
+        assert errors
+        assert any(
+            marker in item.casefold()
+            for item in errors
+            for marker in ("interval", "tier", "count", "poll", "transition")
+        )
 
 
 def test_impact_flag_routing_table_is_complete_and_machine_readable():
