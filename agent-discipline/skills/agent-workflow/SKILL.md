@@ -117,12 +117,17 @@ Tester, Reviewer, and Final Human Review evidence. Final evidence is produced
 only in `complete`.
 
 Every event is governed by `transition_mutation_matrix`: top-level changes
-outside that event's allowlist are invalid. Issue and gate provenance and the
-Base SHA are immutable after classification; Test provenance changes only on
-its explicit Test-lane events. Version 2 is a closed schema at every nested
-record object, so unknown fields are rejected. Revision identity and Candidate
-parent keys are defined only by `revision_provenance`, using parent modes
-`normal` and `mechanical_light`.
+outside that event's allowlist are invalid. Issue and gate authority and the
+Base SHA are immutable after classification. `test_approved` freezes the exact
+Test identity and SHA. `candidate_created` preserves the Implementation
+identity while committing its SHA, creates the Candidate with the same numeric
+iteration, and binds its exact parents. From `testing_started` onward, Test,
+Implementation, and Candidate authority remain immutable until an explicit
+production-rework or KPI-optimization edge invalidates the old Candidate.
+Diagnostics name the authority field that changed or was rebound. Version 2 is
+a closed schema at every nested record object, so unknown fields are rejected.
+Revision identity and Candidate parent keys are defined only by
+`revision_provenance`, using parent modes `normal` and `mechanical_light`.
 
 ### Test path
 
@@ -150,8 +155,9 @@ commits. Candidate `parents.test_sha` and `parents.implementation_sha` bind
 those exact revisions. The entire `revisions.candidate` key is forbidden while
 state is `implementing`; a correction cannot keep an old Candidate or a null
 placeholder bound. `candidate_created` introduces the new Candidate only when
-moving from `implementing` to `candidate`. Permissions, checkout, inputs, and
-evidence are separate boundaries.
+moving from `implementing` to `candidate`, and its iteration must match the
+Implementation iteration. Permissions, checkout, inputs, and evidence are
+separate boundaries.
 
 The Worker must not receive or read the owner's acceptance-test implementation.
 The candidate is a deterministic integration revision made from the test and
@@ -203,13 +209,15 @@ and a matching `reason` may be used while `requested_changes` is false or absent
 Both require the exact two-line command. An approval is invalid if
 `requested_changes` is true.
 
-The outer Gate 1 `reviewer` identifies the approving human and is required only
-when evidence exists. A pending record without evidence keeps it null; a
-change-request record has evidence and therefore records the human reviewer.
-The evidence `actor_login` must exactly equal that outer `reviewer`. Top-level
-`authorization` is optional; when supplied, the login must appear in
-`authorization.github.authorized_human_logins`. `issue.repository` is also
-optional; when supplied, it must exactly match the evidence repository.
+The outer Gate 1 `reviewer` identifies the approving human. Approval requires
+that non-empty reviewer to exactly equal evidence `actor_login`. A pending
+record keeps reviewer and evidence null. A change-request record also keeps
+the reviewer explicitly null: its top-level human `actor_login` comes from the
+command evidence and is not compared with that null reviewer. Top-level
+`authorization` is optional; when supplied, approval and change-request actors
+must appear in `authorization.github.authorized_human_logins`.
+`issue.repository` is also optional; when supplied, it must exactly match the
+evidence repository.
 
 Replies, reactions, labels, Agent-authored commands, abbreviated or stale SHAs,
 and edited or deleted approvals are invalid. A new Test SHA invalidates every
@@ -258,8 +266,13 @@ optimization each permit at most three automatic iterations. At count three,
 the next production-rework disposition enters `stopped` with `stop_escalate`;
 the counter never becomes four. KPI optimization supports iterations one
 through three and rejects a fourth edge. Each successful KPI edge increments
-exactly once and invalidates the prior Candidate-bound evidence before work
-resumes. Never reset a counter by renaming a lane or creating a fresh session.
+exactly once and requires Candidate-bound Tester PASS with
+`tester.kpi.status: miss`, positive elapsed/limit values where elapsed exceeds
+the limit, and a positive edit-attempt count. Counter `n` is bound to Worker
+iteration `W(n+1)`; after incrementing, the next Candidate has the same
+iteration as that Worker. The edge invalidates the prior Candidate, Tester KPI,
+Reviewer, Final Human Review, and final evidence before work resumes. Never
+reset a counter by renaming a lane or creating a fresh session.
 
 ## 7. Candidate evidence and final Human Review
 
@@ -271,15 +284,20 @@ For `tester_passed`, the previous `testing` record remains pending and the
 current `reviewing` record carries Tester PASS plus a pending Reviewer, all
 bound to the unchanged Candidate SHA.
 
-Before `complete`, obtain a current GitHub PR review made by a human whose state
-is `approved`, bound to the exact Candidate SHA. Record repository, PR number,
-review ID, exact actor login, Candidate SHA, and a stopped current-session
-monitor at one of the valid tiers. The actor login must equal the outer
-reviewer. If top-level authorization is supplied, the actor must be authorized
-by `authorization.github.authorized_human_logins`. A Candidate SHA change,
-review edit, dismissal, or requested change invalidates it. The
-`final_approved` transition must preserve the exact Candidate revision object.
-Only then may the record enter `complete`.
+On entry to `final_human_review`, record the pending shape explicitly:
+`approved: false`, the exact Candidate SHA, null reviewer, null evidence, and
+an active current-session monitor reset to 10m/count0. Before `complete`,
+obtain a current GitHub PR review made by a human whose state is `approved`,
+bound to the exact Candidate SHA. Record repository, PR number, review ID,
+exact actor login, Candidate SHA, and a stopped current-session monitor at
+10 minutes with automation tier `10m`; counts valid for that tier remain
+legal. The actor login must equal the outer reviewer. If top-level
+authorization is supplied, the actor must be authorized by
+`authorization.github.authorized_human_logins`. A Candidate SHA change, review
+edit, dismissal, or requested change invalidates it. The `final_approved`
+transition must preserve the exact Candidate revision object and add the
+required allowlisted `revisions.final_evidence`. Only then may the record enter
+`complete`.
 
 ## Handoff templates
 
@@ -365,6 +383,13 @@ with real evidence; do not treat the template itself as evidence.
         "test_sha": "<40-hex-test>",
         "implementation_sha": "<40-hex-implementation>"
       }
+    },
+    "final_evidence": {
+      "identity": "E1", "sha": "<40-hex-evidence>",
+      "reviewed_candidate_sha": "<40-hex-candidate>",
+      "changed_paths": [
+        "agent-discipline/agent-lessons-learned.md"
+      ]
     }
   },
   "human_reviews": {

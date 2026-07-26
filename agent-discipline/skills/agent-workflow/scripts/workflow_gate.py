@@ -40,7 +40,7 @@
 # File:        workflow_gate.py
 # Author:      autoMBD <tkung.lqk@foxmail.com>
 # Date:        2026-07-22
-# Version:     0.8.0
+# Version:     0.9.0
 # Description: Validate stateful Agent workflow records and transitions.
 # =================================================================================
 
@@ -270,6 +270,7 @@ def _validate_closed_schema(record: Mapping[str, Any], errors: list[str]) -> Non
         "human_reviews.final": "human_reviews.final",
         "human_reviews.final.evidence": "human_reviews.final.evidence",
         "tester": "tester",
+        "tester.kpi": "tester.kpi",
         "reviewer": "reviewer",
         "disposition": "disposition",
         "exception": "exception",
@@ -503,6 +504,32 @@ def _validate_authorized_review_actor(
         )
 
 
+def _validate_change_request_actor(
+    review: Mapping[str, Any],
+    evidence: Mapping[str, Any],
+    authorized_human_logins: Any,
+    errors: list[str],
+) -> None:
+    if "reviewer" not in review or review.get("reviewer") is not None:
+        errors.append(
+            "human_reviews.test.reviewer must be null for changes_requested"
+        )
+    actor_login = evidence.get("actor_login")
+    _validate_required_text(
+        actor_login,
+        "human_reviews.test.evidence.actor_login",
+        errors,
+    )
+    if (
+        isinstance(authorized_human_logins, list)
+        and actor_login not in authorized_human_logins
+    ):
+        errors.append(
+            "human_reviews.test.evidence.actor_login is not authorized by "
+            "authorization.github.authorized_human_logins"
+        )
+
+
 def _validate_public_test_review(
     value: Any,
     *,
@@ -541,13 +568,21 @@ def _validate_public_test_review(
     evidence = _mapping(
         review.get("evidence"), "human_reviews.test.evidence", errors
     )
-    _validate_authorized_review_actor(
-        review,
-        evidence,
-        authorized_human_logins,
-        "human_reviews.test",
-        errors,
-    )
+    if approved is True:
+        _validate_authorized_review_actor(
+            review,
+            evidence,
+            authorized_human_logins,
+            "human_reviews.test",
+            errors,
+        )
+    elif approved is False:
+        _validate_change_request_actor(
+            review,
+            evidence,
+            authorized_human_logins,
+            errors,
+        )
     repository = evidence.get("repository")
     _validate_required_text(
         repository, "human_reviews.test.evidence.repository", errors
@@ -633,14 +668,47 @@ def _validate_public_final_review(
 ) -> None:
     if state == "final_human_review":
         review = _mapping(value, "human_reviews.final", errors)
-        if review.get("evidence") is not None:
-            errors.append("human_reviews.final.evidence is forbidden before approval")
+        if review.get("approved") is not False:
+            errors.append(
+                "human_reviews.final.approved must be false while pending"
+            )
+        if review.get("sha") != candidate_sha:
+            errors.append(
+                "human_reviews.final.sha must equal the exact Candidate SHA"
+            )
+        if "reviewer" not in review or review.get("reviewer") is not None:
+            errors.append(
+                "human_reviews.final.reviewer must be explicit null while pending"
+            )
+        if "evidence" not in review or review.get("evidence") is not None:
+            errors.append(
+                "human_reviews.final.evidence must be explicit null while pending"
+            )
         _validate_public_monitor(
             review.get("monitor"),
             path="human_reviews.final.monitor",
             expected_status="active",
             errors=errors,
         )
+        monitor = review.get("monitor")
+        automation = (
+            monitor.get("automation")
+            if isinstance(monitor, Mapping)
+            else None
+        )
+        initial = CONTRACT["human_review_monitor"]["replacement_gate"]
+        if (
+            not isinstance(monitor, Mapping)
+            or monitor.get("interval_minutes")
+            != initial["interval_minutes"]
+            or not isinstance(automation, Mapping)
+            or automation.get("tier") != initial["tier"]
+            or automation.get("count") != initial["count"]
+        ):
+            errors.append(
+                "human_reviews.final.monitor must reset to 10m/count0 "
+                "while pending"
+            )
         return
     if state != "complete":
         if value is not None:
@@ -722,6 +790,26 @@ def _validate_public_final_review(
         expected_status="stopped",
         errors=errors,
     )
+    monitor = review.get("monitor")
+    automation = (
+        monitor.get("automation")
+        if isinstance(monitor, Mapping)
+        else None
+    )
+    if (
+        not isinstance(monitor, Mapping)
+        or monitor.get("interval_minutes") != 10
+    ):
+        errors.append(
+            "human_reviews.final.monitor.interval_minutes must be 10"
+        )
+    if (
+        not isinstance(automation, Mapping)
+        or automation.get("tier") != "10m"
+    ):
+        errors.append(
+            "human_reviews.final.monitor.automation.tier must be 10m"
+        )
 
 
 def _validate_public_record(record: Mapping[str, Any]) -> list[str]:
@@ -742,6 +830,15 @@ def _validate_public_record(record: Mapping[str, Any]) -> list[str]:
         present, _ = _path_value(record, path)
         if not present:
             errors.append(f"{path} is required in state {state}")
+    for path in state_rules[state].get("required_null_fields", []):
+        if not _path_exists(record, path):
+            errors.append(
+                f"{path} is required as explicit null in state {state}"
+            )
+        elif _nested_value(record, path) is not None:
+            errors.append(
+                f"{path} must be explicit null in state {state}"
+            )
     for path in state_rules[state]["forbidden_fields"]:
         if _path_exists(record, path):
             errors.append(f"{path} is forbidden in state {state}")
@@ -1019,6 +1116,54 @@ def _validate_public_record(record: Mapping[str, Any]) -> list[str]:
                 "tester.mode mechanical_verification is reserved for the "
                 "N + DO no-Test path"
             )
+        kpi_value = tester.get("kpi")
+        if kpi_value is not None:
+            kpi = _mapping(kpi_value, "tester.kpi", errors)
+            if tester.get("status") != "pass":
+                errors.append(
+                    "tester.kpi requires tester.status pass"
+                )
+            if kpi.get("status") != "miss":
+                errors.append("tester.kpi.status must be miss")
+            if kpi.get("candidate_sha") != candidate_sha:
+                errors.append(
+                    "tester.kpi.candidate_sha must equal "
+                    "revisions.candidate.sha"
+                )
+            elapsed = kpi.get("elapsed_seconds")
+            limit = kpi.get("limit_seconds")
+            for field, value in (
+                ("elapsed_seconds", elapsed),
+                ("limit_seconds", limit),
+            ):
+                if (
+                    isinstance(value, bool)
+                    or not isinstance(value, (int, float))
+                    or value <= 0
+                ):
+                    errors.append(
+                        f"tester.kpi.{field} must be a positive number"
+                    )
+            if (
+                isinstance(elapsed, (int, float))
+                and not isinstance(elapsed, bool)
+                and isinstance(limit, (int, float))
+                and not isinstance(limit, bool)
+                and elapsed <= limit
+            ):
+                errors.append(
+                    "tester.kpi.elapsed_seconds must exceed "
+                    "tester.kpi.limit_seconds for status miss"
+                )
+            attempts = kpi.get("edit_attempts")
+            if (
+                isinstance(attempts, bool)
+                or not isinstance(attempts, int)
+                or attempts < 1
+            ):
+                errors.append(
+                    "tester.kpi.edit_attempts must be a positive integer"
+                )
     reviewer = record.get("reviewer")
     if reviewer is not None:
         reviewer = _mapping(reviewer, "reviewer", errors)
@@ -1134,6 +1279,40 @@ def _validate_initial_monitor(
         )
 
 
+def _validate_immutable_authority(
+    previous: Mapping[str, Any],
+    current: Mapping[str, Any],
+    path: str,
+    event: str,
+    errors: list[str],
+) -> None:
+    previous_exists = _path_exists(previous, path)
+    current_exists = _path_exists(current, path)
+    previous_value = _nested_value(previous, path)
+    current_value = _nested_value(current, path)
+    if (
+        previous_exists == current_exists
+        and previous_value == current_value
+    ):
+        return
+    if isinstance(previous_value, Mapping) and isinstance(
+        current_value, Mapping
+    ):
+        for field in sorted(set(previous_value) | set(current_value)):
+            _validate_immutable_authority(
+                previous,
+                current,
+                f"{path}.{field}",
+                event,
+                errors,
+            )
+        return
+    errors.append(
+        f"{path} authority is immutable for event {event}; "
+        "rebinding changed the field"
+    )
+
+
 def _validate_transition_mutation_matrix(
     previous: Mapping[str, Any],
     current: Mapping[str, Any],
@@ -1151,20 +1330,30 @@ def _validate_transition_mutation_matrix(
                 f"mutation matrix freezes {root} for event {event}"
             )
     if previous.get("issue") != current.get("issue"):
-        errors.append("issue provenance is frozen across every transition")
+        errors.append(
+            "issue authority is immutable across every transition; "
+            "rebinding changed issue"
+        )
     if previous.get("authorization") != current.get("authorization"):
         errors.append(
-            "authorization provenance is frozen across every transition"
+            "authorization authority is immutable across every transition; "
+            "rebinding changed authorization"
         )
     if previous.get("gate") != current.get("gate"):
-        errors.append("gate classification is frozen across every transition")
+        errors.append(
+            "gate authority is immutable across every transition; "
+            "rebinding changed gate"
+        )
     previous_revisions = previous.get("revisions")
     current_revisions = current.get("revisions")
     if isinstance(previous_revisions, Mapping) and isinstance(
         current_revisions, Mapping
     ):
         if previous_revisions.get("base_sha") != current_revisions.get("base_sha"):
-            errors.append("revisions.base_sha is frozen across every transition")
+            errors.append(
+                "revisions.base_sha authority is immutable across every "
+                "transition; rebinding changed the field"
+            )
         mutable_test_events = {
             "classification_complete",
             "test_frozen",
@@ -1176,6 +1365,49 @@ def _validate_transition_mutation_matrix(
         ):
             errors.append(
                 f"Test provenance is frozen for event {event}"
+            )
+            _validate_immutable_authority(
+                previous,
+                current,
+                "revisions.test",
+                event,
+                errors,
+            )
+        implementation_change_events = {
+            "classification_complete",
+            "test_approved",
+            "production_rework",
+            "kpi_optimization",
+            "candidate_created",
+        }
+        if event == "candidate_created":
+            for field in ("identity", "iteration", "base_sha"):
+                _validate_immutable_authority(
+                    previous,
+                    current,
+                    f"revisions.implementation.{field}",
+                    event,
+                    errors,
+                )
+        elif event not in implementation_change_events:
+            _validate_immutable_authority(
+                previous,
+                current,
+                "revisions.implementation",
+                event,
+                errors,
+            )
+        if event not in {
+            "candidate_created",
+            "production_rework",
+            "kpi_optimization",
+        }:
+            _validate_immutable_authority(
+                previous,
+                current,
+                "revisions.candidate",
+                event,
+                errors,
             )
     if event == "final_approved":
         if _public_candidate_revision(previous) != _public_candidate_revision(current):
@@ -1285,6 +1517,47 @@ def _validate_public_transition(
             errors.append(
                 "review_poll_no_change must preserve current_session"
             )
+    if event == "candidate_created":
+        previous_revisions = previous.get("revisions")
+        current_revisions = current.get("revisions")
+        previous_implementation = (
+            previous_revisions.get("implementation")
+            if isinstance(previous_revisions, Mapping)
+            else None
+        )
+        current_implementation = (
+            current_revisions.get("implementation")
+            if isinstance(current_revisions, Mapping)
+            else None
+        )
+        current_candidate = (
+            current_revisions.get("candidate")
+            if isinstance(current_revisions, Mapping)
+            else None
+        )
+        if (
+            not isinstance(previous_implementation, Mapping)
+            or previous_implementation.get("sha") is not None
+        ):
+            errors.append(
+                "candidate_created requires the previous "
+                "revisions.implementation.sha authority to be null"
+            )
+        implementation_iteration = (
+            current_implementation.get("iteration")
+            if isinstance(current_implementation, Mapping)
+            else None
+        )
+        candidate_iteration = (
+            current_candidate.get("iteration")
+            if isinstance(current_candidate, Mapping)
+            else None
+        )
+        if candidate_iteration != implementation_iteration:
+            errors.append(
+                "revisions.candidate.iteration must match "
+                "revisions.implementation.iteration on candidate_created"
+            )
     previous_counters = previous.get("counters", {})
     current_counters = current.get("counters", {})
     previous_production = (
@@ -1377,6 +1650,11 @@ def _validate_public_transition(
         if previous_kpi == CONTRACT["limits"]["kpi_optimization"]:
             errors.append("fourth KPI optimization is forbidden")
         previous_tester = previous.get("tester")
+        previous_kpi_evidence = (
+            previous_tester.get("kpi")
+            if isinstance(previous_tester, Mapping)
+            else None
+        )
         if (
             not isinstance(previous_tester, Mapping)
             or previous_tester.get("status") != "pass"
@@ -1384,10 +1662,32 @@ def _validate_public_transition(
             errors.append(
                 "kpi_optimization requires functional PASS on the previous Candidate"
             )
+        if (
+            not isinstance(previous_kpi_evidence, Mapping)
+            or previous_kpi_evidence.get("status") != "miss"
+            or previous_kpi_evidence.get("candidate_sha")
+            != _public_candidate_sha(previous)
+        ):
+            errors.append(
+                "kpi_optimization requires tester.kpi status miss bound "
+                "to the previous Candidate"
+            )
         previous_w = _public_revision_iteration(previous, "implementation")
         current_w = _public_revision_iteration(current, "implementation")
         if not isinstance(previous_w, int) or current_w != previous_w + 1:
             errors.append("kpi_optimization must create the next W iteration")
+        if (
+            not isinstance(previous_kpi, int)
+            or isinstance(previous_kpi, bool)
+            or not isinstance(current_kpi, int)
+            or isinstance(current_kpi, bool)
+            or previous_w != previous_kpi + 1
+            or current_w != current_kpi + 1
+        ):
+            errors.append(
+                "KPI optimization Worker iteration must equal "
+                "counters.kpi_optimization + 1"
+            )
         current_revisions = current.get("revisions")
         current_implementation = (
             current_revisions.get("implementation")

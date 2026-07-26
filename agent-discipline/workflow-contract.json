@@ -24,7 +24,8 @@
       "human_reviews.final.evidence": ["provider", "artifact", "repository", "pull_request_number", "review_id", "actor_type", "actor_login", "state", "current", "candidate_sha"],
       "monitor": ["status", "interval_minutes", "scope", "automation"],
       "monitor.automation": ["id", "tier", "count", "session"],
-      "tester": ["status", "candidate_sha", "mode"],
+      "tester": ["status", "candidate_sha", "mode", "kpi"],
+      "tester.kpi": ["status", "candidate_sha", "elapsed_seconds", "limit_seconds", "edit_attempts"],
       "reviewer": ["status", "candidate_sha"],
       "disposition": ["status", "reason"],
       "exception": ["reason", "residual_risk", "remaining_verification"],
@@ -129,12 +130,13 @@
       },
       {
         "name": "final_human_review",
-        "required_fields": ["reviewer.candidate_sha", "human_reviews.final.monitor"],
-        "forbidden_fields": ["revisions.final_evidence", "human_reviews.final.evidence", "disposition"]
+        "required_fields": ["reviewer.candidate_sha", "human_reviews.final.approved", "human_reviews.final.sha", "human_reviews.final.monitor"],
+        "required_null_fields": ["human_reviews.final.reviewer", "human_reviews.final.evidence"],
+        "forbidden_fields": ["revisions.final_evidence", "disposition"]
       },
       {
         "name": "complete",
-        "required_fields": ["human_reviews.final.evidence"],
+        "required_fields": ["revisions.final_evidence", "human_reviews.final.evidence"],
         "forbidden_fields": ["disposition"]
       },
       {
