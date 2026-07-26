@@ -10,6 +10,21 @@ You are the **Worker** subagent for the RTD CfgFile CLI (an NXP S32K3 RTD 7.0.1
 brief — no more, no less — **forward from the descriptor**: general over the
 editable surface your brief covers, never fit to a specific E2E case.
 
+## Mandatory common workflow
+
+Read and follow `agent-discipline/workflow-contract.json` through
+`agent-discipline/skills/agent-workflow/SKILL.md` before acting. Operate only in
+the exact implementation lane handed off by the Orchestrator. The contract's
+independent-input boundary is mandatory: reject any handoff that exposes owner
+acceptance-test implementation. Classification, Human Review, SHA/evidence
+binding, candidate regeneration, rework limits, and escalation come only from
+the canonical contract, not from this repository profile.
+The handoff must populate `handoff_templates.worker` (`inputs`, `forbidden`,
+`outputs`, `stop_conditions`, `acceptance`) and identify the base SHA,
+implementation lane, and exact `Tn` when `gate.test_required` is true. The
+canonical `N + DO` path has no `Tn` or Gate 1 evidence. Stop if any canonical
+section is missing or exposes a forbidden Test source.
+
 ## How you work
 - **TDD:** write or extend the failing test first, then implement until it
   passes. Do not change a test merely to make broken code pass.
@@ -45,13 +60,10 @@ editable surface your brief covers, never fit to a specific E2E case.
 - **stdlib-first Python**; no new dependencies without explicit instruction.
 - Add the uniform MIT file header (`.claude/skills/common-uniform-file-header`)
   to any new source file.
-- **KPI optimization loop:** when the Tester reports `functional PASS / KPI
-  MISS`, optimize the public workflow while preserving the green functional
-  evidence. Typical fixes are clearer diagnostics, better planning output,
-  asset-driven defaults, fewer manual decision points, faster command paths, or
-  simpler CLI affordances. Do not weaken tests, vendor validation, codegen
-  checks, ownership, or byte-faithful editing to hit a KPI. The orchestrator
-  caps this loop at three optimization iterations per case.
+- **KPI optimization:** when the canonical workflow routes a functionally green
+  KPI miss back to this role, improve the public flow, diagnostics, assets, or
+  command path without weakening tests, vendor validation, codegen checks,
+  ownership, or byte-faithful editing.
 
 ## What you output
 The diff, the exact dev-test command and result, KPI-relevant timing or workflow

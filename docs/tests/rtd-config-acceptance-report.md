@@ -2,8 +2,8 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.35.0 |
-| Date | 2026-07-17 |
+| Version | 0.35.2 |
+| Date | 2026-07-22 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Current pass/fail evidence for the E2E acceptance cases defined in `rtd-config-test-cases.md`. This document is the living status record the catalog points to; the catalog defines the target, this records where the tool actually stands. |
 
@@ -16,16 +16,17 @@
 
 ## 1. Acceptance gate status
 
-The functional gate is the **sole acceptance signal** for an E2E case (exit `0`,
-code generated, no SEVERE `[TOOL] … has the following error`, and the case pass
-criteria met). KPI is monitored separately.
+The functional status for an E2E case is derived from the complete case evidence
+(exit `0`, code generated, no SEVERE `[TOOL] … has the following error`, and the
+case pass criteria met). KPI is monitored separately. This report records that
+functional evidence; it does not define repository workflow or release authority.
 
 | Item | Status | Evidence |
 | --- | --- | --- |
 | S32DS headless validation operational | **OPERATIONAL (fixed 2026-06-11)** | Flow B verified on S32DS 3.6.7; pristine `Uart_Example_S32K344` → exit `0`, 120 generated files, `severe_problems: []` via `python -m rtd_config validate`. |
 | Pass gate detects real errors | **VERIFIED** | Known-bad probe (`OsIfUseSystemTimer=true`, empty `OsIfCounterConfig`) → SEVERE `[TOOL] The resource "BaseNXP" … has the following error: The number of OsIf Counters must be exactly one …`; gate returns `passed=false`. |
 | Caller project safety | **VERIFIED** | After validation the caller's `.mex` is byte-identical (validation runs on a throwaway copy). |
-| KPI evidence policy | **DEFINED (2026-06-13; metric refined 2026-06-17)** | Each isolated case records its edit-attempt count, the measured KPI, the KPI status (`pass`/`miss`), and the disposition. The canonical KPI is the **`[context-injected → static-check-passed]` window** — intent analysis + planning + implementation + file editing, as the user perceives it — emitted first-class by `tools/blackbox_e2e.py` (`kpi.kpi_seconds`). It **excludes** the agent-runner startup before the prompt lands AND everything after the static `check` (the vendor `validate` runtime and the trailing report). The older `validation_excluded_s` (`total_span` − `validate`) is retained only as a diagnostic; it over-counts and is not the KPI. |
+| KPI evidence policy | **DEFINED (2026-06-13; metric refined 2026-06-17)** | Each isolated case records its edit-attempt count, the measured KPI, the KPI status (`pass`/`miss`), and the disposition. The canonical KPI is the **`[context-injected → static-check-passed]` window** — intent analysis + planning + implementation + file editing, as the user perceives it — emitted first-class by `tools/blackbox_e2e.py` (`kpi.kpi_seconds`). It **excludes** runner startup before the request lands AND everything after the static `check` (the vendor `validate` runtime and the trailing report). The older `validation_excluded_s` (`total_span` − `validate`) is retained only as a diagnostic; it over-counts and is not the KPI. |
 
 > **Why this matters:** before the fix, the gate failed on *every* input — the
 > registration step timed out, so a pristine fixture returned exit `2`. The
@@ -80,7 +81,7 @@ These historical blockers unblocked the accepted minimal-system cases:
    replace_element_region` splices a new element region (self-closed → populated)
    and re-captures spans; the attribute-edit path is untouched. Proven by
    BASENXP-001 (OsIf counter insertion) with a direct regression test.
-2. ✅ **Cross-module orchestration execution** — DONE. DIO-001 proved the pattern
+2. ✅ **Cross-module dependency execution** — DONE. DIO-001 proved the pattern
    (Dio channel + Port pin); UART-001 extended it to 3 modules (Uart + Platform
    ISR + Mcu clock), UART-002 to Uart + Mcl (FlexIO), UART-003 to Uart + Mcl +
    Platform (DMA). Each writes only its owned regions and the plan declares the
@@ -111,7 +112,7 @@ history. New ADC evidence is recorded in §2 as each case is exercised.
 | 6 | ✅ MCU-001: clock-tree edit + reference-point merge | MCU-001, UART-* |
 | 7 | ✅ Port apply (write queried pin) → PORT-001 | PORT-001, DIO-001 |
 | 8 | ✅ DIO-001: channel creation + Port direction (cross-module) | DIO-001 |
-| 9 | ✅ UART cross-module orchestration → UART-001 | UART-001 |
+| 9 | ✅ UART cross-module dependency execution → UART-001 | UART-001 |
 | 10 | ✅ UART-002: FlexIO channel creation + MCL ref + ISR | UART-002 |
 | 11 | ✅ DMA capability (Uart + Mcl + Platform) → UART-003 | UART-003 |
 | 12 | ✅ ADC module: `adc set --spec` (Hw Unit / groups / channels / watchdog; DMA streaming + Mcl; BCTU single + list hardware triggers; FIFO DMA) → ADC-001..004 | ADC-001, ADC-002, ADC-003, ADC-004 |
@@ -120,6 +121,8 @@ history. New ADC evidence is recorded in §2 as each case is exercised.
 
 | Date | Version | Description |
 | --- | --- | --- |
+| 2026-07-22 | 0.35.2 | Clarified that the report records layered E2E functional evidence without claiming repository workflow or release authority. |
+| 2026-07-22 | 0.35.1 | Removed active runner-governance terminology from the KPI metric description without changing the measured window or any functional/KPI evidence. Historical entries remain unchanged. |
 | 2026-07-17 | 0.35.0 | Refreshed all 14 OpenCode black-box E2E/KPI cases after P1 #65–#72. Final status is 14/14 functional PASS and 14/14 KPI PASS, each with one edit and an independent S32DS pass. The evidence includes the terminal result-parser fix, the Port one-query pin fast path, and the complete ADC/Mcl DMA ownership + coverage fix; ADC-002 now passes in one edit at 28.89 s after the ownership gap had previously required a second edit. |
 | 2026-07-12 | 0.34.0 | Refreshed all 14 OpenCode black-box E2E/KPI cases after #75's P0 release-safety hardening. All functional gates pass and all KPIs pass. ADC-003 initially produced a functional PASS but a KPI MISS because the first spec omitted the target-channel group required by BCTU single conversion; `adc-spec.md` 0.1.1 now shows the complete ADC1/S10 BCTU + watchdog payload, and ADC-003 re-measured PASS at 23.59 s / 1 edit / session `ses_0ac364610ffeylFcv48cIK5TRv`. |
 | 2026-07-07 | 0.33.0 | Refreshed the post-review OpenCode black-box evidence that was stale in 0.32.0. Mcl now passes at 54.78 s / 1 edit / session `ses_0c4bcc13effejDypVDWraYJm6y`. UART-002 initially missed after the Mcl allocator fix (113.74 s), then missed the boundary after fast-path guidance (60.01 s), and passed after promoting the UART-002 reference fast path to the top of `uart-spec.md` (32.21 s / 1 edit / session `ses_0c4afe382ffeT485KxDapiIIPC`). Summary returns to 14 / 14 functional PASS and 14 / 14 KPI PASS. |
