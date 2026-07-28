@@ -367,15 +367,61 @@ def test_human_review_actor_matches_reviewer_and_authorized_policy(
     )
 
 
-def test_gate1_change_request_record_requires_exact_two_lines_and_reason():
-    record = _review_record("human_review_1")
+def _set_gate1_change_request(record: dict, *, reviewer: str | None) -> None:
     review = record["human_reviews"]["test"]
     reason = "The test contract must cover transition evidence."
     review["approved"] = False
+    review["reviewer"] = reviewer
     review["evidence"]["decision"] = "changes_requested"
     review["evidence"]["reason"] = reason
+    review["evidence"]["requested_changes"] = True
     review["evidence"]["command"] = f"/request-test-changes {TEST_SHA}\n{reason}"
+
+
+@pytest.mark.parametrize("reviewer", (None, "owner"))
+def test_gate1_change_request_accepts_null_or_matching_authorized_reviewer(
+    reviewer,
+):
+    record = _review_record("human_review_1")
+    _set_gate1_change_request(record, reviewer=reviewer)
+
     assert _errors(record) == []
+
+
+@pytest.mark.parametrize(
+    ("reviewer", "actor_login", "authorized_logins", "expected"),
+    (
+        ("maintainer", "owner", ["owner"], "reviewer"),
+        ("attacker", "attacker", ["owner"], "authorized"),
+    ),
+)
+def test_gate1_change_request_rejects_mismatched_or_unauthorized_reviewer(
+    reviewer,
+    actor_login,
+    authorized_logins,
+    expected,
+):
+    record = _review_record("human_review_1")
+    _set_gate1_change_request(record, reviewer=reviewer)
+    record["human_reviews"]["test"]["evidence"]["actor_login"] = actor_login
+    record["authorization"]["github"][
+        "authorized_human_logins"
+    ] = authorized_logins
+
+    errors = _errors(record)
+    assert errors
+    assert any(
+        expected in item.casefold()
+        or "login" in item.casefold()
+        or "policy" in item.casefold()
+        for item in errors
+    )
+
+
+def test_gate1_change_request_record_requires_exact_two_lines_and_reason():
+    record = _review_record("human_review_1")
+    _set_gate1_change_request(record, reviewer=None)
+    reason = "The test contract must cover transition evidence."
 
     invalid_commands = (
         f"/request-test-changes {TEST_SHA}",

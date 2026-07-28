@@ -594,9 +594,9 @@ def _coherently_rebind(record: dict, authority: str) -> None:
         record["issue"]["number"] = 79
         record["human_reviews"]["test"]["evidence"]["issue_number"] = 79
         if "final" in record["human_reviews"]:
-            record["human_reviews"]["final"]["evidence"][
-                "pull_request_number"
-            ] = 79
+            evidence = record["human_reviews"]["final"]["evidence"]
+            if evidence is not None:
+                evidence["pull_request_number"] = 79
     elif authority == "base":
         record["revisions"]["base_sha"] = replacement_sha
         record["revisions"]["test"]["base_sha"] = replacement_sha
