@@ -163,6 +163,27 @@ def _expect_invalid(call):
     return caught.value
 
 
+_CHECKPOINT_EVIDENCE = (
+    ("test_approved", "human_review_1"),
+    ("candidate_built", "candidate"),
+    ("tester_passed", "tester"),
+    ("reviewer_accepted", "reviewer"),
+    ("draft_pr_ready", "draft_pr"),
+    ("complete", "final_human_review"),
+)
+
+
+def _record_at_checkpoint(checkpoint):
+    record = _record()
+    checkpoints = _contract()["checkpoints"]
+    record["checkpoint"] = checkpoint
+    checkpoint_index = checkpoints.index(checkpoint)
+    for evidence_checkpoint, evidence_name in _CHECKPOINT_EVIDENCE:
+        if checkpoints.index(evidence_checkpoint) > checkpoint_index:
+            record[evidence_name] = None
+    return record
+
+
 def _clearance_report(error):
     return json.loads(str(error).split(": ", 1)[1])
 
@@ -225,6 +246,52 @@ def test_preflight_review_and_current_candidate_bindings_fail_closed():
     records.append(non_draft)
     for record in records:
         _expect_invalid(lambda record=record: gate.validate_record(record, contract_path=CONTRACT_PATH))
+
+
+def test_checkpoint_evidence_is_null_before_generation_and_closed_after_generation():
+    gate = _gate()
+    contract = _contract()
+    checkpoints = contract["checkpoints"]
+    complete = _record()
+
+    for checkpoint in checkpoints:
+        gate.validate_record(_record_at_checkpoint(checkpoint), contract_path=CONTRACT_PATH)
+
+    for evidence_checkpoint, evidence_name in _CHECKPOINT_EVIDENCE:
+        generated_at = checkpoints.index(evidence_checkpoint)
+        for earlier_checkpoint in checkpoints[:generated_at]:
+            forged = _record_at_checkpoint(earlier_checkpoint)
+            forged[evidence_name] = copy.deepcopy(complete[evidence_name])
+            _expect_invalid(
+                lambda forged=forged: gate.validate_record(forged, contract_path=CONTRACT_PATH)
+            )
+
+        missing = _record_at_checkpoint(evidence_checkpoint)
+        missing[evidence_name] = None
+        _expect_invalid(
+            lambda missing=missing: gate.validate_record(missing, contract_path=CONTRACT_PATH)
+        )
+
+        incomplete = _record_at_checkpoint(evidence_checkpoint)
+        del incomplete[evidence_name][contract["object_fields"][evidence_name][-1]]
+        _expect_invalid(
+            lambda incomplete=incomplete: gate.validate_record(incomplete, contract_path=CONTRACT_PATH)
+        )
+
+
+def test_pass_checkpoints_reject_every_non_pass_terminal_verdict():
+    gate = _gate()
+    non_pass_verdicts = set(_contract()["verdicts"]) - {"PASS"}
+    for checkpoint, evidence_name in (
+        ("tester_passed", "tester"),
+        ("reviewer_accepted", "reviewer"),
+    ):
+        for verdict in non_pass_verdicts:
+            record = _record_at_checkpoint(checkpoint)
+            record[evidence_name]["verdict"] = verdict
+            _expect_invalid(
+                lambda record=record: gate.validate_record(record, contract_path=CONTRACT_PATH)
+            )
 
 
 def test_finding_dispositions_and_attempt_bounds_are_exact():
@@ -295,6 +362,35 @@ def _commit(repo, message):
     _git(repo, "add", "-A")
     _git(repo, "commit", "-m", message)
     return _git(repo, "rev-parse", "HEAD")
+
+
+def _git_input(repo, arguments, data):
+    return subprocess.run(
+        ["git", *arguments], cwd=repo, check=True, input=data,
+        capture_output=True,
+    ).stdout.strip().decode("ascii")
+
+
+def _commit_tree_with_long_payload_path(repo, content):
+    blob = _git_input(repo, ["hash-object", "-w", "--stdin"], content)
+    tree = _git_input(
+        repo,
+        ["mktree", "-z"],
+        f"100644 blob {blob}\tpayload.txt\0".encode("ascii"),
+    )
+    components = [f"segment-{index:03d}-" + "x" * 176 for index in range(180)]
+    for component in reversed(components):
+        tree = _git_input(
+            repo,
+            ["mktree", "-z"],
+            f"040000 tree {tree}\t{component}\0".encode("ascii"),
+        )
+    tree = _git_input(
+        repo,
+        ["mktree", "-z"],
+        f"040000 tree {tree}\tpayload\0".encode("ascii"),
+    )
+    return _git(repo, "commit-tree", tree, "-m", "long object-only payload")
 
 
 def test_clearance_uses_candidate_tree_checks_ancestry_and_self_scans(tmp_path):
@@ -399,3 +495,50 @@ def test_clearance_uses_candidate_tree_checks_ancestry_and_self_scans(tmp_path):
         _expect_invalid(lambda: gate.audit_bootstrap_clearance(repo, clean_sha, [external], []))
     )
     assert external_report["bootstrap_generated_or_payload_count"] > 0
+
+
+def test_clearance_reads_long_tracked_paths_through_tree_object_ids(tmp_path):
+    gate = _gate()
+    repo = tmp_path / "long-object-tree"
+    repo.mkdir()
+    _git(repo, "init")
+    _git(repo, "config", "user.name", "Generality Test")
+    _git(repo, "config", "user.email", "generality@example.invalid")
+    removal_words = " ".join(("remo" + "ve", "be" + "fore", "fi" + "nal", "P" + "0"))
+    candidate_sha = _commit_tree_with_long_payload_path(
+        repo,
+        (removal_words + "\n").encode("utf-8"),
+    )
+
+    report = _clearance_report(
+        _expect_invalid(lambda: gate.audit_bootstrap_clearance(repo, candidate_sha, ["payload"], []))
+    )
+    assert report["bootstrap_generated_or_payload_count"] == 1
+    assert report["temporary_removal_marker_count"] == 1
+
+
+@pytest.mark.parametrize("raw_size", [b"+1", b"-1", b"1x"])
+def test_clearance_rejects_non_decimal_cat_file_blob_sizes(tmp_path, monkeypatch, raw_size):
+    gate = _gate()
+    repo = tmp_path / "malformed-batch-size"
+    repo.mkdir()
+    _git(repo, "init")
+    _git(repo, "config", "user.name", "Generality Test")
+    _git(repo, "config", "user.email", "generality@example.invalid")
+    payload = repo / "payload.bin"
+    payload.write_bytes(b"x")
+    candidate_sha = _commit(repo, "arbitrary binary payload")
+    object_id = _git(repo, "hash-object", "payload.bin")
+    original_run = gate.subprocess.run
+
+    def malformed_batch(arguments, *args, **kwargs):
+        if arguments[:3] == ["git", "cat-file", "--batch"]:
+            output = object_id.encode("ascii") + b" blob " + raw_size + b"\n" + b"x\n"
+            return subprocess.CompletedProcess(arguments, 0, stdout=output, stderr=b"")
+        return original_run(arguments, *args, **kwargs)
+
+    monkeypatch.setattr(gate.subprocess, "run", malformed_batch)
+    error = _expect_invalid(
+        lambda: gate.audit_bootstrap_clearance(repo, candidate_sha, ["payload.bin"], [])
+    )
+    assert "invalid blob size" in str(error)

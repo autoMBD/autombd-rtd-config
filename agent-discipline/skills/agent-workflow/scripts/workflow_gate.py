@@ -90,6 +90,14 @@ _CLEARANCE_KEYS = (
     "bootstrap_debt_pointer_count",
     "open_bootstrap_debt_count",
 )
+_CHECKPOINT_EVIDENCE = (
+    ("test_approved", "human_review_1"),
+    ("candidate_built", "candidate"),
+    ("tester_passed", "tester"),
+    ("reviewer_accepted", "reviewer"),
+    ("draft_pr_ready", "draft_pr"),
+    ("complete", "final_human_review"),
+)
 
 
 def _error(message: str) -> None:
@@ -111,6 +119,28 @@ def _closed_object(value: Any, fields: list[str], label: str) -> dict[str, Any]:
     actual = set(value)
     _require(actual == expected, f"{label} fields must be exactly {fields}")
     return value
+
+
+def _checkpoint_object(
+    record: dict[str, Any],
+    contract: dict[str, Any],
+    evidence_name: str,
+) -> dict[str, Any] | None:
+    checkpoint_by_evidence = {
+        evidence: checkpoint for checkpoint, evidence in _CHECKPOINT_EVIDENCE
+    }
+    evidence_checkpoint = checkpoint_by_evidence[evidence_name]
+    checkpoints = contract["checkpoints"]
+    generated = checkpoints.index(record["checkpoint"]) >= checkpoints.index(evidence_checkpoint)
+    evidence = record[evidence_name]
+    if not generated:
+        _require(evidence is None, f"record.{evidence_name} must be null before {evidence_checkpoint}")
+        return None
+    return _closed_object(
+        evidence,
+        contract["object_fields"][evidence_name],
+        f"record.{evidence_name}",
+    )
 
 
 def _string(value: Any, label: str) -> str:
@@ -167,6 +197,9 @@ def validate_contract(contract, *, contract_path):
     _require(isinstance(object_fields, dict) and set(object_fields) == _OBJECT_FIELD_KEYS, "object_fields is not closed")
     for name, fields in object_fields.items():
         _unique_strings(fields, f"object_fields.{name}")
+    for checkpoint, evidence_name in _CHECKPOINT_EVIDENCE:
+        _require(checkpoint in contract["checkpoints"], f"checkpoint {checkpoint} is missing")
+        _require(evidence_name in object_fields, f"object_fields.{evidence_name} is missing")
     permissions = contract["role_permissions"]
     _require(isinstance(permissions, dict) and set(permissions) == _ROLE_KEYS, "role_permissions is not closed")
     for name, values in permissions.items():
@@ -286,47 +319,54 @@ def validate_record(record, *, contract_path):
     _require(len({authority["base_sha"], authority["test_sha"], authority["implementation_sha"]}) == 3, "authority commit identities must be distinct")
     reviewer_actor = _string(authority["authorized_reviewer"], "record.authority.authorized_reviewer")
 
-    review_1 = _closed_object(value["human_review_1"], fields["human_review_1"], "record.human_review_1")
-    _require(review_1["actor"] == reviewer_actor, "Human Review 1 actor is not authorized")
-    _top_level_comment(review_1["comment_url"], repository, issue["number"], "record.human_review_1.comment_url")
-    _sha(review_1["test_sha"], "record.human_review_1.test_sha")
-    _require(review_1["test_sha"] == authority["test_sha"], "Human Review 1 is not bound to the full Test SHA")
-    _require(review_1["command"] == f"/approve-test {authority['test_sha']}", "Human Review 1 command is not the exact approval command")
-    _require(review_1["edited"] is False and review_1["deleted"] is False, "Human Review 1 evidence must be unedited and undeleted")
+    review_1 = _checkpoint_object(value, contract, "human_review_1")
+    if review_1 is not None:
+        _require(review_1["actor"] == reviewer_actor, "Human Review 1 actor is not authorized")
+        _top_level_comment(review_1["comment_url"], repository, issue["number"], "record.human_review_1.comment_url")
+        _sha(review_1["test_sha"], "record.human_review_1.test_sha")
+        _require(review_1["test_sha"] == authority["test_sha"], "Human Review 1 is not bound to the full Test SHA")
+        _require(review_1["command"] == f"/approve-test {authority['test_sha']}", "Human Review 1 command is not the exact approval command")
+        _require(review_1["edited"] is False and review_1["deleted"] is False, "Human Review 1 evidence must be unedited and undeleted")
 
-    candidate = _closed_object(value["candidate"], fields["candidate"], "record.candidate")
-    candidate_sha = _sha(candidate["sha"], "record.candidate.sha")
-    _require(candidate["parent_test_sha"] == authority["test_sha"], "Candidate Test parent identity does not match")
-    _require(candidate["parent_implementation_sha"] == authority["implementation_sha"], "Candidate Implementation parent identity does not match")
-    _sha(candidate["parent_test_sha"], "record.candidate.parent_test_sha")
-    _sha(candidate["parent_implementation_sha"], "record.candidate.parent_implementation_sha")
+    candidate = _checkpoint_object(value, contract, "candidate")
+    candidate_sha = None
+    if candidate is not None:
+        candidate_sha = _sha(candidate["sha"], "record.candidate.sha")
+        _require(candidate["parent_test_sha"] == authority["test_sha"], "Candidate Test parent identity does not match")
+        _require(candidate["parent_implementation_sha"] == authority["implementation_sha"], "Candidate Implementation parent identity does not match")
+        _sha(candidate["parent_test_sha"], "record.candidate.parent_test_sha")
+        _sha(candidate["parent_implementation_sha"], "record.candidate.parent_implementation_sha")
 
-    tester = _closed_object(value["tester"], fields["tester"], "record.tester")
-    _require(tester["candidate_sha"] == candidate_sha, "Tester verdict is stale")
-    _require(tester["verdict"] in contract["verdicts"], "Tester verdict is not allowed")
-    _string(tester["evidence"], "record.tester.evidence")
-    reviewer = _closed_object(value["reviewer"], fields["reviewer"], "record.reviewer")
-    _require(reviewer["candidate_sha"] == candidate_sha, "Reviewer verdict is stale")
-    _require(reviewer["verdict"] in contract["verdicts"], "Reviewer verdict is not allowed")
-    _string(reviewer["evidence"], "record.reviewer.evidence")
-    _require(tester["verdict"] == "PASS", "Reviewer may run only after Tester PASS on the current Candidate")
+    tester = _checkpoint_object(value, contract, "tester")
+    if tester is not None:
+        _require(tester["candidate_sha"] == candidate_sha, "Tester verdict is stale")
+        _require(tester["verdict"] == "PASS", "tester_passed checkpoint requires Tester PASS")
+        _string(tester["evidence"], "record.tester.evidence")
+    reviewer = _checkpoint_object(value, contract, "reviewer")
+    if reviewer is not None:
+        _require(reviewer["candidate_sha"] == candidate_sha, "Reviewer verdict is stale")
+        _require(reviewer["verdict"] == "PASS", "reviewer_accepted checkpoint requires Reviewer PASS")
+        _string(reviewer["evidence"], "record.reviewer.evidence")
+        _require(tester["verdict"] == "PASS", "Reviewer may run only after Tester PASS on the current Candidate")
 
     findings = value["findings"]
     _require(isinstance(findings, list), "record.findings must be a list")
     for index, finding in enumerate(findings):
         _validate_finding(finding, contract, index)
 
-    draft_pr = _closed_object(value["draft_pr"], fields["draft_pr"], "record.draft_pr")
-    _string(draft_pr["url"], "record.draft_pr.url")
-    _require(draft_pr["candidate_sha"] == candidate_sha, "Draft PR is not bound to the current Candidate")
-    _require(draft_pr["is_draft"] is True, "workflow PR must remain a draft")
-    _require(reviewer["verdict"] == "PASS", "Draft PR requires Reviewer PASS on the current Candidate")
+    draft_pr = _checkpoint_object(value, contract, "draft_pr")
+    if draft_pr is not None:
+        _string(draft_pr["url"], "record.draft_pr.url")
+        _require(draft_pr["candidate_sha"] == candidate_sha, "Draft PR is not bound to the current Candidate")
+        _require(draft_pr["is_draft"] is True, "workflow PR must remain a draft")
+        _require(reviewer["verdict"] == "PASS", "Draft PR requires Reviewer PASS on the current Candidate")
 
-    final_review = _closed_object(value["final_human_review"], fields["final_human_review"], "record.final_human_review")
-    _string(final_review["actor"], "record.final_human_review.actor")
-    _string(final_review["comment_url"], "record.final_human_review.comment_url")
-    _string(final_review["decision"], "record.final_human_review.decision")
-    _require(final_review["candidate_sha"] == candidate_sha, "Final Human Review is not bound to the current Candidate")
+    final_review = _checkpoint_object(value, contract, "final_human_review")
+    if final_review is not None:
+        _string(final_review["actor"], "record.final_human_review.actor")
+        _string(final_review["comment_url"], "record.final_human_review.comment_url")
+        _string(final_review["decision"], "record.final_human_review.decision")
+        _require(final_review["candidate_sha"] == candidate_sha, "Final Human Review is not bound to the current Candidate")
 
     attempt = _closed_object(value["attempt"], fields["attempt"], "record.attempt")
     candidate_attempt = attempt["candidate_attempt"]
@@ -510,6 +550,59 @@ def _external_files(path: Path) -> list[Path]:
     return sorted(item for item in path.rglob("*") if item.is_file())
 
 
+def _candidate_blobs(repository: Path, candidate: str) -> list[tuple[str, bytes]]:
+    tree_output = _git(repository, "ls-tree", "-r", "--full-tree", "-z", candidate, text=False).stdout
+    entries = []
+    for raw_entry in tree_output.split(b"\0"):
+        if not raw_entry:
+            continue
+        metadata, separator, raw_path = raw_entry.partition(b"\t")
+        parts = metadata.split(b" ")
+        _require(separator == b"\t" and len(parts) == 3, "git tree entry is malformed")
+        _, object_type, object_id = parts
+        if object_type == b"blob":
+            entries.append((raw_path.decode("utf-8", errors="surrogateescape"), object_id))
+
+    if not entries:
+        return []
+    try:
+        result = subprocess.run(
+            ["git", "cat-file", "--batch"],
+            cwd=repository,
+            check=True,
+            input=b"".join(object_id + b"\n" for _, object_id in entries),
+            capture_output=True,
+        )
+    except (OSError, subprocess.CalledProcessError) as exc:
+        detail = getattr(exc, "stderr", None)
+        if isinstance(detail, bytes):
+            detail = detail.decode("utf-8", errors="replace")
+        _error(f"git evidence check failed: {(detail or str(exc)).strip()}")
+
+    offset = 0
+    blobs = []
+    output = result.stdout
+    for (path, expected_id) in entries:
+        header_end = output.find(b"\n", offset)
+        _require(header_end >= 0, "git cat-file batch header is missing")
+        header = output[offset:header_end].split(b" ")
+        _require(len(header) == 3, "git cat-file batch header is malformed")
+        object_id, object_type, raw_size = header
+        _require(object_id == expected_id and object_type == b"blob", "git cat-file returned the wrong object")
+        _require(raw_size.isascii() and raw_size.isdigit(), "git cat-file returned an invalid blob size")
+        try:
+            size = int(raw_size)
+        except ValueError:
+            _error("git cat-file returned an invalid blob size")
+        content_start = header_end + 1
+        content_end = content_start + size
+        _require(content_end < len(output) and output[content_end:content_end + 1] == b"\n", "git cat-file blob is truncated")
+        blobs.append((path, output[content_start:content_end]))
+        offset = content_end + 1
+    _require(offset == len(output), "git cat-file returned unexpected trailing output")
+    return blobs
+
+
 def audit_bootstrap_clearance(repository_path, candidate_sha, deployment_paths, bootstrap_document_commits):
     """Audit only a Candidate commit tree and fail when bootstrap residue remains."""
     repository = Path(repository_path)
@@ -517,13 +610,13 @@ def audit_bootstrap_clearance(repository_path, candidate_sha, deployment_paths, 
     candidate = _sha(candidate_sha, "candidate_sha")
     _git(repository, "cat-file", "-e", f"{candidate}^{{commit}}")
     prefixes, external_paths = _deployment_sources(repository, deployment_paths)
-    tree_output = _git(repository, "ls-tree", "-r", "--name-only", "-z", candidate, text=False).stdout
-    paths = [item.decode("utf-8", errors="surrogateescape") for item in tree_output.split(b"\0") if item]
+    blobs = _candidate_blobs(repository, candidate)
+    paths = [path for path, _ in blobs]
 
     counts = {key: 0 for key in _CLEARANCE_KEYS}
     counts[_CLEARANCE_KEYS[0]] = sum(_bootstrap_design_path(path) for path in paths)
-    for path in paths:
-        content = _git(repository, "show", f"{candidate}:{path}", text=False).stdout.decode("utf-8", errors="ignore")
+    for path, blob in blobs:
+        content = blob.decode("utf-8", errors="ignore")
         _scan_content(
             path,
             content,
