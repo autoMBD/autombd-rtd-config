@@ -50,13 +50,14 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import ipaddress
 import json
 from pathlib import Path, PurePosixPath
 import re
 import subprocess
 import sys
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
 
 class WorkflowValidationError(Exception):
@@ -231,6 +232,66 @@ def _top_level_comment(url: Any, repository: str, issue_number: int, label: str)
     return value
 
 
+def _valid_hostname(hostname: str) -> bool:
+    try:
+        ipaddress.ip_address(hostname)
+        return True
+    except ValueError:
+        pass
+    try:
+        ascii_hostname = hostname.encode("idna").decode("ascii")
+    except UnicodeError:
+        return False
+    labels = ascii_hostname.split(".")
+    legacy_ipv4 = 1 <= len(labels) <= 4 and all(
+        re.fullmatch(r"(?:[0-9]+|0[xX][0-9A-Fa-f]+)", item) is not None
+        for item in labels
+    )
+    if len(ascii_hostname) > 253 or legacy_ipv4:
+        return False
+    return all(
+        re.fullmatch(r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?", item)
+        is not None
+        for item in labels
+    )
+
+
+def _https_url(url: Any, label: str) -> str:
+    value = _string(url, label)
+    message = f"{label} must be an unambiguous absolute HTTPS URL"
+    _require(re.search(r"%(?![0-9A-Fa-f]{2})", value) is None, message)
+    try:
+        decoded_value = unquote(value, errors="strict")
+    except UnicodeDecodeError:
+        _error(message)
+    _require(
+        "#" not in value
+        and not any(
+            ord(character) < 32
+            or 127 <= ord(character) <= 159
+            or character == "\\"
+            or character.isspace()
+            for character in decoded_value
+        ),
+        message,
+    )
+    try:
+        parsed = urlparse(value)
+        hostname = parsed.hostname
+        parsed.port
+    except ValueError:
+        _error(message)
+    _require(
+        parsed.scheme == "https"
+        and hostname is not None
+        and _valid_hostname(hostname)
+        and parsed.username is None
+        and parsed.password is None,
+        message,
+    )
+    return value
+
+
 def _preflight_item(item: Any, contract: dict[str, Any], label: str) -> str:
     fields = contract["object_fields"]
     value = _closed_object(item, fields["preflight_item"], label)
@@ -250,11 +311,15 @@ def _validate_finding(finding: Any, contract: dict[str, Any], index: int) -> Non
     _require(value["requirement_id"] in contract["requirement_ids"], f"{label}.requirement_id is not allowed")
     for name in ("evidence", "observed", "expected"):
         _string(value[name], f"{label}.{name}")
-    viability = _closed_object(value["freeze_viability"], fields["freeze_viability"], f"{label}.freeze_viability")
-    _require(all(type(item) is bool for item in viability.values()), f"{label}.freeze_viability values must be booleans")
+    finding_class = value["class"]
+    if finding_class == "F2":
+        viability = _closed_object(value["freeze_viability"], fields["freeze_viability"], f"{label}.freeze_viability")
+        _require(all(type(item) is bool for item in viability.values()), f"{label}.freeze_viability values must be booleans")
+    else:
+        _require(value["freeze_viability"] is None, f"{label}.freeze_viability must be null outside F2")
+        viability = None
     disposition = value["disposition"]
     _require(disposition in contract["dispositions"], f"{label}.disposition is not allowed")
-    finding_class = value["class"]
     if finding_class == "F0":
         _require(disposition in {"BLOCK", "STOP"}, "F0 must BLOCK or STOP and cannot freeze")
     elif finding_class == "F1":
@@ -288,6 +353,8 @@ def validate_record(record, *, contract_path):
     _require(classification["issue_class"] in contract["issue_classes"], "issue_class is not allowed")
     flags = _unique_strings(classification["impact_flags"], "impact_flags")
     _require(all(flag in contract["impact_flags"] for flag in flags), "impact_flags contains an unknown flag")
+    canonical_flags = [flag for flag in contract["impact_flags"] if flag in flags]
+    _require(flags == canonical_flags, "impact_flags must follow the canonical contract order")
     _require(classification["route"] == contract["strict_route"], "route must record the strict route exactly; it is not inferred")
     _require(value["checkpoint"] in contract["checkpoints"], "checkpoint is not allowed")
     _require(value["execution_status"] in contract["execution_statuses"], "execution_status is not allowed")
@@ -356,7 +423,7 @@ def validate_record(record, *, contract_path):
 
     draft_pr = _checkpoint_object(value, contract, "draft_pr")
     if draft_pr is not None:
-        _string(draft_pr["url"], "record.draft_pr.url")
+        _https_url(draft_pr["url"], "record.draft_pr.url")
         _require(draft_pr["candidate_sha"] == candidate_sha, "Draft PR is not bound to the current Candidate")
         _require(draft_pr["is_draft"] is True, "workflow PR must remain a draft")
         _require(reviewer["verdict"] == "PASS", "Draft PR requires Reviewer PASS on the current Candidate")

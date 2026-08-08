@@ -57,6 +57,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 CONTRACT_PATH = ROOT / "agent-discipline" / "workflow-contract.json"
+CASE_CATALOG_PATH = ROOT / "docs" / "tests" / "rtd-config-test-cases.md"
 GATE_PATH = (
     ROOT
     / "agent-discipline"
@@ -94,7 +95,11 @@ def _record():
         "issue": {"repository": "autoMBD/workflow-sandbox", "number": 731, "title": "Validate a bounded workflow"},
         "classification": {
             "issue_class": "W",
-            "impact_flags": ["agent-runtime", "test-contract"],
+            "impact_flags": [
+                flag
+                for flag in contract["impact_flags"]
+                if flag in {"agent-runtime", "test-contract"}
+            ],
             "route": contract["strict_route"],
         },
         "checkpoint": "complete",
@@ -223,6 +228,37 @@ def test_contract_and_record_are_closed_and_domains_are_contract_driven():
         _expect_invalid(mutation)
 
 
+def test_impact_flags_are_a_canonical_ordered_subsequence():
+    gate = _gate()
+    canonical = _contract()["impact_flags"]
+    selected = canonical[1::3]
+    record = _record()
+    record["classification"]["impact_flags"] = selected
+    gate.validate_record(record, contract_path=CONTRACT_PATH)
+
+    reordered = copy.deepcopy(record)
+    reordered["classification"]["impact_flags"] = list(reversed(selected))
+    _expect_invalid(
+        lambda: gate.validate_record(reordered, contract_path=CONTRACT_PATH)
+    )
+
+
+def test_classification_still_rejects_duplicate_flags_and_missing_route():
+    gate = _gate()
+    canonical = _contract()["impact_flags"]
+    duplicate = _record()
+    duplicate["classification"]["impact_flags"] = [canonical[2], canonical[2]]
+    _expect_invalid(
+        lambda: gate.validate_record(duplicate, contract_path=CONTRACT_PATH)
+    )
+
+    missing_route = _record()
+    del missing_route["classification"]["route"]
+    _expect_invalid(
+        lambda: gate.validate_record(missing_route, contract_path=CONTRACT_PATH)
+    )
+
+
 def test_preflight_review_and_current_candidate_bindings_fail_closed():
     gate = _gate()
     records = []
@@ -246,6 +282,129 @@ def test_preflight_review_and_current_candidate_bindings_fail_closed():
     records.append(non_draft)
     for record in records:
         _expect_invalid(lambda record=record: gate.validate_record(record, contract_path=CONTRACT_PATH))
+
+
+def test_draft_pr_url_requires_an_absolute_https_url():
+    gate = _gate()
+    valid = _record()
+    valid["draft_pr"]["url"] = "https://review.invalid/pulls/%39%32%33?mode=draft"
+    gate.validate_record(valid, contract_path=CONTRACT_PATH)
+
+    for invalid_url in (
+        "http://review.invalid/pulls/923",
+        "review.invalid/pulls/923",
+        "https:///pulls/923",
+        "https://review.invalid/pulls/bad path",
+        923,
+    ):
+        record = _record()
+        record["draft_pr"]["url"] = invalid_url
+        _expect_invalid(
+            lambda record=record: gate.validate_record(record, contract_path=CONTRACT_PATH)
+        )
+
+
+def test_draft_pr_url_rejects_malformed_and_ambiguous_locators():
+    gate = _gate()
+    malformed = [
+        "https://review.invalid/pulls/%",
+        "https://review.invalid/pulls/%0G",
+        r"https://review.invalid\@mirror.invalid/pulls/923",
+        "https://review..invalid/pulls/923",
+        "https://:443/pulls/923",
+        "https://reader:token@review.invalid/pulls/923",
+        "https://review.invalid:invalid/pulls/923",
+        "https://review.invalid/pulls/923#https://mirror.invalid/pulls/923",
+    ]
+    malformed.extend(
+        f"https://review.invalid/pulls/a{chr(code)}b"
+        for code in (*range(32), 127)
+    )
+    malformed.extend(
+        f"https://review.invalid/pulls/%{code:02X}"
+        for code in (*range(32), 92, 127)
+    )
+
+    accepted = []
+    for invalid_url in malformed:
+        record = _record()
+        record["draft_pr"]["url"] = invalid_url
+        try:
+            gate.validate_record(record, contract_path=CONTRACT_PATH)
+        except gate.WorkflowValidationError:
+            continue
+        accepted.append(repr(invalid_url))
+    assert not accepted, "malformed draft PR locators accepted:\n" + "\n".join(accepted)
+
+
+def test_draft_pr_url_rejects_c1_controls_and_preserves_utf8_data():
+    gate = _gate()
+    for suffix in ("✓", "%E2%9C%93", "caf%C3%A9"):
+        record = _record()
+        record["draft_pr"]["url"] = f"https://review.invalid/pulls/{suffix}"
+        gate.validate_record(record, contract_path=CONTRACT_PATH)
+
+    invalid_urls = [
+        f"https://review.invalid/pulls/a{chr(code)}b"
+        for code in range(0x80, 0xA0)
+    ]
+    invalid_urls.extend(
+        f"https://review.invalid/pulls/%{code:02X}"
+        for code in range(0x80, 0xA0)
+    )
+    invalid_urls.extend(
+        f"https://review.invalid/pulls/%C2%{code:02X}"
+        for code in range(0x80, 0xA0)
+    )
+    accepted = []
+    for invalid_url in invalid_urls:
+        record = _record()
+        record["draft_pr"]["url"] = invalid_url
+        try:
+            gate.validate_record(record, contract_path=CONTRACT_PATH)
+        except gate.WorkflowValidationError:
+            continue
+        accepted.append(repr(invalid_url))
+    assert not accepted, "C1-control draft PR locators accepted:\n" + "\n".join(accepted)
+
+
+def test_draft_pr_url_rejects_legacy_ipv4_without_rejecting_unambiguous_hosts():
+    gate = _gate()
+    for hostname in (
+        "192.0.2.17",
+        "[2001:db8::17]",
+        "xn--bcher-kva.invalid",
+        "build-123.invalid",
+        "deadbeef.invalid",
+    ):
+        record = _record()
+        record["draft_pr"]["url"] = f"https://{hostname}/pulls/923"
+        gate.validate_record(record, contract_path=CONTRACT_PATH)
+
+    accepted = []
+    for hostname in (
+        "0x7f000001",
+        "0X7F000001",
+        "2130706433",
+        "017700000001",
+        "127.1",
+        "0177.0.0.1",
+        "0x7f.0.0.1",
+        "127.0x0.0.1",
+        "0x7f.00.0x0.1",
+    ):
+        record = _record()
+        record["draft_pr"]["url"] = f"https://{hostname}/pulls/923"
+        try:
+            gate.validate_record(record, contract_path=CONTRACT_PATH)
+        except gate.WorkflowValidationError:
+            continue
+        accepted.append(hostname)
+    assert not accepted, "legacy numeric IPv4 hosts accepted: " + ", ".join(accepted)
+
+
+def test_category_a_case_catalog_has_no_category_b_agents_pointer():
+    assert "AGENTS.md" not in CASE_CATALOG_PATH.read_text(encoding="utf-8")
 
 
 def test_checkpoint_evidence_is_null_before_generation_and_closed_after_generation():
@@ -297,19 +456,23 @@ def test_pass_checkpoints_reject_every_non_pass_terminal_verdict():
 def test_finding_dispositions_and_attempt_bounds_are_exact():
     gate = _gate()
     for finding_class, viability, disposition, valid in [
-        ("F0", [False] * 6, "BLOCK", True),
-        ("F0", [True] * 6, "FREEZE_FOR_NEXT_STAGE", False),
-        ("F1", [False] * 6, "REWORK_CURRENT_STAGE", True),
+        ("F0", None, "BLOCK", True),
+        ("F0", None, "FREEZE_FOR_NEXT_STAGE", False),
+        ("F1", None, "REWORK_CURRENT_STAGE", True),
         ("F2", [True] * 6, "FREEZE_FOR_NEXT_STAGE", True),
         ("F2", [True, True, False, True, True, True], "BLOCK", True),
         ("F2", [True, True, False, True, True, True], "FREEZE_FOR_NEXT_STAGE", False),
-        ("F3", [False] * 6, "DEFER_NON_BLOCKING", True),
-        ("F4", [False] * 6, "FINAL_ACCEPT", False),
+        ("F3", None, "DEFER_NON_BLOCKING", True),
+        ("F4", None, "FINAL_ACCEPT", False),
     ]:
         record = _record()
         finding = record["findings"][0]
         finding["class"] = finding_class
-        finding["freeze_viability"] = dict(zip(_contract()["object_fields"]["freeze_viability"], viability))
+        finding["freeze_viability"] = (
+            None
+            if viability is None
+            else dict(zip(_contract()["object_fields"]["freeze_viability"], viability))
+        )
         finding["disposition"] = disposition
         if valid:
             gate.validate_record(record, contract_path=CONTRACT_PATH)
@@ -319,6 +482,50 @@ def test_finding_dispositions_and_attempt_bounds_are_exact():
         record = _record()
         record["attempt"]["candidate_attempt"] = attempt
         _expect_invalid(lambda record=record: gate.validate_record(record, contract_path=CONTRACT_PATH))
+
+
+def test_freeze_viability_is_null_outside_f2_and_closed_for_f2():
+    gate = _gate()
+    non_f2_dispositions = {
+        "F0": "BLOCK",
+        "F1": "REWORK_CURRENT_STAGE",
+        "F3": "DEFER_NON_BLOCKING",
+        "F4": "DEFER_NON_BLOCKING",
+    }
+    stale_viability = copy.deepcopy(_record()["findings"][0]["freeze_viability"])
+    for finding_class, disposition in non_f2_dispositions.items():
+        record = _record()
+        finding = record["findings"][0]
+        finding["class"] = finding_class
+        finding["freeze_viability"] = None
+        finding["disposition"] = disposition
+        gate.validate_record(record, contract_path=CONTRACT_PATH)
+
+        finding["freeze_viability"] = copy.deepcopy(stale_viability)
+        _expect_invalid(
+            lambda record=record: gate.validate_record(record, contract_path=CONTRACT_PATH)
+        )
+
+    missing = _record()
+    missing["findings"][0]["freeze_viability"] = None
+    _expect_invalid(lambda: gate.validate_record(missing, contract_path=CONTRACT_PATH))
+
+    malformed_values = []
+    incomplete = copy.deepcopy(stale_viability)
+    incomplete.pop(next(iter(incomplete)))
+    malformed_values.append(incomplete)
+    extra = copy.deepcopy(stale_viability)
+    extra["uncontracted"] = True
+    malformed_values.append(extra)
+    non_boolean = copy.deepcopy(stale_viability)
+    non_boolean[next(iter(non_boolean))] = 1
+    malformed_values.append(non_boolean)
+    for viability in malformed_values:
+        record = _record()
+        record["findings"][0]["freeze_viability"] = viability
+        _expect_invalid(
+            lambda record=record: gate.validate_record(record, contract_path=CONTRACT_PATH)
+        )
 
 
 def test_lane_manifests_bind_the_same_contract_base_and_requirements():
