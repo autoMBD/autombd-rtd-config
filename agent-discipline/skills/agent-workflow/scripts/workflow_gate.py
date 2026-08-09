@@ -431,7 +431,7 @@ def validate_record(record, *, contract_path):
     final_review = _checkpoint_object(value, contract, "final_human_review")
     if final_review is not None:
         _string(final_review["actor"], "record.final_human_review.actor")
-        _string(final_review["comment_url"], "record.final_human_review.comment_url")
+        _https_url(final_review["comment_url"], "record.final_human_review.comment_url")
         _string(final_review["decision"], "record.final_human_review.decision")
         _require(final_review["candidate_sha"] == candidate_sha, "Final Human Review is not bound to the current Candidate")
 

@@ -58,6 +58,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 CONTRACT_PATH = ROOT / "agent-discipline" / "workflow-contract.json"
 CASE_CATALOG_PATH = ROOT / "docs" / "tests" / "rtd-config-test-cases.md"
+TEST_STRATEGY_PATH = ROOT / "docs" / "tests" / "rtd-config-test-strategy.md"
 GATE_PATH = (
     ROOT
     / "agent-discipline"
@@ -152,7 +153,7 @@ def _record():
         "draft_pr": {"url": "https://github.com/autoMBD/workflow-sandbox/pull/74", "candidate_sha": SHA["candidate"], "is_draft": True},
         "final_human_review": {
             "actor": "release-owner",
-            "comment_url": "https://github.com/autoMBD/workflow-sandbox/pull/74#issuecomment-991",
+            "comment_url": "https://github.com/autoMBD/workflow-sandbox/pull/74/reviews/991",
             "candidate_sha": SHA["candidate"],
             "decision": "APPROVE",
         },
@@ -403,8 +404,69 @@ def test_draft_pr_url_rejects_legacy_ipv4_without_rejecting_unambiguous_hosts():
     assert not accepted, "legacy numeric IPv4 hosts accepted: " + ", ".join(accepted)
 
 
+def test_final_human_review_comment_url_uses_closed_https_semantics():
+    gate = _gate()
+    for suffix in ("review/%E2%9C%93", "review/caf%C3%A9?decision=accept"):
+        record = _record()
+        record["final_human_review"]["comment_url"] = (
+            f"https://approval.invalid/{suffix}"
+        )
+        gate.validate_record(record, contract_path=CONTRACT_PATH)
+
+    invalid_urls = (
+        "http://approval.invalid/review/73",
+        "approval.invalid/review/73",
+        "https://reader:token@approval.invalid/review/73",
+        r"https://approval.invalid\@mirror.invalid/review/73",
+        "https://approval.invalid/review/%0G",
+        "https://approval.invalid/review/73#ambiguous",
+        "https://approval.invalid/review/bad path",
+        73,
+    )
+    accepted = []
+    for invalid_url in invalid_urls:
+        record = _record()
+        record["final_human_review"]["comment_url"] = invalid_url
+        try:
+            gate.validate_record(record, contract_path=CONTRACT_PATH)
+        except gate.WorkflowValidationError:
+            continue
+        accepted.append(repr(invalid_url))
+    assert not accepted, "invalid final-review locators accepted:\n" + "\n".join(accepted)
+
+
+def test_final_human_review_retains_closed_stage_and_candidate_bindings():
+    gate = _gate()
+    valid = _record()
+    valid["final_human_review"]["actor"] = "arbitrary-release-authority"
+    valid["final_human_review"]["decision"] = "ARBITRARY-NONEMPTY-DECISION"
+    gate.validate_record(valid, contract_path=CONTRACT_PATH)
+
+    mutations = []
+    for field in ("actor", "decision"):
+        record = _record()
+        record["final_human_review"][field] = ""
+        mutations.append(record)
+    stale = _record()
+    stale["final_human_review"]["candidate_sha"] = "5" * 40
+    mutations.append(stale)
+    premature = _record()
+    premature["checkpoint"] = "draft_pr_ready"
+    mutations.append(premature)
+    for record in mutations:
+        _expect_invalid(
+            lambda record=record: gate.validate_record(
+                record, contract_path=CONTRACT_PATH
+            )
+        )
+
+
 def test_category_a_case_catalog_has_no_category_b_agents_pointer():
     assert "AGENTS.md" not in CASE_CATALOG_PATH.read_text(encoding="utf-8")
+
+
+def test_category_a_test_strategy_has_no_category_b_agents_pointer():
+    assert "AGENTS.md" not in TEST_STRATEGY_PATH.read_text(encoding="utf-8")
 
 
 def test_checkpoint_evidence_is_null_before_generation_and_closed_after_generation():
