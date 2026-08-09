@@ -306,6 +306,11 @@ def _pull_request_comment(url: Any, repository: str, label: str) -> str:
         ),
         message,
     )
+    _require(
+        re.search(r"[?;](?=#)", value) is None
+        and re.match(r"^[A-Za-z][A-Za-z0-9+.-]*://[^/?#]*:/", value) is None,
+        message,
+    )
     try:
         parsed = urlparse(value)
         hostname = parsed.hostname
@@ -588,8 +593,8 @@ def _bootstrap_patterns() -> dict[str, re.Pattern[str]]:
         rf")"
     )
     debt_id = re.compile(
-        rf"(?i)\b(?:{p0}{gap}bs{gap}[0-9]+|"
-        rf"{p0}{gap}{boot}{gap}{debt_word}{gap}[0-9]+)\b"
+        rf"(?i)\b(?:{p0}{gap}bs|{p0}{gap}{boot}{gap}{debt_word})"
+        rf"(?:{gap}[0-9]+)?\b"
     )
     debt_pointer = re.compile(
         rf"(?i)^(?=.*\b{boot}\b)(?=.*\b(?:{evidence}|{pointer})\b).*$"

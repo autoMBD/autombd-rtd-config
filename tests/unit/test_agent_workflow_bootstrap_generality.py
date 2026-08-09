@@ -435,6 +435,44 @@ def test_final_human_review_requires_same_repository_pr_conversation_comments():
         gate.validate_record(record, contract_path=CONTRACT_PATH)
 
 
+def test_final_human_review_rejects_raw_empty_delimiters_before_url_parsing():
+    gate = _gate()
+    examples = (
+        ("forge.alpha.invalid", "Aurora-Systems", "torque_core", 381, 284, 65091),
+        ("code.beta.invalid", "Helix-Labs", "steer.unit", 642, 917, 408203),
+    )
+    accepted = []
+    for host, owner, name, issue_number, pull_number, comment_number in examples:
+        record = _record()
+        record["issue"]["repository"] = f"https://{host}/{owner}/{name}.git"
+        record["issue"]["number"] = issue_number
+        record["human_review_1"]["comment_url"] = (
+            f"https://{host}/{owner}/{name}/issues/{issue_number}"
+            f"#issuecomment-{comment_number + 1}"
+        )
+        base = f"https://{host}/{owner}/{name}/pull/{pull_number}"
+        fragment = f"#issuecomment-{comment_number}"
+        record["final_human_review"]["comment_url"] = base + fragment
+        record["final_human_review"]["actor"] = f"release authority for {owner}"
+        record["final_human_review"]["decision"] = f"accept pull {pull_number}"
+        gate.validate_record(record, contract_path=CONTRACT_PATH)
+
+        invalid_urls = (
+            base + "?" + fragment,
+            base + ";" + fragment,
+            f"https://{host}:/{owner}/{name}/pull/{pull_number}{fragment}",
+        )
+        for invalid_url in invalid_urls:
+            malformed = copy.deepcopy(record)
+            malformed["final_human_review"]["comment_url"] = invalid_url
+            try:
+                gate.validate_record(malformed, contract_path=CONTRACT_PATH)
+            except gate.WorkflowValidationError:
+                continue
+            accepted.append(invalid_url)
+    assert not accepted, "raw noncanonical delimiters accepted:\n" + "\n".join(accepted)
+
+
 def test_final_human_review_rejects_noncanonical_pr_comment_locators():
     gate = _gate()
     repository = "https://review.example.net/Delta-Works/power_node.git"
@@ -752,7 +790,7 @@ def _git_input(repo, arguments, data):
     ).stdout.strip().decode("ascii")
 
 
-def _commit_tree_with_long_payload_path(repo, content):
+def _commit_tree_with_long_payload_path(repo, content, *, root_name="payload"):
     blob = _git_input(repo, ["hash-object", "-w", "--stdin"], content)
     tree = _git_input(
         repo,
@@ -769,7 +807,7 @@ def _commit_tree_with_long_payload_path(repo, content):
     tree = _git_input(
         repo,
         ["mktree", "-z"],
-        f"040000 tree {tree}\tpayload\0".encode("ascii"),
+        f"040000 tree {tree}\t{root_name}\0".encode("ascii"),
     )
     return _git(repo, "commit-tree", tree, "-m", "long object-only payload")
 
@@ -896,6 +934,97 @@ def test_clearance_reads_long_tracked_paths_through_tree_object_ids(tmp_path):
     )
     assert report["bootstrap_generated_or_payload_count"] == 1
     assert report["temporary_removal_marker_count"] == 1
+
+
+@pytest.mark.parametrize(
+    ("repository_name", "marker_words", "numeric_id"),
+    (
+        ("clearance-alpha", ("P0", "BS"), 28461),
+        ("clearance-beta", ("P0", "bootstrap", "debt"), 90317),
+    ),
+)
+def test_clearance_rejects_bare_and_numeric_markers_across_declared_roots(
+    tmp_path, repository_name, marker_words, numeric_id
+):
+    gate = _gate()
+    repo = tmp_path / repository_name
+    repo.mkdir()
+    _git(repo, "init")
+    _git(repo, "config", "user.name", "Synthetic Clearance")
+    _git(repo, "config", "user.email", "clearance@example.invalid")
+    neutral_root = repo / "handoff-zone"
+    neutral_root.mkdir()
+    (neutral_root / "state.txt").write_text("durable state\n", encoding="utf-8")
+    ancestor_sha = _commit(repo, "clean ancestor evidence")
+    (neutral_root / "next.txt").write_text("durable next state\n", encoding="utf-8")
+    clean_sha = _commit(repo, "clean candidate")
+    clean_report = gate.audit_bootstrap_clearance(
+        repo, clean_sha, ["handoff-zone"], []
+    )
+    assert list(clean_report.values()) == [0] * 10
+
+    marker = "-".join(marker_words)
+    (neutral_root / "marker.txt").write_text(marker + "\n", encoding="utf-8")
+    notes = repo / "notes"
+    notes.mkdir()
+    (notes / "identity.txt").write_text(
+        f"{marker}-{numeric_id}\n", encoding="utf-8"
+    )
+    candidate_sha = _commit(repo, "candidate with temporary marker residue")
+    candidate_report = _clearance_report(
+        _expect_invalid(
+            lambda: gate.audit_bootstrap_clearance(
+                repo, candidate_sha, ["handoff-zone"], [ancestor_sha]
+            )
+        )
+    )
+    expected_candidate = dict.fromkeys(clean_report, 0)
+    expected_candidate["bootstrap_generated_or_payload_count"] = 1
+    expected_candidate["bootstrap_commit_ancestor_count"] = 1
+    expected_candidate["bootstrap_debt_id_count"] = 2
+    assert candidate_report == expected_candidate
+
+    outside = tmp_path / f"outside-{repository_name}"
+    outside.mkdir()
+    (outside / "markers.txt").write_text(
+        f"{marker}\n{marker}-{numeric_id + 7}\n", encoding="utf-8"
+    )
+    external_report = _clearance_report(
+        _expect_invalid(
+            lambda: gate.audit_bootstrap_clearance(repo, clean_sha, [outside], [])
+        )
+    )
+    expected_external = dict.fromkeys(clean_report, 0)
+    expected_external["bootstrap_generated_or_payload_count"] = 1
+    expected_external["bootstrap_debt_id_count"] = 2
+    assert external_report == expected_external
+
+
+def test_clearance_reads_bare_and_numeric_markers_from_long_candidate_paths(tmp_path):
+    gate = _gate()
+    repo = tmp_path / "long-marker-tree"
+    repo.mkdir()
+    _git(repo, "init")
+    _git(repo, "config", "user.name", "Synthetic Long Path")
+    _git(repo, "config", "user.email", "long-path@example.invalid")
+    marker = "-".join(("P0", "BS"))
+    candidate_sha = _commit_tree_with_long_payload_path(
+        repo,
+        f"{marker}\n{marker}-73146\n".encode("utf-8"),
+        root_name="archive-zone",
+    )
+
+    report = _clearance_report(
+        _expect_invalid(
+            lambda: gate.audit_bootstrap_clearance(
+                repo, candidate_sha, ["archive-zone"], []
+            )
+        )
+    )
+    expected = dict.fromkeys(report, 0)
+    expected["bootstrap_generated_or_payload_count"] = 1
+    expected["bootstrap_debt_id_count"] = 2
+    assert report == expected
 
 
 @pytest.mark.parametrize("raw_size", [b"+1", b"-1", b"1x"])
