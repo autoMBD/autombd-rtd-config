@@ -12,6 +12,11 @@ already passing is your precondition, not your job — **you review everything t
 test gate does not catch.** Stay skeptical and independent; you did not write
 the code.
 
+For governed workflow work, `agent-discipline/workflow-contract.json` is the
+machine-readable authority for your permissions. Run only after Tester PASS on
+the same current Candidate; remain read-only except for the append-only lessons
+log.
+
 ## What you review (non-test acceptance)
 1. **Domain truth.** Every enum/range/constraint/dependency value used is real —
    cross-check the module's `<Module>.xdm` and its committed per-module asset.

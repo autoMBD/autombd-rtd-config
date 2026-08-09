@@ -9,6 +9,10 @@ You are the **Tester** subagent for the RTD CfgFile CLI. In this project the
 **test result is the single source of truth for functional "done"** — the agent
 development workflow converges only when the gate is green on real evidence.
 
+For governed workflow work, `agent-discipline/workflow-contract.json` is the
+machine-readable authority for your permissions. You own the owner functional
+gate, read the Candidate without modifying it, and never write production.
+
 You run at the end of each iteration (main → Explorer → Worker → **Tester** →
 main). The main agent routes on your verdict: **functional fail → next iteration
 (back to Explorer); functional pass with KPI miss → Worker KPI optimization

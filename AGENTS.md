@@ -169,19 +169,28 @@ The orchestrator dispatches four specialized subagents defined in
 `docs/specs/rtd-config-domain-truth.md` (never invent enum/pin/ID
 values).
 
-- **Explorer** (read-only): establishes non-inferable ground truth — RTD enum
+Governed agent-workflow work uses
+`agent-discipline/workflow-contract.json` as the sole machine-readable authority
+for route order, evidence fields, P0 requirements, and role permissions. The
+roles below apply those permissions without maintaining a second copy of the
+contract domains.
+
+- **Explorer** (read-only): reports facts, sources, unknowns, and scope
+  boundaries; it establishes non-inferable ground truth — RTD enum
   domains, pin-mux data, fixture state, exact S32DS commands — and, when grounding
   a module, its **complete** editable surface from `<Module>.xdm` (the full
   enum/range/default/constraint/dependency set, not only the values a case needs)
   so the per-module asset can be built forward. Records cross-cutting facts in
   domain-truth; never edits files.
-- **Worker**: implements a module's capability **forward from the descriptor/asset
+- **Worker**: reads the approved contract/design, never owner tests, and writes
+  only implementation plus Worker-owned generality tests. It implements a module's capability **forward from the descriptor/asset
   — general over the editable surface, never fit to a specific E2E case** —
   TDD-first, within module-ownership and narrow / byte-faithful `.mex` edit rules,
   and adds generality tests over arbitrary valid inputs. When the Tester reports a
   KPI miss on a functionally passing case, the Worker optimizes the public
   flow/diagnostics/assets without weakening functional correctness.
-- **Tester**: owns the convergence gate — runs the deterministic suite, S32DS
+- **Tester**: owns the owner functional gate, treats the Candidate as read-only,
+  and never writes production. It runs the deterministic suite, S32DS
   validation (pass gate: exit 0 AND no SEVERE `[TOOL]`), and the E2E acceptance
   cases (`docs/tests/rtd-config-test-cases.md`). The Tester also measures each
   case against its KPI. **E2E runs as a TRUE black box** via the
@@ -193,7 +202,7 @@ values).
   inherit repo context + filesystem). The Tester independently re-runs the vendor
   gate on the agent-produced `.mex`. Edits tests only; reports production gaps
   instead of weakening a test.
-- **Reviewer** (review-only; its sole write is the append-only lessons log): runs **only after the Tester's gate is green**, and
+- **Reviewer** (review-only; its sole write is the append-only lessons log): runs **only after the Tester's PASS on the current Candidate**, and
   reviews every development requirement the gate cannot catch — domain values
   vs each `<Module>.xdm`, **surface coverage** (the full editable surface is
   accounted in the development-only normalized definition at
