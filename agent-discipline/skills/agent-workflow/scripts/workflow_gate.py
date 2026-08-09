@@ -292,6 +292,48 @@ def _https_url(url: Any, label: str) -> str:
     return value
 
 
+def _pull_request_comment(url: Any, repository: str, label: str) -> str:
+    value = _string(url, label)
+    message = f"{label} must identify an unambiguous top-level Pull Request conversation comment"
+    _require("%" not in value, message)
+    _require(
+        not any(
+            ord(character) < 32
+            or 127 <= ord(character) <= 159
+            or character == "\\"
+            or character.isspace()
+            for character in value
+        ),
+        message,
+    )
+    try:
+        parsed = urlparse(value)
+        hostname = parsed.hostname
+        port = parsed.port
+    except ValueError:
+        _error(message)
+    host, owner, name = _repo_identity(repository)
+    _require(
+        parsed.scheme == "https"
+        and hostname is not None
+        and _valid_hostname(hostname)
+        and hostname.lower() == host
+        and parsed.username is None
+        and parsed.password is None
+        and port is None
+        and not parsed.params
+        and not parsed.query,
+        message,
+    )
+    pull_path = re.escape(f"/{owner}/{name}/pull/") + r"[1-9][0-9]*"
+    _require(re.fullmatch(pull_path, parsed.path) is not None, message)
+    _require(
+        re.fullmatch(r"issuecomment-[1-9][0-9]*", parsed.fragment) is not None,
+        message,
+    )
+    return value
+
+
 def _preflight_item(item: Any, contract: dict[str, Any], label: str) -> str:
     fields = contract["object_fields"]
     value = _closed_object(item, fields["preflight_item"], label)
@@ -431,7 +473,11 @@ def validate_record(record, *, contract_path):
     final_review = _checkpoint_object(value, contract, "final_human_review")
     if final_review is not None:
         _string(final_review["actor"], "record.final_human_review.actor")
-        _https_url(final_review["comment_url"], "record.final_human_review.comment_url")
+        _pull_request_comment(
+            final_review["comment_url"],
+            repository,
+            "record.final_human_review.comment_url",
+        )
         _string(final_review["decision"], "record.final_human_review.decision")
         _require(final_review["candidate_sha"] == candidate_sha, "Final Human Review is not bound to the current Candidate")
 

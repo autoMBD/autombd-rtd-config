@@ -153,7 +153,7 @@ def _record():
         "draft_pr": {"url": "https://github.com/autoMBD/workflow-sandbox/pull/74", "candidate_sha": SHA["candidate"], "is_draft": True},
         "final_human_review": {
             "actor": "release-owner",
-            "comment_url": "https://github.com/autoMBD/workflow-sandbox/pull/74/reviews/991",
+            "comment_url": "https://github.com/autoMBD/workflow-sandbox/pull/74#issuecomment-991",
             "candidate_sha": SHA["candidate"],
             "decision": "APPROVE",
         },
@@ -404,35 +404,147 @@ def test_draft_pr_url_rejects_legacy_ipv4_without_rejecting_unambiguous_hosts():
     assert not accepted, "legacy numeric IPv4 hosts accepted: " + ", ".join(accepted)
 
 
-def test_final_human_review_comment_url_uses_closed_https_semantics():
+def test_final_human_review_requires_same_repository_pr_conversation_comments():
     gate = _gate()
-    for suffix in ("review/%E2%9C%93", "review/caf%C3%A9?decision=accept"):
+    examples = (
+        (
+            "stellar-labs/drive_kernel",
+            2861,
+            "https://github.com/stellar-labs/drive_kernel/issues/2861#issuecomment-77123",
+            "https://github.com/stellar-labs/drive_kernel/pull/4729#issuecomment-830041",
+            "release authority alpha",
+            "ACCEPT_AFTER_SAFETY_REVIEW",
+        ),
+        (
+            "https://code.example.net/Vector-Works/brake.control.git",
+            643,
+            "https://code.example.net/Vector-Works/brake.control/issues/643#issuecomment-77123",
+            "https://code.example.net/Vector-Works/brake.control/pull/906#issuecomment-410007",
+            "independent approver beta",
+            "ship-with-recorded-rationale",
+        ),
+    )
+    for repository, issue_number, review_1_url, comment_url, actor, decision in examples:
         record = _record()
-        record["final_human_review"]["comment_url"] = (
-            f"https://approval.invalid/{suffix}"
-        )
+        record["issue"]["repository"] = repository
+        record["issue"]["number"] = issue_number
+        record["human_review_1"]["comment_url"] = review_1_url
+        record["final_human_review"]["comment_url"] = comment_url
+        record["final_human_review"]["actor"] = actor
+        record["final_human_review"]["decision"] = decision
         gate.validate_record(record, contract_path=CONTRACT_PATH)
 
+
+def test_final_human_review_rejects_noncanonical_pr_comment_locators():
+    gate = _gate()
+    repository = "https://review.example.net/Delta-Works/power_node.git"
+    issue_number = 502
+    valid_base = "https://review.example.net/Delta-Works/power_node/pull/418"
     invalid_urls = (
-        "http://approval.invalid/review/73",
-        "approval.invalid/review/73",
-        "https://reader:token@approval.invalid/review/73",
-        r"https://approval.invalid\@mirror.invalid/review/73",
-        "https://approval.invalid/review/%0G",
-        "https://approval.invalid/review/73#ambiguous",
-        "https://approval.invalid/review/bad path",
-        73,
+        "http://review.example.net/Delta-Works/power_node/pull/418#issuecomment-62001",
+        "review.example.net/Delta-Works/power_node/pull/418#issuecomment-62001",
+        "https://mirror.example.net/Delta-Works/power_node/pull/418#issuecomment-62001",
+        "https://review.example.net/Other-Works/power_node/pull/418#issuecomment-62001",
+        "https://review.example.net/Delta-Works/other_node/pull/418#issuecomment-62001",
+        "https://reader:token@review.example.net/Delta-Works/power_node/pull/418#issuecomment-62001",
+        "https://review.example.net:443/Delta-Works/power_node/pull/418#issuecomment-62001",
+        "https://review.example.net/Delta-Works/power_node/issues/418#issuecomment-62001",
+        "https://review.example.net/Delta-Works/power_node/pull/418/reviews/62001#issuecomment-62001",
+        "https://review.example.net/Delta-Works/power_node/pull/418/files#issuecomment-62001",
+        "https://review.example.net/Delta-Works/power_node/pull/0#issuecomment-62001",
+        "https://review.example.net/Delta-Works/power_node/pull/0418#issuecomment-62001",
+        "https://review.example.net/Delta-Works/power_node/pull/not-decimal#issuecomment-62001",
+        "https://review.example.net/Delta-Works/power_node/pull/418?view=conversation#issuecomment-62001",
+        valid_base,
+        f"{valid_base}#pullrequestreview-62001",
+        f"{valid_base}#issuecomment-0",
+        f"{valid_base}#issuecomment-062001",
+        f"{valid_base}#issuecomment-not-decimal",
+        418,
     )
     accepted = []
     for invalid_url in invalid_urls:
         record = _record()
+        record["issue"]["repository"] = repository
+        record["issue"]["number"] = issue_number
+        record["human_review_1"]["comment_url"] = (
+            "https://review.example.net/Delta-Works/power_node/issues/502"
+            "#issuecomment-77123"
+        )
         record["final_human_review"]["comment_url"] = invalid_url
         try:
             gate.validate_record(record, contract_path=CONTRACT_PATH)
         except gate.WorkflowValidationError:
             continue
         accepted.append(repr(invalid_url))
-    assert not accepted, "invalid final-review locators accepted:\n" + "\n".join(accepted)
+    assert not accepted, "noncanonical final-review locators accepted:\n" + "\n".join(accepted)
+
+
+def test_final_human_review_rejects_encoded_ambiguity_and_control_characters():
+    gate = _gate()
+    valid_base = "https://secure.example.org/Control-Team/chassis_fw/pull/719"
+    invalid_urls = [
+        f"{valid_base}%",
+        f"{valid_base}%0G#issuecomment-92017",
+        f"{valid_base}%FF#issuecomment-92017",
+        f"{valid_base}%C0%AF#issuecomment-92017",
+        "https://secure.example.org/Control-Team/chassis_fw/pull/%37%31%39#issuecomment-92017",
+        "https://secure.example.org/Control-Team/chassis_fw/pull/719%2Ffiles#issuecomment-92017",
+        "https://secure.example.org/Control-Team/chassis_fw/pull/719%3Ftab#issuecomment-92017",
+        "https://secure.example.org/Control-Team/chassis_fw/pull/719%23issuecomment-92017",
+        "https://secure.example.org/Control-Team/chassis_fw/pull/719#issuecomment-%39%32%30%31%37",
+        "https://secure.example.org%2FControl-Team/chassis_fw/pull/719#issuecomment-92017",
+        r"https://secure.example.org\@mirror.example.org/Control-Team/chassis_fw/pull/719#issuecomment-92017",
+        r"https://secure.example.org/Control-Team\chassis_fw/pull/719#issuecomment-92017",
+        "https://secure.example.org/Control-Team%5Cchassis_fw/pull/719#issuecomment-92017",
+        "https://secure.example.org/Control-Team/chassis_fw/pull/719%20#issuecomment-92017",
+    ]
+    invalid_urls.extend(
+        f"{valid_base}{chr(code)}#issuecomment-92017"
+        for code in (*range(32), *range(0x80, 0xA0), 127)
+    )
+    invalid_urls.extend(
+        f"{valid_base}%{code:02X}#issuecomment-92017"
+        for code in (*range(32), *range(0x80, 0xA0), 92, 127)
+    )
+    invalid_urls.extend(
+        f"{valid_base}%C2%{code:02X}#issuecomment-92017"
+        for code in range(0x80, 0xA0)
+    )
+
+    accepted = []
+    for invalid_url in invalid_urls:
+        record = _record()
+        record["issue"]["repository"] = "secure.example.org/Control-Team/chassis_fw"
+        record["issue"]["number"] = 811
+        record["human_review_1"]["comment_url"] = (
+            "https://secure.example.org/Control-Team/chassis_fw/issues/811"
+            "#issuecomment-77123"
+        )
+        record["final_human_review"]["comment_url"] = invalid_url
+        try:
+            gate.validate_record(record, contract_path=CONTRACT_PATH)
+        except gate.WorkflowValidationError:
+            continue
+        accepted.append(repr(invalid_url))
+    assert not accepted, "ambiguous final-review locators accepted:\n" + "\n".join(accepted)
+
+
+@pytest.mark.parametrize("hostname", ("review..example", "0x7f000001"))
+def test_final_human_review_requires_an_unambiguous_repository_host(hostname):
+    gate = _gate()
+    record = _record()
+    record["issue"]["repository"] = f"https://{hostname}/Safety-Team/body_gateway.git"
+    record["issue"]["number"] = 347
+    record["human_review_1"]["comment_url"] = (
+        f"https://{hostname}/Safety-Team/body_gateway/issues/347#issuecomment-58103"
+    )
+    record["final_human_review"]["comment_url"] = (
+        f"https://{hostname}/Safety-Team/body_gateway/pull/126#issuecomment-74009"
+    )
+    _expect_invalid(
+        lambda: gate.validate_record(record, contract_path=CONTRACT_PATH)
+    )
 
 
 def test_final_human_review_retains_closed_stage_and_candidate_bindings():
