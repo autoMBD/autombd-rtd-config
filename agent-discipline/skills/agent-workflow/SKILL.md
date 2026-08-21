@@ -20,7 +20,8 @@ extend those domains in prompts, records, or prose.
    evidence consistent with the validated record.
 4. Keep Test and Implementation lanes on the approved Base. A Worker reads only
    the approved contract/design and writes implementation plus Worker-owned
-   generality tests; it never reads owner tests.
+   generality tests; it never reads owner tests. At every role handoff, use the
+   standalone guard sequence described below.
 5. Require immutable Human Review 1 evidence bound to the authorized reviewer
    and full Test commit before implementation advances.
 6. Assemble a Candidate only from the recorded Test and Implementation lane
@@ -33,6 +34,31 @@ extend those domains in prompts, records, or prose.
 9. Bind the draft PR and final Human Review to the same current Candidate.
 10. Before completion, validate both lane manifests and run bootstrap clearance
     against the Candidate commit tree and every deployment path.
+
+## Handoff guard
+
+At every role handoff, invoke all three operations in order with the same
+manifest, receipt, and event-log paths:
+
+```console
+python agent-discipline/skills/agent-workflow/scripts/handoff_guard.py prepare --role <role> --expected-top-level <canonical-worktree> --base-sha <sha> --lane-sha <sha> --contract-path <relative-path> --contract-blob-sha <sha> --manifest <manifest.json> --receipt <receipt.json> --event-log <events.jsonl> --timeout-seconds <seconds> -- <explicit-argv>
+python agent-discipline/skills/agent-workflow/scripts/handoff_guard.py check-handoff --manifest <manifest.json> --receipt <receipt.json> --event-log <events.jsonl>
+python agent-discipline/skills/agent-workflow/scripts/handoff_guard.py run --manifest <manifest.json> --receipt <receipt.json> --event-log <events.jsonl>
+```
+
+`prepare` pins the canonical worktree, HEAD, contract blob, role, exact argv,
+and timeout after checking the current identity; the base SHA names an ancestor commit
+of that HEAD. `check-handoff` and `run` require the prior receipt's manifest digest
+to match the current raw manifest bytes before rechecking identity. `run` then
+executes only the pinned argv. Each invocation atomically replaces the receipt
+and appends one canonical JSON event to the append-only event log; preserve both
+as handoff evidence.
+
+The guard checks identity, not repository cleanliness: it does not inspect dirty status.
+Because execution uses an exact argv without a shell, `.cmd` and `.bat`
+commands require an explicit interpreter such as `cmd.exe /d /c`. Operational
+observations do not imply semantic classification; apply contract semantics and
+finding dispositions separately.
 
 ## Validator
 

@@ -45,6 +45,7 @@
 # =================================================================================
 
 import copy
+import hashlib
 import importlib.util
 import inspect
 import json
@@ -67,6 +68,15 @@ GATE_PATH = (
     / "scripts"
     / "workflow_gate.py"
 )
+HANDOFF_GUARD_PATH = (
+    ROOT
+    / "agent-discipline"
+    / "skills"
+    / "agent-workflow"
+    / "scripts"
+    / "handoff_guard.py"
+)
+WORKFLOW_SKILL_PATH = ROOT / "agent-discipline" / "skills" / "agent-workflow" / "SKILL.md"
 SHA = {name: character * 40 for name, character in zip(
     ("base", "test", "implementation", "candidate"), "1234"
 )}
@@ -1052,3 +1062,245 @@ def test_clearance_rejects_non_decimal_cat_file_blob_sizes(tmp_path, monkeypatch
         lambda: gate.audit_bootstrap_clearance(repo, candidate_sha, ["payload.bin"], [])
     )
     assert "invalid blob size" in str(error)
+
+
+def _run_handoff_guard(repo, *arguments):
+    return subprocess.run(
+        [sys.executable, str(HANDOFF_GUARD_PATH), *arguments],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+    )
+
+
+@pytest.mark.parametrize(
+    ("repository_name", "role", "contract_relative", "evidence_relative", "command", "result_relative", "timeout"),
+    (
+        (
+            "aurora-handoff",
+            "explorer-probe",
+            "policy/aurora.json",
+            "records/north",
+            "from pathlib import Path; Path('aurora.done').write_text('north', encoding='utf-8')",
+            "aurora.done",
+            11,
+        ),
+        (
+            "zephyr-handoff",
+            "review-auditor",
+            "rules/zephyr.txt",
+            "audit/east",
+            "from pathlib import Path; Path('zephyr.result').write_text('east', encoding='utf-8')",
+            "zephyr.result",
+            19,
+        ),
+    ),
+)
+def test_handoff_guard_runs_independent_synthetic_git_handoffs(
+    tmp_path, repository_name, role, contract_relative, evidence_relative,
+    command, result_relative, timeout
+):
+    repo = tmp_path / repository_name
+    repo.mkdir()
+    _git(repo, "init")
+    _git(repo, "config", "user.name", "Synthetic Handoff")
+    _git(repo, "config", "user.email", "handoff@example.invalid")
+    contract = repo / contract_relative
+    contract.parent.mkdir(parents=True)
+    contract.write_text(f"contract for {role}\n", encoding="utf-8")
+    base_sha = _commit(repo, f"establish {role} base")
+    (repo / f"lane-{role}.txt").write_text("lane identity\n", encoding="utf-8")
+    lane_sha = _commit(repo, f"advance {role} lane")
+    contract_blob_sha = _git(repo, "hash-object", contract_relative)
+    evidence = repo / evidence_relative
+    evidence.mkdir(parents=True)
+    manifest, receipt, event_log = (
+        evidence / "manifest.json", evidence / "receipt.json", evidence / "events.jsonl"
+    )
+    child_argv = [sys.executable, "-c", command]
+    common = ["--manifest", str(manifest), "--receipt", str(receipt), "--event-log", str(event_log)]
+    prepare = _run_handoff_guard(
+        repo, "prepare", "--role", role, "--expected-top-level", str(repo.resolve()),
+        "--base-sha", base_sha, "--lane-sha", lane_sha,
+        "--contract-path", contract_relative, "--contract-blob-sha", contract_blob_sha,
+        *common, "--timeout-seconds", str(timeout), "--", *child_argv,
+    )
+    assert prepare.returncode == 0, prepare.stderr
+    manifest_value = json.loads(manifest.read_text(encoding="utf-8"))
+    assert manifest_value["role"] == role
+    assert manifest_value["argv"] == child_argv
+    assert manifest_value["timeout_seconds"] == timeout
+
+    (repo / f"untracked-{role}.txt").write_text("dirty state is outside identity\n", encoding="utf-8")
+    checked = _run_handoff_guard(repo, "check-handoff", *common)
+    assert checked.returncode == 0, checked.stderr
+    executed = _run_handoff_guard(repo, "run", *common)
+    assert executed.returncode == 0, executed.stderr
+    assert (repo / result_relative).is_file()
+    events = [json.loads(line) for line in event_log.read_text(encoding="utf-8").splitlines()]
+    assert [event["operation"] for event in events] == ["prepare", "check-handoff", "run"]
+    assert [event["outcome"] for event in events] == ["PREPARED", "CHECKED", "EXITED"]
+    assert {event["manifest_sha256"] for event in events} == {
+        hashlib.sha256(manifest.read_bytes()).hexdigest()
+    }
+    assert json.loads(receipt.read_text(encoding="utf-8")) == events[-1]
+
+
+@pytest.mark.parametrize("operation", ("prepare", "check-handoff", "run"))
+@pytest.mark.parametrize("base_kind", ("missing", "blob", "tree", "tag", "nonancestor"))
+def test_handoff_guard_rejects_invalid_base_for_every_operation(
+    tmp_path, operation, base_kind
+):
+    role = f"{base_kind}-{operation}-probe"
+    repo = tmp_path / f"identity-{base_kind}-{operation}"
+    repo.mkdir()
+    _git(repo, "init")
+    _git(repo, "config", "user.name", "Synthetic Identity")
+    _git(repo, "config", "user.email", "identity@example.invalid")
+    contract_relative = f"policy/{base_kind}/{operation}.txt"
+    contract = repo / contract_relative
+    contract.parent.mkdir(parents=True)
+    contract.write_text(f"identity contract for {role}\n", encoding="utf-8")
+    valid_base = _commit(repo, f"establish {role} base")
+    (repo / "lane.txt").write_text(f"lane for {role}\n", encoding="utf-8")
+    lane_sha = _commit(repo, f"advance {role} lane")
+    contract_blob_sha = _git(repo, "hash-object", contract_relative)
+    if base_kind == "missing":
+        invalid_base = "e" * 40
+    elif base_kind == "blob":
+        invalid_base = contract_blob_sha
+    elif base_kind == "tree":
+        invalid_base = _git(repo, "rev-parse", "HEAD^{tree}")
+    elif base_kind == "tag":
+        _git(repo, "tag", "-a", "detached-base", valid_base, "-m", f"tag for {role}")
+        invalid_base = _git(repo, "rev-parse", "refs/tags/detached-base")
+    else:
+        invalid_base = _git(
+            repo, "commit-tree", _git(repo, "rev-parse", "HEAD^{tree}"),
+            "-m", f"detached {role}",
+        )
+    evidence = repo / "identity-evidence"
+    evidence.mkdir()
+    manifest, receipt, event_log = (
+        evidence / "manifest.json", evidence / "receipt.json", evidence / "events.jsonl"
+    )
+    marker = f"spawned-{base_kind}-{operation}.txt"
+    child_argv = [
+        sys.executable, "-c",
+        f"from pathlib import Path; Path('{marker}').write_text('spawned', encoding='utf-8')",
+    ]
+    common = ["--manifest", str(manifest), "--receipt", str(receipt), "--event-log", str(event_log)]
+
+    if operation != "prepare":
+        prepared = _run_handoff_guard(
+            repo, "prepare", "--role", role, "--expected-top-level", str(repo.resolve()),
+            "--base-sha", valid_base, "--lane-sha", lane_sha,
+            "--contract-path", contract_relative, "--contract-blob-sha", contract_blob_sha,
+            *common, "--timeout-seconds", "23", "--", *child_argv,
+        )
+        assert prepared.returncode == 0, prepared.stderr
+        manifest_value = json.loads(manifest.read_text(encoding="utf-8"))
+        manifest_value["base_sha"] = invalid_base
+        raw = json.dumps(
+            manifest_value, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+        ).encode("utf-8")
+        manifest.write_bytes(raw)
+        receipt_value = json.loads(receipt.read_text(encoding="utf-8"))
+        receipt_value["manifest_sha256"] = hashlib.sha256(raw).hexdigest()
+        receipt.write_text(json.dumps(receipt_value), encoding="utf-8")
+        result = _run_handoff_guard(repo, operation, *common)
+    else:
+        result = _run_handoff_guard(
+            repo, "prepare", "--role", role, "--expected-top-level", str(repo.resolve()),
+            "--base-sha", invalid_base, "--lane-sha", lane_sha,
+            "--contract-path", contract_relative, "--contract-blob-sha", contract_blob_sha,
+            *common, "--timeout-seconds", "23", "--", *child_argv,
+        )
+
+    assert result.returncode == 1, result.stderr
+    assert json.loads(receipt.read_text(encoding="utf-8"))["outcome"] == "REJECTED"
+    assert not (repo / marker).exists()
+
+
+@pytest.mark.parametrize("operation", ("check-handoff", "run"))
+@pytest.mark.parametrize(
+    "receipt_state", ("missing", "malformed", "duplicate", "manifest-rewrite")
+)
+def test_handoff_guard_requires_prior_receipt_digest_continuity(
+    tmp_path, operation, receipt_state
+):
+    role = f"continuity-{receipt_state}-{operation}"
+    repo = tmp_path / f"continuity-{receipt_state}-{operation}"
+    repo.mkdir()
+    _git(repo, "init")
+    _git(repo, "config", "user.name", "Synthetic Continuity")
+    _git(repo, "config", "user.email", "continuity@example.invalid")
+    contract_relative = f"rules/{receipt_state}/{operation}.cfg"
+    contract = repo / contract_relative
+    contract.parent.mkdir(parents=True)
+    contract.write_text(f"continuity contract for {role}\n", encoding="utf-8")
+    base_sha = _commit(repo, f"establish {role} base")
+    (repo / "lane.txt").write_text(f"lane for {role}\n", encoding="utf-8")
+    lane_sha = _commit(repo, f"advance {role} lane")
+    contract_blob_sha = _git(repo, "hash-object", contract_relative)
+    evidence = repo / "continuity-evidence"
+    evidence.mkdir()
+    manifest, receipt, event_log = (
+        evidence / "manifest.json", evidence / "receipt.json", evidence / "events.jsonl"
+    )
+    marker = f"spawned-{receipt_state}-{operation}.txt"
+    child_argv = [
+        sys.executable, "-c",
+        f"from pathlib import Path; Path('{marker}').write_text('spawned', encoding='utf-8')",
+    ]
+    common = ["--manifest", str(manifest), "--receipt", str(receipt), "--event-log", str(event_log)]
+    prepared = _run_handoff_guard(
+        repo, "prepare", "--role", role, "--expected-top-level", str(repo.resolve()),
+        "--base-sha", base_sha, "--lane-sha", lane_sha,
+        "--contract-path", contract_relative, "--contract-blob-sha", contract_blob_sha,
+        *common, "--timeout-seconds", "31", "--", *child_argv,
+    )
+    assert prepared.returncode == 0, prepared.stderr
+
+    if receipt_state == "missing":
+        receipt.unlink()
+    elif receipt_state == "malformed":
+        receipt.write_bytes(b"{malformed-receipt")
+    elif receipt_state == "duplicate":
+        receipt_value = json.loads(receipt.read_text(encoding="utf-8"))
+        correct = receipt_value["manifest_sha256"]
+        field = f'"manifest_sha256":"{correct}"'
+        duplicate = f'"manifest_sha256":"{"0" * 64}",{field}'
+        receipt.write_text(
+            receipt.read_text(encoding="utf-8").replace(field, duplicate, 1),
+            encoding="utf-8",
+        )
+    else:
+        manifest_value = json.loads(manifest.read_text(encoding="utf-8"))
+        manifest.write_text(
+            json.dumps(manifest_value, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+    result = _run_handoff_guard(repo, operation, *common)
+
+    assert result.returncode == 1, result.stderr
+    assert json.loads(receipt.read_text(encoding="utf-8"))["outcome"] == "REJECTED"
+    assert not (repo / marker).exists()
+
+
+def test_workflow_skill_requires_guarded_handoffs_and_states_boundaries():
+    skill = WORKFLOW_SKILL_PATH.read_text(encoding="utf-8")
+    for operation in ("prepare", "check-handoff", "run"):
+        assert f"handoff_guard.py {operation}" in skill
+    for boundary in (
+        "receipt",
+        "append-only event log",
+        "does not inspect dirty status",
+        "explicit interpreter",
+        ".cmd",
+        ".bat",
+        "observations do not imply semantic classification",
+        "base SHA names an ancestor commit",
+        "prior receipt's manifest digest",
+    ):
+        assert boundary in skill
