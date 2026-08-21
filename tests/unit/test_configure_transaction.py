@@ -47,6 +47,8 @@
 from __future__ import annotations
 
 from dataclasses import replace
+import hashlib
+import inspect
 import os
 from pathlib import Path
 import stat
@@ -97,11 +99,50 @@ def _passed_static(*_args, **_kwargs):
     return SimpleNamespace(status="passed", diagnostics=[], to_dict=lambda: {"status": "passed"})
 
 
+def _path_record(path: Path):
+    status = os.lstat(path)
+    identity = (status.st_dev, status.st_ino) if status.st_ino else None
+    if stat.S_ISLNK(status.st_mode):
+        return ("link", identity, os.readlink(path))
+    if stat.S_ISREG(status.st_mode):
+        return ("file", identity, path.read_bytes())
+    return ("directory", identity, None)
+
+
+def _directory_inventory(root: Path):
+    return {
+        path.relative_to(root).as_posix(): _path_record(path)
+        for path in sorted(root.rglob("*"))
+    }
+
+
+def _assert_failure_has_no_path_leak(failure: CliFailure, root: Path) -> None:
+    def strings(value):
+        if isinstance(value, dict) or hasattr(value, "items"):
+            for key, item in value.items():
+                if key == "preserved":
+                    assert all(Path(name).name == name for name in item)
+                yield str(key)
+                yield from strings(item)
+        elif isinstance(value, (list, tuple, set, frozenset)):
+            for item in value:
+                yield from strings(item)
+        elif isinstance(value, (str, Path)):
+            yield str(value)
+
+    roots = {str(root.resolve()), root.resolve().as_posix()}
+    for text in strings({"message": failure.message, "details": failure.details}):
+        assert not any(value in text for value in roots)
+        assert not Path(text).is_absolute()
+
+
 def test_static_checks_actual_same_directory_candidate_before_publish(tmp_path):
     project = _prepared_project(tmp_path)
     mex = project.mex_file
     original = mex.read_bytes()
-    observed = {}
+    observed = {"seam": 0}
+
+    def reject_backup(*_args): observed["seam"] += 1; pytest.fail("backup=False reached absent-backup seam")
 
     def inspect_candidate(path, *, doc, verified_target, bundle, **_kwargs):
         observed["path"] = path
@@ -115,11 +156,12 @@ def test_static_checks_actual_same_directory_candidate_before_publish(tmp_path):
         return _passed_static()
 
     try:
-        result = ConfigureTransaction(project, static_runner=inspect_candidate).execute(
+        result = ConfigureTransaction(project, static_runner=inspect_candidate, backup_install_absent_fn=reject_backup).execute(
             _intent(), _edit
         )
         assert result.status == "passed"
         assert mex.read_bytes() == result.published_bytes
+        assert observed["seam"] == 0 and not mex.with_name(mex.name + ".bak").exists()
         assert not observed["path"].exists()
     finally:
         project.close()
@@ -175,6 +217,59 @@ def test_backup_uses_original_snapshot_bytes(tmp_path):
     assert mex.with_name(mex.name + ".bak").read_bytes() == original
 
 
+def test_absent_backup_seam_and_real_helper_own_publication_state(
+    monkeypatch, tmp_path
+):
+    constructor = inspect.signature(ConfigureTransaction).parameters
+    assert tuple(constructor) == ("project", "plan", "binding", "backup", "static_runner", "vendor_runner", "atomic_publish_fn", "release_for_publish_fn", "backup_install_absent_fn")
+    dependency = constructor["backup_install_absent_fn"]
+    assert (dependency.kind, dependency.default, dependency.annotation) == (inspect.Parameter.KEYWORD_ONLY, None, "Callable[[Path, Path], None] | None")
+    helper = inspect.signature(target_module.atomic_install_absent).parameters
+    assert tuple(helper) == ("path", "staging", "candidate_sha256", "platform", "install_fn")
+    assert (helper["install_fn"].kind, helper["install_fn"].default, helper["install_fn"].annotation) == (inspect.Parameter.KEYWORD_ONLY, None, "Callable[[Path, Path], None] | None")
+
+    platform = default_target_platform()
+    destination, candidate = tmp_path / "backup.mex", tmp_path / "candidate.tmp"
+    destination.write_bytes(b"external")
+    called = []
+    with pytest.raises(CliFailure) as conflict:
+        target_module.atomic_install_absent(
+            destination, candidate, "unused", platform, install_fn=lambda *args: called.append(args)
+        )
+    assert conflict.value.code == "configure_backup_changed"
+    assert called == []
+
+    destination.unlink()
+    candidate.write_bytes(b"candidate")
+    expected_sha = hashlib.sha256(b"candidate").hexdigest()
+    observed = []
+    def snapshot_file(path): observed.append(("snapshot", path)); return platform.snapshot_file(path)
+    def install_absent(source, target):
+        observed.append(("install", source, target))
+        platform.install_absent(source, target)
+        return target_module.AtomicPublishResult(FileSnapshot(target, FileIdentity(None, None, None), 0, 0, 0, "forged", b""), None, None, AtomicPublishState(target, source))
+    spy = SimpleNamespace(install_absent=install_absent, snapshot_file=snapshot_file)
+    result = target_module.atomic_install_absent(destination, candidate, expected_sha, spy)
+    assert observed == [("snapshot", candidate), ("install", candidate, destination), ("snapshot", destination)]
+    assert result.state is not None and result.state.phase == "published"
+    assert result.published == result.state.published
+    assert result.published.sha256 == expected_sha
+
+    destination.unlink()
+    candidate.write_bytes(b"candidate")
+    snapshot = platform.snapshot_file
+    monkeypatch.setattr(platform, "snapshot_file", lambda path: (_ for _ in ()).throw(OSError()) if path == destination else snapshot(path))
+    with pytest.raises(AtomicPublishFailure) as uncertain:
+        target_module.atomic_install_absent(
+            destination, candidate, expected_sha, platform,
+            install_fn=platform.install_absent,
+        )
+    assert uncertain.value.code == "configure_backup_uncertain"
+    assert uncertain.value.state.phase == "installed"
+    assert uncertain.value.state.destination == destination
+    monkeypatch.setattr(platform, "snapshot_file", snapshot)
+
+
 def test_noop_does_not_stage_backup_or_replace(tmp_path):
     project = _prepared_project(tmp_path)
     mex = project.mex_file
@@ -189,10 +284,11 @@ def test_noop_does_not_stage_backup_or_replace(tmp_path):
     try:
         result = ConfigureTransaction(
             project,
-            backup=True,
+            backup=False,
             static_runner=_passed_static,
             atomic_publish_fn=forbidden,
             release_for_publish_fn=forbidden,
+            backup_install_absent_fn=forbidden,
         ).execute(_intent(), no_change)
         assert result.status == "passed"
         assert result.changed_modules == []
@@ -979,27 +1075,43 @@ def test_target_publish_failure_rolls_back_backup_pair(tmp_path, preexisting):
 
 
 def test_absent_backup_syscall_race_preserves_external_backup(
-    monkeypatch, tmp_path
+    monkeypatch, tmp_path,
 ):
     project = _prepared_project(tmp_path)
     mex = project.mex_file
     original = mex.read_bytes()
     backup = mex.with_name(mex.name + ".bak")
     attacker = b"external-backup"
-    install = transaction_module.atomic_install_absent
+    platform = project.verified_target.lease._resources["platform"]
+    before = _directory_inventory(mex.parent)
+    observed = {}
 
-    def race(path, staging, candidate_sha256, *, platform):
-        path.write_bytes(attacker)
-        return install(path, staging, candidate_sha256, platform=platform)
+    def lose_absent_race(candidate, destination):
+        destination.write_bytes(attacker)
+        observed["attacker"] = _path_record(destination)
+        platform.install_absent(candidate, destination)
 
-    monkeypatch.setattr(transaction_module, "atomic_install_absent", race)
+    helper = target_module.atomic_install_absent
+    def require_exact_forwarding(path, staging, sha, platform=None, *, install_fn=None):
+        observed["forwarded"] = True
+        assert platform is project.verified_target.lease._resources["platform"]
+        assert install_fn is lose_absent_race
+        return helper(path, staging, sha, platform, install_fn=install_fn)
+    monkeypatch.setattr(transaction_module, "atomic_install_absent", require_exact_forwarding)
     with pytest.raises(CliFailure) as caught:
         ConfigureTransaction(
-            project, backup=True, static_runner=_passed_static
+            project,
+            backup=True,
+            static_runner=_passed_static,
+            backup_install_absent_fn=lose_absent_race,
         ).execute(_intent(), _edit)
     assert caught.value.code == "configure_backup_changed"
-    assert mex.read_bytes() == original
-    assert backup.read_bytes() == attacker
+    assert observed["forwarded"] is True
+    expected = dict(before)
+    expected[backup.name] = observed["attacker"]
+    assert _directory_inventory(mex.parent) == expected
+    assert mex.read_bytes() == original and backup.read_bytes() == attacker
+    _assert_failure_has_no_path_leak(caught.value, mex.parent)
 
 
 def test_preexisting_backup_syscall_race_preserves_external_backup(
@@ -1013,6 +1125,9 @@ def test_preexisting_backup_syscall_race_preserves_external_backup(
     attacker = b"external-backup"
     publish = transaction_module.atomic_publish_candidate
 
+    def reject_absent_helper(*_args, **_kwargs):
+        pytest.fail("absent-backup helper reached the existing-backup branch")
+
     def race(expectation, staging, candidate_sha256, *, platform):
         replacement = backup.with_name("external-backup.tmp")
         replacement.write_bytes(attacker)
@@ -1022,9 +1137,11 @@ def test_preexisting_backup_syscall_race_preserves_external_backup(
         )
 
     monkeypatch.setattr(transaction_module, "atomic_publish_candidate", race)
+    monkeypatch.setattr(transaction_module, "atomic_install_absent", reject_absent_helper)
     with pytest.raises(CliFailure) as caught:
         ConfigureTransaction(
-            project, backup=True, static_runner=_passed_static
+            project, backup=True, static_runner=_passed_static,
+            backup_install_absent_fn=reject_absent_helper,
         ).execute(_intent(), _edit)
     assert caught.value.code == "project_target_changed"
     assert mex.read_bytes() == original
@@ -1151,112 +1268,215 @@ def test_real_windows_transaction_adopts_restore_failure_without_masking_primary
     assert all(Path(item).name == item for item in preserved)
 
 
-def test_absent_backup_snapshot_failure_is_adopted_and_restored_absent(
-    monkeypatch, tmp_path
+@pytest.mark.parametrize("missing_destination", [False, True])
+def test_absent_backup_post_install_snapshot_failure_is_uncertain_and_cleaned(
+    monkeypatch, tmp_path, missing_destination
 ):
     project = _prepared_project(tmp_path)
     mex = project.mex_file
+    original = mex.read_bytes()
     backup = mex.with_name(mex.name + ".bak")
+    evidence = mex.with_name("missing-backup-evidence.bin")
     platform = project.verified_target.lease._resources["platform"]
-    install = platform.install_absent
     snapshot = platform.snapshot_file
     state = {"installed": False, "failed": False}
+    before = _directory_inventory(mex.parent)
 
-    def mark_install(replacement, destination):
-        install(replacement, destination)
-        if destination == backup:
-            state["installed"] = True
+    def install_backup(candidate, destination):
+        platform.install_absent(candidate, destination)
+        state["installed"] = True
+        state["record"] = _path_record(destination)
+        if missing_destination:
+            os.replace(destination, evidence)
 
     def fail_first_backup_snapshot(path):
         if path == backup and state["installed"] and not state["failed"]:
             state["failed"] = True
+            if missing_destination:
+                raise FileNotFoundError(path)
             raise OSError("injected backup classification failure")
         return snapshot(path)
 
-    monkeypatch.setattr(platform, "install_absent", mark_install)
     monkeypatch.setattr(platform, "snapshot_file", fail_first_backup_snapshot)
     with pytest.raises(CliFailure) as caught:
         ConfigureTransaction(
-            project, backup=True, static_runner=_passed_static
+            project,
+            backup=True,
+            static_runner=_passed_static,
+            backup_install_absent_fn=install_backup,
         ).execute(_intent(), _edit)
     assert caught.value.code == "configure_backup_uncertain"
-    assert not backup.exists()
+    expected = before | ({evidence.name: state["record"]} if missing_destination else {})
+    assert _directory_inventory(mex.parent) == expected
+    assert mex.read_bytes() == original and not backup.exists()
+    assert state["record"][2] == original
+    assert backup.name in caught.value.details["preserved"]
+    _assert_failure_has_no_path_leak(caught.value, mex.parent)
 
 
-def test_absent_backup_hash_mismatch_is_preserved_and_fully_classified(
-    monkeypatch, tmp_path
-):
+@pytest.mark.parametrize("same_bytes", [False, True])
+def test_absent_backup_readable_swap_is_staging_changed_and_preserved(tmp_path, same_bytes):
     project = _prepared_project(tmp_path)
     mex = project.mex_file
     original = mex.read_bytes()
     backup = mex.with_name(mex.name + ".bak")
     platform = project.verified_target.lease._resources["platform"]
-    install = platform.install_absent
-    tampered = b"external-backup-after-noreplace"
+    evidence = mex.with_name("installed-backup-evidence.bin")
+    attacker = mex.with_name("readable-backup-attacker.bin")
+    attacker_bytes = original if same_bytes else b"external-backup-after-noreplace"
+    attacker.write_bytes(attacker_bytes)
+    before = _directory_inventory(mex.parent)
+    observed = {}
 
-    def tamper_after_install(replacement, destination):
-        install(replacement, destination)
-        if destination == backup:
-            destination.write_bytes(tampered)
+    def publish_then_swap(candidate, destination):
+        platform.install_absent(candidate, destination)
+        os.replace(destination, evidence)
+        observed["evidence"] = _path_record(evidence)
+        os.replace(attacker, destination)
 
-    monkeypatch.setattr(platform, "install_absent", tamper_after_install)
     with pytest.raises(CliFailure) as caught:
         ConfigureTransaction(
-            project, backup=True, static_runner=_passed_static
+            project,
+            backup=True,
+            static_runner=_passed_static,
+            backup_install_absent_fn=publish_then_swap,
         ).execute(_intent(), _edit)
 
     assert caught.value.code == "configure_staging_changed"
-    assert mex.read_bytes() == original
-    assert backup.read_bytes() == tampered
-    preserved = caught.value.details["preserved"]
-    assert backup.name in preserved
-    assert all(Path(item).name == item for item in preserved)
+    expected = dict(before)
+    expected[backup.name] = expected.pop(attacker.name)
+    expected[evidence.name] = observed["evidence"]
+    assert _directory_inventory(mex.parent) == expected
+    assert backup.read_bytes() == attacker_bytes and evidence.read_bytes() == original
+    assert backup.name in caught.value.details["preserved"]
+    _assert_failure_has_no_path_leak(caught.value, mex.parent)
 
 
-@pytest.mark.skipif(os.name != "nt", reason="real Windows backup path swap")
-@pytest.mark.parametrize("operation", ["swap", "reparse"])
-def test_absent_backup_post_install_path_attack_is_preserved_without_residual(
-    monkeypatch, tmp_path, operation
+def test_absent_backup_unclassifiable_destination_is_uncertain_and_preserved(
+    tmp_path,
 ):
     project = _prepared_project(tmp_path)
     mex = project.mex_file
     original = mex.read_bytes()
     backup = mex.with_name(mex.name + ".bak")
-    external = mex.with_name("external-backup-source.tmp")
-    external_bytes = b"external-backup-path"
-    external.write_bytes(external_bytes)
+    evidence = mex.with_name("unclassifiable-backup-evidence.bin")
     platform = project.verified_target.lease._resources["platform"]
-    install = platform.install_absent
+    before = _directory_inventory(mex.parent)
+    observed = {}
 
-    def attack_after_install(replacement, destination):
-        install(replacement, destination)
-        if destination != backup:
-            return
-        if operation == "swap":
-            os.replace(external, destination)
-        else:
-            destination.unlink()
-            os.symlink(external, destination)
+    def publish_then_make_directory(candidate, destination):
+        platform.install_absent(candidate, destination)
+        os.replace(destination, evidence)
+        observed["evidence"] = _path_record(evidence)
+        destination.mkdir()
+        (destination / "attacker-sentinel.bin").write_bytes(b"attacker-evidence")
+        observed["directory"] = _path_record(destination)
+        observed["sentinel"] = _path_record(destination / "attacker-sentinel.bin")
 
-    monkeypatch.setattr(platform, "install_absent", attack_after_install)
     with pytest.raises(CliFailure) as caught:
         ConfigureTransaction(
-            project, backup=True, static_runner=_passed_static
+            project,
+            backup=True,
+            static_runner=_passed_static,
+            backup_install_absent_fn=publish_then_make_directory,
         ).execute(_intent(), _edit)
 
-    assert caught.value.code in {
-        "configure_backup_uncertain", "configure_staging_changed",
-    }
+    assert caught.value.code == "configure_backup_uncertain"
+    expected = dict(before)
+    expected.update({evidence.name: observed["evidence"], backup.name: observed["directory"],
+                     f"{backup.name}/attacker-sentinel.bin": observed["sentinel"]})
+    assert _directory_inventory(mex.parent) == expected
+    assert evidence.read_bytes() == original
+    assert backup.name in caught.value.details["preserved"]
+    _assert_failure_has_no_path_leak(caught.value, mex.parent)
+
+
+@pytest.mark.skipif(os.name != "nt", reason="literal Windows reparse-point slice")
+def test_real_windows_absent_backup_reparse_is_uncertain_and_not_followed(
+    monkeypatch, tmp_path
+):
+    platform = default_target_platform()
+    prerequisite_target = tmp_path / "symlink-prerequisite-target.bin"
+    prerequisite_link = tmp_path / "symlink-prerequisite-link.bin"
+    prerequisite_candidate = tmp_path / "symlink-prerequisite-candidate.bin"
+    prerequisite_installed = tmp_path / "symlink-prerequisite-installed.bin"
+    prerequisite_target.write_bytes(b"probe")
+    prerequisite_candidate.write_bytes(b"installed")
+    try:
+        with platform.protect_root(tmp_path.resolve()):
+            platform.install_absent(prerequisite_candidate, prerequisite_link)
+            os.replace(prerequisite_link, prerequisite_installed)
+            os.symlink(prerequisite_target, prerequisite_link)
+            try:
+                platform.snapshot_file(prerequisite_link)
+            except (OSError, ValueError, RuntimeError):
+                pass
+            else:
+                pytest.fail("Windows adapter followed the retained-handle reparse point")
+    except OSError as exc:
+        pytest.skip(
+            "Windows retained-handle no-replace/reparse prerequisite unavailable "
+            f"(winerror={getattr(exc, 'winerror', None)})"
+        )
+    finally:
+        for path in (prerequisite_link, prerequisite_installed, prerequisite_target):
+            if os.path.lexists(path):
+                path.unlink()
+
+    project = _prepared_project(tmp_path)
+    mex = project.mex_file
+    platform = project.verified_target.lease._resources["platform"]
+    original = mex.read_bytes()
+    backup = mex.with_name(mex.name + ".bak")
+    external = mex.with_name("reparse-target-evidence.bin")
+    installed = mex.with_name("reparse-installed-evidence.bin")
+    external.write_bytes(b"external-reparse-evidence")
+    before = _directory_inventory(mex.parent)
+    snapshot = platform.snapshot_file
+    attack = {"execute_entered": False, "primitive_returned": False, "done": False}
+
+    def install_movable_then_return(candidate, destination):
+        attack["execute_entered"] = True
+        movable = tmp_path / "movable-backup-candidate.bin"
+        movable.write_bytes(candidate.read_bytes())
+        platform.install_absent(movable, destination)
+        attack["primitive_returned"] = True
+
+    def attack_after_primitive_return(path):
+        if path == backup and not attack["done"]:
+            assert attack["primitive_returned"] is True
+            attack["done"] = True
+            try:
+                os.replace(path, installed)
+                os.symlink(external, path)
+            except OSError as exc:
+                attack["setup_error"] = exc
+                raise
+            attack["installed"] = _path_record(installed)
+            attack["link"] = _path_record(path)
+        return snapshot(path)
+
+    monkeypatch.setattr(platform, "snapshot_file", attack_after_primitive_return)
+    with pytest.raises(CliFailure) as caught:
+        ConfigureTransaction(
+            project,
+            backup=True,
+            static_runner=_passed_static,
+            backup_install_absent_fn=install_movable_then_return,
+        ).execute(_intent(), _edit)
+
+    assert attack["execute_entered"] is True
+    assert attack["primitive_returned"] is True
+    assert "setup_error" not in attack and attack["done"] is True
+    assert backup.is_symlink()
+    assert caught.value.code == "configure_backup_uncertain"
+    expected = dict(before)
+    expected.update({backup.name: attack["link"], installed.name: attack["installed"]})
+    assert _directory_inventory(mex.parent) == expected
     assert mex.read_bytes() == original
-    if operation == "swap":
-        assert backup.read_bytes() == external_bytes
-        assert not external.exists()
-    else:
-        assert backup.is_symlink()
-        assert external.read_bytes() == external_bytes
-    preserved = caught.value.details["preserved"]
-    assert backup.name in preserved
-    assert all(Path(item).name == item for item in preserved)
+    assert installed.read_bytes() == original and external.read_bytes() == b"external-reparse-evidence"
+    assert backup.name in caught.value.details["preserved"]
+    _assert_failure_has_no_path_leak(caught.value, mex.parent)
 
 
 def test_second_finalize_failure_returns_published_with_cleanup_warning(
