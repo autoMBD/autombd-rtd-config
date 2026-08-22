@@ -24,3 +24,6 @@ pythonpath = ["autombd-rtd/rtd-config-cli-py"]
 # intact for subprocess inheritance while still capturing test output for
 # failure diagnostics (unlike -s, which discards it).
 addopts = "--capture=sys --basetemp=tests/.tmp"
+markers = [
+  "requires_symlink_capability: requires real file and directory symbolic links",
+]

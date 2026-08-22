@@ -135,6 +135,25 @@ each iteration taught.
 python -m pytest -q          # deterministic gate
 ```
 
+Tests that need real symbolic links carry the
+`requires_symlink_capability` marker. Pytest probes one file link and one
+directory link lazily when the first marked test reaches setup, caches the
+result for that session, and leaves unmarked tests unaffected. By default, a
+platform without a symlink API or a Windows process reporting exact
+`WinError 1314` skips only marked tests with explicit diagnostics; traversal,
+payload, setup, and cleanup failures remain test failures.
+
+Use the fail-closed mode for a prerequisite gate:
+
+```bash
+python -m pytest -m requires_symlink_capability --require-symlink-capability
+```
+
+On Windows, enable Developer Mode or start the test shell with symlink-creation
+privilege before using required mode. The test run never requests elevation and
+does not fall back to junctions. GitHub Actions exercises the marked tests in a
+dedicated capable Windows required-mode job.
+
 Agent operating discipline lives in `AGENTS.md`. External tools, installed
 environments, connectors, and development source materials are remembered through
 the lightweight `external-dependency-memory` skill and the ignored local cache
