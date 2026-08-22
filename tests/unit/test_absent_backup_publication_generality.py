@@ -415,3 +415,93 @@ def test_transaction_routes_install_dependency_only_to_an_absent_backup(
         assert candidate.name.startswith(f".{mex_path.name}.backup.")
         assert destination == backup_path
     assert backup_path.exists() is backup
+
+
+@pytest.mark.parametrize(
+    ("primitive_error", "expected_code"),
+    [
+        (OSError("bounded late ordinary failure"), "configure_backup_changed"),
+        (
+            NotImplementedError("bounded late unsupported failure"),
+            "configure_atomic_publish_unavailable",
+        ),
+    ],
+    ids=["ordinary", "unsupported"],
+)
+def test_transaction_rolls_back_owned_backup_when_install_raises_after_replace(
+    tmp_path: Path,
+    primitive_error: Exception,
+    expected_code: str,
+):
+    route_name = f"late-owned-{type(primitive_error).__name__.lower()}"
+    root = tmp_path / route_name
+    shutil.copytree(UART_FIXTURE, root)
+    mex_path = next(root.glob("*.mex"))
+    original = mex_path.read_bytes()
+    backup_path = mex_path.with_name(mex_path.name + ".bak")
+    project = Project.verified(root)
+    cli._preflight_project(project)
+
+    def install(candidate: Path, destination: Path) -> None:
+        os.replace(candidate, destination)
+        raise primitive_error
+
+    def apply(document, _intent, *, bundle) -> ApplyResult:
+        del bundle
+        config = document.find_config_set("Uart")
+        setting = next(item for item in config.iter() if item.tag.endswith("setting"))
+        setting.attrib["value"] = f"GENERALITY_{route_name}"
+        return ApplyResult(changed_modules=["uart"], modified_elements=[setting])
+
+    with pytest.raises(CliFailure) as caught:
+        ConfigureTransaction(
+            project,
+            backup=True,
+            static_runner=lambda *_args, **_kwargs: SimpleNamespace(status="passed"),
+            backup_install_absent_fn=install,
+        ).execute(Intent("surface", "mutate", {"route": route_name}), apply)
+
+    assert caught.value.code == expected_code
+    assert not backup_path.exists()
+    assert mex_path.read_bytes() == original
+    assert isinstance(caught.value, AtomicPublishFailure)
+    assert caught.value.state.published is not None
+    assert caught.value.state.phase == "adopted_install"
+
+
+def test_transaction_preserves_foreign_backup_after_late_primitive_failure(
+    tmp_path: Path,
+):
+    route_name = "late-foreign-citrine"
+    root = tmp_path / route_name
+    shutil.copytree(UART_FIXTURE, root)
+    mex_path = next(root.glob("*.mex"))
+    original = mex_path.read_bytes()
+    backup_path = mex_path.with_name(mex_path.name + ".bak")
+    foreign = b"bounded-foreign-evidence::late-install::53"
+    project = Project.verified(root)
+    cli._preflight_project(project)
+
+    def install(candidate: Path, destination: Path) -> None:
+        destination.write_bytes(foreign)
+        assert candidate.exists()
+        raise OSError("bounded late foreign failure")
+
+    def apply(document, _intent, *, bundle) -> ApplyResult:
+        del bundle
+        config = document.find_config_set("Uart")
+        setting = next(item for item in config.iter() if item.tag.endswith("setting"))
+        setting.attrib["value"] = f"GENERALITY_{route_name}"
+        return ApplyResult(changed_modules=["uart"], modified_elements=[setting])
+
+    with pytest.raises(CliFailure) as caught:
+        ConfigureTransaction(
+            project,
+            backup=True,
+            static_runner=lambda *_args, **_kwargs: SimpleNamespace(status="passed"),
+            backup_install_absent_fn=install,
+        ).execute(Intent("surface", "mutate", {"route": route_name}), apply)
+
+    assert caught.value.code == "configure_backup_changed"
+    assert backup_path.read_bytes() == foreign
+    assert mex_path.read_bytes() == original

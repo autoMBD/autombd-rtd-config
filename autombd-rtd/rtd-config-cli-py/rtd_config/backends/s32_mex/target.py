@@ -1466,19 +1466,43 @@ def atomic_install_absent(
             "The staged backup candidate changed before publication.",
             module="backend",
         )
+
+    def failed_install(
+        code: str, message: str
+    ) -> AtomicPublishFailure:
+        try:
+            inspection = adapter.inspect(path)
+            classifiable = (
+                inspection.exists
+                and not inspection.is_directory
+                and inspection.is_regular
+                and not inspection.is_symlink
+                and not inspection.is_reparse_point
+                and not inspection.is_mount_point
+            )
+            published = adapter.snapshot_file(path) if classifiable else None
+        except Exception:
+            published = None
+        if published is not None and (
+            published.identity == candidate.identity
+            and published.sha256 == candidate.sha256
+            and published.content == candidate.content
+            and hashlib.sha256(published.content).hexdigest() == candidate_sha256
+        ):
+            state.published = published
+        return AtomicPublishFailure(code, message, state)
+
     try:
         installer(staging, path)
     except NotImplementedError as exc:
-        raise CliFailure(
+        raise failed_install(
             "configure_atomic_publish_unavailable",
             "This platform lacks atomic no-replace installation.",
-            module="backend",
         ) from exc
     except Exception as exc:
-        raise CliFailure(
+        raise failed_install(
             "configure_backup_changed",
             "The absent backup destination changed at publication.",
-            module="backend",
         ) from exc
     state.phase = "installed"
 

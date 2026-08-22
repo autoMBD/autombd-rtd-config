@@ -136,7 +136,7 @@
     },
     {
       "path": "rtd-config-cli-py/rtd_config/backends/s32_mex/target.py",
-      "sha256": "bd275ffb783287c8e964982e0fc2a9a5bcf5c78ad18a7e28bd5bfda1da119d1f"
+      "sha256": "924ecc7936c73a3a48ae2fb83f7eb8d33e667c9660c4e902baa74f10f262d0dc"
     },
     {
       "path": "rtd-config-cli-py/rtd_config/backends/s32_mex/transaction.py",
