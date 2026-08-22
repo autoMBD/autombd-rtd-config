@@ -114,6 +114,7 @@ class ConfigureTransaction:
         vendor_runner: Callable[..., object] | None = None,
         atomic_publish_fn: Callable[..., AtomicPublishResult] = atomic_publish_candidate,
         release_for_publish_fn: Callable[..., PublishExpectation] = release_for_publish,
+        backup_install_absent_fn: Callable[[Path, Path], None] | None = None,
     ) -> None:
         self.project = project
         self.plan = plan
@@ -127,6 +128,7 @@ class ConfigureTransaction:
         self.vendor_runner = vendor_runner
         self.atomic_publish_fn = atomic_publish_fn
         self.release_for_publish_fn = release_for_publish_fn
+        self.backup_install_absent_fn = backup_install_absent_fn
         self.platform = self.target.lease._resources.get("platform")
         if self.platform is None:
             raise CliFailure(
@@ -257,6 +259,7 @@ class ConfigureTransaction:
                         backup_publication = atomic_install_absent(
                             backup_path, backup_staging, backup_sha,
                             platform=self.platform,
+                            install_fn=self.backup_install_absent_fn,
                         )
                     else:
                         backup_publication = atomic_publish_candidate(

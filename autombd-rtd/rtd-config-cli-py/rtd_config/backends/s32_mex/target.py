@@ -1427,11 +1427,16 @@ def atomic_install_absent(
     staging: Path,
     candidate_sha256: str,
     platform: TargetPlatform | None = None,
+    *,
+    install_fn: Callable[[Path, Path], None] | None = None,
 ) -> AtomicPublishResult:
     """Atomically install a candidate only while its destination is absent."""
-    adapter = platform or default_target_platform()
+    adapter = platform if platform is not None else default_target_platform()
     state = AtomicPublishState(path, staging)
-    installer = getattr(adapter, "install_absent", None)
+    installer = (
+        install_fn if install_fn is not None
+        else getattr(adapter, "install_absent", None)
+    )
     if not callable(installer):
         raise CliFailure(
             "configure_atomic_publish_unavailable",
@@ -1445,35 +1450,79 @@ def atomic_install_absent(
             module="backend",
         )
     try:
+        candidate = adapter.snapshot_file(staging)
+    except Exception as exc:
+        raise CliFailure(
+            "configure_staging_changed",
+            "The staged backup candidate could not be classified before publication.",
+            module="backend",
+        ) from exc
+    if (
+        candidate.sha256 != candidate_sha256
+        or hashlib.sha256(candidate.content).hexdigest() != candidate_sha256
+    ):
+        raise CliFailure(
+            "configure_staging_changed",
+            "The staged backup candidate changed before publication.",
+            module="backend",
+        )
+    try:
         installer(staging, path)
-        state.phase = "installed"
-        published = adapter.snapshot_file(path)
     except NotImplementedError as exc:
         raise CliFailure(
             "configure_atomic_publish_unavailable",
             "This platform lacks atomic no-replace installation.",
             module="backend",
         ) from exc
-    except (OSError, ValueError, RuntimeError) as exc:
-        if state.phase == "installed":
-            raise AtomicPublishFailure(
-                "configure_backup_uncertain",
-                "The installed backup could not be classified and was preserved.",
-                state,
-            ) from exc
+    except Exception as exc:
         raise CliFailure(
             "configure_backup_changed",
             "The absent backup destination changed at publication.",
             module="backend",
         ) from exc
-    if published.sha256 != candidate_sha256:
-        state.published = published
+    state.phase = "installed"
+
+    try:
+        inspection = adapter.inspect(path)
+    except Exception as exc:
         raise AtomicPublishFailure(
-            "configure_staging_changed",
-            "The installed backup differs from its validated candidate.",
+            "configure_backup_uncertain",
+            "The installed backup could not be classified and was preserved.",
+            state,
+        ) from exc
+    if (
+        not inspection.exists
+        or inspection.is_directory
+        or not inspection.is_regular
+        or inspection.is_symlink
+        or inspection.is_reparse_point
+        or inspection.is_mount_point
+    ):
+        raise AtomicPublishFailure(
+            "configure_backup_uncertain",
+            "The installed backup could not be classified and was preserved.",
             state,
         )
+    try:
+        published = adapter.snapshot_file(path)
+    except Exception as exc:
+        raise AtomicPublishFailure(
+            "configure_backup_uncertain",
+            "The installed backup could not be classified and was preserved.",
+            state,
+        ) from exc
     state.published = published
+    if (
+        published.identity != candidate.identity
+        or published.sha256 != candidate.sha256
+        or published.content != candidate.content
+        or hashlib.sha256(published.content).hexdigest() != candidate_sha256
+    ):
+        raise AtomicPublishFailure(
+            "configure_staging_changed",
+            "The installed backup differs from the validated candidate identity or content.",
+            state,
+        )
     state.phase = "published"
     return AtomicPublishResult(published, None, None, state)
 
