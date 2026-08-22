@@ -46,7 +46,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 import shutil
 
@@ -72,6 +72,12 @@ class _ObserveCall:
 @dataclass
 class _RecordingOperations:
     create_errors: dict[capability.LinkKind, BaseException] = field(default_factory=dict)
+    observation_errors: dict[capability.LinkKind, BaseException] = field(
+        default_factory=dict
+    )
+    observation_changes: dict[capability.LinkKind, dict[str, object]] = field(
+        default_factory=dict
+    )
     observation_overrides: dict[
         capability.LinkKind, capability.LinkObservation
     ] = field(default_factory=dict)
@@ -103,6 +109,9 @@ class _RecordingOperations:
         expected_kind: capability.LinkKind,
     ) -> capability.LinkObservation:
         self.observe_calls.append(_ObserveCall(link, payload_via_link, expected_kind))
+        error = self.observation_errors.get(expected_kind)
+        if error is not None:
+            raise error
         override = self.observation_overrides.get(expected_kind)
         if override is not None:
             return override
@@ -113,11 +122,15 @@ class _RecordingOperations:
             translated_payload = target / payload_via_link.relative_to(link)
         payload = translated_payload.read_bytes()
         self.observed_payloads[expected_kind] = payload
-        return capability.LinkObservation(
+        observation = capability.LinkObservation(
             is_link=True,
             target_exists=target.exists(),
             target_is_directory=target.is_dir(),
             payload=payload,
+        )
+        return replace(
+            observation,
+            **self.observation_changes.get(expected_kind, {}),
         )
 
     def cleanup_owned_tree(self, *, root: Path) -> None:
@@ -267,6 +280,68 @@ def test_unrelated_error_is_functional_while_other_link_kind_is_still_probed(
         capability.LinkKind.DIRECTORY
     ]
     assert len(operations.cleanup_calls) == 1
+    assert sentinel.exists()
+
+
+@pytest.mark.parametrize(
+    ("field_name", "field_value", "expected_evidence"),
+    [
+        ("is_link", False, "not-a-link"),
+        ("target_exists", False, "target-missing"),
+        ("target_is_directory", True, "wrong-target-kind"),
+        ("payload", b"mutated-observation-payload", "payload-mismatch"),
+    ],
+)
+def test_each_observation_dimension_is_independently_required(
+    tmp_path: Path,
+    field_name: str,
+    field_value: object,
+    expected_evidence: str,
+) -> None:
+    parent, sentinel = _probe_parent(tmp_path)
+    operations = _RecordingOperations(
+        observation_changes={
+            capability.LinkKind.FILE: {field_name: field_value},
+        }
+    )
+
+    result = capability.probe_symlink_capability(parent, operations=operations)
+
+    assert result.disposition is capability.ProbeDisposition.ERROR
+    assert f"file=error:mismatch:{expected_evidence}" in result.detail
+    assert "directory=ok" in result.detail
+    assert "cleanup=ok" in result.detail
+    assert len(operations.observe_calls) == 2
+    assert sentinel.exists()
+
+
+@pytest.mark.parametrize(
+    ("error_factory", "expected_evidence"),
+    [
+        (NotImplementedError, "file=error:NotImplementedError"),
+        (_winerror_1314, "file=error:OSError"),
+    ],
+)
+def test_observation_stage_capability_shaped_errors_are_functional(
+    tmp_path: Path,
+    error_factory: type[BaseException] | object,
+    expected_evidence: str,
+) -> None:
+    parent, sentinel = _probe_parent(tmp_path)
+    operations = _RecordingOperations(
+        observation_errors={
+            capability.LinkKind.FILE: error_factory(),  # type: ignore[operator]
+        }
+    )
+
+    result = capability.probe_symlink_capability(parent, operations=operations)
+
+    assert result.disposition is capability.ProbeDisposition.ERROR
+    assert expected_evidence in result.detail
+    assert "directory=ok" in result.detail
+    assert "cleanup=ok" in result.detail
+    assert len(operations.create_calls) == 2
+    assert len(operations.observe_calls) == 2
     assert sentinel.exists()
 
 

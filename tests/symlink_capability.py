@@ -252,16 +252,6 @@ def probe_symlink_capability(
                     link=case.link,
                     kind=case.kind,
                 )
-                observation = active_operations.observe_link(
-                    link=case.link,
-                    payload_via_link=case.payload_via_link,
-                    expected_kind=case.kind,
-                )
-                statuses[case.kind] = _validate_observation(
-                    observation,
-                    expected_kind=case.kind,
-                    expected_payload=case.payload,
-                )
             except NotImplementedError as error:
                 statuses[case.kind] = f"unsupported:{_error_text(error)}"
             except OSError as error:
@@ -273,6 +263,20 @@ def probe_symlink_capability(
                     statuses[case.kind] = f"error:{_error_text(error)}"
             except BaseException as error:
                 statuses[case.kind] = f"error:{_error_text(error)}"
+            else:
+                try:
+                    observation = active_operations.observe_link(
+                        link=case.link,
+                        payload_via_link=case.payload_via_link,
+                        expected_kind=case.kind,
+                    )
+                    statuses[case.kind] = _validate_observation(
+                        observation,
+                        expected_kind=case.kind,
+                        expected_payload=case.payload,
+                    )
+                except BaseException as error:
+                    statuses[case.kind] = f"error:{_error_text(error)}"
     except BaseException as error:
         statuses[LinkKind.FILE] = f"error:setup:{_error_text(error)}"
         statuses[LinkKind.DIRECTORY] = "not-run"
