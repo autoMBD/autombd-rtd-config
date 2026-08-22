@@ -91,6 +91,23 @@ class _DelegatingInstallAdapter:
         return getattr(self.delegate, name)
 
 
+class _SnapshotOnlyInstallAdapter:
+    def __init__(self, *, late_error: bool = False) -> None:
+        self.delegate = default_target_platform()
+        self.late_error = late_error
+        self.events: list[tuple[str, Path]] = []
+
+    def snapshot_file(self, path: Path) -> FileSnapshot:
+        self.events.append(("snapshot", path))
+        return self.delegate.snapshot_file(path)
+
+    def install_absent(self, staging: Path, destination: Path) -> None:
+        self.events.append(("install", destination))
+        os.replace(staging, destination)
+        if self.late_error:
+            raise OSError("bounded snapshot-only late failure")
+
+
 class _ClassifyingAdapter:
     def __init__(
         self,
@@ -202,6 +219,41 @@ def test_install_override_and_selected_adapter_receive_candidate_then_destinatio
     expected_call = [(staging, destination)]
     assert override_calls == (expected_call if use_override else [])
     assert adapter.install_calls == ([] if use_override else expected_call)
+
+
+def test_snapshot_only_adapter_completes_successful_install(tmp_path: Path):
+    payload = b"bounded-general-input::umber::59"
+    staging, destination, digest = _stage(tmp_path, "umber-register", payload)
+    adapter = _SnapshotOnlyInstallAdapter()
+
+    result = atomic_install_absent(
+        destination, staging, digest, platform=adapter
+    )
+
+    assert result.published.content == payload
+    assert adapter.events == [
+        ("snapshot", staging),
+        ("install", destination),
+        ("snapshot", destination),
+    ]
+
+
+def test_snapshot_only_adapter_proves_owned_late_failure(tmp_path: Path):
+    payload = b"bounded-general-input::teal::61"
+    staging, destination, digest = _stage(tmp_path, "teal-register", payload)
+    adapter = _SnapshotOnlyInstallAdapter(late_error=True)
+
+    with pytest.raises(AtomicPublishFailure) as caught:
+        atomic_install_absent(destination, staging, digest, platform=adapter)
+
+    assert caught.value.code == "configure_backup_changed"
+    assert caught.value.state.published is not None
+    assert caught.value.state.published.content == payload
+    assert adapter.events == [
+        ("snapshot", staging),
+        ("install", destination),
+        ("snapshot", destination),
+    ]
 
 
 def test_helper_ignores_a_forged_primitive_result_and_owns_cleanup_state(

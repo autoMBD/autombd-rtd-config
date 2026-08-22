@@ -1467,20 +1467,29 @@ def atomic_install_absent(
             module="backend",
         )
 
+    def installed_entry_is_classifiable() -> bool:
+        inspector = getattr(adapter, "inspect", None)
+        if not callable(inspector):
+            return True
+        inspection = inspector(path)
+        return (
+            inspection.exists
+            and not inspection.is_directory
+            and inspection.is_regular
+            and not inspection.is_symlink
+            and not inspection.is_reparse_point
+            and not inspection.is_mount_point
+        )
+
     def failed_install(
         code: str, message: str
     ) -> AtomicPublishFailure:
         try:
-            inspection = adapter.inspect(path)
-            classifiable = (
-                inspection.exists
-                and not inspection.is_directory
-                and inspection.is_regular
-                and not inspection.is_symlink
-                and not inspection.is_reparse_point
-                and not inspection.is_mount_point
+            published = (
+                adapter.snapshot_file(path)
+                if installed_entry_is_classifiable()
+                else None
             )
-            published = adapter.snapshot_file(path) if classifiable else None
         except Exception:
             published = None
         if published is not None and (
@@ -1507,21 +1516,14 @@ def atomic_install_absent(
     state.phase = "installed"
 
     try:
-        inspection = adapter.inspect(path)
+        classifiable = installed_entry_is_classifiable()
     except Exception as exc:
         raise AtomicPublishFailure(
             "configure_backup_uncertain",
             "The installed backup could not be classified and was preserved.",
             state,
         ) from exc
-    if (
-        not inspection.exists
-        or inspection.is_directory
-        or not inspection.is_regular
-        or inspection.is_symlink
-        or inspection.is_reparse_point
-        or inspection.is_mount_point
-    ):
+    if not classifiable:
         raise AtomicPublishFailure(
             "configure_backup_uncertain",
             "The installed backup could not be classified and was preserved.",
