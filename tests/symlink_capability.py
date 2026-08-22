@@ -203,13 +203,21 @@ def probe_symlink_capability(
     operations: ProbeOperations | None = None,
 ) -> SymlinkCapability:
     active_operations = operations if operations is not None else _PathOperations()
-    owned_tree = Path(probe_parent) / f"symlink-capability-{uuid4().hex}"
+    probe_parent = Path(probe_parent)
+    owned_tree = probe_parent / f"symlink-capability-{uuid4().hex}"
     statuses = {LinkKind.FILE: "not-run", LinkKind.DIRECTORY: "not-run"}
     winerrors: set[int] = set()
     cleanup_status = "not-needed"
+    probe_parent_created = False
     owned_tree_created = False
 
     try:
+        try:
+            probe_parent.mkdir()
+            probe_parent_created = True
+        except FileExistsError:
+            if not probe_parent.is_dir():
+                raise
         owned_tree.mkdir()
         owned_tree_created = True
         file_payload = b"symlink-capability-file-payload\n"
@@ -275,6 +283,12 @@ def probe_symlink_capability(
                 cleanup_status = "ok"
             except BaseException as error:
                 cleanup_status = f"error:{_error_text(error)}"
+        if probe_parent_created and cleanup_status in {"ok", "not-needed"}:
+            try:
+                probe_parent.rmdir()
+                cleanup_status = "ok"
+            except BaseException as error:
+                cleanup_status = f"error:parent:{_error_text(error)}"
 
     disposition = _summarize_disposition(statuses, cleanup_status=cleanup_status)
     reason = _reason_for(disposition)

@@ -180,6 +180,38 @@ def test_probe_checks_distinct_file_and_relative_directory_traversal_once(
     assert list(parent.iterdir()) == [sentinel]
 
 
+def test_probe_owns_and_removes_only_a_missing_probe_parent(tmp_path: Path) -> None:
+    parent = tmp_path / "new-capability-parent"
+    adjacent = tmp_path / "ancestor-sentinel.keep"
+    adjacent.write_bytes(b"preserve-adjacent")
+    operations = _RecordingOperations()
+
+    result = capability.probe_symlink_capability(parent, operations=operations)
+
+    assert result.disposition is capability.ProbeDisposition.AVAILABLE
+    assert len(operations.cleanup_calls) == 1
+    assert not parent.exists()
+    assert adjacent.read_bytes() == b"preserve-adjacent"
+
+
+def test_missing_parent_remains_safe_when_owned_tree_cleanup_fails(
+    tmp_path: Path,
+) -> None:
+    parent = tmp_path / "new-partial-failure-parent"
+    adjacent = tmp_path / "partial-failure-sentinel.keep"
+    adjacent.write_bytes(b"preserve-on-failure")
+    operations = _RecordingOperations(cleanup_error=OSError("owned cleanup blocked"))
+
+    result = capability.probe_symlink_capability(parent, operations=operations)
+
+    assert result.disposition is capability.ProbeDisposition.ERROR
+    assert "cleanup=error:OSError:owned cleanup blocked" in result.detail
+    assert len(operations.cleanup_calls) == 1
+    assert operations.cleanup_calls[0].parent == parent
+    assert operations.cleanup_calls[0].exists()
+    assert adjacent.read_bytes() == b"preserve-on-failure"
+
+
 @pytest.mark.parametrize(
     ("error_factory", "expected_disposition", "expected_text"),
     [
