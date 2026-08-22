@@ -45,3 +45,21 @@ jobs:
         run: >-
           python -m pytest tests/unit/test_deploy_rtd_skill.py
           -k clean_deploy_contains_exact_manifest_set_and_runs_outside_repo
+
+  windows-symlink-capability:
+    name: Windows required symlink capability
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+      - name: Install test runner
+        run: python -m pip install pytest
+      - name: Run symlink-dependent tests with required capability
+        run: >-
+          python -m pytest
+          tests/unit/test_deploy_rtd_skill.py
+          tests/unit/test_project_metadata.py
+          -m requires_symlink_capability
+          --require-symlink-capability

@@ -2,8 +2,8 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 1.0.1 |
-| Date | 2026-06-15 |
+| Version | 1.1.0 |
+| Date | 2026-08-22 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | The convergence contract for the RTD CfgFile CLI. Tests — deterministic, static, vendor validation, and isolated E2E acceptance — are the SOLE criterion for functional "done". Defines the test layers, the vendor gate, and the acceptance rule; the concrete E2E cases live in `rtd-config-test-cases.md`. |
 
@@ -27,7 +27,9 @@ here.
 
 1. **Deterministic development tests** — `python -m pytest -q`. Fast, hermetic,
    run on every change. Cover the CLI/JSON contract, providers, document core,
-   static checks, and `.mex` write fidelity (unit + integration).
+   static checks, and `.mex` write fidelity (unit + integration). Tests that
+   require symbolic links use only the `requires_symlink_capability` marker;
+   their prerequisite contract is defined in §2.1.
 2. **Static runtime checks** — the tool's own vendor-free checks, run after
    every config-file edit (well-formedness, ownership, reference coherence,
    conflicting carriers, invalid requests rejected with actionable blockers).
@@ -43,6 +45,34 @@ here.
    Pass requires the case's criteria, the vendor gate, and successful code
    generation; `validate` is independently re-run on the produced `.mex` (an
    independent re-check, not a self-reported result), and the KPI result is recorded.
+
+### 2.1 Symbolic-link prerequisite contract
+
+The symbolic-link probe is lazy: an unmarked-only run performs no probe. When
+the first `requires_symlink_capability` node reaches setup, pytest probes one
+file link and one directory link inside a unique owned tree, records the result,
+and reuses it for the rest of that session. Both links must be real links to
+existing targets of the correct kind and must expose distinct payloads. The
+directory payload is reached through a relative path below the link, proving
+directory traversal rather than link creation alone. Cleanup removes only the
+owned tree, including after partial probe failure.
+
+The four dispositions are deterministic:
+
+- **available** — marked assertions execute unchanged;
+- **unsupported** — the link API is absent or raises `NotImplementedError`;
+- **unavailable** — link creation raises an `OSError` whose exact `winerror` is
+  `1314`; diagnostics include the literal `WinError 1314`;
+- **error** — every other exception, broken link, observation mismatch, setup
+  failure, or cleanup failure. This is always a functional test failure.
+
+Local optional mode skips only marked tests for `unsupported` or `unavailable`.
+`--require-symlink-capability` makes either disposition fail closed and is used
+by the dedicated capable Windows CI job. On Windows, enable Developer Mode or
+run the shell with symlink-creation privilege before required mode; pytest never
+prompts for elevation and never substitutes a junction. Stable probe evidence
+reports disposition, reason, file result, directory result, cleanup result, and
+winerror.
 
 ## 3. Acceptance rule
 
@@ -100,3 +130,4 @@ roadmap.
 | 2026-05-30 | 0.1.0 | Created RTD CfgFile CLI test strategy. |
 | 2026-06-15 | 1.0.0 | Issue #7 reorganization: deleted §4 Subagent roles in the convergence loop from this engineering strategy; removed the KPI-honesty/3rd-attempt bullet from §5 Test hygiene; renumbered remaining sections; updated header Description to drop role/loop wording. |
 | 2026-06-15 | 1.0.1 | Issue #7 follow-up: abstracted §2.4 to drop the agent-driver specifics (third-party agent CLI / Codex / "agent self-report") — the paragraph still names the isolated black-box harness flow while keeping driver details outside this engineering strategy; trimmed §3 to keep the KPI as a measured metric while removing the capped optimization-loop process. |
+| 2026-08-22 | 1.1.0 | Added the lazy, once-per-session symbolic-link prerequisite contract, explicit optional/required dispositions, Windows setup guidance, and capable hosted-CI gate. |

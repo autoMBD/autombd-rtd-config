@@ -67,3 +67,5 @@ if _SRC_ROOT not in sys.path:
 _PYTHONPATH = os.environ.get("PYTHONPATH", "")
 if _SRC_ROOT not in _PYTHONPATH.split(os.pathsep):
     os.environ["PYTHONPATH"] = os.pathsep.join(p for p in (_SRC_ROOT, _PYTHONPATH) if p)
+
+pytest_plugins = ("tests.symlink_capability",)
