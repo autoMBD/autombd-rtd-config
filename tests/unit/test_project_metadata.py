@@ -284,6 +284,7 @@ def test_auxiliary_source_failures_are_typed(tmp_path, payload, error, code):
     assert caught.value.code == code
 
 
+@pytest.mark.requires_symlink_capability
 def test_default_reader_rejects_auxiliary_path_escape_and_reparse(monkeypatch, tmp_path):
     root = _temporary_project(tmp_path)
     settings = root / ".settings"
@@ -293,6 +294,7 @@ def test_default_reader_rejects_auxiliary_path_escape_and_reparse(monkeypatch, t
     assert caught.value.code == "unsafe_project_path"
 
 
+@pytest.mark.requires_symlink_capability
 def test_default_reader_does_not_follow_fixed_source_symlink(tmp_path):
     root = _temporary_project(tmp_path)
     outside = tmp_path / "outside.cproject"

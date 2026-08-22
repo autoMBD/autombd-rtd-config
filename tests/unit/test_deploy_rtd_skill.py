@@ -345,6 +345,7 @@ def test_copy_released_payload_rejects_incomplete_staging_without_replacing_exis
     assert not list(destination.parent.glob(f".{destination.name}.deploying.*"))
 
 
+@pytest.mark.requires_symlink_capability
 def test_deploy_defaults_to_codex_and_claude_project_skill_indexes(tmp_path):
     deploy = load_deploy_module()
     repo_root = Path(__file__).resolve().parents[2]
@@ -362,6 +363,7 @@ def test_deploy_defaults_to_codex_and_claude_project_skill_indexes(tmp_path):
     assert_released_payload(linked)
 
 
+@pytest.mark.requires_symlink_capability
 def test_deploy_can_target_only_claude_project_skill_index(tmp_path):
     deploy = load_deploy_module()
     repo_root = Path(__file__).resolve().parents[2]
@@ -397,6 +399,7 @@ def test_deploy_updates_when_installed_version_is_older(tmp_path):
     assert f"version: {src_version}" in (installed / "SKILL.md").read_text(encoding="utf-8")
 
 
+@pytest.mark.requires_symlink_capability
 def test_deploy_replaces_existing_claude_copy_with_link(tmp_path):
     deploy = load_deploy_module()
     repo_root = Path(__file__).resolve().parents[2]
@@ -414,6 +417,7 @@ def test_deploy_replaces_existing_claude_copy_with_link(tmp_path):
     assert_link_points_to(installed, canonical)
 
 
+@pytest.mark.requires_symlink_capability
 def test_main_reports_linked_agent_destinations(tmp_path, capsys):
     deploy = load_deploy_module()
     repo_root = Path(__file__).resolve().parents[2]
