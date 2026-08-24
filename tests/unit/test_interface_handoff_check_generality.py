@@ -264,6 +264,10 @@ class InterfaceHandoffCheckGeneralityTests(unittest.TestCase):
             with self.subTest(label=label):
                 self.assert_rejected(self.invoke_raw(raw))
 
+    def test_rejects_over_limit_json_integer_without_traceback(self):
+        raw = b'{"schema_version":' + b"7" * 5000 + b"}"
+        self.assert_rejected(self.invoke_raw(raw))
+
     def test_enforces_closed_top_level_and_fixed_identity_fields(self):
         mutations = []
 

@@ -120,7 +120,7 @@ def load_packet(path, expected_sha256):
             object_pairs_hook=unique_object,
             parse_constant=reject_json_constant,
         )
-    except json.JSONDecodeError:
+    except ValueError:
         reject("packet is not valid JSON")
     return packet, actual_sha256
 
