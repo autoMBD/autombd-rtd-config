@@ -60,6 +60,25 @@ commands require an explicit interpreter such as `cmd.exe /d /c`. Operational
 observations do not imply semantic classification; apply contract semantics and
 finding dispositions separately.
 
+### Interface-handoff completeness
+
+For governed owner-Test-to-isolated-Worker handoffs that declare public Python,
+CLI, or JSON seams, pin the completeness checker and expected raw packet digest
+as the exact command executed through the unchanged handoff-guard sequence:
+
+```console
+python agent-discipline/skills/agent-workflow/scripts/handoff_guard.py prepare --role worker --expected-top-level <canonical-worktree> --base-sha <sha> --lane-sha <sha> --contract-path <relative-path> --contract-blob-sha <sha> --manifest <manifest.json> --receipt <receipt.json> --event-log <events.jsonl> --timeout-seconds <seconds> -- python agent-discipline/skills/agent-workflow/scripts/interface_handoff_check.py validate --packet <interface-handoff.json> --expected-sha256 <64-lowercase-hex>
+python agent-discipline/skills/agent-workflow/scripts/handoff_guard.py check-handoff --manifest <manifest.json> --receipt <receipt.json> --event-log <events.jsonl>
+python agent-discipline/skills/agent-workflow/scripts/handoff_guard.py run --manifest <manifest.json> --receipt <receipt.json> --event-log <events.jsonl>
+```
+
+The Worker is eligible for dispatch only after both the handoff guard and the
+completeness checker pass. Classify a rejection mechanically as
+`PROCESS/HANDOFF` before Worker dispatch; it consumes no Candidate attempt. The
+checker validates only completeness, closed shape, immutable identities, and
+digest continuity. It has no semantic authority and cannot add packet fields or
+blocking rules.
+
 ## Validator
 
 For a workflow record, run:
