@@ -2,11 +2,11 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.8.0 |
-| Date | 2026-09-04 |
+| Version | 0.9.0 |
+| Date | 2026-09-05 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
-| Status | Human-approved bootstrap baseline; time-control and harness-boundary design recorded |
-| Description | Agent Loop 的 Category B trust-tracing lane：冻结现状审计与历史教训，定义结构化角色交接、统一守卫与失败局部返工、双 lane、Candidate 0 加三次增量修正，以及 Agent 动态监督与确定性工具超时的双时间平面，并用 append-only trace 记录有限自举状态。 |
+| Status | Human-approved design; Phase 0 corrections prepared for exact-diff Human review |
+| Description | Agent Loop 的 Category B trust-tracing lane：冻结现状审计与历史教训，定义结构化角色交接、统一守卫与失败局部返工、双 lane、Candidate 0 加三次增量修正、Phase 0–3 人工自举顺序，以及 Agent 动态监督与确定性工具超时的双时间平面，并用 append-only trace 记录有限自举状态。 |
 
 ## 0. Trust-tracing lane 的权威与维护边界
 
@@ -53,10 +53,12 @@ heartbeat 和当前活动文档的治理定义。本版据此作出以下核心�
 5. Reviewer 在 task **终止时恰好运行一次**：Candidate 通过时审查成功结果；
    Candidate 3 仍失败时审查失败过程、剩余缺陷和治理证据。Reviewer 不是每次
    Candidate 的一部分，也不驱动新的 Attempt。
-6. owner Test、acceptance Candidate 和 Reviewer lessons 都是 off-main 证据。
-   成功 PR 只携带 accepted Implementation；失败则不建产品 PR，只在 issue 记录
-   Tester/Reviewer 终态。把 Test-first Candidate 或 lesson-child 推到 `master` 是
-   已发生的拓扑污染，不是应继续保持的做法。
+6. 对每个新 task，**在其 Governor `G` 之后产生的当前 series** owner Test、
+   acceptance Candidate 和 Reviewer lessons 都是 off-main 证据。成功 PR 在
+   `G..accepted-Implementation-PR` 范围内只携带 accepted Implementation；失败则
+   不建产品 PR，只在 issue 记录 Tester/Reviewer 终态。`G` 之前已经存在的历史
+   Test-first Candidate 或 lesson-child 保留为基线历史，不被本规则重写，也不得被
+   误判为当前 task 新引入的拓扑污染。
 
 当前 `workflow-contract.json`、Agent Workflow Skill、`AGENTS.md` 和角色说明仍
 保留“`candidate_attempt=1..3`”“Gate 1 后才实施”“Reviewer 仅在 Tester PASS 后”
@@ -97,11 +99,13 @@ known-bad；它不进入 Worker 输入，也不再承担 `K` 有效性证明。
 本次审阅建议保留并继续使用已经合并的 P0 最小 Loop、#88 和 #90，不推倒重来。
 下一步不应先建设一个完整 `loopctl` 或一次铺开全功能执行器，而应复用 #78 已经
 证明有效的增量自举原则，并采用一个人类深度监督、单边界、可退出的
-`BOOTSTRAP-LIMITED` 流程。第一项自举不是继续 #85 Implementation，而是执行 #93：
-把结构化交接文件、统一守卫、lane 生命周期、Candidate 0+三次修正、terminal
-Reviewer 和 off-main topology 固化到合同/角色文档及最小回放 gate。未知问题默认
-进入观察账本，只阻塞受影响操作；除非它破坏证据完整性、安全性或强制验收项，
-否则不得自动扩展为全局规则或更高阻塞等级。
+`BOOTSTRAP-LIMITED` 流程。当前先由 #94 冻结本 trust trace，再由 #57 Phase 1
+完成执行索引；第一项实现 package 是 Timeout Package A
+[#95](https://github.com/autoMBD/autombd-rtd-config/issues/95)，其 accepted merge
+成为 #93 Governor。随后 #93 才把结构化交接文件、统一守卫、lane 生命周期、
+Candidate 0+三次修正、terminal Reviewer 和当前-series off-main topology 固化到
+合同/角色文档及最小回放 gate。未知问题默认进入观察账本，只阻塞受影响操作；除非
+它破坏证据完整性、安全性或强制验收项，否则不得自动扩展为全局规则或更高阻塞等级。
 
 ## 2. 审阅范围、方法与证据基线
 
@@ -239,7 +243,7 @@ Worker correction 和 success/failure 两种 terminal review。
   真黑盒 E2E 和 KPI；
 - **Reviewer**：当前文档只允许在 Candidate Tester PASS 后进行非测试审查，且
   唯一写入是 append-only lessons log；Owner 新规则要求在成功或三次修正耗尽后
-  恰好审查一次，lesson 只能留在 review evidence/off-main lane；
+  恰好审查一次，当前 task 的 lesson 只能留在 review evidence/off-main lane；
 - **Human**：批准 Test、提供 blocker 输入、最终审核和 merge。
 
 这些规则在角色 Markdown 和平台生成配置中存在，但大部分仍属于 policy
@@ -400,7 +404,7 @@ Human-approved T + matching I0 ready → assemble Candidate 0 → Tester
 | Orchestrator → same Worker | 经完整性与泄漏审查的 Worker Correction Envelope；上一 Implementation tip | fresh restart；暴露 test case；只给症状不给根因；把 correction 当新 Test epoch |
 | Worker correction | `Ik` 必须是 `I(k-1)` 的增量后继；最多 `k=1..3` | sibling-from-Governor 重建；无理由丢弃已完成实现 |
 | Orchestrator → terminal Reviewer | Reviewer Launch Envelope：成功终态或 Candidate 3 失败终态的完整证据 | 每次 Attempt 都调用 Reviewer；Reviewer 触发新返工 |
-| Reviewer → Orchestrator/Human | Reviewer Report：恰好一次终态 review；lesson/evidence 留在 review lane/comment | 把 lesson commit 作为产品 PR tip 或主线 ancestor |
+| Reviewer → Orchestrator/Human | Reviewer Report：恰好一次终态 review；当前 task 的 lesson/evidence 留在 review lane/comment | 把当前 task 的 lesson commit 放入 `G..accepted-Implementation-PR` 或作为产品 PR tip |
 | success finalization | PR head 为 exact accepted `Ik`；Candidate 只用于证明 `T+Ik` 通过 | 合并 Test、Candidate 或 lesson child |
 | failure finalization | issue 记录 final Tester + Reviewer 结果、剩余缺陷和可复用 Implementation tip | 建立声称成功的产品 PR；删除失败实现历史 |
 
@@ -1059,7 +1063,8 @@ failure:    no product PR; issue binds final Candidate + Tester + Reviewer evide
 
 - PR head 等于 terminal PASS Candidate 中的 exact Implementation parent；
 - PR diff/blob set 等于 accepted Implementation lane，且不含 Test-only paths；
-- owner Test、Candidate merge 和 Reviewer lesson 都不是 PR head 的 ancestors；
+- 当前 task 在 `G` 后产生的 owner Test、Candidate merge 和 Reviewer lesson 都不在
+  `G..accepted-Implementation-PR` 范围；不检查或改写 `G` 之前的历史 ancestry；
 - PR base/merge-base、changed-path allowlist 和 no merge-only edits 仍满足合同；
 - Human Gate 2 同时绑定 Candidate、frozen Test、accepted Implementation 和 PR head，
   避免批准的是一棵验收树、合入的是另一份代码。
@@ -1304,7 +1309,12 @@ blocker，也不自动改变现有 issue priority。
 - 不扩展：该 package 不实现 route executor、持久 recovery、通用 scheduler 或所有
   项目脚本 timeout；后者按 §9.13 和 §11 的独立非阻塞链逐步实现。
 
-### 7.2 B1：事实与边界明确，应在 #85 完成交付后小步修正
+### 7.2 B1：按依赖 owner 分流，不设统一的“#85 后修复阶段”
+
+B1 是已明确事实和边界的窄缺口，但五项并不共享同一时序：B1-1/B1-2 是 #93
+统一 #88/#90 交接守卫的一部分，必须在 #85 重启前完成；B1-3/B1-4/B1-5 由 #86
+在 #85 transition vocabulary 稳定后实现。不得再把它们整体推迟到 #85 之后，或
+另建一个重复的 handoff-guard repair stage。
 
 #### B1-1 #88 可以跳过成功的 `check-handoff`
 
@@ -1312,6 +1322,7 @@ blocker，也不自动改变现有 issue priority。
 - 最小修复目标：`run` 必须只接受同 manifest digest、operation=`check-handoff`、
   outcome=`CHECKED`、exit code 0 的直接 prior receipt；添加 known-good/bad replay
   tests。
+- 路由：并入 #93 的统一交接守卫，先于 #85。
 - 不扩展：本修复不顺带实现完整 workflow transition engine。
 
 #### B1-2 Governed workflow 未把 generic guard role 映射到 canonical role
@@ -1321,15 +1332,18 @@ blocker，也不自动改变现有 issue priority。
   role 必须来自 workflow contract。
 - 最小目标：由 governed workflow 的 wrapper/manifest producer 校验 canonical
   role；除非另行批准改变 #88 generic contract，不直接收窄 standalone guard。
+- 路由：并入 #93 的统一交接守卫，先于 #85。
 
 #### B1-3 Candidate 和 lane manifest 不验证 Git 实体
 
 - 标签：**能力缺口**。
 - 事实：当前只比较声明字符串，不验证 commit 存在、ordered parents、merge-base、
   direct union、path ownership、no merge-only edits。
-- 建议：在 route executor 前先增加一个只读 Candidate/finalization verifier；除了
-  验证 acceptance Candidate，还必须证明 success PR head 是 exact accepted
-  Implementation，且 Test/Candidate/lesson 都不在其 ancestry；assembler 仍后置。
+- 建议：#86 在 route executor 前增加一个只读 Candidate/finalization verifier；
+  除了验证 acceptance Candidate，还必须证明 success PR head 是 exact accepted
+  Implementation，且当前 task 在 `G` 后产生的 Test/Candidate/lesson 不出现在
+  `G..accepted-Implementation-PR` 范围；assembler 仍后置。
+- 路由：#86，位于 #85 之后、#79/#87 之前。
 
 #### B1-4 Human/Tester/Reviewer evidence 是 self-asserted/free-form
 
@@ -1338,6 +1352,7 @@ blocker，也不自动改变现有 issue priority。
   Gate 2 actor/decision 比实际运行规则更宽。
 - 建议：由 #86 处理 exact remote evidence、structured result envelope 和 epoch
   ledger，不在 #85 transition core 内夹带实现。
+- 路由：#86。
 
 #### B1-5 Operational invalid-run 与 contract finding 共用 “F0” 命名
 
@@ -1348,6 +1363,7 @@ blocker，也不自动改变现有 issue priority。
 - 建议：在 #86 中将 operational observation、contract finding、affected operation
   state、correction accounting 和 global workflow status 分开建模；在映射获批前，
   不以 completion-first 实践为理由弱化现有 contract F0 blocker 矩阵。
+- 路由：#86。
 
 ### 7.3 B2：重要但不阻塞当前自举
 
@@ -1470,7 +1486,7 @@ Correction Envelope 的语义充分性与 non-disclosure 判断。
 | `T` | owner Test tip | Human Gate 1 前可修订；批准后到 task 终止永久冻结 |
 | `I0` | Worker 初始完整 Implementation tip | Worker lane 首次完成时形成 |
 | `Ik` | 第 `k` 次增量修正后的 Implementation，`k=1..3` | 必须是 `I(k-1)` 的后继 |
-| `Ck=[T,Ik]` | 第 `k` 个 acceptance Candidate | off-main、direct union、无 merge-only edits |
+| `Ck=[T,Ik]` | 当前 task 第 `k` 个 acceptance Candidate | 在 `G` 后保持 off-main、direct union、无 merge-only edits |
 | Correction Attempt `k` | Tester 证明 Implementation defect 后，Worker 的第 `k` 次修正机会 | 只有 `k=1..3`，没有 Attempt 0 |
 | `S=(task_run,G,K,T)` | Human 批准后冻结的 Candidate series | `G/K/T` 任一改变即终止，不得原地重置预算 |
 | `R` | terminal Reviewer result/lesson evidence | series 成功或失败终止时恰好产生一次 |
@@ -1612,16 +1628,34 @@ Human Gate 前的 Test 修订、以及 Orchestrator 对报告做泄漏审查都�
 - 不能因为旧 gate 无法表达新状态就声称新状态已经机器验证；
 - 由 Human/Orchestrator 对 exact commits、diff、known-good/bad replay 和分支拓扑
   做一次显式 compensating review；
-- package 成功后只把 Implementation/governance change 合入，Test、Candidate 和
-  terminal lesson 保持 off-main；
+- package 成功后只把 Implementation/governance change 合入；当前 package 在 `G`
+  后产生的 Test、Candidate 和 terminal lesson 保持 off-main；
 - 下一 stage 从已合入 Implementation 开始，不回到最初 Governor。
 
-第一次 package 是 #93，只修复 `functional-development-v1` 当前无法安全交接的
-结构边界：B0-0 的双 lane readiness、Test freeze、Candidate 0、三次 correction、
-terminal Reviewer 和 Implementation-only finalization；B0-3 的最小 artifact family
-与统一交接守卫；以及 B0-1/B0-2 所需的 `K`、Tester Report、Correction Envelope
-结构容器。它不实现 #85 的具体 precedence/identity/routing 语义，也不得顺带实现
-完整 `loopctl`、recovery、notifications、GitHub executor 或 capability sandbox。
+当前 Phase 0、1、2、3 进一步使用 `MANUAL-BOOTSTRAP`：不得自主 dispatch lane、
+迭代、重试、组装 Candidate、轮询 Gate、计算 correction 或 merge。每个开发、修正、
+验证、PR 和 merge 动作都必须从一条明确 Human 命令开始；Agent 完成该有界动作并
+返回 exact diff/evidence 后停止，Human 审阅并明确选择下一动作。准备 future issue/
+index 只建立 tracking topology，不完成 phase，也不授权进入下一 phase。
+
+> No autonomous Agent Loop iteration is authorized in Phases 0–3. No automatic
+> lane dispatch, retry, Candidate assembly, gate polling, correction accounting,
+> or merge. Each development/correction step begins only from an explicit Human
+> command; the Agent produces the requested change and evidence; the Human
+> reviews and verifies it; the exact final revision merges only after explicit
+> Human approval.
+
+Phase 0 [#94](https://github.com/autoMBD/autombd-rtd-config/issues/94) 先冻结本文，
+Phase 1 再由 #57 的 canonical execution index 完成依赖绑定。第一项**实现** package
+是 Timeout Package A [#95](https://github.com/autoMBD/autombd-rtd-config/issues/95)；
+它只纠正 Agent 生命周期与确定性 command timeout 的边界。其 accepted merge 由
+Human 选择为 #93 Governor 后，#93 才修复 `functional-development-v1` 当前无法安全
+交接的结构边界：B0-0 的双 lane readiness、Test freeze、Candidate 0、三次
+correction、terminal Reviewer 和 Implementation-only finalization；B0-3 的最小
+artifact family 与统一交接守卫；以及 B0-1/B0-2 所需的 `K`、Tester Report、
+Correction Envelope 结构容器。#93 不实现 #85 的具体 precedence/identity/routing
+语义，也不得顺带实现完整 `loopctl`、recovery、notifications、GitHub executor 或
+capability sandbox。
 
 ### 9.3 启动权威与 Orchestrator 责任
 
@@ -2159,7 +2193,7 @@ Orchestrator 用 frozen `T` 和 exact `I0` 组装 `C0`：
 - Test 与 Implementation manifests 各自完整；
 - tree 是两条 lane 相对 `G` 的 direct union；
 - 无 merge-only edits；
-- Candidate、Test 和 acceptance receipts 全部 off-main。
+- 当前 task 在 `G` 后产生的 Candidate、Test 和 acceptance receipts 全部 off-main。
 
 `C0` 是首次真实集成和 owner gate 执行，**不是 correction Attempt**。Tester 可读取
 完整 Candidate，包括 Implementation 和 Test，但必须：
@@ -2321,12 +2355,13 @@ issue/PR evidence。
 
 1. Orchestrator 创建产品 PR，head 为 Candidate 中 exact accepted Implementation
    `Ik`，不是 Candidate、Test 或 lesson child；
-2. Candidate/Test/review refs 保留为 off-main acceptance evidence；
+2. 当前 task 的 Candidate/Test/review refs 保留为 off-main acceptance evidence；
 3. Human final packet 同时绑定 `G/T/Ik/Ck`、PR head/tree、Tester PASS 和 Reviewer
    result；
 4. Human approval 后只合并 `Ik` 的产品/governance diff；
-5. finalization verifier 或人工补偿证明 Test-only paths、Candidate merge、lesson
-   commit 都不在 PR ancestry；
+5. finalization verifier 或人工补偿证明当前 task 在 `G` 后产生的 Test-only paths、
+   Candidate merge、lesson commit 都不在 `G..accepted-Implementation-PR` 范围；
+   `G` 之前的历史 ancestry 不属于本次检查；
 6. merge 后运行 bounded trust-root verification，并在 issue 记录 exact remote tip。
 
 #### 失败
@@ -2692,29 +2727,25 @@ Human 明确要求停止始终优先。除此之外，任何触发都先阻塞�
 ### 11.1 依赖图
 
 ```text
-Timeout Package A P0.1 dynamic Agent supervision + harness boundary
-    │
-    └──hard──> #93 structured handoff artifacts + unified #88/#90 guard
-                   + functional-development lifecycle contract correction
-                    │
-                    └──hard──> #85 functional-development transition core restart
-                                   │
-                                   └──hard──> #86 exact evidence/correction ledger
-                                                  + read-only Candidate/finalization verifier
-                                                      │
-                                                      └──hard──> #79 capability isolation/
-                                                                     headless hydration
-                                                                          │
-                                                                          └──hard──> #87 route profiles
-                                                                                           │
-                                                                                           └──hard──> #80 Human intake
+#94 Phase 0 freeze trust-trace baseline
+    └──hard──> #57 Phase 1 execution index explicitly completed by Human
+                   └──hard──> #95 Timeout Package A dynamic Agent supervision
+                                  └──hard──> #93 structured handoff artifacts
+                                                 + unified #88/#90 guard
+                                                 + lifecycle correction
+                                                   └──hard──> #85 transition core
+                                                                  └──hard──> #86 evidence/finalization
+                                                                                 └──hard──> #79 isolation/hydration
+                                                                                                └──hard──> #87 route profiles
+                                                                                                               └──hard──> #80 Human intake
 
-Timeout Package C product/runtime public timeout contract
-    └──hard──> Timeout Package D project scripts/CI
-                   └──hard──> Timeout Package E black-box Agent harness adapter
+#96 Timeout Package C product/runtime public timeout contract
+    └──hard──> #97 Timeout Package D project scripts/CI
+                   └──hard──> #98 Timeout Package E black-box Agent harness adapter
 
-Timeout Package E also depends on Package A's Agent-lifecycle semantics.
-#93 and #85 do not wait for Timeout Packages C/D/E.
+#98 also depends on #95's Agent-lifecycle semantics.
+#96/#97/#98 begin implementation only after #93 so they use the accepted workflow,
+but #93 and #85 do not wait for them.
 
 #92 GUI hygiene executes after #80 unless it becomes an actual blocker.
 #59 recovery and #81 notifications consume the stabilized state/evidence model later.
@@ -2728,7 +2759,9 @@ Timeout Package E also depends on Package A's Agent-lifecycle semantics.
 ### 11.2 P0.1-A：动态 Agent 监督与 harness 边界
 
 优先级：**P0.1，阻塞 #93 lane dispatch，但不阻塞与 Agent Loop 无关的产品工作**。
-Tracking issue 尚未创建；必须由 Human 审阅 issue scope 后再实施。
+Tracking issue：[#95](https://github.com/autoMBD/autombd-rtd-config/issues/95)。
+#95 必须等待 #94 accepted merge 和 #57 Phase 1 明确完成；每个开发、验证、修正、
+PR 和 merge 动作仍分别需要 Human 命令。
 
 该 package 只能包括：
 
@@ -2792,7 +2825,8 @@ Package A 只纠正规则、角色与监督记录的时间语义，不会令当�
 - 支持 Tester PASS 与 correction exhausted/Test invalid/contract invalid 两种
   terminal Reviewer 路径；
 - Reviewer 恰好一次且 terminal，不触发返工；
-- finalization 明确 accepted Implementation-only PR，Test/Candidate/lesson off-main；
+- finalization 明确 accepted Implementation-only PR；当前 task 在 `G` 后产生的
+  Test/Candidate/lesson 保持 off-main；
 - 更新对应 Skill、角色说明和极小 lifecycle known-good/bad replay。
 
 明确排除：
@@ -2853,7 +2887,9 @@ restart，也不得把旧 #85 Candidate acceptance 结果当新证据。
 - canonical history、sequence/run identity 和 duplicate idempotency；
 - operational observation 与 contract finding/status 正交；
 - Candidate ordered parents/direct union/no merge-only edits；
-- final PR head 等于 accepted Implementation，Test/Candidate/lesson 不在 ancestry。
+- final PR head 等于 accepted Implementation；当前 task 在 `G` 后产生的
+  Test/Candidate/lesson 不在 `G..accepted-Implementation-PR` 范围，`G` 之前的
+  历史 ancestry 不在本次检查范围。
 
 持久化 recovery 仍属于 #59；assembler/merge mutation 仍后置。先做只读 verifier，
 避免把一个尚不稳定的 writer 放进所有 PR 路径。
@@ -2884,6 +2920,8 @@ restart，也不得把旧 #85 Candidate acceptance 结果当新证据。
 ### 11.8 Timeout Package C：产品/runtime 公共 timeout 合同
 
 优先级：**P1；不阻塞 #93/#85，只阻塞依赖这些长操作的后续产品验收**。
+Tracking issue：[#96](https://github.com/autoMBD/autombd-rtd-config/issues/96)。
+实现治理上等待 #93 accepted，以使用新工作流；技术设计基线依赖 #94。
 
 - standalone `validate` 支持与通用 runtime 一致的 config/CLI/API timeout override 和
   precedence；
@@ -2895,7 +2933,8 @@ restart，也不得把旧 #85 Candidate acceptance 结果当新证据。
 
 ### 11.9 Timeout Package D：项目 scripts/CI 的确定性 deadline
 
-依赖：Timeout Package C 的错误结构和 deadline 传播语义稳定。
+Tracking issue：[#97](https://github.com/autoMBD/autombd-rtd-config/issues/97)。
+依赖：#96 的错误结构和 deadline 传播语义稳定。
 
 - release manifest 的 Git subprocess 增加合理默认、显式覆盖和稳定错误；
 - deploy lock/operation timeout 可覆盖，stale lock 增加 PID/liveness/lease refresh；
@@ -2905,8 +2944,9 @@ restart，也不得把旧 #85 Candidate acceptance 结果当新证据。
 
 ### 11.10 Timeout Package E：black-box Agent harness adapter
 
-依赖：Timeout Package A 的 Agent-lifecycle语义和 Packages C/D 的内外 deadline/错误
-结构。它只阻塞下一项 E2E-dependent product development，不反向阻塞 #93/#85。
+Tracking issue：[#98](https://github.com/autoMBD/autombd-rtd-config/issues/98)。
+依赖：#95 的 Agent-lifecycle 语义以及 #96/#97 的内外 deadline/错误结构。它只阻塞
+下一项 E2E-dependent product development，不反向阻塞 #93/#85。
 
 - 以 streaming/pollable adapter 驱动 Codex、OpenCode 和后续 runner；
 - 删除正常路径的 `subprocess.run(..., fixed Agent timeout)`；长时间但持续有进展的
@@ -2933,8 +2973,14 @@ restart，也不得把旧 #85 Candidate acceptance 结果当新证据。
 
 ### 12.1 单个 task/package 的强制终止
 
-一个 bootstrap package 只覆盖一个 issue 和一个 frozen Candidate series。发生
-以下任一条件即结束，随后 terminal Reviewer 恰好运行一次：
+本小节描述 **Phase 3 被 Human 验收并合入之后**，未来 governed Loop 对单个
+task/package 的目标终止语义；它不是 Phase 0、1、2、3 当前人工自举过程的执行
+授权。Phase 0–3 继续受 §9.2 的 `MANUAL-BOOTSTRAP` 覆盖：每个 bounded action
+完成即停止，Candidate 组装、Tester、terminal Reviewer、PR 和 merge 都只能在
+Human 对该 exact 下一动作另行下令后发生，不得因下列条件自动 dispatch 或推进。
+
+进入该未来 governed 模式后，一个 package 只覆盖一个 issue 和一个 frozen
+Candidate series。发生以下任一条件即结束，随后 terminal Reviewer 恰好运行一次：
 
 - 某个 `C0..C3` Tester PASS；
 - `C3` valid FAIL；
@@ -2994,8 +3040,9 @@ Tester/Reviewer results 和 observations。下一个 stage 必须从已合入 Im
    Orchestrator 验证诊断充分性并去除 owner-Test 泄漏，再由同一个 Worker 在既有
    Implementation 上增量修正。
 6. Reviewer 在 task 成功或失败终止时恰好一次，进入 Reviewer 后不再返工。
-7. Test、Candidate 和 Reviewer lessons 不进入产品主线；成功 PR 只携带 accepted
-   Implementation，失败用 issue terminal record。
+7. 当前 task 在 `G` 后产生的 Test、Candidate 和 Reviewer lessons 不进入
+   `G..accepted-Implementation-PR`；成功 PR 在该范围只携带 accepted
+   Implementation，失败用 issue terminal record。`G` 之前的历史 ancestry 不重写。
 8. 未知问题 observation-first、completion-first；一次有界诊断，除 integrity、
    safety 或 mandatory acceptance 外不盲目扩大 scope/blocking。
 9. Task-level Tester 只运行 Human-approved Test Gate 所绑定的 Test Impact Set；
@@ -3035,12 +3082,19 @@ Tester/Reviewer results 和 observations。下一个 stage 必须从已合入 Im
 21. 动态 monitor plan/event 属于 ignored Orchestrator runtime state，不进入 `K` 或
     Candidate identity。估时/下一观察点修订不产生 `K1`；#93 guard 只校验 locator/
     identity/结构，不判断时间估计、调度或业务 verdict。
+22. Phase 0、1、2、3 使用 `MANUAL-BOOTSTRAP`，不允许 Agent Loop 自主 dispatch、
+    迭代、重试、Candidate 组装、Gate polling、correction accounting 或 merge；每个
+    bounded action 和最终合并都由 Human 分别明确下令并审阅 evidence。
+23. 当前 completion gate 顺序是 #94 → #57 Phase 1 → #95 → #93；#93 在 #85 前吸收
+    B1-1/B1-2，#86 在 #85 后处理 B1-3/B1-4/B1-5。所有 off-main/finalization
+    禁则只检查当前 task 在 `G..accepted-Implementation-PR` 中新增的拓扑，不重写
+    历史。
 
 仍需 Human 对实际变更逐项批准的是：
 
-- Timeout Package A 的 exact Test Human Gate 1 与 terminal Implementation-only PR；
-- #93 exact Test Human Gate 1（Task Contract Epoch 只作为绑定身份/支持证据）；
-- #93 terminal Candidate/Implementation-only PR；
+- #94 corrected trust-trace 的 formal verification、freeze commit、PR 和 final merge；
+- #95 每个实现/验证动作、exact PR 和 final merge；
+- #93 每个合同/实现/回放验证动作、exact PR 和 final merge；
 - 之后以新 master 重启 #85 的 exact semantic annex 和 Gate。
 
 在 Timeout Package A 与 #93 合入前，本文是审阅与目标设计，不修改
@@ -3058,14 +3112,15 @@ Tester/Reviewer results 和 observations。下一个 stage 必须从已合入 Im
 | Trace lane | `agent-discipline/agent-loop-bootstrap-trust-trace.md` |
 | Audited Governor | `9331d6684d4cfb977212ef60e70771e36c065b7c` |
 | Audited Workflow Contract blob | `b747065ac2fafa03d35d7a94b39d52d70f1de416` |
-| Design state | v0.8.0 记录守卫失败路由、双时间平面和 harness 边界；尚未修改活动规则/机器合同或实现 K/artifact schemas |
-| Active bootstrap package | #93 tracking issue 已创建但 lane 未启动；其前置 Timeout Package A 尚无 tracking issue/Implementation |
+| Design state | v0.9.0 保留 v0.8.0 的守卫失败路由与双时间平面设计，并纠正执行顺序、B1 owner、当前-series topology 范围和 tracking receipts；尚未修改活动规则/机器合同或实现 K/artifact schemas |
+| Active bootstrap package | #94 Phase 0 文档修正已获 Human 命令；#57 Phase 1 index 已准备但未完成；#95 已创建但 Implementation 未启动；#93 等待 #95 accepted merge |
 | Candidate/correction state | none；不得用历史 `candidate_attempt` 伪造新模型 |
-| Next allowed operation | 完成 v0.8.0 文档验证；等待 Human 明确授权创建/执行 Timeout Package A，再以其 accepted merge commit 为 #93 Governor；不得直接恢复 #85 Candidate series |
+| Next allowed operation | 停止本次 correction action，向 Human 提交 v0.9.0 exact working-tree diff 与 author self-check evidence；等待 Human 单独下令 `VERIFY`。在此之前不得 commit、创建 PR、推进 Phase 1/#95/#93 或恢复 #85 |
 
 ### 14.2 Append-only event schema
 
-每个 bootstrap event 必须追加以下字段；未知值写 `UNKNOWN` 并说明原因，禁止推测：
+自 BT-0004 起，每个新增 bootstrap event 必须追加以下字段；未知值写 `UNKNOWN`
+并说明原因，禁止推测：
 
 ```text
 trace_id
@@ -3084,6 +3139,12 @@ supersedes（仅纠正旧事件时）
 Trace event 只记录已经发生且可引用的事实。设计愿望、未来计划和自然语言判断分别
 留在 versioned design/current snapshot；不得伪造成 event。事件修正只能追加新行并
 通过 `supersedes` 指向旧 `trace_id`。
+
+BT-0001、BT-0002、BT-0003 在该完整 schema 冻结前已经追加，缺少
+`Test Impact Set / mandatory acceptance`、`raw Tester report / Worker Correction
+Envelope` 和 `bounded diagnostic` 字段；这些缺项统一解释为
+`NOT_RECORDED_LEGACY`，不推导为 PASS、NOT_APPLICABLE 或当前合规证据。append-only
+规则禁止为补齐形状而改写它们；如需纠正其事实，只能追加带 `supersedes` 的新事件。
 
 ### 14.3 Append-only events
 
@@ -3196,6 +3257,29 @@ next_allowed_operation: verify v0.8.0; await explicit authority for Timeout Pack
 supersedes: none — records the newly approved design; active fixed-time rules remain facts until separately implemented and accepted
 ```
 
+#### BT-0006 — Phase 0 trust-trace correction authorized
+
+```text
+trace_id: BT-0006
+observed_at_utc: 2026-09-04T23:32:00.1047379Z
+issue / task_run / stage: #94 / manual-bootstrap-phase-0 / trust-trace-correction
+event / actor: PHASE0_TRUST_TRACE_CORRECTION_AUTHORIZED / Human autoMBD
+authority: current Human instruction "是的，修正这些内容" after the frozen-document audit
+G: 9331d6684d4cfb977212ef60e70771e36c065b7c
+W: b747065ac2fafa03d35d7a94b39d52d70f1de416 — unchanged
+K / T / I / C: NOT_CREATED
+candidate_index / correction_count: NOT_STARTED / 0
+input_digests: frozen head cb3f48414434789fba21c2ff0461ba7126bc8c14; trust-trace raw SHA-256 b9ba3244015f08a202ad6cbb61ab305de640ec669df3e4c2c4d180712546a0df; ignored execution-plan SHA-256 1111b12fe1fea16742c96a439147db3504c724ab113b394abca21933483cadd8
+output_digests: corrected working-tree document; exact raw SHA-256 is reported externally because a file cannot embed its own digest; no correction commit created
+Test Impact Set / mandatory acceptance: N/A — governance documentation only; structural and semantic review required
+raw Tester report / Worker Correction Envelope: NOT_APPLICABLE
+observations: #94–#98 and the #57 canonical index exist; current projections must route #94 → #57 Phase 1 → #95 → #93; B1-1/B1-2 belong to #93, B1-3/B1-4/B1-5 to #86; topology exclusions apply only to current-task additions in G..accepted-Implementation-PR
+bounded diagnostic: author self-check of the exact two-file branch path set plus two independent read-only correction reviews; this is correction evidence, not the separately Human-commanded Phase 0 VERIFY verdict; no runtime, product, Test Gate, Candidate, commit, PR, or merge action
+disposition: CORRECT_DOCUMENTATION_AND_STOP_FOR_HUMAN_REVIEW
+next_allowed_operation: present the v0.9.0 exact working-tree diff and author self-check evidence, then await an explicit Human VERIFY command; do not commit or create a PR
+supersedes: BT-0003 only for its direct-#93 next operation, and BT-0005 only for its now-completed tracking-creation next operation; all approved design content remains active
+```
+
 ## Appendix A — 证据索引
 
 ### A.1 当前主线文件
@@ -3222,7 +3306,36 @@ supersedes: none — records the newly approved design; active fixed-time rules 
 - [`../tests/unit/test_interface_handoff_check.py`](../tests/unit/test_interface_handoff_check.py)
 - [`../tests/unit/test_interface_handoff_check_generality.py`](../tests/unit/test_interface_handoff_check_generality.py)
 
-### A.3 关键历史评论
+### A.3 关键历史与当前 tracking receipts
+
+#### A.3.1 当前人工自举 tracking
+
+- Phase 0 trust-trace freeze：
+  [issue 94](https://github.com/autoMBD/autombd-rtd-config/issues/94)
+- Canonical Phase 0–3 execution index：
+  [#57 comment 5541711951](https://github.com/autoMBD/autombd-rtd-config/issues/57#issuecomment-5541711951)
+- Timeout Package A：
+  [issue 95](https://github.com/autoMBD/autombd-rtd-config/issues/95)
+- Timeout Packages C/D/E：
+  [issue 96](https://github.com/autoMBD/autombd-rtd-config/issues/96)、
+  [issue 97](https://github.com/autoMBD/autombd-rtd-config/issues/97)、
+  [issue 98](https://github.com/autoMBD/autombd-rtd-config/issues/98)
+- Phase 3 manual-bootstrap dependency：
+  [#93 comment 5541711518](https://github.com/autoMBD/autombd-rtd-config/issues/93#issuecomment-5541711518)
+- #85 restart anchor：
+  [comment 5541712266](https://github.com/autoMBD/autombd-rtd-config/issues/85#issuecomment-5541712266)
+- #86 corrected lifecycle：
+  [comment 5541712995](https://github.com/autoMBD/autombd-rtd-config/issues/86#issuecomment-5541712995)
+- #79/#87/#80 dependency boundaries：
+  [#79 comment 5541712568](https://github.com/autoMBD/autombd-rtd-config/issues/79#issuecomment-5541712568)、
+  [#87 comment 5541713320](https://github.com/autoMBD/autombd-rtd-config/issues/87#issuecomment-5541713320)、
+  [#80 comment 5541714111](https://github.com/autoMBD/autombd-rtd-config/issues/80#issuecomment-5541714111)
+- #59/#81/#92 non-hard scheduling boundaries：
+  [#59 comment 5541713661](https://github.com/autoMBD/autombd-rtd-config/issues/59#issuecomment-5541713661)、
+  [#81 comment 5541714532](https://github.com/autoMBD/autombd-rtd-config/issues/81#issuecomment-5541714532)、
+  [#92 comment 5541714868](https://github.com/autoMBD/autombd-rtd-config/issues/92#issuecomment-5541714868)
+
+#### A.3.2 已有历史评论
 
 - #57 approved baseline / package split：
   [comment 5035390309](https://github.com/autoMBD/autombd-rtd-config/issues/57#issuecomment-5035390309)
@@ -3302,13 +3415,15 @@ supersedes: none — records the newly approved design; active fixed-time rules 
   未来 acceptance evidence；
 - GitHub comment 引用证明历史过程，不替代当前 remote-state verification；
 - 未合并历史 lesson commit 证明“曾发现过问题”，不自动成为当前规范；
-- 本次 GitHub 变更仅为创建 #93 和在 #85 追加依赖/生命周期纠偏评论；没有修改
-  workflow contract、现有 Candidate refs 或 product/runtime。
+- 截至 BT-0005 的原始审阅动作只创建 #93 并在 #85 追加依赖/生命周期纠偏评论；
+  BT-0006 另行记录已创建的 #94–#98 和现有 issue 的 dependency comments。两阶段
+  都没有修改 workflow contract、现有 Candidate refs 或 product/runtime。
 
 ## Changelog
 
 | Version | Date | Changes |
 | --- | --- | --- |
+| 0.9.0 | 2026-09-05 | Corrected the Phase 0 trust trace before PR: made #94 → #57 Phase 1 → #95 → #93 the explicit order and bound Phases 0–3 to Human-commanded `MANUAL-BOOTSTRAP`; split B1-1/B1-2 to #93 and B1-3/B1-4/B1-5 to #86; scoped off-main/finalization ancestry checks to current-task additions in `G..accepted-Implementation-PR`; recorded #94–#98 and dependency-comment receipts; updated the derived snapshot; and appended BT-0006 without rewriting BT-0001…BT-0005. |
 | 0.8.0 | 2026-09-04 | Recorded the Human-approved two-plane time-control design: dynamic Orchestrator supervision for Agent tasks, deterministic configurable deadlines for project tools, Codex/OpenCode harness boundaries, interruption routing, current timeout inventory, narrow validation scope, and dependency-ordered Timeout Packages A/C/D/E. Added Owner decisions 18–21 and append-only trace BT-0005 without claiming implementation. |
 | 0.7.0 | 2026-09-03 | Recorded local guard-failure routing, structured guard results, immutable replacement/report-only repair, same-lane continuity, safe evidence fallback, side-effect-aware retry and unchanged correction accounting; explicitly excluded real guard/timeout implementation defects from PROCESS exemptions. Appended BT-0004 and preserved earlier trace/changelog history. |
 | 0.6.0 | 2026-08-30 | Froze the structured-handoff architecture: `G` remains a Git identity rather than a file; task semantics move to canonical `K`/Envelope/Report artifacts; prompts are locator-only and chat responses notification-only; removed generic `description_session`; retained one Tester role across Test Gate authoring/prevalidation and Candidate acceptance and one Worker across incremental corrections; accepted Orchestrator LLM semantic redaction as the v0.1 trust boundary; defined the complete minimal artifact family, unified #88/#90 guard responsibilities, role prompt examples, #93→#85 dependency, and trace event BT-0003. |
