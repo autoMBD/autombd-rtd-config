@@ -2,8 +2,8 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.1.6 |
-| Date | 2026-07-18 |
+| Version | 0.1.8 |
+| Date | 2026-08-29 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Documentation-governance rules for the RTD CfgFile CLI project. Defines the two-category split, official tool name, changelog integrity, archive policy, and the authoritative cross-category documentation map. |
 
@@ -112,6 +112,7 @@ paths are relative to the repository root.
 | `agent-discipline/skills/external-dependency-memory/SKILL.md` | Skill for reusing local external dependency evidence across agents and conversations | AGENTS.md, source materials |
 | `agent-discipline/owner-review-comments.md` | Review-comment resolutions across rounds | agent-discipline/review-archive-NOT-USED-NEVER-TOUCH!!!/ |
 | `agent-discipline/agent-lessons-learned.md` | Reviewer's running lessons log | — |
+| `agent-discipline/agent-loop-bootstrap-trust-trace.md` | Bootstrap trust-tracing lane: frozen framework/history audit, Human-approved lifecycle design, derived current snapshot, append-only bootstrap events, and complete lessons synthesis | AGENTS.md, workflow contract, agent-lessons-learned |
 | `agent-discipline/documentation-governance.md` | This document: governance rules + documentation map | — |
 | `agent-discipline/review-archive-NOT-USED-NEVER-TOUCH!!!/` | Frozen review archives — never a requirements source | — |
 
@@ -136,6 +137,8 @@ flowchart TD
   RM["docs/roadmaps/roadmap"]
   ROLES["agent-discipline/subagents/"] --> AGENTS
   LL["agent-discipline/agent-lessons-learned"] --> AGENTS
+  TT["agent-discipline/agent-loop-bootstrap-trust-trace"] --> AGENTS
+  TT --> LL
   CT["agent-discipline/owner-review-comments"] -.archives.-> OBS["agent-discipline/review-archive-NOT-USED-NEVER-TOUCH!!!/"]
   SKILL["autombd-rtd/SKILL.md + assets/ + CLI"] -. released deliverable .-> TC
 ```
@@ -144,6 +147,8 @@ flowchart TD
 
 | Date | Version | Description |
 | --- | --- | --- |
+| 2026-08-29 | 0.1.8 | Renamed the Agent Loop review as the bootstrap trust-tracing lane and documented its split baseline/design/snapshot/append-only-event responsibilities. |
+| 2026-08-29 | 0.1.7 | Added the Agent Loop framework review and limited-bootstrap design to the authoritative Category B documentation map. |
 | 2026-07-18 | 0.1.6 | Required task-specific execution plans to remain ignored local state under `.agent-state/plans/`; durable engineering design remains Category A and reusable Agent workflow remains Category B. |
 | 2026-07-12 | 0.1.5 | Added the Category B implementation-plan directory to the authoritative documentation map. |
 | 2026-07-12 | 0.1.4 | Added the runtime-safety and public-contract design to the authoritative Category A documentation map. |
