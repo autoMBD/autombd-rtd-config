@@ -2,11 +2,11 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.11.0 |
-| Date | 2026-09-05 |
+| Version | 0.12.0 |
+| Date | 2026-09-06 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
-| Status | Phase 0 merged; #95 awaiting Human review; accepted-Candidate PR correction documented |
-| Description | Agent Loop 的 Category B trust-tracing lane：冻结现状审计与历史教训，定义结构化角色交接、统一守卫与失败局部返工、双 lane、Candidate 0 加三次增量修正、Phase 0–3 人工自举顺序，以及 Agent 动态监督与确定性工具超时的双时间平面，并用 append-only trace 记录有限自举状态。 |
+| Status | Phase 0 merged; #95 awaiting Human review; three-tier testing and issue-driven local KPI design recorded, not implemented |
+| Description | Agent Loop 的 Category B trust-tracing lane：保留现状审计与历史教训，维护结构化交接、统一守卫、双 lane 与 Candidate 0 加三次修正、人工自举、动态监督和工具超时，并记录三级测试、RTD CfgFile CLI 单向 KPI Issue 与本地结果展示的批准设计及实施边界。 |
 
 ## 0. Trust-tracing lane 的权威与维护边界
 
@@ -66,6 +66,14 @@ heartbeat 和当前活动文档的治理定义。本版据此作出以下核心�
 推论：这两项是 Orchestrator 的错误解释，不是 Owner 要求。§6.9、§9.11 给出统一
 拓扑与合并规则；BT-0008 记录本次纠正。历史提交事实、旧事件和旧 changelog 保留，
 其中被纠正的解释不再作为执行依据；不重写 `G` 之前的 Git 历史。
+
+v0.12.0 另按 Owner 的三级测试讨论纠偏：Worker TDD unit、Tester 人审 feature
+functional gate、合并后 RTD CfgFile CLI 综合 KPI 是不同目的的交付。KPI 不再进入
+功能 Candidate 的放行或自动优化计数；由 Reviewer 形成建单决定、Orchestrator 提
+PR 时建立待 merge 的 KPI Issue，Human 在源 Candidate 获批且源 PR 实际合并后
+启动该 Issue。用例与结果都经人审，本地不自动触发、不做 CT、不追溯补齐历史测试
+架构。完整规则见 §9.14，实施旁路见 §11.12，BT-0009 记录本次授权；这些仍是待
+实现设计，不是对当前机器合同或 runner 已具备能力的声明。
 
 当前 `workflow-contract.json`、Agent Workflow Skill、`AGENTS.md` 和角色说明仍
 保留“`candidate_attempt=1..3`”“Gate 1 后才实施”“Reviewer 仅在 Tester PASS 后”
@@ -353,6 +361,10 @@ manifest check、全 pytest、outside-repo deploy smoke 和 Windows symlink lane
 - GUI-free derived-checkout hydration。
 
 对应计划主要分布在 #59、#79、#80、#81、#85、#86、#87、#92、#93。
+
+2026-09-06 追加的能力边界：三级测试的独立路由、Reviewer→PR 的 KPI 建单交接、
+单向 KPI Issue、根目录 `kpi/` JSON 结果与美观 Dashboard 均尚未实现，分别由
+#100/#101/#102 跟踪；不得把下文目标设计误读为现有执行能力。
 
 ## 5. 当前角色交付接口审阅
 
@@ -2355,6 +2367,11 @@ lineage、Tester forensic evidence、Worker Correction Envelopes、公开合同�
 - 两条路径都记录 lessons/observations，但不修改 Test 或 Implementation；
 - Reviewer 不发起新的 Attempt；finding 不能在同一 task 返工。
 
+§9.14 的新功能交付规则落地后，成功路径 Reviewer Report 还包含结构化 KPI 建单
+决定：产品归属、feature/变更类型、需新建或复用的 KPI 用例及来源身份。Reviewer
+只做审查和交接，不获取宽泛 GitHub 写权限；实际建单由 Orchestrator 在提 PR 时
+完成。非 RTD CfgFile CLI 任务不要求 KPI；缺少 KPI 结果不阻塞功能 Reviewer。
+
 Terminal 状态：
 
 | Tester terminal | Reviewer result | Task result |
@@ -2389,6 +2406,11 @@ issue/PR evidence。
    与临时 confidential/reference evidence 不成为交付内容；已有 `G` 历史不重写；
 6. merge 后运行 bounded trust-root verification，确认远端包含 exact accepted `Ck`
    及批准的合并结果，并在 issue 记录 exact remote tip。
+
+提 PR 步骤同步消费 Reviewer 的 KPI 建单决定：符合 §9.14 范围时创建或复用一个
+关联 source PR/exact Candidate 的待 merge KPI Issue。建单不修改 Candidate tree，
+也不自动启动个人端 Agent。只有该 Candidate 的 Human final approval、源 PR
+实际 accepted merge 及 Human 启动 KPI Issue 三者满足，才进入独立 KPI 路由。
 
 这里的“包含测试”指两个 lane 中按合同交付的测试源码与必要测试资产，不把 ignored
 reference overlay、一次性 stubs、运行日志或 confidential 报告自动升级成 PR 文件。
@@ -2469,7 +2491,8 @@ Deterministic tool plane
 | `mcp_tool_timeout` | 一个 MCP server 启动或 tool call 的调用上限 | 只失败受影响调用；可按安全性重试/后备 |
 | `command_timeout` | 一个确定性命令/子进程的执行上限 | 可以终止该命令；必须报告阶段、elapsed、cleanup 和稳定错误 |
 | Human Gate polling/backoff | 何时再读外部审批状态 | 不是审批或任务 expiry |
-| Candidate/correction/KPI cap | 次数预算或结束后性能衡量 | 不是 wall-clock timeout |
+| 功能 Candidate/correction | 功能开发的组装索引与修正次数预算 | 不是 wall-clock timeout；不适用于 KPI Issue |
+| KPI 指标 | 场景执行后的性能衡量 | 不是 Agent timeout，也没有自动优化 correction cap |
 
 估计超出本身不消耗 correction、不作废 `T/I/C`、不更换 Worker、不生成新 `K`，
 也不把 observation 自动升级为 blocker。Agent 长时间没有可见进度只触发一次状态
@@ -2640,6 +2663,158 @@ finding enum，也不能由 Agent 自己声明 PROCESS 豁免。模糊归因保�
 - regression 只选择受影响 owner/generality/adapter tests，不运行无 dependency edge 的
   存量 full unit suite；CI/release full suite 与当前 Candidate verdict 分离。
 
+### 9.14 三级测试与 RTD CfgFile CLI 单向 KPI Issue
+
+#### 9.14.1 生效范围：只约束后续交付，不追溯补课
+
+本节记录 2026-09-06 Human 已确认的设计。适用于后续新 feature 开发和新 issue
+解决；正在排队、尚未接受的 #85 等后续交付按对应新规则执行。已合并 feature/代码
+不因缺少新分层架构而补建 Test lane、补跑全套测试或重新审批历史 PR。已有实现和
+测试保留；未来变更确实影响已有测试时，按 Test Impact Set 选择相关回归。
+
+| 测试类别 | 责任与交付 | 目的与时机 |
+| --- | --- | --- |
+| Unit | Worker 在 Implementation lane 基于 TDD 编写，包括 generality tests | 开发/增量修正期间验证实现细节、边界和泛化；不是独立 owner 功能验收 |
+| Functional | Tester 在独立 Test lane 编写并预验证，Human 批准后冻结 | 合并前验证当前 issue/feature 的正常、异常和必要直接依赖行为；PR 交付 accepted Candidate 的 Test+Implementation |
+| KPI | Tester/Human 独立设计或选择综合场景；Human 审用例，Tester 执行，Human 审结果 | 功能 merge 后评估 RTD CfgFile CLI 复合/综合场景及其性能，不回写原功能 Gate 或自动优化 |
+
+分类依据职责和目的，不是 pytest API、目录或调用粒度。功能测试以当前 feature
+为边界，但不能只测 happy path；也不能默认膨胀为完整系统综合场景。KPI 不是给
+功能 Gate 复制一份计时器。当前 KPI 范围**仅 RTD CfgFile CLI**，不包括 Agent Loop
+自身、#85 状态机、文档或其他工具。指标阈值不是 Agent 生命周期期限。
+
+#### 9.14.2 Reviewer 决策、PR 时建单、merge 后人工启动
+
+不得假定 GitHub merge 能自动唤醒个人端 Agent。本地阶段没有 merge webhook
+触发器、后台领单、定时 CT 或新服务。建单是正在运行的功能交付流程中的显式动作：
+
+1. 功能 Tester PASS 后，terminal Reviewer 审查时根据公开任务合同/issue scope
+   判定产品、feature、new-feature/bugfix、KPI 用例覆盖和建单需要，形成结构化结果。
+   不凭修改路径猜测业务类型，不读取隐藏功能用例来为 Worker 定制实现。
+2. Reviewer APPROVED 后，Orchestrator **在提交功能 PR 时**消费该结果，创建并
+   关联待 merge 的 KPI Issue；记录 source issue/PR、exact accepted Candidate 和
+   测试范围。Reviewer 不亲自获得通用 GitHub writer 权限。
+3. 基于 source PR/Candidate 与测试范围识别已有建单；重复命令或写入响应不明时
+   先核对，不重复创建。KPI 资产/结果/Dashboard 的提交不得递归生成 KPI Issue。
+4. 提 PR 时尚未 merge，因此 Issue 创建与可执行是两件事。只有 exact Candidate
+   获 Human final approval、源 PR 实际合入且身份已验证、**Human 明确启动该 KPI
+   Issue**，才进入用例准备和测试流程；不以 Issue 存在或 approval 单独证明已合并。
+5. 源 PR 未合并、关闭或换了未批准 Candidate 时不运行该 Issue；保留真实状态供
+   Human 处置，不自动换被测版本、重建 Issue 或启动补偿流程。
+
+| 来源变更 | KPI Issue 的用例工作 |
+| --- | --- |
+| RTD CfgFile CLI 新 feature | 准备独立的复合/综合 KPI 场景，进入 Human 用例 Gate |
+| 旧 feature bugfix，已有 KPI 用例覆盖 | 引用既有用例版本与本次范围，不重复开发；执行后提交结果 |
+| 旧 feature bugfix，没有现成覆盖 | 记录覆盖缺口并交 Human 决定，不擅自补 case 或跳过并宣称已测 |
+| 非 RTD CfgFile CLI | 不建 KPI 测量 Issue，不要求 KPI 证据 |
+
+“没有现成覆盖”是保留的 Human 决策分支，不是自动回补历史的授权。
+
+#### 9.14.3 KPI 是独立类型、单向 Loop，不是功能 correction 的延长
+
+目标路由（具体枚举/JSON schema 由 #100 版本化落地，不偷加到旧 v1 record）：
+
+```text
+Human 启动 KPI Issue（源 Candidate 已批、源 PR 已 merge）
+→ Tester/Human 编写或选择用例，完成预测试
+→ Human 用例 Gate（冻结 exact case revision 与执行范围）
+→ Tester 本地执行获批用例
+→ 记录完整结果
+→ Reviewer 一次终态审查
+→ Human 结果审核/处置
+→ KPI Issue 结束
+```
+
+KPI Issue 没有 Worker、Implementation lane、Candidate 组装或 correction counter。
+Tester 不改产品实现；Reviewer 只审过程/证据/报告且不重跑测试或发起返工。所有
+结果均交 Human，不自动修复、优化、重新采样直到通过或启动下一 issue。Human
+另行命令重测、改用例或修复时，生成明确的新执行/变更记录，不覆盖失败记录。
+
+人工可以直接设计、编写或修改 KPI 用例。Tester 负责将最终内容变为可执行用例并
+预验证所选 discovery/fixture/runner/计时/结果采集链；预测试不承担产品优化，也不
+作为正式测量结果。Human Gate 审的是完整用例包，指标、方法、范围和版本是其组成
+部分，不为每个字段另设审批。既有用例只确认本次引用的获批版本和范围，不重复开发。
+获批内容在本次执行期间冻结；语义改变需要新的用例版本和 Human 批准。
+
+#### 9.14.4 真实结果与人工处置
+
+| 结果 | 必须记录的含义与后续 |
+| --- | --- |
+| 场景完成且指标达标 | 有效样本、目标比较和证据，交 Human 审核 |
+| 场景完成但指标未达标 | 性能差距与瓶颈分析，交 Human；不调用 Worker |
+| 综合场景失败 | 如实记录失败位置与可确认原因，不包装成单纯环境/测量无效 |
+| 环境异常、数据缺失或执行中断 | 单列 operational outcome、不可判定指标及证据，不算作达标或擅自豁免真实场景失败 |
+
+场景需要完成条件，失败后快速退出不能视为性能优秀；这不是重新审核原功能 PR。
+一次评估完成不等于 KPI 全部达标，Human 可以接受“已完成评估/存在失败”的结果并
+安排后续工作。不得修改原功能 verdict、重置功能 correction 或为此舍弃已有实现。
+执行方案中预先获批的重复采样属于测试方法，不是失败后的自主迭代；必须保留所有
+样本，不只记录最快一次。Agent 动态监督及确定性命令超时继续按 §9.13 执行。
+
+#### 9.14.5 两类交接沿用一个守卫
+
+最小 KPI 交接包括：功能 Reviewer 的建单决定、KPI Issue/启动输入、KPI 用例包与
+预测试报告、Human 用例决定、Tester 执行报告、terminal Reviewer 报告、Human
+结果决定及终态记录。用例包表达场景、完成条件、指标/单位/阈值、样本方法、fixture
+和版本；执行报告绑定该包、源合并身份、实际环境和结果。Prompt 只定位文件。
+
+上述 kind-specific 文件复用 #93 的统一包装、身份、前驱、合法性和可见性守卫。
+#100 实现显式 KPI profile 扩展，不另建 guard，不哈希 prompt，也不用虚假
+Implementation/Candidate 字段填充功能 profile。#93 初版仍只实现功能交付必需文件，
+不因本节增加完整 KPI 引擎。自然语言场景审查和诊断判断仍由 Human/LLM 承担。
+
+#### 9.14.6 既有用例迁移与第三方 Agent 执行
+
+`docs/tests/rtd-config-test-cases.md` 现有 14 个带 KPI 的 `RTD-MEX-*` 用例直接迁入
+新 KPI 架构，保留 ID、场景、fixture、指标和必要完成条件；历史用例不强制重写成
+全新复杂场景。迁移清单/口径经 Human 确认。历史报告保持原义，不冒充本次 postmerge
+结果；仅因迁移不重跑历史全量验收。未来新 issue 的功能 Gate 由独立 Test lane
+生成，旧综合 KPI catalog 不再默认是合并前的 mandatory full E2E suite。
+
+保留现有第三方 Agent/E2E 能力：Tester 组织执行并分析，场景 Agent 只看到部署后
+Skill、case prompt、staged fixture，不看到仓库；embedded Tester 不是黑盒执行端。
+复用 #98 adapter 与现有 harness，局部修正功能/KPI catalog 耦合及计时有效性：
+runner exit 0 不等于场景成功，首次失败 check 的结束时间不能作成功计时终点。
+不借此新建通用测试平台。临时环境仍在 `tests/.tmp/`，必要证据持久保存后才能清理。
+
+#### 9.14.7 根目录 `kpi/`、JSON 结果与 Dashboard
+
+| 目标路径 | 职责 |
+| --- | --- |
+| `kpi/cases/` | 可复用 KPI 场景、指标和版本 |
+| `kpi/schemas/` | 用例/结果 JSON 的格式合同 |
+| `kpi/results/<run-id>.json` | 一次执行一份结果，简单 JSON 数据库，不覆盖旧运行 |
+| `kpi/dashboard/` | 本地网页、图表和只读结果浏览 |
+| `kpi/README.md` | 本地准备、执行和查看方法 |
+
+JSON 至少记录 source/KPI issue、源 PR/merge SHA、feature、获批用例及审批引用、
+runner/model/tool/环境身份、实际命令、全部样本/单位/目标、场景与指标结论、异常、
+原始证据引用和 Human 结果处置关联。不存凭据，不把缺失值写作零或 PASS；结果与
+审批/后续处置分别可追溯。Dashboard 的汇总/索引可重建，JSON 是唯一结果源。
+
+Dashboard 的**美观与可视化友好是验收要求**：先给 Human 审阅页面设计，再验证
+实际渲染。要求总览→feature/场景→单次详情层次、目标与实测对比、历史趋势、合理的
+版本对比、筛选/证据导航；排版、留白、配色、响应式布局一致，状态不只靠颜色区分。
+清楚显示未执行、达标、未达标、场景失败、不可判定；比较时保留用例/环境/指标口径，
+不能把不可比版本或极少样本画成可信的性能改善。Schema PASS 不替代视觉验收。
+
+`kpi/` 放工程用例、数据和界面，Agent 角色/审批/路由规则仍在 Category B。
+用例、工具和 Dashboard 的仓库交付需显式 Human 审阅；KPI 运行结果不自动 commit/
+push，是否发布及保留原始日志由对应交付决定。不把这些资产追加进已批准产品
+Candidate，不用 Reviewer lesson child 带入主线。
+
+#### 9.14.8 本地阶段不是 CT，框架建设也不是 KPI 测量任务
+
+本地阶段的全部 KPI 工作由 Issue 驱动、Human 启动；交付可复用获批用例和本次
+结果，不安装服务器、自动触发器、后台领单服务或定时 CT。未来有服务器时只增加
+调度/运行环境，调用同一测试入口、用例和 JSON 输出，不每轮重做用例开发 Loop。
+
+#100/#101/#102 是建设这些能力的普通工程 issue，遵循各自获准的开发/功能验收
+流程；它们产出的 KPI 测量 issue 才不含 Worker/Candidate。不能用“开发 KPI 框架”
+为理由取消工程实现的 unit/functional gate，也不能把其建设反过来升级为所有新
+feature merge 的前置条件。Phase 0–3 人工命令边界保持不变。
+
 ## 10. 未知问题处理协议
 
 ### 10.1 默认原则
@@ -2780,6 +2955,11 @@ accepted Candidate；人工 Phase 0–3 合入 Human 审阅的 exact 变更与�
 #96/#97/#98 begin implementation only after #93 so they use the accepted workflow,
 but #93 and #85 do not wait for them.
 
+#87 -> #100 KPI issue profile / Reviewer-to-PR ticket intake (schedule after #80)
+#100 + #98 -> #101 local KPI cases / manual execution / JSON results
+#101 -> #102 local visual KPI Dashboard
+#100/#101/#102 are not predecessors of functional feature acceptance.
+
 #92 GUI hygiene executes after #80 unless it becomes an actual blocker.
 #59 recovery and #81 notifications consume the stabilized state/evidence model later.
 ```
@@ -2862,6 +3042,10 @@ Package A 只纠正规则、角色与监督记录的时间语义，不会令当�
   禁止提前单独推 Test、剥离测试，以及用 Reviewer lesson child 替换获批 head；
 - 更新对应 Skill、角色说明和极小 lifecycle known-good/bad replay。
 
+按 §9.14 明确 Worker unit 与 Tester 功能 Gate 的归属，移除功能 profile 对合并前
+KPI 结果/自动优化的依赖。KPI 专属类型、审批文件和路由由 #100 扩展；#93 不实现
+完整 KPI 引擎、建单服务、runner 或 Dashboard，也不为未来字段填假 receipt。
+
 明确排除：
 
 - #85 的 transition/event 业务语义；
@@ -2926,6 +3110,10 @@ restart，也不得把旧 #85 Candidate acceptance 结果当新证据。
 持久化 recovery 仍属于 #59；assembler/merge mutation 仍后置。先做只读 verifier，
 避免把一个尚不稳定的 writer 放进所有 PR 路径。
 
+旧标题/设计中的独立 KPI optimization counter 已被 §9.14 取代：#86 只维护功能
+Candidate/correction 账本，不创建 KPI 自动修正预算；KPI report 不是功能接受的
+前置证据，KPI 的 source-merge 关联由 #100 消费已稳定的身份验证能力。
+
 ### 11.6 已并入 #93：#88/#90 统一交接守卫迁移
 
 不再保留一个 #85 之后的独立 #88 repair stage。#93 直接吸收：
@@ -2978,7 +3166,10 @@ Tracking issue：[#97](https://github.com/autoMBD/autombd-rtd-config/issues/97)�
 
 Tracking issue：[#98](https://github.com/autoMBD/autombd-rtd-config/issues/98)。
 依赖：#95 的 Agent-lifecycle 语义以及 #96/#97 的内外 deadline/错误结构。它只阻塞
-下一项 E2E-dependent product development，不反向阻塞 #93/#85。
+真正调用该 black-box runner 的操作，包括 #101 本地 KPI 执行；不再一概阻塞
+#40–#44 的开发或 merge，也不反向阻塞 #93/#85。若新 feature 自身的功能 Gate
+确需该 runner，应以实际 dependency edge 单独证明，不能用已迁出的 KPI catalog
+把所有产品任务重新绑成全局前置。
 
 - 以 streaming/pollable adapter 驱动 Codex、OpenCode 和后续 runner；
 - 删除正常路径的 `subprocess.run(..., fixed Agent timeout)`；长时间但持续有进展的
@@ -3001,6 +3192,21 @@ Tracking issue：[#98](https://github.com/autoMBD/autombd-rtd-config/issues/98)�
 
 不得为了“无人值守”同时开工这四项；executor 能重放、能恢复之后再接通知。
 
+### 11.12 P1 KPI 旁路：用例与本地结果，不建设本期 CT
+
+| Issue | 交付边界 | 硬依赖与排程 |
+| --- | --- | --- |
+| [#100](https://github.com/autoMBD/autombd-rtd-config/issues/100) | KPI 类型、单向角色/人审交接、Reviewer 建单决定及 PR 时幂等建单、source merge 前置 | #87；排程偏好主链到 #80 后，不反向阻塞主链 |
+| [#101](https://github.com/autoMBD/autombd-rtd-config/issues/101) | 14 个已有 KPI 用例迁移、本地人工启动执行、第三方 Agent/E2E 复用、JSON 结果与证据 | #100 和 #98；不运行历史补课或自动优化 |
+| [#102](https://github.com/autoMBD/autombd-rtd-config/issues/102) | 美观易用的本地 JSON Dashboard、图表/筛选/详情/证据，Human 视觉验收 | #101 结果 schema；可先做界面设计，集成须以接受的格式为准 |
+
+三个均为 P1 窄工程任务，不因登记就开工。#93 不承担全部 KPI schema/执行器，
+#85 保持功能 transition core，#86 不实现 KPI 优化计数，#79 保持隔离边界。
+#87/#80 的公共路由/入口被 #100 复用，KPI 专属能力不与它们同时膨胀。
+新产品 issue 仍按 #9 triage→#40→#41→#42→#43→#44 的既有排序评估自身功能范围；
+#9 不变成历史三级测试重建。已存在的产品功能缺口继续独立处理，不因“不补测试
+架构”被宣称解决。未来服务器 CT 只记录扩展方向，不新增当前实施前置或服务任务。
+
 ## 12. 自举退出条件
 
 ### 12.1 单个 task/package 的强制终止
@@ -3011,8 +3217,10 @@ task/package 的目标终止语义；它不是 Phase 0、1、2、3 当前人工�
 完成即停止，Candidate 组装、Tester、terminal Reviewer、PR 和 merge 都只能在
 Human 对该 exact 下一动作另行下令后发生，不得因下列条件自动 dispatch 或推进。
 
-进入该未来 governed 模式后，一个 package 只覆盖一个 issue 和一个 frozen
-Candidate series。发生以下任一条件即结束，随后 terminal Reviewer 恰好运行一次：
+进入该未来 governed 模式后，**功能开发 profile** 的一个 package 只覆盖一个 issue
+和一个 frozen Candidate series。KPI 测量 profile 没有 Candidate，按 §9.14 的单向
+执行、一次终态 Reviewer 和 Human 结果处置结束，不套用以下修正/终止条件。
+功能开发发生以下任一条件即结束，随后 terminal Reviewer 恰好运行一次：
 
 - 某个 `C0..C3` Tester PASS；
 - `C3` valid FAIL；
@@ -3123,6 +3331,16 @@ Tester/Reviewer results 和 observations。下一个 stage 必须从已验收合
     B1-1/B1-2，#86 在 #85 后处理 B1-3/B1-4/B1-5。finalization 对当前 task 检查
     `PR head == accepted Ck` 和 `G..Ck` 的完整交付；不得把开发期隔离扩大为测试
     永不进入主线，也不重写历史。
+24. 三级测试按责任/目的划分：Worker TDD unit、Tester 人审 feature functional gate、
+    合并后 RTD CfgFile CLI 独立综合 KPI。新规则面向后续交付，已合并历史不补课。
+25. KPI 用例和结果都经 Human 审核；Human 可直接设计用例。KPI Issue 是无 Worker/
+    Implementation/Candidate/correction 的单向 Loop，任何结果只记录后交 Human。
+26. Reviewer 形成 KPI 建单决定，Orchestrator 提功能 PR 时建待 merge 的关联 Issue；
+    exact Candidate 人批、源 PR 真实 merge、Human 启动后才执行。不依赖 merge
+    自动唤醒个人端 Agent，不做本地后台领单或 CT。
+27. 已有带 KPI 的 14 个 RTD-MEX 用例直接迁移；有覆盖的 bugfix 复用，无覆盖交
+    Human 决定。根目录 kpi/ 保存可复用用例与逐 run JSON，Dashboard 美观/可视化
+    友好属于验收；未来服务器仅复用用例和执行入口。#100/#101/#102 跟踪实施。
 
 仍需 Human 对实际变更逐项批准的是：
 
@@ -3147,10 +3365,10 @@ Tester/Reviewer results 和 observations。下一个 stage 必须从已验收合
 | Audited Governor | `9331d6684d4cfb977212ef60e70771e36c065b7c` |
 | Audited Workflow Contract blob | `b747065ac2fafa03d35d7a94b39d52d70f1de416` |
 | Execution Governor | `2631060b80c1192729be99690f9de2d726d66d44` — PR #99 accepted merge; trust-trace blob `ed14ed830d2fbe3765bc424587925a054bb1b059` |
-| Design state | v0.11.0 按 Human 指正统一成功 PR 为 exact accepted Candidate（Test+Implementation），撤回 Implementation-only 与 Test-in-history 即污染的错误推论；保留历史 Git/执行事实并追加 BT-0008。#95 代码状态仍待 Human 验收；K/artifact schemas、workflow contract 和 #98 adapter 未因本文纠正而实现 |
+| Design state | v0.12.0 保留 exact accepted Candidate PR 纠正，新增三级测试、RTD CfgFile CLI 专属单向 KPI Issue、PR 时建单/merge 后人工启动、历史用例迁移、JSON 与美观 Dashboard；#100/#101/#102 跟踪尚未实现的能力。#95 仍待 Human 验收；workflow contract、角色运行代码与 #98 adapter 本轮未改 |
 | Active bootstrap package | Human 在 #99 合并后明确要求直接解决下一 issue；已核对 #57 索引与合并 receipts，进入 #95。分支 `codex/issue-95-dynamic-agent-supervision` 的实现与 focused checks 完成后等待 Human 检查；#93 仍等待 #95 accepted merge |
 | Candidate/correction state | none；不得用历史 `candidate_attempt` 伪造新模型 |
-| Next allowed operation | 提交本次全文纠正 diff 与文档一致性检查结果，等待 Human 检查；#95 既有 focused verification 保留为代码证据。不自行提 PR、merge、修改 GitHub issue 或启动 #93 |
+| Next allowed operation | Human 本次授权更新本文、ignored 执行计划、同步远程 issues 并创建必要 tracking；完成一致性与远程回读后提交结果。该授权不包含代码实现、commit/PR/merge、启动 #93 或 KPI 执行；#95 既有 focused verification 仅为历史代码证据 |
 
 ### 14.2 Append-only event schema
 
@@ -3361,6 +3579,29 @@ next_allowed_operation: present corrected document and consistency checks for Hu
 supersedes: prior design's Implementation-only / permanent Test-or-Candidate off-main interpretations, including BT-0006's G..accepted-Implementation-PR observation and corresponding v0.3.0/v0.9.0 changelog conclusions; all other historical facts, decisions and raw BT-0001…BT-0007 records remain unchanged
 ```
 
+#### BT-0009 — three-tier tests and issue-driven local KPI plan synchronized
+
+```text
+trace_id: BT-0009
+observed_at_utc: 2026-09-05T18:54:14Z
+issue / task_run / stage: #57 / three-tier-kpi-planning / documentation-and-tracking
+event / actor: KPI_DESIGN_AND_EXECUTION_PLAN_SYNC / Orchestrator under Human instruction
+authority: Human "把我们的讨论更新到agent-loop-bootstrap-trust-trace.md中，同时调整执行计划，同步远程issues，如果需要创建新issue，也一并创建。"
+G: 2631060b80c1192729be99690f9de2d726d66d44 — existing accepted manual baseline, not reselected
+W: b747065ac2fafa03d35d7a94b39d52d70f1de416 — unchanged
+K / T / I / C: NOT_CREATED — documentation and issue synchronization only
+candidate_index / correction_count: NOT_STARTED / 0
+input_digests: reviewed HEAD e7a2ab5f1a99473e78e27285826fb895a0f8672c; v0.11.0 trust blob d0b94f478baf9282b63bdbc0c1f6c7ae69f41b70; raw SHA-256 d26192692952eac0090450e849fc49fba8bff1e2fb67195fad718ab5b0ec72d2
+output_digests: v0.12.0 working document and ignored plan v0.5.0; final raw hashes and exact GitHub write/readback receipts are recorded in the ignored synchronization record and #57 canonical index, not self-embedded
+Test Impact Set / mandatory acceptance: documentation consistency/diff checks and exact remote readback; no runtime/unit/E2E acceptance claimed
+raw Tester report / Worker Correction Envelope: NOT_APPLICABLE
+observations: Worker TDD unit and frozen Human-approved feature functional gates remain premerge; CLI-only comprehensive KPI is a separately Human-started one-way issue with case/result review, no Worker or automatic correction; Reviewer decides ticket intake, Orchestrator creates waiting-for-merge ticket at PR submission; current local delivery is not CT; historical KPI cases migrate without historical test backfill
+bounded diagnostic: read active role/contract/harness/plan and existing open issues/comments; create bounded #100/#101/#102 tracking, synchronize affected issue bodies/index without changing old Human approvals or runtime code
+disposition: RECORD_APPROVED_DESIGN_AND_SYNC_TRACKING_PRESERVE_IMPLEMENTATION_AND_HISTORY
+next_allowed_operation: verify local document/plan and remote receipts, then report; no implementation, PR, merge, automatic Agent wakeup or #93 advancement
+supersedes: earlier proposal of no KPI Human Gate, generic-feature KPI, automatic merge-trigger/local CT, and functional premerge KPI optimization counters; BT-0008 remote-sync restriction is superseded only by this explicit synchronization authority; historical test/verdict/event/changelog bytes remain unchanged
+```
+
 ## Appendix A — 证据索引
 
 ### A.1 当前主线文件
@@ -3417,6 +3658,12 @@ supersedes: prior design's Implementation-only / permanent Test-or-Candidate off
   [#92 comment 5541714868](https://github.com/autoMBD/autombd-rtd-config/issues/92#issuecomment-5541714868)
 
 #### A.3.2 已有历史评论
+
+本轮 KPI 设计 tracking：[#100](https://github.com/autoMBD/autombd-rtd-config/issues/100)、
+[#101](https://github.com/autoMBD/autombd-rtd-config/issues/101)、
+[#102](https://github.com/autoMBD/autombd-rtd-config/issues/102)。本轮同步的 issue/comment
+写入和回读证据存于 ignored 执行计划及 synchronization receipt；#57 仍只有一个
+canonical execution index，不另建竞争清单。
 
 - #57 approved baseline / package split：
   [comment 5035390309](https://github.com/autoMBD/autombd-rtd-config/issues/57#issuecomment-5035390309)
@@ -3495,9 +3742,10 @@ supersedes: prior design's Implementation-only / permanent Test-or-Candidate off
 - 本地 ignored evidence 可能被清理，故本文件只把它作为历史诊断，不把它当成
   未来 acceptance evidence；
 - GitHub comment 引用证明历史过程，不替代当前 remote-state verification；
-- BT-0008 只纠正本地文档与 ignored 执行计划，没有改写 #86/#93 等 GitHub 评论。
-  旧评论中的 Implementation-only 表述如与本次 Human 指正冲突，不得继续作为执行
-  依据；对外同步仍需独立授权，不伪称已经完成；
+- BT-0008 当时只纠正本地文档与 ignored 执行计划，没有改写 #86/#93 等 GitHub
+  评论；BT-0009 获得同步授权后修正当前 issue 正文/索引并记录 superseding receipts。
+  历史评论中的 Implementation-only 或 KPI 自动优化表述保留作历史，不作为新执行
+  依据；远程变更应以本轮逐项回读结果为准，不把本地编辑冒充 remote write；
 - 未合并历史 lesson commit 证明“曾发现过问题”，不自动成为当前规范；
 - 截至 BT-0005 的原始审阅动作只创建 #93 并在 #85 追加依赖/生命周期纠偏评论；
   BT-0006 另行记录已创建的 #94–#98 和现有 issue 的 dependency comments。两阶段
@@ -3507,6 +3755,7 @@ supersedes: prior design's Implementation-only / permanent Test-or-Candidate off
 
 | Version | Date | Changes |
 | --- | --- | --- |
+| 0.12.0 | 2026-09-06 | Recorded Human-approved Worker-unit / Tester-functional / CLI-only comprehensive KPI tiers; defined Reviewer-to-PR ticket intake, merge plus Human-start prerequisites, one-way KPI issue with Human case/result review and no Worker correction, direct legacy case migration without retrospective test backfill, local JSON/Dashboard delivery and deferred server CT; split #100/#101/#102, narrowed #98 dependencies, synchronized current planning authority and added BT-0009 while preserving historical events and changelog rows. |
 | 0.11.0 | 2026-09-05 | Corrected the full document to deliver the exact accepted Candidate as PR head, including frozen Test and final Implementation; withdrew the Implementation-only and Test-in-history-as-contamination interpretations, aligned finalization/#93/#86/bootstrap guidance, distinguished manual Phases 0–3, and added BT-0008 without rewriting prior events or changelog rows. |
 | 0.10.0 | 2026-09-05 | Recorded PR #99 acceptance and the Human-commanded direct #95 branch implementation, focused monitoring/timeout compatibility evidence, deferred deployment/#98 boundaries, and BT-0007; preserved earlier trace events and audit baselines. |
 | 0.9.0 | 2026-09-05 | Corrected the Phase 0 trust trace before PR: made #94 → #57 Phase 1 → #95 → #93 the explicit order and bound Phases 0–3 to Human-commanded `MANUAL-BOOTSTRAP`; split B1-1/B1-2 to #93 and B1-3/B1-4/B1-5 to #86; scoped off-main/finalization ancestry checks to current-task additions in `G..accepted-Implementation-PR`; recorded #94–#98 and dependency-comment receipts; updated the derived snapshot; and appended BT-0006 without rewriting BT-0001…BT-0005. |
