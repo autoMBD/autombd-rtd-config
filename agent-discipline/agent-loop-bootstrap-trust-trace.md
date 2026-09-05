@@ -2,10 +2,10 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.10.0 |
+| Version | 0.11.0 |
 | Date | 2026-09-05 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
-| Status | Phase 0 merged; #95 direct implementation prepared for Human review |
+| Status | Phase 0 merged; #95 awaiting Human review; accepted-Candidate PR correction documented |
 | Description | Agent Loop 的 Category B trust-tracing lane：冻结现状审计与历史教训，定义结构化角色交接、统一守卫与失败局部返工、双 lane、Candidate 0 加三次增量修正、Phase 0–3 人工自举顺序，以及 Agent 动态监督与确定性工具超时的双时间平面，并用 append-only trace 记录有限自举状态。 |
 
 ## 0. Trust-tracing lane 的权威与维护边界
@@ -22,10 +22,12 @@
 `workflow-contract.json` 的机器生命周期、以及 raw receipt 的执行结果。本文件只引用
 这些权威并解释它们之间的关系，不得用自然语言摘要覆盖不一致的原始证据。
 
-本文件使用独立 governance/trust lane 维护，不进入 owner Test、Implementation 或
-acceptance Candidate ancestry。活跃 bootstrap 期间只追加 trace event；发现旧记录
-有误时追加 `supersedes` 事件，不改写历史事件。终态内容如需进入 `master`，走独立
-governance approval，不作为产品 PR、Candidate 或 Reviewer lesson child 合入。
+本文件使用 governance/trust lane 维护；当前产品任务新增的 trace/runtime evidence
+不作为 merge-only edits 注入 Test、Implementation 或 Candidate。已经通过治理 PR
+合入并存在于 `G` 中的本文属于正常基线，不因后续 Candidate 继承它而违规。本文自身
+的治理变更按 Human 批准的范围审阅、提 PR，不借 Reviewer lesson child 自动合入。
+历史事件只追加；发现旧记录有误时追加 `supersedes` 事件，不改写旧事件。经 Human
+要求纠正的设计正文和派生快照可以更新，但必须记录版本与纠正依据。
 
 ## 1. 审阅结论
 
@@ -53,12 +55,17 @@ heartbeat 和当前活动文档的治理定义。本版据此作出以下核心�
 5. Reviewer 在 task **终止时恰好运行一次**：Candidate 通过时审查成功结果；
    Candidate 3 仍失败时审查失败过程、剩余缺陷和治理证据。Reviewer 不是每次
    Candidate 的一部分，也不驱动新的 Attempt。
-6. 对每个新 task，**在其 Governor `G` 之后产生的当前 series** owner Test、
-   acceptance Candidate 和 Reviewer lessons 都是 off-main 证据。成功 PR 在
-   `G..accepted-Implementation-PR` 范围内只携带 accepted Implementation；失败则
-   不建产品 PR，只在 issue 记录 Tester/Reviewer 终态。`G` 之前已经存在的历史
-   Test-first Candidate 或 lesson-child 保留为基线历史，不被本规则重写，也不得被
-   误判为当前 task 新引入的拓扑污染。
+6. 成功 PR 的 head 是经过 Tester PASS 和 terminal Reviewer APPROVED 的 exact
+   **acceptance Candidate `Ck=[T,Ik]`**；`G..Ck` 同时包含 Human-approved frozen Test
+   和最终 Implementation，包括 Worker-owned generality tests。开发期间的双 lane
+   隔离不等于最终 PR 排除测试。Gate 1 只批准 Test，不授权单独把 Test 推入主线；
+   Human final approval 后通过 PR 合入同一个 `Ck`，不得换成 `Ik` 或 lesson child。
+   失败则不建成功 PR，只记录 Tester/Reviewer 终态并保留已有实现。
+
+本版撤回前版的 **Implementation-only PR** 及“Test/Candidate 进入主线即构成污染”
+推论：这两项是 Orchestrator 的错误解释，不是 Owner 要求。§6.9、§9.11 给出统一
+拓扑与合并规则；BT-0008 记录本次纠正。历史提交事实、旧事件和旧 changelog 保留，
+其中被纠正的解释不再作为执行依据；不重写 `G` 之前的 Git 历史。
 
 当前 `workflow-contract.json`、Agent Workflow Skill、`AGENTS.md` 和角色说明仍
 保留“`candidate_attempt=1..3`”“Gate 1 后才实施”“Reviewer 仅在 Tester PASS 后”
@@ -103,7 +110,7 @@ known-bad；它不进入 Worker 输入，也不再承担 `K` 有效性证明。
 完成执行索引；第一项实现 package 是 Timeout Package A
 [#95](https://github.com/autoMBD/autombd-rtd-config/issues/95)，其 accepted merge
 成为 #93 Governor。随后 #93 才把结构化交接文件、统一守卫、lane 生命周期、
-Candidate 0+三次修正、terminal Reviewer 和当前-series off-main topology 固化到
+Candidate 0+三次修正、terminal Reviewer 和 accepted-Candidate PR topology 固化到
 合同/角色文档及最小回放 gate。未知问题默认进入观察账本，只阻塞受影响操作；除非
 它破坏证据完整性、安全性或强制验收项，否则不得自动扩展为全局规则或更高阻塞等级。
 
@@ -177,7 +184,7 @@ tests/unit/test_interface_handoff_check_generality.py
 
 | 层 | 当前资产 | 已经证明的能力 | 没有证明的能力 |
 | --- | --- | --- | --- |
-| 治理层 | `AGENTS.md`、四个角色文件、documentation governance | 角色职责、所有权、独立测试、旧版 Reviewer 时序、文档边界 | Owner 新确认的双 lane/Candidate 0+3/terminal Reviewer/off-main topology；运行时身份认证、文件访问隔离、角色输出结构化 |
+| 治理层 | `AGENTS.md`、四个角色文件、documentation governance | 角色职责、所有权、独立测试、旧版 Reviewer 时序、文档边界 | Owner 新确认的双 lane/Candidate 0+3/terminal Reviewer/accepted-Candidate PR topology；运行时身份认证、文件访问隔离、角色输出结构化 |
 | 静态合同层 | `workflow-contract.json`、`workflow_gate.py` | 封闭字段/枚举、快照一致性、部分 Human/Test/Candidate 绑定、finding-disposition 形状 | 合法状态历史、真实 Git/GitHub 对象、实际 role permission、Candidate direct union |
 | 机械执行守卫 | `handoff_guard.py`（#88） | cwd/HEAD/Base/contract/argv/timeout/digest 连续性 | 统一角色交接文件、业务语义、文件洁净度、角色能力 |
 | 接口包守卫 | `interface_handoff_check.py`（#90） | packet 封闭形状、安全路径、接口种类、authority/receipt 摘要形状 | 行为语义、错误 precedence、authority/receipt 真值、Worker 是否只读批准输入 |
@@ -385,7 +392,7 @@ Human-approved T + matching I0 ready → assemble Candidate 0 → Tester
     FAIL → sanitize → same Worker correction 3 → Candidate 3
     PASS at any Candidate ─┐
     FAIL at Candidate 3 ──┴→ terminal Reviewer exactly once
-                            ├─ success: PR exact Implementation tip
+                            ├─ success: PR exact accepted Ck=[T,Ik] → Human final approval
                             └─ failure: issue terminal record, no PR
 ```
 
@@ -404,8 +411,8 @@ Human-approved T + matching I0 ready → assemble Candidate 0 → Tester
 | Orchestrator → same Worker | 经完整性与泄漏审查的 Worker Correction Envelope；上一 Implementation tip | fresh restart；暴露 test case；只给症状不给根因；把 correction 当新 Test epoch |
 | Worker correction | `Ik` 必须是 `I(k-1)` 的增量后继；最多 `k=1..3` | sibling-from-Governor 重建；无理由丢弃已完成实现 |
 | Orchestrator → terminal Reviewer | Reviewer Launch Envelope：成功终态或 Candidate 3 失败终态的完整证据 | 每次 Attempt 都调用 Reviewer；Reviewer 触发新返工 |
-| Reviewer → Orchestrator/Human | Reviewer Report：恰好一次终态 review；当前 task 的 lesson/evidence 留在 review lane/comment | 把当前 task 的 lesson commit 放入 `G..accepted-Implementation-PR` 或作为产品 PR tip |
-| success finalization | PR head 为 exact accepted `Ik`；Candidate 只用于证明 `T+Ik` 通过 | 合并 Test、Candidate 或 lesson child |
+| Reviewer → Orchestrator/Human | Reviewer Report：恰好一次终态 review；当前 task 的 lesson/evidence 留在 review lane/comment | 用 lesson child 替换已验收 Candidate 作为 PR head，或将 lesson 作为 merge-only edit 注入 Candidate |
+| success finalization | PR head 为 exact accepted `Ck=[T,Ik]`；Human final approval 后，Test 与 Implementation 一起通过该 PR 合入 | 改为 Implementation-only PR、单独推送 Test，或用未验收 Candidate/lesson child 替换获批 head |
 | failure finalization | issue 记录 final Tester + Reviewer 结果、剩余缺陷和可复用 Implementation tip | 建立声称成功的产品 PR；删除失败实现历史 |
 
 ### 5.2 当前交付合同的核心断点
@@ -597,7 +604,9 @@ stage 6: 57373f5 ─┬─ fe8cc87 (final Test)
 
 Stage 1–5 的 Test 和 Candidate 没有进入最终 accepted ancestry；它们是阶段性证明。
 Stage 1–5 的 Implementation 进展却全部通过父子链被保留。这正是“测试证据可作废、
-已完成实现不应随之丢弃”的最强历史证据。
+已完成实现不应随之丢弃”的最强历史证据。这是当时的 staged-bootstrap 谱系事实，
+不是排除最终 Test 的交付规则；最终 `31e913d` 本身仍包含 stage 6 的 Test 与
+Implementation。今后的成功 PR 交付 accepted Candidate，不从它再剥离 Test。
 
 因此成功的因果链是：
 
@@ -636,12 +645,14 @@ Category B playbook 或机器回放。问题不是 Agent 没有经历过，而�
 
 必须区分可继承与不可照搬的部分：
 
-- **必须继承**：优先级分层、小 stage、上一 Implementation 成为下一 Governor、
-  每阶段明确退出、阶段证据与实现资产分离；
+- **必须继承**：优先级分层、小 stage、保留累积实现、每阶段明确退出，以及阶段
+  证据与实现资产分离；新任务由 Human 选择已验收合入后的 exact 基线，不能把历史
+  “上一 Implementation tip 直接作为下一 Governor”推广成剥离测试的通用规则；
 - **不得照搬**：用故意失败的 full-target owner Test 逐阶段发现需求、允许修改同一
-  task 已经 Human-approved 的 Test、把 Candidate/Test/lesson ancestry 合入产品
-  主线。新版 bootstrap 应把每个 stage 定义成可独立通过的窄 work package，并遵守
-  Candidate 0+三次 correction 与 off-main topology。
+  task 已经 Human-approved 的 Test、绕过 final approval/PR 单独推 Test，或把 lesson
+  child 当作已验收 Candidate 合入。新版 governed bootstrap 的窄 work package 遵守
+  Candidate 0+三次 correction，成功 PR 包含最终 Test+Implementation；当前人工
+  Phase 0–3 则按 §9.2 审阅 exact 变更与所需测试，不自主运行这些步骤。
 
 ### 6.3 #82：先修正 Test seam，再定义 Windows 发布线性化与所有权
 
@@ -1019,17 +1030,19 @@ Owner 指出的浪费属实，但需要区分三种不同现象：真正重写�
 - `G` 或 `K` 改变时，旧 commit identity 不能直接充当新 acceptance，但
   Orchestrator 必须先生成 source-salvage 清单：可复用、需适配、受 owner Test
   污染、与新合同冲突。只有后两类允许丢弃或重写。
-- “不得读取历史 Test/Candidate”只保护隐藏 gate；不得被扩写成“不得读取自己完成
-  的 Implementation 或公开设计”。若隔离要求 fresh Worker，也必须给它经过审查的
+- “不得读取历史 Test/Candidate”只保护当前或未接受 series 的隐藏 gate，不排除已
+  accepted merge 带入 `G` 的正常回归测试；也不得扩写成“不得读取自己完成的
+  Implementation 或公开设计”。若隔离要求 fresh Worker，也必须给它经过审查的
   clean implementation patch，而不是让其从零重复发现相同设计。
 
-### 6.9 Test/Candidate/Lesson 进入主分支的拓扑污染
+### 6.9 合并路径纠偏：交付 accepted Candidate，而不是剥离 Test
 
 Owner 点名的 `091da706e6332ca7ca01064764448144e1011073`、
 `6648f94c15aeca296335e6700e5534b036f243a6` 和
-`c896174cb94382ab25c5b5d284ff6c8ea14689c9` 不是孤例，而是过去 finalization
-设计的系统性结果：先做 Test-first merge Candidate，再让 Reviewer lesson commit
-成为 Candidate 的 sole child，最后把 lesson child 推到 `master`。精确谱系包括：
+`c896174cb94382ab25c5b5d284ff6c8ea14689c9` 引出了两个必须分开审查的问题：
+Test 是否绕过最终验收/PR 单独进入主线，以及最终提交是否由 accepted Candidate
+变成了 Reviewer lesson child。过去确实反复采用后者的 finalization 路径；精确谱系
+如下。该表记录 Git 事实，不凭 ancestry 本身判定某次 Human 审批是否有效：
 
 | Issue | Acceptance Candidate | Candidate parents | 被推入主线的 lesson/final tip |
 | --- | --- | --- | --- |
@@ -1039,35 +1052,40 @@ Owner 点名的 `091da706e6332ca7ca01064764448144e1011073`、
 | #83 | `d510f09` | Test `6648f94` + Implementation `228c9d3` | `69b4e217` |
 | #90 | `e72befe` | Test `f94eb2f` + Implementation `d0a1274` | `9331d668`（本次审阅 HEAD） |
 
-因此当前 `master` ancestry 不仅包含产品 Implementation，也包含 owner Test commit、
-acceptance-only merge commit 和 Reviewer lesson。`6648f94...` 本身就是 #83 owner
-Test；`091da706...`、`c896174...` 虽名为 lesson/final tip，其父链必然把对应 Test
-和 Candidate 一起带入主线。即使后续删除测试路径，Git 历史仍保留隐藏 gate 和
-literals，未来 Worker 可以从 ancestry 读取，破坏“Worker 不读 owner Test”的
-隔离假设。
+前版据此推导“Test/Candidate 进入主线即污染，成功 PR 只能保留 Implementation”，
+这是错误的。`6648f94...` 是 Test commit，不意味着它必须永远排除在主线外；它可以
+作为已批准 `T`，随通过验收和最终 Human 审批的 `Ck=[T,Ik]` 经 PR 一起合入。
+仅凭祖先链，不能区分这条合法路径与绕过审批直接推送 Test 的违规路径。
+
+隔离保护的是**当前任务开发/修正期间**的 owner Test：Worker 不读它，Tester 不改
+Implementation。既往 accepted Candidate 带入 `G` 的测试是已合并回归资产；其存在
+本身不证明新任务发生泄漏。当前任务未批准、失败或仍保密的 Test/Candidate 仍不能
+通过历史 ref 访问绕过隔离。不得以“保护隔离”为由删除最终应交付的测试。
 
 正确的目标拓扑是：
 
 ```text
-G ────────────────────────────────┬─ I0 → I1 → I2 → I3  (product lane)
-                                  ├─ T                  (frozen owner Test, off-main)
-                                  ├─ C0=[T,I0]          (acceptance only, off-main)
-                                  ├─ C1=[T,I1] ...      (acceptance only, off-main)
-                                  └─ R                  (terminal review evidence, off-main)
+same G → Test lane → approved frozen T
+same G → Implementation lane → I0 → I1 → I2 → I3（按需修正）
 
-success PR: G → accepted Ik
-failure:    no product PR; issue binds final Candidate + Tester + Reviewer evidence
+Ck = direct union of T and Ik; ordered parents = [T, Ik]
+Ck → Tester PASS → terminal Reviewer APPROVED
+   → PR head exactly Ck → Human final approval → merge Test + Implementation
+
+Reviewer report/lesson: separate evidence; does not replace Ck as PR head
+failure: no success PR; preserve Implementation and terminal evidence
 ```
 
 机器 finalization 至少要证明：
 
-- PR head 等于 terminal PASS Candidate 中的 exact Implementation parent；
-- PR diff/blob set 等于 accepted Implementation lane，且不含 Test-only paths；
-- 当前 task 在 `G` 后产生的 owner Test、Candidate merge 和 Reviewer lesson 都不在
-  `G..accepted-Implementation-PR` 范围；不检查或改写 `G` 之前的历史 ancestry；
-- PR base/merge-base、changed-path allowlist 和 no merge-only edits 仍满足合同；
-- Human Gate 2 同时绑定 Candidate、frozen Test、accepted Implementation 和 PR head，
-  避免批准的是一棵验收树、合入的是另一份代码。
+- PR head 就是 terminal PASS 且 Reviewer APPROVED 的 exact `Ck`，不是 `Ik`；
+- `Ck` 的 ordered parents 为 `[T,Ik]`，两条 lane 的 merge-base 为 exact `G`；
+- `G..Ck` 的 changed paths/blob set 是两个 lane manifest 的 direct union；包含批准
+  Test 的交付文件和 Implementation（含 generality tests），无 merge-only edits；
+- PR base 与批准的 `G` 一致，Human Gate 2、Tester/Reviewer evidence 和 PR head/tree
+  都绑定同一 `Ck`；不得换 head、重建一份“等价”Implementation-only 交付；
+- 不将临时 reference/stub、confidential receipts、未接受的 Candidate 或 Reviewer
+  lesson 追加到获批 head；不重写 `G` 之前的历史。
 
 Reviewer 的 lesson 若需要长期进入仓库，必须另开一个明确获批的 governance issue/
 PR；它不能借产品任务自动进入主线。当前 `AGENTS.md` 要求 Reviewer append repo
@@ -1134,8 +1152,9 @@ lessons，与这条规则冲突；迁移完成前，Reviewer 可在独立 review
   source 是不同资产；只有污染或合同不兼容的部分不能 salvage。
 - “三次 Attempt 等于最多三个 Candidate。”——三次是初始实现之后的三次修正，
   正确上限是 Candidate 0、1、2、3 共四个。
-- “为了证明 Test+Implementation 通过，必须把 Candidate 和 Reviewer lesson 合入
-  master。”——Candidate 是验收拓扑；产品 PR 应只携带 accepted Implementation。
+- “开发时 Test/Implementation 隔离，所以成功 PR 必须排除 Test。”——隔离约束开发
+  过程；最终 PR 必须是包含两者的 accepted Candidate。Reviewer lesson 属于单独
+  证据，不能据此将 PR head 换成未验收 lesson child。
 
 正确叙事是：现有成果都是有效但有边界的 building blocks。下一轮自举必须组合
 它们，同时为“从公开合同到 fresh consumer 行为”增加独立证据，才能把局部 green
@@ -1232,9 +1251,10 @@ blocker，也不自动改变现有 issue priority。
 - 标签：**已证实设计/合同缺陷**。
 - 事实：当前 route 把 Human Gate 1 放在 Implementation 前；
   `candidate_attempt=1..3` 不能表达 Candidate 0+三次 correction；Reviewer 只允许
-  Tester PASS 后进入；finalization 历史把 Test/Candidate/lesson 带入主线。
+  Tester PASS 后进入；历史 finalization 又用 lesson child 替代 accepted Candidate
+  作为最终 tip。前版的 Implementation-only 纠偏反而错误剥离了应交付 Test。
 - 影响：如果直接按当前合同恢复 #85，新流程要么无法表示，要么被迫伪造 attempt、
-  跳过 failure review，或再次污染 `master`。
+  跳过 failure review，或让最终交付偏离已验收 Candidate。
 - 当前措施：先以一个极窄 bootstrap work package 更新合同、Skill、角色定义和
   known-good/bad lifecycle replay；不在该包中实现 #85 transition engine、完整
   executor、recovery 或 GitHub automation。
@@ -1242,7 +1262,7 @@ blocker，也不自动改变现有 issue priority。
   之前触发 Gate 1、首次 Candidate 才 join approved Test 与 ready Implementation、
   Test approval freeze、`C0` 不消耗 correction、`C1..C3` 逐一消耗、
   `I0→I1→I2→I3` continuity、PASS/exhausted 两条 terminal Reviewer 路径和
-  accepted Implementation-only PR topology。
+  accepted-Candidate PR topology：head exact `Ck=[T,Ik]`，完整交付测试与实现。
 
 #### B0-1 语义交接合同缺失
 
@@ -1340,9 +1360,9 @@ B1 是已明确事实和边界的窄缺口，但五项并不共享同一时序�
 - 事实：当前只比较声明字符串，不验证 commit 存在、ordered parents、merge-base、
   direct union、path ownership、no merge-only edits。
 - 建议：#86 在 route executor 前增加一个只读 Candidate/finalization verifier；
-  除了验证 acceptance Candidate，还必须证明 success PR head 是 exact accepted
-  Implementation，且当前 task 在 `G` 后产生的 Test/Candidate/lesson 不出现在
-  `G..accepted-Implementation-PR` 范围；assembler 仍后置。
+  除了验证 acceptance Candidate，还必须证明 success PR head 就是 exact accepted
+  `Ck=[T,Ik]`，`G..Ck` 保留两个 lane 的交付且没有 merge-only edits 或 lesson-child
+  替换；不能排除合法 Test paths。assembler 仍后置。
 - 路由：#86，位于 #85 之后、#79/#87 之前。
 
 #### B1-4 Human/Tester/Reviewer evidence 是 self-asserted/free-form
@@ -1417,10 +1437,10 @@ requirement text、owner stage、evidence type 和 test trace，但这不是 #85
 #### B2-8 Reviewer lesson child 被错误当成产品 finalization tip
 
 实际合并常将“Reviewer lesson commit”作为 exact Candidate 的 sole child 推到
-`master`。这不仅是 record 少一个 identity，而是最终拓扑本身错误：它把 hidden
-Test 与 acceptance merge 一起引入产品主线。短期必须禁止此 finalization；长期由
-Candidate/finalization verifier 证明 PR 仅携带 accepted Implementation。lesson 若需
-进入仓库，走独立 governance approval，不再给产品 Candidate 增加 child。
+`master`。问题不是它的父链含 Test/Candidate，而是 lesson child 不再是同一个已
+验收 Candidate，不能自动继承对 `Ck` 的批准。当前成功 PR 必须保留 exact `Ck` 为
+head，完整包含 Test 与 Implementation；#86 verifier 验证这种身份一致性。lesson
+若需进入仓库，走独立 governance approval，不再给产品 Candidate 增加 child。
 
 #### B2-9 规范权威仍然碎片化
 
@@ -1486,7 +1506,7 @@ Correction Envelope 的语义充分性与 non-disclosure 判断。
 | `T` | owner Test tip | Human Gate 1 前可修订；批准后到 task 终止永久冻结 |
 | `I0` | Worker 初始完整 Implementation tip | Worker lane 首次完成时形成 |
 | `Ik` | 第 `k` 次增量修正后的 Implementation，`k=1..3` | 必须是 `I(k-1)` 的后继 |
-| `Ck=[T,Ik]` | 当前 task 第 `k` 个 acceptance Candidate | 在 `G` 后保持 off-main、direct union、无 merge-only edits |
+| `Ck=[T,Ik]` | 当前 task 第 `k` 个 acceptance Candidate | 审批前在独立 ref 验收；direct union、无 merge-only edits；成功的 exact Ck 是最终 PR head |
 | Correction Attempt `k` | Tester 证明 Implementation defect 后，Worker 的第 `k` 次修正机会 | 只有 `k=1..3`，没有 Attempt 0 |
 | `S=(task_run,G,K,T)` | Human 批准后冻结的 Candidate series | `G/K/T` 任一改变即终止，不得原地重置预算 |
 | `R` | terminal Reviewer result/lesson evidence | series 成功或失败终止时恰好产生一次 |
@@ -1628,9 +1648,9 @@ Human Gate 前的 Test 修订、以及 Orchestrator 对报告做泄漏审查都�
 - 不能因为旧 gate 无法表达新状态就声称新状态已经机器验证；
 - 由 Human/Orchestrator 对 exact commits、diff、known-good/bad replay 和分支拓扑
   做一次显式 compensating review；
-- package 成功后只把 Implementation/governance change 合入；当前 package 在 `G`
-  后产生的 Test、Candidate 和 terminal lesson 保持 off-main；
-- 下一 stage 从已合入 Implementation 开始，不回到最初 Governor。
+- governed package 成功后，经 final approval/PR 合入 exact accepted Candidate，
+  同时交付 Test 与 Implementation；临时验收证据和 terminal lesson 不追加到该 head；
+- 下一 stage 从已验收合入的 exact 基线开始，保留测试与实现成果，不回到最初 Governor。
 
 当前 Phase 0、1、2、3 进一步使用 `MANUAL-BOOTSTRAP`：不得自主 dispatch lane、
 迭代、重试、组装 Candidate、轮询 Gate、计算 correction 或 merge。每个开发、修正、
@@ -1651,7 +1671,7 @@ Phase 1 再由 #57 的 canonical execution index 完成依赖绑定。第一项*
 它只纠正 Agent 生命周期与确定性 command timeout 的边界。其 accepted merge 由
 Human 选择为 #93 Governor 后，#93 才修复 `functional-development-v1` 当前无法安全
 交接的结构边界：B0-0 的双 lane readiness、Test freeze、Candidate 0、三次
-correction、terminal Reviewer 和 Implementation-only finalization；B0-3 的最小
+correction、terminal Reviewer 和 accepted-Candidate finalization；B0-3 的最小
 artifact family 与统一交接守卫；以及 B0-1/B0-2 所需的 `K`、Tester Report、
 Correction Envelope 结构容器。#93 不实现 #85 的具体 precedence/identity/routing
 语义，也不得顺带实现完整 `loopctl`、recovery、notifications、GitHub executor 或
@@ -1694,7 +1714,7 @@ lane 共享的公开任务内容。Launch Envelope 是角色实际消费的结�
 | Worker Correction Envelope | Orchestrator → same Worker | 返回脱敏但可行动的 production root cause 和 correction identity |
 | Reviewer Launch Envelope | Orchestrator → Reviewer | 启动唯一一次 terminal review |
 | Reviewer Report | Reviewer → Orchestrator/Human | 返回成功或失败终态 review，不触发返工 |
-| Terminal Record | Orchestrator → Human/finalization | 记录 accepted Implementation-only PR 或失败处置 |
+| Terminal Record | Orchestrator → Human/finalization | 记录 exact accepted-Candidate PR（含 Test+Implementation）或失败处置 |
 | Handoff Guard Result | 统一守卫 → Orchestrator/获授权的 artifact producer | 机器返回本次检查的 exact 输入、检查状态、拒绝字段与证据；不是业务 verdict |
 
 这些 artifacts 共享极小公共外壳：
@@ -2016,8 +2036,9 @@ Worker 同样可以在自己的 Implementation branch 内提交多次，但只�
 条件后才返回 `I0 ready`：
 
 - 只消费 Launch Envelope 中的公开 spec、接口合同和经过授权/污染审查的 source；
-- 不读取 owner Test source、branch/worktree、reference mutants、case literals 或
-  historical acceptance Candidates；
+- 不读取当前 owner Test source、branch/worktree、reference mutants、case literals，
+  也不得借历史未接受 Test/Candidate refs 访问隐藏 gate；已合入 `G` 的回归测试不因
+  其历史来源是 Test lane 而被自动禁止；
 - 以 TDD 编写 Worker-owned generality tests，输入与 owner gate literals 独立；
 - 实现完整公开能力，不以“猜中 hidden Test”为目标；
 - 自己决定实现所需 changed paths，但每个路径必须落在公开 capability/scope 与角色
@@ -2193,7 +2214,8 @@ Orchestrator 用 frozen `T` 和 exact `I0` 组装 `C0`：
 - Test 与 Implementation manifests 各自完整；
 - tree 是两条 lane 相对 `G` 的 direct union；
 - 无 merge-only edits；
-- 当前 task 在 `G` 后产生的 Candidate、Test 和 acceptance receipts 全部 off-main。
+- 验收和最终 Human approval 前，Candidate/Test 保持在开发与验收 refs，不直接推入
+  主线；成功后 exact `Ck` 连同 Test 通过 PR 合入，临时 acceptance receipts 不注入它。
 
 `C0` 是首次真实集成和 owner gate 执行，**不是 correction Attempt**。Tester 可读取
 完整 Candidate，包括 Implementation 和 Test，但必须：
@@ -2327,7 +2349,7 @@ lineage、Tester forensic evidence、Worker Correction Envelopes、公开合同�
 恰好执行一次：
 
 - Tester PASS 路径：审查 scope、generality、ownership、代码/文档质量、是否 test-fit、
-  lane continuity、off-main/final PR topology；
+  lane continuity、开发期隔离及最终 PR 与 accepted Candidate 的身份一致性；
 - Tester FAIL/invalid 路径：审查失败归属、三次 correction 是否真实增量、是否泄漏
   owner Test、是否错误丢弃实现、剩余缺陷和可 salvage 资产；
 - 两条路径都记录 lessons/observations，但不修改 Test 或 Implementation；
@@ -2353,16 +2375,24 @@ issue/PR evidence。
 
 当且仅当 Tester PASS 且 terminal Reviewer APPROVED：
 
-1. Orchestrator 创建产品 PR，head 为 Candidate 中 exact accepted Implementation
-   `Ik`，不是 Candidate、Test 或 lesson child；
-2. 当前 task 的 Candidate/Test/review refs 保留为 off-main acceptance evidence；
+1. Orchestrator 创建 PR，head 为 exact accepted Candidate `Ck`，不是单独的 `Ik`、
+   `T` 或 Reviewer lesson child；
+2. `Ck` 保留 ordered parents `[T,Ik]`、exact merge-base `G` 和两个 manifest 的
+   direct union。PR 同时交付 frozen Test 与最终 Implementation，包括 generality
+   tests；不能删除 Test-only paths 或重新组装一棵不同的交付树；
 3. Human final packet 同时绑定 `G/T/Ik/Ck`、PR head/tree、Tester PASS 和 Reviewer
-   result；
-4. Human approval 后只合并 `Ik` 的产品/governance diff；
-5. finalization verifier 或人工补偿证明当前 task 在 `G` 后产生的 Test-only paths、
-   Candidate merge、lesson commit 都不在 `G..accepted-Implementation-PR` 范围；
-   `G` 之前的历史 ancestry 不属于本次检查；
-6. merge 后运行 bounded trust-root verification，并在 issue 记录 exact remote tip。
+   result。Gate 1 的 Test approval 不替代这次最终审批；
+4. Human final approval 后通过该 PR 合入同一个 `Ck`；不单独推 Test、改用
+   Implementation-only PR，或把 lesson/其他新编辑追加到获批 head；
+5. finalization verifier 或人工补偿检查 `PR head == accepted Ck`、`G..Ck` 的 Test
+   与 Implementation 完整性、scope/ownership 和 no merge-only edits。失败 Candidate
+   与临时 confidential/reference evidence 不成为交付内容；已有 `G` 历史不重写；
+6. merge 后运行 bounded trust-root verification，确认远端包含 exact accepted `Ck`
+   及批准的合并结果，并在 issue 记录 exact remote tip。
+
+这里的“包含测试”指两个 lane 中按合同交付的测试源码与必要测试资产，不把 ignored
+reference overlay、一次性 stubs、运行日志或 confidential 报告自动升级成 PR 文件。
+**开发隔离、验收同树、交付同一 Candidate** 是三个同时成立的要求。
 
 #### 失败
 
@@ -2380,10 +2410,10 @@ Candidate 3 FAIL、Reviewer 拒绝或 Test/contract/integrity invalid 时：
 #78 可复用的不是“让一个大 Test 连续红六个 stage”，而是以下结构：
 
 ```text
-窄 stage 0 Implementation accepted
-→ stage 1 从 stage 0 的 accepted Implementation/master 开始
-→ 每 stage 独立 Test、独立 Candidate series、明确退出
-→ 只积累 Implementation，不积累旧 acceptance topology
+窄 package 通过其适用的验收与 Human 合并审批
+→ 下一 package 从 Human 选定的 exact accepted merge 基线开始
+→ 累积已交付的实现与测试，不复用旧任务的 approval/verdict 证明新变更
+→ 正常 Loop 使用独立双 lane/Candidate；人工 Phase 0–3 使用显式命令与 exact diff 审阅
 ```
 
 当前推荐四步：
@@ -2393,17 +2423,19 @@ Candidate 3 FAIL、Reviewer 拒绝或 Test/contract/integrity invalid 时：
    规则；不在该 stage 重构完整 black-box harness。
 2. **Bootstrap Stage A — 生命周期合同纠偏。** 只修改 workflow contract、Skill、
    role guidance 和最小 replay tests，使第 9.1–9.11 节可表达；Human 深度参与，
-   不依赖旧合同自证。成功后只合入该 stage 的 accepted Implementation。
+   不依赖旧合同自证。当前人工 Phase 合入 Human 审阅的 exact 变更，包含实现、
+   配套测试与获准文档；不为人工开发虚构 Test lane/Candidate。
 3. **Bootstrap Stage B — #85 语义交接充分性。** 从 Stage A 新 master 启动；由
    Orchestrator冻结 semantic annex，Tester 和 Worker 独立完成，使用 Candidate
    0+三次 correction。优先评估/清洗现有 #85 Implementation 资产，禁止无理由重写。
 4. **后续 stages。** #86 evidence ledger、Candidate/finalization verifier、#79
-   isolation、#87 executor 分别作为窄 task；每项都从上一 accepted Implementation
-   开始，不一次建完整医院。
+   isolation、#87 executor 分别作为窄 task；每项从已验收合入的基线开始，在 governed
+   模式下交付含 Test+Implementation 的 accepted Candidate，不一次建完整医院。
 
-每个 stage 都必须有自己的可独立通过的 Test Gate；不得用尚未实现的后续 stage
-要求故意制造当前 stage 的红 Candidate。这样既保留 #78 一个月形成的最小 Loop 和
-bootstrap 成果，又不再用不完善的 Loop 冒充已经完整的自动执行器。
+每个 governed stage 都有自己的可独立通过的 Test Gate；当前人工 Phase 0–3 则按
+Human 命令完成对应 focused checks 和人工验证，没有创建的 `T/I/C` 如实记录为
+`NOT_CREATED`。两种模式都不得用尚未实现的后续 stage 要求故意制造当前失败。
+这样既保留 #78 的最小 Loop 和 bootstrap 成果，也不把人工补偿冒充完整自动执行器。
 
 ### 9.13 Agent 动态监督与确定性工具超时：两个独立时间平面
 
@@ -2722,7 +2754,8 @@ Human 明确要求停止始终优先。除此之外，任何触发都先阻塞�
 
 本计划不放弃 #78 已合并成果，也不立即建设完整执行器。它先用一个极窄 package
 去除固定 Agent 时限与 harness 误建模，再修正会直接扭曲下一 task 的生命周期，
-然后恢复 #85；每一步都是窄 issue，成功后只合入 accepted Implementation。
+然后恢复 #85；每一步都是窄 issue。正常 Loop 成功后合入含 Test+Implementation 的
+accepted Candidate；人工 Phase 0–3 合入 Human 审阅的 exact 变更与配套测试。
 
 ### 11.1 依赖图
 
@@ -2825,8 +2858,8 @@ Package A 只纠正规则、角色与监督记录的时间语义，不会令当�
 - 支持 Tester PASS 与 correction exhausted/Test invalid/contract invalid 两种
   terminal Reviewer 路径；
 - Reviewer 恰好一次且 terminal，不触发返工；
-- finalization 明确 accepted Implementation-only PR；当前 task 在 `G` 后产生的
-  Test/Candidate/lesson 保持 off-main；
+- finalization 明确 PR head 为 exact accepted `Ck=[T,Ik]`，完整交付两个 lane；
+  禁止提前单独推 Test、剥离测试，以及用 Reviewer lesson child 替换获批 head；
 - 更新对应 Skill、角色说明和极小 lifecycle known-good/bad replay。
 
 明确排除：
@@ -2837,11 +2870,11 @@ Package A 只纠正规则、角色与监督记录的时间语义，不会令当�
 - 通用 Candidate assembler；
 - 把历史 owner Test 从 Git history 重写删除。
 
-这是一次显式 bootstrap exception：旧合同不能证明自己的替代品，故由 Human 深度
-审查 exact contract delta、replay vectors、提交拓扑和最终 Implementation-only PR。
-成功后，携带新合同的 accepted Implementation 经独立产品/governance PR 合入，
-Human 再把 exact merge commit 选择为后续 task 的 Governor；Test/Candidate/review
-evidence 仍不合入。
+这是一次显式 `MANUAL-BOOTSTRAP`：旧合同不能证明自己的替代品，故由 Human 深度
+审查 exact contract delta、focused replay vectors 和最终 PR。该人工 PR 包含实际
+实现、配套测试与获准文档，不需要先运行新 Loop 生成虚构的 `T/I/C`。Human 明确
+批准后合入 exact revision，再选择 exact merge commit 为后续任务 Governor。
+#93 要实现的未来正常 Loop 则严格采用 accepted Candidate 为 PR head，两者不能混用。
 
 ### 11.4 P1-C：从新 master 重启 #85，而不是从零重写
 
@@ -2887,9 +2920,8 @@ restart，也不得把旧 #85 Candidate acceptance 结果当新证据。
 - canonical history、sequence/run identity 和 duplicate idempotency；
 - operational observation 与 contract finding/status 正交；
 - Candidate ordered parents/direct union/no merge-only edits；
-- final PR head 等于 accepted Implementation；当前 task 在 `G` 后产生的
-  Test/Candidate/lesson 不在 `G..accepted-Implementation-PR` 范围，`G` 之前的
-  历史 ancestry 不在本次检查范围。
+- final PR head 等于 exact accepted `Ck=[T,Ik]`；`G..Ck` 完整包含两条 lane 的
+  交付，不能剥离 Test 或追加 lesson/merge-only edits；不重写 `G` 之前的历史。
 
 持久化 recovery 仍属于 #59；assembler/merge mutation 仍后置。先做只读 verifier，
 避免把一个尚不稳定的 writer 放进所有 PR 路径。
@@ -2990,11 +3022,11 @@ Candidate series。发生以下任一条件即结束，随后 terminal Reviewer 
 - Human 明确停止。
 
 PASS 不等于直接合并：只有 Reviewer APPROVED 和 Human final approval 后，exact
-accepted Implementation PR 才能进入主线。失败不建产品 PR；保留 Implementation
-tip 和 salvage inventory。
+accepted Candidate PR（包含 Test+Implementation）才能进入主线。失败不建产品 PR；
+保留 Implementation tip 和 salvage inventory。
 
 package 退出时清理 disposable stubs/temp evidence，保留 raw digests、terminal
-Tester/Reviewer results 和 observations。下一个 stage 必须从已合入 Implementation
+Tester/Reviewer results 和 observations。下一个 stage 必须从已验收合入的 exact 基线
 或 Human 明确指定的新 Governor 启动，不能隐式继承旧 Test/Candidate approval。
 
 ### 12.2 长期取消人工补偿控制的目标
@@ -3008,7 +3040,8 @@ Tester/Reviewer results 和 observations。下一个 stage 必须从已合入 Im
 - structured failure-disclosure bridge 绑定 Confidential Tester Report 与 Worker
   Correction Envelope；守卫验证结构/visibility/引用，Orchestrator LLM 负责 root cause
   充分性和 hidden-Test non-disclosure；
-- Candidate/finalization verifier 证明 acceptance topology 与产品 PR topology分离；
+- Candidate/finalization verifier 证明最终 PR head 与 accepted Candidate identity
+  一致，完整包含批准 Test 和最终 Implementation，无 merge-only edits；
 - governed role handoff 以结构化 input/output artifacts、direct predecessor digests 和
   有效运行上下文为权威；prompt/response 只是 locator/notification；
 - Worker/Test 隔离具有可验证 capability boundary；
@@ -3040,9 +3073,10 @@ Tester/Reviewer results 和 observations。下一个 stage 必须从已合入 Im
    Orchestrator 验证诊断充分性并去除 owner-Test 泄漏，再由同一个 Worker 在既有
    Implementation 上增量修正。
 6. Reviewer 在 task 成功或失败终止时恰好一次，进入 Reviewer 后不再返工。
-7. 当前 task 在 `G` 后产生的 Test、Candidate 和 Reviewer lessons 不进入
-   `G..accepted-Implementation-PR`；成功 PR 在该范围只携带 accepted
-   Implementation，失败用 issue terminal record。`G` 之前的历史 ancestry 不重写。
+7. 成功 PR 的 head 是 exact accepted `Ck=[T,Ik]`，`G..Ck` 同时交付 Human-approved
+   frozen Test 与最终 Implementation。禁止的是提前单独推 Test、剥离 Test 的
+   Implementation-only PR，以及 Reviewer lesson child 替换获批 head；不是禁止
+   测试随 Candidate 经 PR 合入。失败用 issue terminal record，既有 Git 历史不重写。
 8. 未知问题 observation-first、completion-first；一次有界诊断，除 integrity、
    safety 或 mandatory acceptance 外不盲目扩大 scope/blocking。
 9. Task-level Tester 只运行 Human-approved Test Gate 所绑定的 Test Impact Set；
@@ -3086,9 +3120,9 @@ Tester/Reviewer results 和 observations。下一个 stage 必须从已合入 Im
     迭代、重试、Candidate 组装、Gate polling、correction accounting 或 merge；每个
     bounded action 和最终合并都由 Human 分别明确下令并审阅 evidence。
 23. 当前 completion gate 顺序是 #94 → #57 Phase 1 → #95 → #93；#93 在 #85 前吸收
-    B1-1/B1-2，#86 在 #85 后处理 B1-3/B1-4/B1-5。所有 off-main/finalization
-    禁则只检查当前 task 在 `G..accepted-Implementation-PR` 中新增的拓扑，不重写
-    历史。
+    B1-1/B1-2，#86 在 #85 后处理 B1-3/B1-4/B1-5。finalization 对当前 task 检查
+    `PR head == accepted Ck` 和 `G..Ck` 的完整交付；不得把开发期隔离扩大为测试
+    永不进入主线，也不重写历史。
 
 仍需 Human 对实际变更逐项批准的是：
 
@@ -3113,10 +3147,10 @@ Tester/Reviewer results 和 observations。下一个 stage 必须从已合入 Im
 | Audited Governor | `9331d6684d4cfb977212ef60e70771e36c065b7c` |
 | Audited Workflow Contract blob | `b747065ac2fafa03d35d7a94b39d52d70f1de416` |
 | Execution Governor | `2631060b80c1192729be99690f9de2d726d66d44` — PR #99 accepted merge; trust-trace blob `ed14ed830d2fbe3765bc424587925a054bb1b059` |
-| Design state | v0.10.0 记录 #95 分支上的动态监督规则、只读 monitor record validator 和 #88 CLI 兼容别名；尚未经 Human 验收合并。原始审计正文保留其历史基线；K/artifact schemas、workflow contract 和 #98 黑盒 adapter 未在本次实现 |
+| Design state | v0.11.0 按 Human 指正统一成功 PR 为 exact accepted Candidate（Test+Implementation），撤回 Implementation-only 与 Test-in-history 即污染的错误推论；保留历史 Git/执行事实并追加 BT-0008。#95 代码状态仍待 Human 验收；K/artifact schemas、workflow contract 和 #98 adapter 未因本文纠正而实现 |
 | Active bootstrap package | Human 在 #99 合并后明确要求直接解决下一 issue；已核对 #57 索引与合并 receipts，进入 #95。分支 `codex/issue-95-dynamic-agent-supervision` 的实现与 focused checks 完成后等待 Human 检查；#93 仍等待 #95 accepted merge |
 | Candidate/correction state | none；不得用历史 `candidate_attempt` 伪造新模型 |
-| Next allowed operation | 向 Human 提交 #95 分支 diff 与 focused verification evidence 后停止；等待检查和下一条命令。不得自行提 PR、merge 或启动 #93 |
+| Next allowed operation | 提交本次全文纠正 diff 与文档一致性检查结果，等待 Human 检查；#95 既有 focused verification 保留为代码证据。不自行提 PR、merge、修改 GitHub issue 或启动 #93 |
 
 ### 14.2 Append-only event schema
 
@@ -3304,6 +3338,29 @@ next_allowed_operation: present the branch diff and evidence, then wait for Huma
 supersedes: BT-0006 next operation and Phase 0 pending state only; historical observations and approved design remain intact
 ```
 
+#### BT-0008 — accepted-Candidate PR rule corrected after Human review
+
+```text
+trace_id: BT-0008
+observed_at_utc: 2026-09-05T10:46:45Z
+issue / task_run / stage: #95 / issue95-direct-development / documentation-correction
+event / actor: CANDIDATE_PR_SEMANTICS_CORRECTION / Orchestrator under Human instruction
+authority: Human "test lane和implement lane独立走，但pr是 acceptance Candidate，即包含两者" followed by "审查全文，把这部分修正。"
+G: 2631060b80c1192729be99690f9de2d726d66d44 — existing manual package base, not reselected
+W: b747065ac2fafa03d35d7a94b39d52d70f1de416 — unchanged
+K / T / I / C: NOT_CREATED — documentation correction within manual development
+candidate_index / correction_count: NOT_STARTED / 0
+input_digests: reviewed HEAD 8519d9d99d06db37346b23f554dd0586ca243190; v0.10.0 trust-trace blob ae12c93da63542e3491064a3b11b603f3f278089; raw SHA-256 9b2d7160113a49c1ccb012c55b0bda7f0755ecf8a8ade7855621d84abe723179
+output_digests: corrected working-tree document and ignored execution plan; final raw digests reported externally, not embedded self-digests
+Test Impact Set / mandatory acceptance: N/A — documentation-only correction; no new runtime/unit/E2E verdict claimed
+raw Tester report / Worker Correction Envelope: NOT_APPLICABLE
+observations: prior design wrongly equated development isolation with excluding Test from final PR; success PR must be exact accepted Ck=[T,Ik], not Ik or lesson child; existing accepted tests in G are not automatically a hidden-Test breach; manual Phases 0–3 do not fabricate Candidates
+bounded diagnostic: full-document reading, targeted cross-section audit and independent read-only consistency review; no implementation, Test Gate, Git ref, GitHub issue/PR or merge mutation
+disposition: CORRECT_CURRENT_DESIGN_AND_LOCAL_PLAN_PRESERVE_HISTORICAL_RECORDS
+next_allowed_operation: present corrected document and consistency checks for Human inspection; do not commit, open PR, merge or advance #93
+supersedes: prior design's Implementation-only / permanent Test-or-Candidate off-main interpretations, including BT-0006's G..accepted-Implementation-PR observation and corresponding v0.3.0/v0.9.0 changelog conclusions; all other historical facts, decisions and raw BT-0001…BT-0007 records remain unchanged
+```
+
 ## Appendix A — 证据索引
 
 ### A.1 当前主线文件
@@ -3438,6 +3495,9 @@ supersedes: BT-0006 next operation and Phase 0 pending state only; historical ob
 - 本地 ignored evidence 可能被清理，故本文件只把它作为历史诊断，不把它当成
   未来 acceptance evidence；
 - GitHub comment 引用证明历史过程，不替代当前 remote-state verification；
+- BT-0008 只纠正本地文档与 ignored 执行计划，没有改写 #86/#93 等 GitHub 评论。
+  旧评论中的 Implementation-only 表述如与本次 Human 指正冲突，不得继续作为执行
+  依据；对外同步仍需独立授权，不伪称已经完成；
 - 未合并历史 lesson commit 证明“曾发现过问题”，不自动成为当前规范；
 - 截至 BT-0005 的原始审阅动作只创建 #93 并在 #85 追加依赖/生命周期纠偏评论；
   BT-0006 另行记录已创建的 #94–#98 和现有 issue 的 dependency comments。两阶段
@@ -3447,6 +3507,7 @@ supersedes: BT-0006 next operation and Phase 0 pending state only; historical ob
 
 | Version | Date | Changes |
 | --- | --- | --- |
+| 0.11.0 | 2026-09-05 | Corrected the full document to deliver the exact accepted Candidate as PR head, including frozen Test and final Implementation; withdrew the Implementation-only and Test-in-history-as-contamination interpretations, aligned finalization/#93/#86/bootstrap guidance, distinguished manual Phases 0–3, and added BT-0008 without rewriting prior events or changelog rows. |
 | 0.10.0 | 2026-09-05 | Recorded PR #99 acceptance and the Human-commanded direct #95 branch implementation, focused monitoring/timeout compatibility evidence, deferred deployment/#98 boundaries, and BT-0007; preserved earlier trace events and audit baselines. |
 | 0.9.0 | 2026-09-05 | Corrected the Phase 0 trust trace before PR: made #94 → #57 Phase 1 → #95 → #93 the explicit order and bound Phases 0–3 to Human-commanded `MANUAL-BOOTSTRAP`; split B1-1/B1-2 to #93 and B1-3/B1-4/B1-5 to #86; scoped off-main/finalization ancestry checks to current-task additions in `G..accepted-Implementation-PR`; recorded #94–#98 and dependency-comment receipts; updated the derived snapshot; and appended BT-0006 without rewriting BT-0001…BT-0005. |
 | 0.8.0 | 2026-09-04 | Recorded the Human-approved two-plane time-control design: dynamic Orchestrator supervision for Agent tasks, deterministic configurable deadlines for project tools, Codex/OpenCode harness boundaries, interruption routing, current timeout inventory, narrow validation scope, and dependency-ordered Timeout Packages A/C/D/E. Added Owner decisions 18–21 and append-only trace BT-0005 without claiming implementation. |
