@@ -2,10 +2,10 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.9.0 |
+| Version | 0.10.0 |
 | Date | 2026-09-05 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
-| Status | Human-approved design; Phase 0 corrections prepared for exact-diff Human review |
+| Status | Phase 0 merged; #95 direct implementation prepared for Human review |
 | Description | Agent Loop 的 Category B trust-tracing lane：冻结现状审计与历史教训，定义结构化角色交接、统一守卫与失败局部返工、双 lane、Candidate 0 加三次增量修正、Phase 0–3 人工自举顺序，以及 Agent 动态监督与确定性工具超时的双时间平面，并用 append-only trace 记录有限自举状态。 |
 
 ## 0. Trust-tracing lane 的权威与维护边界
@@ -3112,10 +3112,11 @@ Tester/Reviewer results 和 observations。下一个 stage 必须从已合入 Im
 | Trace lane | `agent-discipline/agent-loop-bootstrap-trust-trace.md` |
 | Audited Governor | `9331d6684d4cfb977212ef60e70771e36c065b7c` |
 | Audited Workflow Contract blob | `b747065ac2fafa03d35d7a94b39d52d70f1de416` |
-| Design state | v0.9.0 保留 v0.8.0 的守卫失败路由与双时间平面设计，并纠正执行顺序、B1 owner、当前-series topology 范围和 tracking receipts；尚未修改活动规则/机器合同或实现 K/artifact schemas |
-| Active bootstrap package | #94 Phase 0 文档修正已获 Human 命令；#57 Phase 1 index 已准备但未完成；#95 已创建但 Implementation 未启动；#93 等待 #95 accepted merge |
+| Execution Governor | `2631060b80c1192729be99690f9de2d726d66d44` — PR #99 accepted merge; trust-trace blob `ed14ed830d2fbe3765bc424587925a054bb1b059` |
+| Design state | v0.10.0 记录 #95 分支上的动态监督规则、只读 monitor record validator 和 #88 CLI 兼容别名；尚未经 Human 验收合并。原始审计正文保留其历史基线；K/artifact schemas、workflow contract 和 #98 黑盒 adapter 未在本次实现 |
+| Active bootstrap package | Human 在 #99 合并后明确要求直接解决下一 issue；已核对 #57 索引与合并 receipts，进入 #95。分支 `codex/issue-95-dynamic-agent-supervision` 的实现与 focused checks 完成后等待 Human 检查；#93 仍等待 #95 accepted merge |
 | Candidate/correction state | none；不得用历史 `candidate_attempt` 伪造新模型 |
-| Next allowed operation | 停止本次 correction action，向 Human 提交 v0.9.0 exact working-tree diff 与 author self-check evidence；等待 Human 单独下令 `VERIFY`。在此之前不得 commit、创建 PR、推进 Phase 1/#95/#93 或恢复 #85 |
+| Next allowed operation | 向 Human 提交 #95 分支 diff 与 focused verification evidence 后停止；等待检查和下一条命令。不得自行提 PR、merge 或启动 #93 |
 
 ### 14.2 Append-only event schema
 
@@ -3280,6 +3281,29 @@ next_allowed_operation: present the v0.9.0 exact working-tree diff and author se
 supersedes: BT-0003 only for its direct-#93 next operation, and BT-0005 only for its now-completed tracking-creation next operation; all approved design content remains active
 ```
 
+#### BT-0007 — Phase 0 merge and direct #95 implementation
+
+```text
+trace_id: BT-0007
+observed_at_utc: 2026-09-05T04:53:47Z
+issue / task_run / stage: #95 / issue95-direct-development / manual-bootstrap-phase-2
+event / actor: DIRECT_IMPLEMENTATION_WITH_FOCUSED_VERIFICATION / Orchestrator under Human command
+authority: Human "继续下一个，拉issue 创建分支，然后直接解决，不走agent loop，解决后等待我检查即可。"
+G: 2631060b80c1192729be99690f9de2d726d66d44
+W: b747065ac2fafa03d35d7a94b39d52d70f1de416 — unchanged
+K / T / I / C: NOT_CREATED — direct development, no autonomous Loop lanes or Candidates
+candidate_index / correction_count: NOT_STARTED / 0
+input_digests: accepted PR #99 head 43e8cb28eb69a59b585a4b4c606936393294a6d3; merged trust-trace blob ed14ed830d2fbe3765bc424587925a054bb1b059; #57 execution index 5541711951; issue #95 body
+output_digests: working-tree diff and file identities reported in ignored .agent-state/plans/issue95-implementation-report.md; no implementation commit or PR yet
+Test Impact Set / mandatory acceptance: final test_agent_monitor.py 47 passed; affected test_handoff_guard.py 26 passed with 19 subtests; three selected role/frontmatter/renderer checks passed; no full suite, S32DS, or E2E run
+raw Tester report / Worker Correction Envelope: NOT_APPLICABLE — direct Human-commanded development and verification
+observations: removed fixed 3/5/10-minute and Tester KPI-derived lifetime rules; added passive closed monitor records with explicit decisions and a read-only validator; command timeout alias preserves v1 wire fields; generated local platform roles still need deployment after acceptance; #98 retains ownership of the fixed black-box runtime adapter
+bounded diagnostic: missing-validator and unsupported-alias RED evidence preceded implementation; a read-only check found completed+TERMINATE incorrectly accepted, reproduced with a failing test then fixed; isolated pytest cache writes were disabled after a cache warning; generic skill validation lacked optional PyYAML, so unchanged frontmatter and reference links were checked directly
+disposition: IMPLEMENTED_ON_BRANCH_AWAITING_HUMAN_REVIEW
+next_allowed_operation: present the branch diff and evidence, then wait for Human review; no PR, merge, or #93 advancement
+supersedes: BT-0006 next operation and Phase 0 pending state only; historical observations and approved design remain intact
+```
+
 ## Appendix A — 证据索引
 
 ### A.1 当前主线文件
@@ -3423,6 +3447,7 @@ supersedes: BT-0003 only for its direct-#93 next operation, and BT-0005 only for
 
 | Version | Date | Changes |
 | --- | --- | --- |
+| 0.10.0 | 2026-09-05 | Recorded PR #99 acceptance and the Human-commanded direct #95 branch implementation, focused monitoring/timeout compatibility evidence, deferred deployment/#98 boundaries, and BT-0007; preserved earlier trace events and audit baselines. |
 | 0.9.0 | 2026-09-05 | Corrected the Phase 0 trust trace before PR: made #94 → #57 Phase 1 → #95 → #93 the explicit order and bound Phases 0–3 to Human-commanded `MANUAL-BOOTSTRAP`; split B1-1/B1-2 to #93 and B1-3/B1-4/B1-5 to #86; scoped off-main/finalization ancestry checks to current-task additions in `G..accepted-Implementation-PR`; recorded #94–#98 and dependency-comment receipts; updated the derived snapshot; and appended BT-0006 without rewriting BT-0001…BT-0005. |
 | 0.8.0 | 2026-09-04 | Recorded the Human-approved two-plane time-control design: dynamic Orchestrator supervision for Agent tasks, deterministic configurable deadlines for project tools, Codex/OpenCode harness boundaries, interruption routing, current timeout inventory, narrow validation scope, and dependency-ordered Timeout Packages A/C/D/E. Added Owner decisions 18–21 and append-only trace BT-0005 without claiming implementation. |
 | 0.7.0 | 2026-09-03 | Recorded local guard-failure routing, structured guard results, immutable replacement/report-only repair, same-lane continuity, safe evidence fallback, side-effect-aware retry and unchanged correction accounting; explicitly excluded real guard/timeout implementation defects from PROCESS exemptions. Appended BT-0004 and preserved earlier trace/changelog history. |

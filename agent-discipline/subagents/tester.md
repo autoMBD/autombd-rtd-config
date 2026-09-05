@@ -43,8 +43,18 @@ judges everything the gate cannot catch.
   deploys the released skill (`tools/deploy_rtd_skill.py`) into a fresh temp dir,
   copies the case fixture, and drives an **independent third-party agent CLI**
   (OpenCode by default; Codex and others via the extensible runner registry) with the case's Subagent Prompt
-  + a structured-result suffix, sandboxed to the temp dir, timeout = 3× the max
-  catalog KPI (so S32DS validation, excluded from the per-case KPI, fits). The **embedded
+  + a structured-result suffix, sandboxed to the temp dir. KPI measures the
+  completed case and never sets the Agent's lifetime. Agent estimates and
+  observation windows are revised by the Orchestrator; wait/yield expiry is an
+  observation, not a functional verdict. Report progress, the current operation,
+  blockers, and useful evidence when contacted, then continue in the same session
+  unless explicitly interrupted. Preserve work and report transport/tool/platform
+  interruptions separately from functional PASS/FAIL.
+  The current harness still implements a fixed Agent timeout; replacing that
+  adapter is #98, and this guidance does not claim it already supports dynamic
+  supervision. Report its timeout as a harness interruption, never proof of an
+  Implementation defect. Deterministic setup/vendor commands keep their own
+  configurable deadlines. The **embedded
   subagent is NOT a valid black box** — it inherits this repo's
   `CLAUDE.md`/`AGENTS.md` and filesystem and can peek; only the external agent
   CLI sees nothing but the deployed skill + fixture + prompt. **Do not trust the

@@ -37,17 +37,26 @@ extend those domains in prompts, records, or prose.
 
 ## Handoff guard
 
+Use the guard for deterministic commands only, not a whole Agent session.
+`command_timeout_seconds` is the canonical semantic name for a child-command
+deadline. Prefer `--command-timeout-seconds`; `--timeout-seconds` remains its v1
+CLI alias. Supply exactly one. The v1 manifest/receipt/event wire member stays
+`timeout_seconds`, with the same positive-integer value and digest behavior;
+do not rename fields in frozen v1 files. Both CLI spellings emit the same closed
+v1 shape and retain command `TIMED_OUT` / exit 124 behavior. A future wire-version
+migration belongs to #93 and must be explicit.
+
 At every role handoff, invoke all three operations in order with the same
 manifest, receipt, and event-log paths:
 
 ```console
-python agent-discipline/skills/agent-workflow/scripts/handoff_guard.py prepare --role <role> --expected-top-level <canonical-worktree> --base-sha <sha> --lane-sha <sha> --contract-path <relative-path> --contract-blob-sha <sha> --manifest <manifest.json> --receipt <receipt.json> --event-log <events.jsonl> --timeout-seconds <seconds> -- <explicit-argv>
+python agent-discipline/skills/agent-workflow/scripts/handoff_guard.py prepare --role <role> --expected-top-level <canonical-worktree> --base-sha <sha> --lane-sha <sha> --contract-path <relative-path> --contract-blob-sha <sha> --manifest <manifest.json> --receipt <receipt.json> --event-log <events.jsonl> --command-timeout-seconds <seconds> -- <explicit-argv>
 python agent-discipline/skills/agent-workflow/scripts/handoff_guard.py check-handoff --manifest <manifest.json> --receipt <receipt.json> --event-log <events.jsonl>
 python agent-discipline/skills/agent-workflow/scripts/handoff_guard.py run --manifest <manifest.json> --receipt <receipt.json> --event-log <events.jsonl>
 ```
 
 `prepare` pins the canonical worktree, HEAD, contract blob, role, exact argv,
-and timeout after checking the current identity; the base SHA names an ancestor commit
+and command timeout after checking the current identity; the base SHA names an ancestor commit
 of that HEAD. `check-handoff` and `run` require the prior receipt's manifest digest
 to match the current raw manifest bytes before rechecking identity. `run` then
 executes only the pinned argv. Each invocation atomically replaces the receipt
@@ -67,7 +76,7 @@ CLI, or JSON seams, pin the completeness checker and expected raw packet digest
 as the exact command executed through the unchanged handoff-guard sequence:
 
 ```console
-python agent-discipline/skills/agent-workflow/scripts/handoff_guard.py prepare --role worker --expected-top-level <canonical-worktree> --base-sha <sha> --lane-sha <sha> --contract-path <relative-path> --contract-blob-sha <sha> --manifest <manifest.json> --receipt <receipt.json> --event-log <events.jsonl> --timeout-seconds <seconds> -- python agent-discipline/skills/agent-workflow/scripts/interface_handoff_check.py validate --packet <interface-handoff.json> --expected-sha256 <64-lowercase-hex>
+python agent-discipline/skills/agent-workflow/scripts/handoff_guard.py prepare --role worker --expected-top-level <canonical-worktree> --base-sha <sha> --lane-sha <sha> --contract-path <relative-path> --contract-blob-sha <sha> --manifest <manifest.json> --receipt <receipt.json> --event-log <events.jsonl> --command-timeout-seconds <seconds> -- python agent-discipline/skills/agent-workflow/scripts/interface_handoff_check.py validate --packet <interface-handoff.json> --expected-sha256 <64-lowercase-hex>
 python agent-discipline/skills/agent-workflow/scripts/handoff_guard.py check-handoff --manifest <manifest.json> --receipt <receipt.json> --event-log <events.jsonl>
 python agent-discipline/skills/agent-workflow/scripts/handoff_guard.py run --manifest <manifest.json> --receipt <receipt.json> --event-log <events.jsonl>
 ```
@@ -80,6 +89,24 @@ digest continuity. It has no semantic authority and cannot add packet fields or
 blocking rules.
 
 ## Validator
+
+### Agent monitoring (separate runtime observations)
+
+For live Agent supervision, read [the monitoring contract](references/agent-monitoring.md).
+The Orchestrator owns dynamic estimates, passive observation, communication, and
+explicit termination. Monitor records never assign workflow findings/verdicts,
+consume correction budget, change `G/K/T/I/C`, or authorize the next stage.
+Validate their closed shape with:
+
+```console
+python agent-discipline/skills/agent-workflow/scripts/agent_monitor.py validate --plan <monitor-plan.json> --events <monitor-events.jsonl>
+```
+
+This read-only command checks records; it does not schedule, wait, contact, or
+interrupt an Agent. In a Human-commanded manual bootstrap, retain that execution
+boundary even when a record says `CONTINUE`.
+
+### Workflow evidence
 
 For a workflow record, run:
 

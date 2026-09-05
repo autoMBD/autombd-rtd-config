@@ -36,7 +36,7 @@ The main agent owns:
 - selecting the active spec, plan, tests, fixtures, source-material boundaries,
   and acceptance criteria that govern the current work;
 - decomposing work into clear subagent tasks with inputs, constraints,
-  expected evidence, time budgets, and success/failure criteria;
+  expected evidence, revisable time estimates, observation points, and success/failure criteria;
 - dispatching independent implementation, investigation, review, and validation
   subagents instead of personally doing all task-level execution;
 - ensuring independent E2E validation is a **true black box** — driven through
@@ -55,7 +55,8 @@ The main agent owns:
 - preserving the development test loop and runtime verification loop as
   separate but connected acceptance mechanisms;
 - deciding when the main agent must intervene directly because a subagent has
-  exceeded the time budget, lacks enough context, or exposes a systemic issue.
+  needs intervention based on observed progress, lacks enough context, or exposes
+  a systemic issue. Exceeding an estimate alone is not a reason to fail or stop it.
 
 The main agent may perform direct local work when it is the most reliable way
 to keep the project moving, such as small documentation updates, final
@@ -227,8 +228,8 @@ Tests are the convergence signal, owned by the Tester. KPI misses are
 optimization triggers, not permission to weaken the functional gate. The
 Reviewer is the non-test acceptance gate and the keeper of lessons learned. The
 orchestrator integrates evidence, protects scope, enforces the three-iteration
-KPI optimization cap, and intervenes when a role exceeds its time budget or
-exposes a systemic issue.
+KPI optimization cap, and selects continued waiting, contact, intervention, or
+termination from observed progress and task conditions rather than a fixed clock.
 
 ## Testing Terminology
 
@@ -274,10 +275,24 @@ exposes a systemic issue.
   and KPI measurement after each iteration. Stop early only when KPI passes; if
   all three iterations still miss, record the true final KPI result and
   disposition in the acceptance report before review.
-- Focused independent subagent validation should converge within 3 minutes.
-  E2E subagent validation should converge within 5 minutes. A subagent run may
-  continue up to 10 minutes to expose useful problem evidence; after 10
-  minutes, the main agent intervenes and collects issue information.
+- Agent tasks use dynamic Orchestrator supervision. Estimate duration and the
+  next observation point from scope, expected commands, dependencies, comparable
+  work, and the Agent's latest progress. Revise both as new evidence arrives;
+  neither is an Agent deadline. Prefer passive harness events and communicate
+  with the same Agent when its status is unclear. Record an explicit
+  `CONTINUE | CONTACT | INTERVENE | TERMINATE` decision under the monitor contract
+  in `agent-discipline/skills/agent-workflow/references/agent-monitoring.md`.
+- Expiry of a wait/observation window or a command-tool yield returns control;
+  it does not end the Agent task. Only an explicit Human/Orchestrator termination
+  decision actively interrupts a task. A fixed estimate or KPI overrun alone
+  must never trigger failure, termination, new correction accounting, or loss
+  of completed work. Keep transport, tool, and platform/usage interruptions
+  separate from functional verdicts and preserve source/evidence for continuation.
+- Deterministic commands retain configurable command deadlines. The #88 guard's
+  `--command-timeout-seconds` (legacy `--timeout-seconds`) limits only its child
+  command; do not wrap an entire Agent session in this guard. The existing
+  black-box harness still has a fixed Agent timeout until #98 implements its
+  adapter; #95 policy does not claim that deferred runtime behavior is fixed.
 - All test temporary artifacts (black-box workdirs, validation throwaways)
   stay within the repository workspace — use `tests/.tmp/` as the canonical
   temp base (e.g. `--temp-base tests/.tmp` for `tools/blackbox_e2e.py`). The

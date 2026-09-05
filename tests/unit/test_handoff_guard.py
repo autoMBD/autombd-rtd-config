@@ -128,7 +128,8 @@ class HandoffGuardTests(unittest.TestCase):
         values = {
             "role": "worker", "expected": self.repo, "base": self.base,
             "lane": self.head, "contract": "contract.json", "blob": self.blob,
-            "timeout": 10, "manifest": self.manifest, "receipt": self.receipt,
+            "timeout": 10, "timeout_option": "--timeout-seconds", "timeout_extra": [],
+            "manifest": self.manifest, "receipt": self.receipt,
             "events": self.events,
         }
         values.update(overrides)
@@ -136,7 +137,8 @@ class HandoffGuardTests(unittest.TestCase):
             "prepare", "--role", values["role"], "--expected-top-level", values["expected"],
             "--base-sha", values["base"], "--lane-sha", values["lane"],
             "--contract-path", values["contract"], "--contract-blob-sha", values["blob"],
-            "--timeout-seconds", values["timeout"], "--manifest", values["manifest"],
+            values["timeout_option"], values["timeout"], *values["timeout_extra"],
+            "--manifest", values["manifest"],
             "--receipt", values["receipt"], "--event-log", values["events"], "--", *argv,
             cwd=overrides.get("cwd"), env=overrides.get("env"),
         )
@@ -198,6 +200,38 @@ class HandoffGuardTests(unittest.TestCase):
 
     def test_temporary_root_is_direct_child_of_canonical_tests_tmp(self):
         self.assertEqual(TEST_TMP_PARENT.resolve(), self.root.resolve().parent)
+
+    def test_command_timeout_alias_preserves_v1_manifest_and_execution(self):
+        argv = self.counting_command()
+        result = self.prepare(argv, timeout_option="--command-timeout-seconds")
+        self.assertEqual(0, result.returncode, result.stderr)
+        manifest = json.loads(self.manifest.read_bytes())
+        self.assertEqual(MANIFEST_KEYS, set(manifest))
+        self.assertEqual(10, manifest["timeout_seconds"])
+        for operation in ("check-handoff", "run"):
+            result = self.guard(operation, "--manifest", self.manifest,
+                                "--receipt", self.receipt, "--event-log", self.events)
+            self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual("1", self.sentinel.read_text())
+
+    def test_command_timeout_alias_still_times_out_only_the_command(self):
+        argv = [sys.executable, "-c", "import time; time.sleep(30)"]
+        result = self.prepare(argv, timeout_option="--command-timeout-seconds", timeout=1)
+        self.assertEqual(0, result.returncode, result.stderr)
+        for operation in ("check-handoff", "run"):
+            result = self.guard(operation, "--manifest", self.manifest,
+                                "--receipt", self.receipt, "--event-log", self.events)
+        self.assertEqual(124, result.returncode, result.stderr)
+        receipt, _ = self.receipt_and_events()
+        self.assertEqual("TIMED_OUT", receipt["outcome"])
+        self.assertEqual(1, receipt["timeout_seconds"])
+
+    def test_timeout_aliases_cannot_be_supplied_together(self):
+        result = self.prepare(self.counting_command(),
+                              timeout_extra=["--command-timeout-seconds", "5"])
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("not allowed with argument", result.stderr)
+        self.assertFalse(self.manifest.exists())
 
     def test_valid_prepare_check_run_executes_exact_argv_once(self):
         argv = self.counting_command()

@@ -213,7 +213,11 @@ def parse_args():
     for option in ("role", "expected-top-level", "base-sha", "lane-sha", "contract-path",
                    "contract-blob-sha", "manifest", "receipt", "event-log"):
         prepare.add_argument(f"--{option}", required=True)
-    prepare.add_argument("--timeout-seconds", required=True, type=int)
+    timeout = prepare.add_mutually_exclusive_group(required=True)
+    timeout.add_argument("--command-timeout-seconds", dest="timeout_seconds", type=int,
+                         help="deterministic child-command deadline; not an Agent task deadline")
+    timeout.add_argument("--timeout-seconds", dest="timeout_seconds", type=int,
+                         help="v1 compatibility alias for --command-timeout-seconds")
     prepare.add_argument("command", nargs=argparse.REMAINDER)
     for operation in ("check-handoff", "run"):
         command = commands.add_parser(operation)
