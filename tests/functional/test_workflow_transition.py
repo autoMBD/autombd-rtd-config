@@ -40,9 +40,14 @@
 # File:        test_workflow_transition.py
 # Author:      autoMBD <tkung.lqk@foxmail.com>
 # Date:        2026-09-06
-# Version:     0.1.0
+# Version:     0.1.1
 # Description: Independent frozen functional gate for the pure workflow reducer.
 # =================================================================================
+
+"""Automation for tests/doc/agent-functional-test-cases.md, cases 001-028.
+
+The case catalogue is the Human review entry; preserve its approved expectations.
+"""
 
 import copy
 import os

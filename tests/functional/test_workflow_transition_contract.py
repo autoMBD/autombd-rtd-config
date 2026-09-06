@@ -40,9 +40,14 @@
 # File:        test_workflow_transition_contract.py
 # Author:      autoMBD <tkung.lqk@foxmail.com>
 # Date:        2026-09-06
-# Version:     0.1.0
+# Version:     0.1.1
 # Description: Scoped schema and immutable protocol compatibility checks.
 # =================================================================================
+
+"""Static checks for tests/doc/agent-functional-test-cases.md, cases 029-034.
+
+These declaration checks do not establish runtime or documentation semantics.
+"""
 
 import copy
 import hashlib
