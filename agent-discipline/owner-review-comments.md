@@ -2,8 +2,8 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.5.0 |
-| Date | 2026-06-10 |
+| Version | 0.8.0 |
+| Date | 2026-09-06 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Tracks how review comments were resolved across design document revisions. |
 
@@ -120,6 +120,12 @@ test strategy. A future development-process document should capture the
 human-assisted agent development loop, skill growth, and closed-loop validation
 workflow as that process becomes concrete.
 
+## Prospective functional case-document review
+
+| ID | Original area | Comment intent | Resolution | Target document |
+| --- | --- | --- | --- | --- |
+| TEST-DOC-01 | [#85 Human Test Gate rejection](https://github.com/autoMBD/autombd-rtd-config/issues/85#issuecomment-5559022292) and confirming Human instruction | Human reviews readable case documents; incrementally classify functional cases by Agent/RTD CfgFile CLI; separate KPI and no historical backfill | Added reusable discipline, Tester/Worker/Reviewer boundaries and exact doc/script Test binding. #85 remains a rejected, unapproved Test until the revised document-led packet is approved; retained Implementation is unchanged. | `AGENTS.md`; `agent-discipline/documentation-governance.md`; role definitions; structured-handoff reference; #85 Test lane catalogue |
+
 ## Changelog
 
 | Date | Version | Description |
@@ -134,3 +140,4 @@ workflow as that process becomes concrete.
 | 2026-05-30 | 0.1.0 | Created review comment tracking table. |
 | 2026-06-15 | 0.6.0 | Issue #7 reorganization: moved from `docs/common/rtd-config-core-comments-tracking.md` to `agent-discipline/owner-review-comments.md`; updated all archive path references from `docs/OBSOLETE_NEVER_TOUCH!!!/` to `agent-discipline/review-archive/`. |
 | 2026-06-29 | 0.7.0 | Issue #35: renamed the review archive directory to `agent-discipline/review-archive-NOT-USED-NEVER-TOUCH!!!/` to make its frozen, never-a-requirements-source status explicit; updated the active archive pointers above. Frozen changelog rows retain the historical path. |
+| 2026-09-06 | 0.8.0 | Tracked the prospective document-first functional Test review decision, type catalogues, exact Test binding and separate KPI ownership without retrospective case-document work. |

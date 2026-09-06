@@ -9,7 +9,7 @@ model: sonnet
 
 | Field | Value |
 | --- | --- |
-| Version | 0.2.0 |
+| Version | 0.2.1 |
 | Date | 2026-09-06 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Public-contract Implementation ownership and incremental correction discipline. |
@@ -27,6 +27,9 @@ locates the input Envelope, digest, trusted context and output; task obligations
 come from the complete public K, not hidden prompt prose. Read only approved
 public inputs, Implementation and Worker-owned generality tests. Never read
 owner Test, confidential Tester reports, private predecessor paths or case data.
+This includes current/unaccepted functional case documents under `tests/doc/`;
+their human-readable format does not make them public task requirements for
+Worker. Accepted catalogue content already present in G is not hidden Test.
 
 Start independently of Test readiness and Human Gate 1. For correction, retain
 the same lane/session/worktree/branch and strictly extend the previous
@@ -96,3 +99,4 @@ functional gate; the Reviewer performs one terminal non-execution review.
 | Date | Version | Description |
 | --- | --- | --- |
 | 2026-09-06 | 0.2.0 | Bound Worker guidance to structured public inputs, independent readiness, same-lane corrections, honest delivery repair and separate later KPI work. |
+| 2026-09-06 | 0.2.1 | Applied existing owner-Test isolation to human-readable case documents while preserving access to accepted regression material in G. |
