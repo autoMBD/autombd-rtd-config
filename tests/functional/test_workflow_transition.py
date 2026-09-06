@@ -438,7 +438,10 @@ def test_rerun_cannot_reuse_execution_or_dispatch_history(h, field):
     h.result("INVALID_RUN")
     body = h.candidate_body(rerun=True)
     body["payload"][field] = first[field]
-    h.reject(h.event(body), "STALE_EVENT")
+    event = h.event(body)
+    h.reject(event, "STALE_EVENT")
+    h.context["checks"] = []
+    h.reject(event, "STALE_EVENT")
 
 
 def test_pending_correction_is_single_and_not_ready_does_not_spend_it(h):
