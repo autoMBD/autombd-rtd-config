@@ -39,12 +39,12 @@
 # Project:     RTD CfgFile CLI <https://github.com/autoMBD/autombd-rtd-config>
 # File:        test_workflow_transition.py
 # Author:      autoMBD <tkung.lqk@foxmail.com>
-# Date:        2026-09-06
-# Version:     0.1.1
+# Date:        2026-09-07
+# Version:     0.1.2
 # Description: Independent frozen functional gate for the pure workflow reducer.
 # =================================================================================
 
-"""Automation for tests/doc/agent-functional-test-cases.md, cases 001-028.
+"""Automation for tests/doc/reference/agent/workflow-transition-cases.md, 001-028.
 
 The case catalogue is the Human review entry; preserve its approved expectations.
 """

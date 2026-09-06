@@ -39,12 +39,12 @@
 # Project:     RTD CfgFile CLI <https://github.com/autoMBD/autombd-rtd-config>
 # File:        test_workflow_transition_contract.py
 # Author:      autoMBD <tkung.lqk@foxmail.com>
-# Date:        2026-09-06
-# Version:     0.1.1
+# Date:        2026-09-07
+# Version:     0.1.2
 # Description: Scoped schema and immutable protocol compatibility checks.
 # =================================================================================
 
-"""Static checks for tests/doc/agent-functional-test-cases.md, cases 029-034.
+"""Static checks for tests/doc/reference/agent/workflow-transition-cases.md, 029-034.
 
 These declaration checks do not establish runtime or documentation semantics.
 """
