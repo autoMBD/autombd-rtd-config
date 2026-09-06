@@ -46,6 +46,7 @@
 
 import copy
 import hashlib
+import importlib.util
 import json
 from pathlib import Path
 import subprocess
@@ -113,10 +114,53 @@ def interface(packet, kind):
 
 def temporary_directory():
     TEMP_BASE.mkdir(parents=True, exist_ok=True)
-    return tempfile.TemporaryDirectory(dir=TEMP_BASE)
+    return tempfile.TemporaryDirectory(prefix="issue93-b-interface-", dir=TEMP_BASE)
 
 
 class InterfaceHandoffCheckGeneralityTests(unittest.TestCase):
+    def test_legacy_import_api_works_without_script_directory_on_sys_path(self):
+        spec = importlib.util.spec_from_file_location("issue93_legacy_adapter", SCRIPT)
+        adapter = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(adapter)
+        raw = compact_bytes(complete_packet(947))
+        digest = hashlib.sha256(raw).hexdigest()
+        with temporary_directory() as directory:
+            path = Path(directory) / "packet.json"
+            path.write_bytes(raw)
+            packet, actual = adapter.load_packet(str(path), digest)
+            self.assertEqual(digest, actual)
+            self.assertIsNone(adapter.validate_packet(packet))
+            self.assertEqual(set(packet), adapter.TOP_LEVEL_KEYS)
+            with self.assertRaises(adapter.Rejected):
+                adapter.load_packet(str(path), "f" * 64)
+            with self.assertRaises(adapter.Rejected):
+                adapter.validate_packet({})
+
+    def test_unified_guard_preserves_legacy_raw_bytes_and_diagnostics(self):
+        valid = compact_bytes(complete_packet(619))
+        pretty = json.dumps(complete_packet(731), ensure_ascii=False, indent=2).encode()
+        for raw, expected_code in ((valid, 0), (pretty, 0), (b"{}", 1),
+                                   (b'{"schema_version":1,"schema_version":1}', 1),
+                                   (b"\xef\xbb\xbf" + valid, 1)):
+            with self.subTest(raw=raw[:40]):
+                with temporary_directory() as directory:
+                    path = Path(directory) / "packet.json"
+                    path.write_bytes(raw)
+                    results = []
+                    for script, operation in ((SCRIPT, "validate"),
+                                              (SCRIPT.with_name("handoff_guard.py"), "validate-interface")):
+                        results.append(subprocess.run(
+                            [sys.executable, str(script), operation, "--packet", str(path),
+                             "--expected-sha256", hashlib.sha256(raw).hexdigest()],
+                            cwd=directory, capture_output=True, text=True,
+                        ))
+                    legacy, unified = results
+                    self.assertEqual(expected_code, legacy.returncode, legacy.stderr)
+                    self.assertEqual((legacy.returncode, legacy.stdout, legacy.stderr),
+                                     (unified.returncode, unified.stdout, unified.stderr))
+                    self.assertEqual(raw, path.read_bytes())
+                    self.assertEqual([path], list(Path(directory).iterdir()))
+
     def invoke_raw(self, raw, expected_sha256=None):
         with temporary_directory() as directory:
             packet_path = Path(directory) / "handoff.json"

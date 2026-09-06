@@ -1,0 +1,3861 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:autombd:structured-handoff:1.0",
+  "title": "Structured handoff protocol v1",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/task-contract"
+    },
+    {
+      "$ref": "#/$defs/test-launch"
+    },
+    {
+      "$ref": "#/$defs/worker-launch"
+    },
+    {
+      "$ref": "#/$defs/test-gate-report"
+    },
+    {
+      "$ref": "#/$defs/implementation-report"
+    },
+    {
+      "$ref": "#/$defs/human-decision"
+    },
+    {
+      "$ref": "#/$defs/candidate-test-envelope"
+    },
+    {
+      "$ref": "#/$defs/tester-confidential-report"
+    },
+    {
+      "$ref": "#/$defs/worker-correction-envelope"
+    },
+    {
+      "$ref": "#/$defs/reviewer-launch"
+    },
+    {
+      "$ref": "#/$defs/reviewer-report"
+    },
+    {
+      "$ref": "#/$defs/terminal-record"
+    },
+    {
+      "$ref": "#/$defs/delivery-repair"
+    },
+    {
+      "$ref": "#/$defs/guard-result"
+    }
+  ],
+  "$defs": {
+    "CwdPath": {
+      "anyOf": [{"const": "."}, {"$ref": "#/$defs/Path"}]
+    },
+    "ID": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "Text": {
+      "type": "string",
+      "pattern": "\\S"
+    },
+    "SHA": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "Digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "Index": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 3
+    },
+    "Positive": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "Nonnegative": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "Int": {
+      "type": "integer"
+    },
+    "Bool": {
+      "type": "boolean"
+    },
+    "Path": {
+      "type": "string",
+      "format": "relative-path"
+    },
+    "StatePath": {
+      "type": "string",
+      "format": "state-path"
+    },
+    "Time": {
+      "type": "string",
+      "format": "utc-time"
+    },
+    "AbsolutePath": {
+      "type": "string",
+      "format": "canonical-root"
+    },
+    "Role": {
+      "enum": [
+        "orchestrator",
+        "tester",
+        "worker",
+        "reviewer",
+        "human"
+      ]
+    },
+    "Visibility": {
+      "enum": [
+        "public-task",
+        "tester-confidential",
+        "orchestrator-confidential",
+        "terminal-review"
+      ]
+    },
+    "Task": {
+      "type": "object",
+      "properties": {
+        "repository": {
+          "$ref": "#/$defs/Text"
+        },
+        "issue_number": {
+          "$ref": "#/$defs/Positive"
+        },
+        "task_run": {
+          "$ref": "#/$defs/ID"
+        }
+      },
+      "required": [
+        "repository",
+        "issue_number",
+        "task_run"
+      ],
+      "additionalProperties": false
+    },
+    "Governor": {
+      "type": "object",
+      "properties": {
+        "commit": {
+          "$ref": "#/$defs/SHA"
+        },
+        "workflow_contract_path": {
+          "$ref": "#/$defs/Path"
+        },
+        "workflow_contract_blob": {
+          "$ref": "#/$defs/SHA"
+        }
+      },
+      "required": [
+        "commit",
+        "workflow_contract_path",
+        "workflow_contract_blob"
+      ],
+      "additionalProperties": false
+    },
+    "KRef": {
+      "type": "object",
+      "properties": {
+        "revision": {
+          "$ref": "#/$defs/Nonnegative"
+        },
+        "path": {
+          "$ref": "#/$defs/StatePath"
+        },
+        "sha256": {
+          "$ref": "#/$defs/Digest"
+        }
+      },
+      "required": [
+        "revision",
+        "path",
+        "sha256"
+      ],
+      "additionalProperties": false
+    },
+    "Kind": {
+      "enum": [
+        "task-contract",
+        "test-launch",
+        "worker-launch",
+        "test-gate-report",
+        "implementation-report",
+        "human-decision",
+        "candidate-test-envelope",
+        "tester-confidential-report",
+        "worker-correction-envelope",
+        "reviewer-launch",
+        "reviewer-report",
+        "terminal-record",
+        "delivery-repair",
+        "guard-result"
+      ]
+    },
+    "ArtifactRef": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/Kind"
+        },
+        "artifact_id": {
+          "$ref": "#/$defs/ID"
+        },
+        "path": {
+          "$ref": "#/$defs/StatePath"
+        },
+        "sha256": {
+          "$ref": "#/$defs/Digest"
+        }
+      },
+      "required": [
+        "kind",
+        "artifact_id",
+        "path",
+        "sha256"
+      ],
+      "additionalProperties": false
+    },
+    "EvidenceRef": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/Path"
+        },
+        "sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "evidence_type": {
+          "enum": [
+            "command-result",
+            "manifest",
+            "impact-set",
+            "coverage-join",
+            "authority",
+            "lesson",
+            "disclosure-review"
+          ]
+        }
+      },
+      "required": [
+        "path",
+        "sha256",
+        "evidence_type"
+      ],
+      "additionalProperties": false
+    },
+    "Lane": {
+      "type": "object",
+      "properties": {
+        "lane_id": {
+          "$ref": "#/$defs/ID"
+        },
+        "agent_session_id": {
+          "$ref": "#/$defs/Text"
+        },
+        "worktree_id": {
+          "$ref": "#/$defs/ID"
+        },
+        "branch": {
+          "$ref": "#/$defs/Text"
+        }
+      },
+      "required": [
+        "lane_id",
+        "agent_session_id",
+        "worktree_id",
+        "branch"
+      ],
+      "additionalProperties": false
+    },
+    "Tip": {
+      "type": "object",
+      "properties": {
+        "commit": {
+          "$ref": "#/$defs/SHA"
+        },
+        "parents": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SHA"
+          },
+          "minItems": 0
+        },
+        "tree": {
+          "$ref": "#/$defs/SHA"
+        }
+      },
+      "required": [
+        "commit",
+        "parents",
+        "tree"
+      ],
+      "additionalProperties": false
+    },
+    "CommandResult": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": "1.0"
+        },
+        "argv": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Text"
+          },
+          "minItems": 1
+        },
+        "cwd": {
+          "$ref": "#/$defs/CwdPath"
+        },
+        "exit_code": {
+          "$ref": "#/$defs/Int"
+        },
+        "outcome": {
+          "enum": [
+            "PASS",
+            "FAIL",
+            "INVALID",
+            "TIMED_OUT"
+          ]
+        },
+        "environment_id": {
+          "$ref": "#/$defs/ID"
+        }
+      },
+      "required": [
+        "schema_version",
+        "argv",
+        "cwd",
+        "exit_code",
+        "outcome",
+        "environment_id"
+      ],
+      "additionalProperties": false
+    },
+    "RunEvidence": {
+      "type": "object",
+      "properties": {
+        "purpose": {
+          "$ref": "#/$defs/Text"
+        },
+        "argv": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Text"
+          },
+          "minItems": 1
+        },
+        "cwd": {
+          "$ref": "#/$defs/CwdPath"
+        },
+        "exit_code": {
+          "$ref": "#/$defs/Int"
+        },
+        "outcome": {
+          "enum": [
+            "PASS",
+            "FAIL",
+            "INVALID",
+            "TIMED_OUT"
+          ]
+        },
+        "result": {
+          "$ref": "#/$defs/EvidenceRef"
+        },
+        "environment_id": {
+          "$ref": "#/$defs/ID"
+        }
+      },
+      "required": [
+        "purpose",
+        "argv",
+        "cwd",
+        "exit_code",
+        "outcome",
+        "result",
+        "environment_id"
+      ],
+      "additionalProperties": false
+    },
+    "Observation": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/ID"
+        },
+        "public_obligation_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ID"
+          },
+          "minItems": 0
+        },
+        "category": {
+          "enum": [
+            "OBSERVATION",
+            "DEPENDENCY_UNAVAILABLE",
+            "CONTRACT_AMBIGUITY"
+          ]
+        },
+        "affected_operation": {
+          "$ref": "#/$defs/ID"
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/EvidenceRef"
+          },
+          "minItems": 0
+        },
+        "retained_work": {
+          "$ref": "#/$defs/Text"
+        },
+        "requested_decision": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Text"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "public_obligation_ids",
+        "category",
+        "affected_operation",
+        "evidence",
+        "retained_work",
+        "requested_decision"
+      ],
+      "additionalProperties": false
+    },
+    "Replacement": {
+      "type": "object",
+      "properties": {
+        "original": {
+          "$ref": "#/$defs/ArtifactRef"
+        },
+        "guard_result": {
+          "$ref": "#/$defs/ArtifactRef"
+        }
+      },
+      "required": [
+        "original",
+        "guard_result"
+      ],
+      "additionalProperties": false
+    },
+    "RevisionAck": {
+      "type": "object",
+      "properties": {
+        "old_contract": {
+          "$ref": "#/$defs/KRef"
+        },
+        "new_contract": {
+          "$ref": "#/$defs/KRef"
+        },
+        "verified_sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "current_tip": {
+          "$ref": "#/$defs/SHA"
+        },
+        "invalidated_receipt_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ID"
+          },
+          "minItems": 0
+        },
+        "retained_work": {
+          "$ref": "#/$defs/Text"
+        },
+        "resume_requirement_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ID"
+          },
+          "minItems": 0
+        }
+      },
+      "required": [
+        "old_contract",
+        "new_contract",
+        "verified_sha256",
+        "current_tip",
+        "invalidated_receipt_ids",
+        "retained_work",
+        "resume_requirement_ids"
+      ],
+      "additionalProperties": false
+    },
+    "Location": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/Path"
+        },
+        "symbol": {
+          "$ref": "#/$defs/Text"
+        },
+        "line": {
+          "$ref": "#/$defs/Positive"
+        }
+      },
+      "required": [
+        "path",
+        "symbol",
+        "line"
+      ],
+      "additionalProperties": false
+    },
+    "DisclosureReview": {
+      "type": "object",
+      "properties": {
+        "review_id": {
+          "$ref": "#/$defs/ID"
+        },
+        "source_report_id": {
+          "$ref": "#/$defs/ID"
+        },
+        "source_report_sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "reviewed_by": {
+          "const": "orchestrator"
+        },
+        "authority_complete": {
+          "const": true
+        },
+        "diagnostic_complete": {
+          "const": true
+        },
+        "non_disclosing": {
+          "const": true
+        },
+        "anti_fitting": {
+          "const": true
+        },
+        "mapping": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "public_diagnosis_id": {
+                "$ref": "#/$defs/ID"
+              },
+              "confidential_finding_id": {
+                "$ref": "#/$defs/ID"
+              }
+            },
+            "required": [
+              "public_diagnosis_id",
+              "confidential_finding_id"
+            ],
+            "additionalProperties": false
+          },
+          "minItems": 1
+        }
+      },
+      "required": [
+        "review_id",
+        "source_report_id",
+        "source_report_sha256",
+        "reviewed_by",
+        "authority_complete",
+        "diagnostic_complete",
+        "non_disclosing",
+        "anti_fitting",
+        "mapping"
+      ],
+      "additionalProperties": false
+    },
+    "PublicDiagnosis": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/ID"
+        },
+        "requirement_id": {
+          "$ref": "#/$defs/ID"
+        },
+        "decision_rule_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ID"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "affected_capability": {
+          "$ref": "#/$defs/Text"
+        },
+        "expected_requirement_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ID"
+          },
+          "minItems": 0
+        },
+        "observed": {
+          "$ref": "#/$defs/Text"
+        },
+        "first_public_divergence": {
+          "$ref": "#/$defs/Text"
+        },
+        "production_location": {
+          "$ref": "#/$defs/Location"
+        },
+        "control_flow": {
+          "$ref": "#/$defs/Text"
+        },
+        "root_cause": {
+          "$ref": "#/$defs/Text"
+        },
+        "confidence_percent": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "alternatives": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Text"
+          },
+          "minItems": 0
+        },
+        "public_reproduction_authority_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ID"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "required_outcome_requirement_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ID"
+          },
+          "minItems": 0
+        }
+      },
+      "required": [
+        "id",
+        "requirement_id",
+        "decision_rule_id",
+        "affected_capability",
+        "expected_requirement_ids",
+        "observed",
+        "first_public_divergence",
+        "production_location",
+        "control_flow",
+        "root_cause",
+        "confidence_percent",
+        "alternatives",
+        "public_reproduction_authority_id",
+        "required_outcome_requirement_ids"
+      ],
+      "additionalProperties": false
+    },
+    "ConfidentialFinding": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/ID"
+        },
+        "requirement_id": {
+          "$ref": "#/$defs/ID"
+        },
+        "decision_rule_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ID"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "owner_node": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Text"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "assertion": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Text"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "case_context": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Text"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "expected": {
+          "$ref": "#/$defs/Text"
+        },
+        "observed": {
+          "$ref": "#/$defs/Text"
+        },
+        "first_divergence": {
+          "$ref": "#/$defs/Text"
+        },
+        "production_location": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Location"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "control_flow": {
+          "$ref": "#/$defs/Text"
+        },
+        "root_cause": {
+          "$ref": "#/$defs/Text"
+        },
+        "confidence_percent": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "alternatives": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Text"
+          },
+          "minItems": 0
+        },
+        "exclusion_evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/EvidenceRef"
+          },
+          "minItems": 0
+        },
+        "responsibility": {
+          "enum": [
+            "IMPLEMENTATION",
+            "TEST",
+            "CONTRACT",
+            "PROCESS",
+            "ENVIRONMENT",
+            "INTEGRITY"
+          ]
+        },
+        "affected_surface": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Text"
+          },
+          "minItems": 0
+        },
+        "unaffected_boundary": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Text"
+          },
+          "minItems": 0
+        }
+      },
+      "required": [
+        "id",
+        "requirement_id",
+        "decision_rule_id",
+        "owner_node",
+        "assertion",
+        "case_context",
+        "expected",
+        "observed",
+        "first_divergence",
+        "production_location",
+        "control_flow",
+        "root_cause",
+        "confidence_percent",
+        "alternatives",
+        "exclusion_evidence",
+        "responsibility",
+        "affected_surface",
+        "unaffected_boundary"
+      ],
+      "additionalProperties": false
+    },
+    "LaneManifestV1": {
+      "type": "object",
+      "properties": {
+        "contract_version": {
+          "$ref": "#/$defs/Positive"
+        },
+        "contract_blob_sha": {
+          "$ref": "#/$defs/SHA"
+        },
+        "base_sha": {
+          "$ref": "#/$defs/SHA"
+        },
+        "lane_sha": {
+          "$ref": "#/$defs/SHA"
+        },
+        "requirement_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ID"
+          },
+          "minItems": 0
+        }
+      },
+      "required": [
+        "contract_version",
+        "contract_blob_sha",
+        "base_sha",
+        "lane_sha",
+        "requirement_ids"
+      ],
+      "additionalProperties": false
+    },
+    "ImpactSet": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": "1.0"
+        },
+        "task": {
+          "$ref": "#/$defs/Task"
+        },
+        "task_contract": {
+          "$ref": "#/$defs/KRef"
+        },
+        "selected_checks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/ID"
+              },
+              "family": {
+                "enum": [
+                  "unit",
+                  "functional",
+                  "static",
+                  "vendor",
+                  "e2e"
+                ]
+              },
+              "argv": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/Text"
+                },
+                "minItems": 1
+              },
+              "requirement_ids": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/ID"
+                },
+                "minItems": 1
+              },
+              "covered_paths": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/Path"
+                },
+                "minItems": 1
+              }
+            },
+            "required": [
+              "id",
+              "family",
+              "argv",
+              "requirement_ids",
+              "covered_paths"
+            ],
+            "additionalProperties": false
+          },
+          "minItems": 1
+        },
+        "excluded_checks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/ID"
+              },
+              "family": {
+                "enum": [
+                  "unit",
+                  "functional",
+                  "static",
+                  "vendor",
+                  "e2e"
+                ]
+              },
+              "reason": {
+                "$ref": "#/$defs/Text"
+              }
+            },
+            "required": [
+              "id",
+              "family",
+              "reason"
+            ],
+            "additionalProperties": false
+          },
+          "minItems": 0
+        },
+        "public_dependency_edges": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "from": {
+                "$ref": "#/$defs/Path"
+              },
+              "to": {
+                "$ref": "#/$defs/Path"
+              },
+              "reason": {
+                "$ref": "#/$defs/Text"
+              }
+            },
+            "required": [
+              "from",
+              "to",
+              "reason"
+            ],
+            "additionalProperties": false
+          },
+          "minItems": 0
+        },
+        "prevalidation_obligations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/ID"
+              },
+              "mode": {
+                "enum": [
+                  "RED",
+                  "FULL_CHAIN",
+                  "KNOWN_GOOD",
+                  "KNOWN_BAD",
+                  "NOT_APPLICABLE"
+                ]
+              },
+              "reason": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Text"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "mode",
+              "reason"
+            ],
+            "additionalProperties": false
+          },
+          "minItems": 1
+        }
+      },
+      "required": [
+        "schema_version",
+        "task",
+        "task_contract",
+        "selected_checks",
+        "excluded_checks",
+        "public_dependency_edges",
+        "prevalidation_obligations"
+      ],
+      "additionalProperties": false
+    },
+    "CoverageJoin": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": "1.0"
+        },
+        "test_commit": {
+          "$ref": "#/$defs/SHA"
+        },
+        "implementation_commit": {
+          "$ref": "#/$defs/SHA"
+        },
+        "impact_set_sha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "changed_paths": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "$ref": "#/$defs/Path"
+              },
+              "owner": {
+                "enum": [
+                  "TEST",
+                  "IMPLEMENTATION"
+                ]
+              },
+              "requirement_ids": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/ID"
+                },
+                "minItems": 1
+              },
+              "selected_check_ids": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/ID"
+                },
+                "minItems": 1
+              }
+            },
+            "required": [
+              "path",
+              "owner",
+              "requirement_ids",
+              "selected_check_ids"
+            ],
+            "additionalProperties": false
+          },
+          "minItems": 1
+        }
+      },
+      "required": [
+        "schema_version",
+        "test_commit",
+        "implementation_commit",
+        "impact_set_sha256",
+        "changed_paths"
+      ],
+      "additionalProperties": false
+    },
+    "task-contract": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": "1.0"
+        },
+        "artifact_kind": {
+          "const": "task-contract"
+        },
+        "artifact_id": {
+          "$ref": "#/$defs/ID"
+        },
+        "task": {
+          "$ref": "#/$defs/Task"
+        },
+        "workflow_profile": {
+          "const": "functional-development-v1"
+        },
+        "producer_role": {
+          "const": "orchestrator"
+        },
+        "consumer_role": {
+          "const": "orchestrator"
+        },
+        "visibility": {
+          "const": "public-task"
+        },
+        "governor": {
+          "$ref": "#/$defs/Governor"
+        },
+        "task_contract": {
+          "const": null
+        },
+        "predecessors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ArtifactRef"
+          },
+          "minItems": 0
+        },
+        "replaces": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Replacement"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "revision": {
+              "type": "object",
+              "properties": {
+                "number": {
+                  "$ref": "#/$defs/Nonnegative"
+                },
+                "predecessor": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/ArtifactRef"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "authority": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/EvidenceRef"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "reason": {
+                  "$ref": "#/$defs/Text"
+                },
+                "changed_authority_ids": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/ID"
+                  },
+                  "minItems": 0
+                },
+                "affected_requirement_ids": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/ID"
+                  },
+                  "minItems": 0
+                }
+              },
+              "required": [
+                "number",
+                "predecessor",
+                "authority",
+                "reason",
+                "changed_authority_ids",
+                "affected_requirement_ids"
+              ],
+              "additionalProperties": false
+            },
+            "priority": {
+              "enum": [
+                "P0",
+                "P0.1",
+                "P1",
+                "P2"
+              ]
+            },
+            "dependencies": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "issue_number": {
+                    "$ref": "#/$defs/Positive"
+                  },
+                  "relation": {
+                    "enum": [
+                      "HARD",
+                      "SCHEDULING"
+                    ]
+                  },
+                  "condition": {
+                    "$ref": "#/$defs/Text"
+                  }
+                },
+                "required": [
+                  "issue_number",
+                  "relation",
+                  "condition"
+                ],
+                "additionalProperties": false
+              },
+              "minItems": 0
+            },
+            "authorities": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "$ref": "#/$defs/ID"
+                  },
+                  "source_kind": {
+                    "enum": [
+                      "issue-body",
+                      "issue-comment",
+                      "repository-file",
+                      "human-decision"
+                    ]
+                  },
+                  "locator": {
+                    "$ref": "#/$defs/Text"
+                  },
+                  "snapshot": {
+                    "$ref": "#/$defs/EvidenceRef"
+                  }
+                },
+                "required": [
+                  "id",
+                  "source_kind",
+                  "locator",
+                  "snapshot"
+                ],
+                "additionalProperties": false
+              },
+              "minItems": 1
+            },
+            "objective": {
+              "$ref": "#/$defs/Text"
+            },
+            "requirements": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "$ref": "#/$defs/ID"
+                  },
+                  "authority_ids": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/$defs/ID"
+                    },
+                    "minItems": 1
+                  },
+                  "obligation": {
+                    "$ref": "#/$defs/Text"
+                  }
+                },
+                "required": [
+                  "id",
+                  "authority_ids",
+                  "obligation"
+                ],
+                "additionalProperties": false
+              },
+              "minItems": 1
+            },
+            "scope": {
+              "type": "object",
+              "properties": {
+                "included": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/Text"
+                  },
+                  "minItems": 1
+                },
+                "excluded": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/Text"
+                  },
+                  "minItems": 0
+                }
+              },
+              "required": [
+                "included",
+                "excluded"
+              ],
+              "additionalProperties": false
+            },
+            "boundaries": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "role": {
+                    "$ref": "#/$defs/Role"
+                  },
+                  "ownership": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/$defs/Text"
+                    },
+                    "minItems": 0
+                  },
+                  "forbidden_sources": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/$defs/Text"
+                    },
+                    "minItems": 0
+                  },
+                  "forbidden_actions": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/$defs/Text"
+                    },
+                    "minItems": 0
+                  }
+                },
+                "required": [
+                  "role",
+                  "ownership",
+                  "forbidden_sources",
+                  "forbidden_actions"
+                ],
+                "additionalProperties": false
+              },
+              "minItems": 0
+            },
+            "interfaces": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "$ref": "#/$defs/ID"
+                  },
+                  "kind": {
+                    "enum": [
+                      "python",
+                      "cli",
+                      "json"
+                    ]
+                  },
+                  "locator": {
+                    "$ref": "#/$defs/Path"
+                  },
+                  "signature": {
+                    "$ref": "#/$defs/Text"
+                  },
+                  "behavior_requirement_ids": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/$defs/ID"
+                    },
+                    "minItems": 0
+                  }
+                },
+                "required": [
+                  "id",
+                  "kind",
+                  "locator",
+                  "signature",
+                  "behavior_requirement_ids"
+                ],
+                "additionalProperties": false
+              },
+              "minItems": 0
+            },
+            "decision_rules": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "$ref": "#/$defs/ID"
+                  },
+                  "priority": {
+                    "$ref": "#/$defs/Nonnegative"
+                  },
+                  "when": {
+                    "$ref": "#/$defs/Text"
+                  },
+                  "result": {
+                    "$ref": "#/$defs/Text"
+                  },
+                  "error": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/Text"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "side_effects": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/$defs/Text"
+                    },
+                    "minItems": 0
+                  },
+                  "requirement_ids": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/$defs/ID"
+                    },
+                    "minItems": 0
+                  }
+                },
+                "required": [
+                  "id",
+                  "priority",
+                  "when",
+                  "result",
+                  "error",
+                  "side_effects",
+                  "requirement_ids"
+                ],
+                "additionalProperties": false
+              },
+              "minItems": 0
+            },
+            "acceptance": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "$ref": "#/$defs/ID"
+                  },
+                  "kind": {
+                    "enum": [
+                      "unit",
+                      "functional",
+                      "static",
+                      "vendor",
+                      "e2e"
+                    ]
+                  },
+                  "requirement_ids": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/$defs/ID"
+                    },
+                    "minItems": 1
+                  },
+                  "selection_rule": {
+                    "$ref": "#/$defs/Text"
+                  }
+                },
+                "required": [
+                  "id",
+                  "kind",
+                  "requirement_ids",
+                  "selection_rule"
+                ],
+                "additionalProperties": false
+              },
+              "minItems": 1
+            },
+            "unknown_policy": {
+              "type": "object",
+              "properties": {
+                "record_first": {
+                  "const": true
+                },
+                "bounded_diagnostic": {
+                  "const": true
+                },
+                "block_affected_operation_only": {
+                  "const": true
+                },
+                "ambiguous_classification": {
+                  "const": "human"
+                },
+                "preserve_implementation": {
+                  "const": true
+                }
+              },
+              "required": [
+                "record_first",
+                "bounded_diagnostic",
+                "block_affected_operation_only",
+                "ambiguous_classification",
+                "preserve_implementation"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "revision",
+            "priority",
+            "dependencies",
+            "authorities",
+            "objective",
+            "requirements",
+            "scope",
+            "boundaries",
+            "interfaces",
+            "decision_rules",
+            "acceptance",
+            "unknown_policy"
+          ],
+          "additionalProperties": false
+        },
+        "unresolved": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Observation"
+          },
+          "minItems": 0
+        }
+      },
+      "required": [
+        "schema_version",
+        "artifact_kind",
+        "artifact_id",
+        "task",
+        "workflow_profile",
+        "producer_role",
+        "consumer_role",
+        "visibility",
+        "governor",
+        "task_contract",
+        "predecessors",
+        "replaces",
+        "payload",
+        "unresolved"
+      ],
+      "additionalProperties": false
+    },
+    "test-launch": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": "1.0"
+        },
+        "artifact_kind": {
+          "const": "test-launch"
+        },
+        "artifact_id": {
+          "$ref": "#/$defs/ID"
+        },
+        "task": {
+          "$ref": "#/$defs/Task"
+        },
+        "workflow_profile": {
+          "const": "functional-development-v1"
+        },
+        "producer_role": {
+          "const": "orchestrator"
+        },
+        "consumer_role": {
+          "const": "tester"
+        },
+        "visibility": {
+          "const": "tester-confidential"
+        },
+        "governor": {
+          "$ref": "#/$defs/Governor"
+        },
+        "task_contract": {
+          "$ref": "#/$defs/KRef"
+        },
+        "predecessors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ArtifactRef"
+          },
+          "minItems": 0
+        },
+        "replaces": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Replacement"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "dispatch_id": {
+              "$ref": "#/$defs/ID"
+            },
+            "mode": {
+              "enum": [
+                "INITIAL",
+                "K_REVISION"
+              ]
+            },
+            "lane": {
+              "$ref": "#/$defs/Lane"
+            },
+            "output_path": {
+              "$ref": "#/$defs/StatePath"
+            },
+            "requirement_ids": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ID"
+              },
+              "minItems": 0
+            },
+            "interface_ids": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ID"
+              },
+              "minItems": 0
+            },
+            "forbidden_sources": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Text"
+              },
+              "minItems": 0
+            },
+            "forbidden_actions": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Text"
+              },
+              "minItems": 0
+            },
+            "previous_launch": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ArtifactRef"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "revision_ack_required": {
+              "$ref": "#/$defs/Bool"
+            },
+            "duties": {
+              "type": "object",
+              "properties": {
+                "author_functional_gate": {
+                  "const": true
+                },
+                "prevalidate_full_chain": {
+                  "const": true
+                },
+                "freeze_impact_set": {
+                  "const": true
+                },
+                "implementation_read_allowed": {
+                  "const": false
+                },
+                "production_write_allowed": {
+                  "const": false
+                }
+              },
+              "required": [
+                "author_functional_gate",
+                "prevalidate_full_chain",
+                "freeze_impact_set",
+                "implementation_read_allowed",
+                "production_write_allowed"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "dispatch_id",
+            "mode",
+            "lane",
+            "output_path",
+            "requirement_ids",
+            "interface_ids",
+            "forbidden_sources",
+            "forbidden_actions",
+            "previous_launch",
+            "revision_ack_required",
+            "duties"
+          ],
+          "additionalProperties": false
+        },
+        "unresolved": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Observation"
+          },
+          "minItems": 0
+        }
+      },
+      "required": [
+        "schema_version",
+        "artifact_kind",
+        "artifact_id",
+        "task",
+        "workflow_profile",
+        "producer_role",
+        "consumer_role",
+        "visibility",
+        "governor",
+        "task_contract",
+        "predecessors",
+        "replaces",
+        "payload",
+        "unresolved"
+      ],
+      "additionalProperties": false
+    },
+    "worker-launch": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": "1.0"
+        },
+        "artifact_kind": {
+          "const": "worker-launch"
+        },
+        "artifact_id": {
+          "$ref": "#/$defs/ID"
+        },
+        "task": {
+          "$ref": "#/$defs/Task"
+        },
+        "workflow_profile": {
+          "const": "functional-development-v1"
+        },
+        "producer_role": {
+          "const": "orchestrator"
+        },
+        "consumer_role": {
+          "const": "worker"
+        },
+        "visibility": {
+          "const": "public-task"
+        },
+        "governor": {
+          "$ref": "#/$defs/Governor"
+        },
+        "task_contract": {
+          "$ref": "#/$defs/KRef"
+        },
+        "predecessors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ArtifactRef"
+          },
+          "minItems": 0
+        },
+        "replaces": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Replacement"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "dispatch_id": {
+              "$ref": "#/$defs/ID"
+            },
+            "mode": {
+              "enum": [
+                "INITIAL",
+                "K_REVISION"
+              ]
+            },
+            "lane": {
+              "$ref": "#/$defs/Lane"
+            },
+            "output_path": {
+              "$ref": "#/$defs/StatePath"
+            },
+            "requirement_ids": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ID"
+              },
+              "minItems": 0
+            },
+            "interface_ids": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ID"
+              },
+              "minItems": 0
+            },
+            "forbidden_sources": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Text"
+              },
+              "minItems": 0
+            },
+            "forbidden_actions": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Text"
+              },
+              "minItems": 0
+            },
+            "previous_launch": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ArtifactRef"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "revision_ack_required": {
+              "$ref": "#/$defs/Bool"
+            },
+            "duties": {
+              "type": "object",
+              "properties": {
+                "tdd": {
+                  "const": true
+                },
+                "generality": {
+                  "const": true
+                },
+                "owner_test_read_allowed": {
+                  "const": false
+                }
+              },
+              "required": [
+                "tdd",
+                "generality",
+                "owner_test_read_allowed"
+              ],
+              "additionalProperties": false
+            },
+            "salvage": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "patch": {
+                    "$ref": "#/$defs/EvidenceRef"
+                  },
+                  "source_commit": {
+                    "$ref": "#/$defs/SHA"
+                  },
+                  "disclosure_review": {
+                    "$ref": "#/$defs/EvidenceRef"
+                  }
+                },
+                "required": [
+                  "patch",
+                  "source_commit",
+                  "disclosure_review"
+                ],
+                "additionalProperties": false
+              },
+              "minItems": 0
+            }
+          },
+          "required": [
+            "dispatch_id",
+            "mode",
+            "lane",
+            "output_path",
+            "requirement_ids",
+            "interface_ids",
+            "forbidden_sources",
+            "forbidden_actions",
+            "previous_launch",
+            "revision_ack_required",
+            "duties",
+            "salvage"
+          ],
+          "additionalProperties": false
+        },
+        "unresolved": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Observation"
+          },
+          "minItems": 0
+        }
+      },
+      "required": [
+        "schema_version",
+        "artifact_kind",
+        "artifact_id",
+        "task",
+        "workflow_profile",
+        "producer_role",
+        "consumer_role",
+        "visibility",
+        "governor",
+        "task_contract",
+        "predecessors",
+        "replaces",
+        "payload",
+        "unresolved"
+      ],
+      "additionalProperties": false
+    },
+    "test-gate-report": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": "1.0"
+        },
+        "artifact_kind": {
+          "const": "test-gate-report"
+        },
+        "artifact_id": {
+          "$ref": "#/$defs/ID"
+        },
+        "task": {
+          "$ref": "#/$defs/Task"
+        },
+        "workflow_profile": {
+          "const": "functional-development-v1"
+        },
+        "producer_role": {
+          "const": "tester"
+        },
+        "consumer_role": {
+          "const": "orchestrator"
+        },
+        "visibility": {
+          "const": "tester-confidential"
+        },
+        "governor": {
+          "$ref": "#/$defs/Governor"
+        },
+        "task_contract": {
+          "$ref": "#/$defs/KRef"
+        },
+        "predecessors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ArtifactRef"
+          },
+          "minItems": 0
+        },
+        "replaces": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Replacement"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "dispatch_id": {
+              "$ref": "#/$defs/ID"
+            },
+            "status": {
+              "enum": [
+                "READY",
+                "NOT_READY",
+                "CONTRACT_AMBIGUITY",
+                "K_ACK"
+              ]
+            },
+            "lane": {
+              "$ref": "#/$defs/Lane"
+            },
+            "test_tip": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Tip"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "manifest": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/EvidenceRef"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "requirement_coverage": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "requirement_id": {
+                    "$ref": "#/$defs/ID"
+                  },
+                  "test_obligation": {
+                    "$ref": "#/$defs/Text"
+                  }
+                },
+                "required": [
+                  "requirement_id",
+                  "test_obligation"
+                ],
+                "additionalProperties": false
+              },
+              "minItems": 0
+            },
+            "impact_set": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/EvidenceRef"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "impact_selection": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "family": {
+                    "$ref": "#/$defs/Text"
+                  },
+                  "disposition": {
+                    "enum": [
+                      "SELECTED",
+                      "EXCLUDED"
+                    ]
+                  },
+                  "dependency_reason": {
+                    "$ref": "#/$defs/Text"
+                  }
+                },
+                "required": [
+                  "family",
+                  "disposition",
+                  "dependency_reason"
+                ],
+                "additionalProperties": false
+              },
+              "minItems": 0
+            },
+            "prevalidation": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/RunEvidence"
+              },
+              "minItems": 0
+            },
+            "revision_ack": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/RevisionAck"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "dispatch_id",
+            "status",
+            "lane",
+            "test_tip",
+            "manifest",
+            "requirement_coverage",
+            "impact_set",
+            "impact_selection",
+            "prevalidation",
+            "revision_ack"
+          ],
+          "additionalProperties": false
+        },
+        "unresolved": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Observation"
+          },
+          "minItems": 0
+        }
+      },
+      "required": [
+        "schema_version",
+        "artifact_kind",
+        "artifact_id",
+        "task",
+        "workflow_profile",
+        "producer_role",
+        "consumer_role",
+        "visibility",
+        "governor",
+        "task_contract",
+        "predecessors",
+        "replaces",
+        "payload",
+        "unresolved"
+      ],
+      "additionalProperties": false
+    },
+    "implementation-report": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": "1.0"
+        },
+        "artifact_kind": {
+          "const": "implementation-report"
+        },
+        "artifact_id": {
+          "$ref": "#/$defs/ID"
+        },
+        "task": {
+          "$ref": "#/$defs/Task"
+        },
+        "workflow_profile": {
+          "const": "functional-development-v1"
+        },
+        "producer_role": {
+          "const": "worker"
+        },
+        "consumer_role": {
+          "const": "orchestrator"
+        },
+        "visibility": {
+          "const": "public-task"
+        },
+        "governor": {
+          "$ref": "#/$defs/Governor"
+        },
+        "task_contract": {
+          "$ref": "#/$defs/KRef"
+        },
+        "predecessors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ArtifactRef"
+          },
+          "minItems": 0
+        },
+        "replaces": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Replacement"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "dispatch_id": {
+              "$ref": "#/$defs/ID"
+            },
+            "status": {
+              "enum": [
+                "READY",
+                "NOT_READY",
+                "CONTRACT_AMBIGUITY",
+                "K_ACK"
+              ]
+            },
+            "lane": {
+              "$ref": "#/$defs/Lane"
+            },
+            "implementation_index": {
+              "$ref": "#/$defs/Index"
+            },
+            "implementation_tip": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Tip"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "previous_implementation": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/SHA"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "manifest": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/EvidenceRef"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "changed_paths": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "path": {
+                    "$ref": "#/$defs/Path"
+                  },
+                  "requirement_ids": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/$defs/ID"
+                    },
+                    "minItems": 0
+                  },
+                  "rationale": {
+                    "$ref": "#/$defs/Text"
+                  }
+                },
+                "required": [
+                  "path",
+                  "requirement_ids",
+                  "rationale"
+                ],
+                "additionalProperties": false
+              },
+              "minItems": 0
+            },
+            "requirement_coverage": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "requirement_id": {
+                    "$ref": "#/$defs/ID"
+                  },
+                  "implementation_location": {
+                    "$ref": "#/$defs/Text"
+                  }
+                },
+                "required": [
+                  "requirement_id",
+                  "implementation_location"
+                ],
+                "additionalProperties": false
+              },
+              "minItems": 0
+            },
+            "generality": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/RunEvidence"
+              },
+              "minItems": 0
+            },
+            "revision_ack": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/RevisionAck"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "dispatch_id",
+            "status",
+            "lane",
+            "implementation_index",
+            "implementation_tip",
+            "previous_implementation",
+            "manifest",
+            "changed_paths",
+            "requirement_coverage",
+            "generality",
+            "revision_ack"
+          ],
+          "additionalProperties": false
+        },
+        "unresolved": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Observation"
+          },
+          "minItems": 0
+        }
+      },
+      "required": [
+        "schema_version",
+        "artifact_kind",
+        "artifact_id",
+        "task",
+        "workflow_profile",
+        "producer_role",
+        "consumer_role",
+        "visibility",
+        "governor",
+        "task_contract",
+        "predecessors",
+        "replaces",
+        "payload",
+        "unresolved"
+      ],
+      "additionalProperties": false
+    },
+    "human-decision": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": "1.0"
+        },
+        "artifact_kind": {
+          "const": "human-decision"
+        },
+        "artifact_id": {
+          "$ref": "#/$defs/ID"
+        },
+        "task": {
+          "$ref": "#/$defs/Task"
+        },
+        "workflow_profile": {
+          "const": "functional-development-v1"
+        },
+        "producer_role": {
+          "const": "human"
+        },
+        "consumer_role": {
+          "const": "orchestrator"
+        },
+        "visibility": {
+          "enum": [
+            "tester-confidential",
+            "terminal-review"
+          ]
+        },
+        "governor": {
+          "$ref": "#/$defs/Governor"
+        },
+        "task_contract": {
+          "$ref": "#/$defs/KRef"
+        },
+        "predecessors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ArtifactRef"
+          },
+          "minItems": 0
+        },
+        "replaces": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Replacement"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "gate": {
+              "enum": [
+                "TEST",
+                "FINAL"
+              ]
+            },
+            "decision": {
+              "enum": [
+                "APPROVE",
+                "REQUEST_CHANGES",
+                "STOP"
+              ]
+            },
+            "subject_sha": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/SHA"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "authority_actor": {
+              "$ref": "#/$defs/Text"
+            },
+            "source": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "github-issue-comment",
+                    "human-command"
+                  ]
+                },
+                "locator": {
+                  "$ref": "#/$defs/Text"
+                },
+                "raw": {
+                  "$ref": "#/$defs/EvidenceRef"
+                },
+                "created_at": {
+                  "$ref": "#/$defs/Time"
+                },
+                "updated_at": {
+                  "$ref": "#/$defs/Time"
+                },
+                "deleted": {
+                  "$ref": "#/$defs/Bool"
+                }
+              },
+              "required": [
+                "kind",
+                "locator",
+                "raw",
+                "created_at",
+                "updated_at",
+                "deleted"
+              ],
+              "additionalProperties": false
+            },
+            "reason": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Text"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "gate",
+            "decision",
+            "subject_sha",
+            "authority_actor",
+            "source",
+            "reason"
+          ],
+          "additionalProperties": false
+        },
+        "unresolved": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Observation"
+          },
+          "minItems": 0
+        }
+      },
+      "required": [
+        "schema_version",
+        "artifact_kind",
+        "artifact_id",
+        "task",
+        "workflow_profile",
+        "producer_role",
+        "consumer_role",
+        "visibility",
+        "governor",
+        "task_contract",
+        "predecessors",
+        "replaces",
+        "payload",
+        "unresolved"
+      ],
+      "additionalProperties": false
+    },
+    "candidate-test-envelope": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": "1.0"
+        },
+        "artifact_kind": {
+          "const": "candidate-test-envelope"
+        },
+        "artifact_id": {
+          "$ref": "#/$defs/ID"
+        },
+        "task": {
+          "$ref": "#/$defs/Task"
+        },
+        "workflow_profile": {
+          "const": "functional-development-v1"
+        },
+        "producer_role": {
+          "const": "orchestrator"
+        },
+        "consumer_role": {
+          "const": "tester"
+        },
+        "visibility": {
+          "const": "tester-confidential"
+        },
+        "governor": {
+          "$ref": "#/$defs/Governor"
+        },
+        "task_contract": {
+          "$ref": "#/$defs/KRef"
+        },
+        "predecessors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ArtifactRef"
+          },
+          "minItems": 0
+        },
+        "replaces": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Replacement"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "dispatch_id": {
+              "$ref": "#/$defs/ID"
+            },
+            "candidate_index": {
+              "$ref": "#/$defs/Index"
+            },
+            "correction_count": {
+              "$ref": "#/$defs/Index"
+            },
+            "candidate": {
+              "$ref": "#/$defs/Tip"
+            },
+            "test_tip": {
+              "$ref": "#/$defs/Tip"
+            },
+            "implementation_tip": {
+              "$ref": "#/$defs/Tip"
+            },
+            "test_manifest": {
+              "$ref": "#/$defs/EvidenceRef"
+            },
+            "implementation_manifest": {
+              "$ref": "#/$defs/EvidenceRef"
+            },
+            "impact_set": {
+              "$ref": "#/$defs/EvidenceRef"
+            },
+            "coverage_join": {
+              "$ref": "#/$defs/EvidenceRef"
+            },
+            "output_path": {
+              "$ref": "#/$defs/StatePath"
+            },
+            "execution_id": {
+              "$ref": "#/$defs/ID"
+            },
+            "rerun_of": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ArtifactRef"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "readonly_candidate": {
+              "const": true
+            },
+            "previous_candidate": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ArtifactRef"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "dispatch_id",
+            "candidate_index",
+            "correction_count",
+            "candidate",
+            "test_tip",
+            "implementation_tip",
+            "test_manifest",
+            "implementation_manifest",
+            "impact_set",
+            "coverage_join",
+            "output_path",
+            "execution_id",
+            "rerun_of",
+            "readonly_candidate",
+            "previous_candidate"
+          ],
+          "additionalProperties": false
+        },
+        "unresolved": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Observation"
+          },
+          "minItems": 0
+        }
+      },
+      "required": [
+        "schema_version",
+        "artifact_kind",
+        "artifact_id",
+        "task",
+        "workflow_profile",
+        "producer_role",
+        "consumer_role",
+        "visibility",
+        "governor",
+        "task_contract",
+        "predecessors",
+        "replaces",
+        "payload",
+        "unresolved"
+      ],
+      "additionalProperties": false
+    },
+    "tester-confidential-report": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": "1.0"
+        },
+        "artifact_kind": {
+          "const": "tester-confidential-report"
+        },
+        "artifact_id": {
+          "$ref": "#/$defs/ID"
+        },
+        "task": {
+          "$ref": "#/$defs/Task"
+        },
+        "workflow_profile": {
+          "const": "functional-development-v1"
+        },
+        "producer_role": {
+          "const": "tester"
+        },
+        "consumer_role": {
+          "const": "orchestrator"
+        },
+        "visibility": {
+          "const": "tester-confidential"
+        },
+        "governor": {
+          "$ref": "#/$defs/Governor"
+        },
+        "task_contract": {
+          "$ref": "#/$defs/KRef"
+        },
+        "predecessors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ArtifactRef"
+          },
+          "minItems": 0
+        },
+        "replaces": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Replacement"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "dispatch_id": {
+              "$ref": "#/$defs/ID"
+            },
+            "candidate_index": {
+              "$ref": "#/$defs/Index"
+            },
+            "candidate_sha": {
+              "$ref": "#/$defs/SHA"
+            },
+            "execution_id": {
+              "$ref": "#/$defs/ID"
+            },
+            "outcome": {
+              "enum": [
+                "PASS",
+                "IMPLEMENTATION_FAIL",
+                "INVALID_RUN",
+                "TEST_GATE_INVALID",
+                "CONTRACT_INVALID",
+                "INTEGRITY_INVALID"
+              ]
+            },
+            "execution": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/RunEvidence"
+              },
+              "minItems": 0
+            },
+            "findings": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ConfidentialFinding"
+              },
+              "minItems": 0
+            },
+            "summary": {
+              "$ref": "#/$defs/Text"
+            }
+          },
+          "required": [
+            "dispatch_id",
+            "candidate_index",
+            "candidate_sha",
+            "execution_id",
+            "outcome",
+            "execution",
+            "findings",
+            "summary"
+          ],
+          "additionalProperties": false
+        },
+        "unresolved": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Observation"
+          },
+          "minItems": 0
+        }
+      },
+      "required": [
+        "schema_version",
+        "artifact_kind",
+        "artifact_id",
+        "task",
+        "workflow_profile",
+        "producer_role",
+        "consumer_role",
+        "visibility",
+        "governor",
+        "task_contract",
+        "predecessors",
+        "replaces",
+        "payload",
+        "unresolved"
+      ],
+      "additionalProperties": false
+    },
+    "worker-correction-envelope": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": "1.0"
+        },
+        "artifact_kind": {
+          "const": "worker-correction-envelope"
+        },
+        "artifact_id": {
+          "$ref": "#/$defs/ID"
+        },
+        "task": {
+          "$ref": "#/$defs/Task"
+        },
+        "workflow_profile": {
+          "const": "functional-development-v1"
+        },
+        "producer_role": {
+          "const": "orchestrator"
+        },
+        "consumer_role": {
+          "const": "worker"
+        },
+        "visibility": {
+          "const": "public-task"
+        },
+        "governor": {
+          "$ref": "#/$defs/Governor"
+        },
+        "task_contract": {
+          "$ref": "#/$defs/KRef"
+        },
+        "predecessors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ArtifactRef"
+          },
+          "minItems": 0
+        },
+        "replaces": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Replacement"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "dispatch_id": {
+              "$ref": "#/$defs/ID"
+            },
+            "correction_index": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 3
+            },
+            "lane": {
+              "$ref": "#/$defs/Lane"
+            },
+            "previous_implementation": {
+              "$ref": "#/$defs/SHA"
+            },
+            "diagnoses": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/PublicDiagnosis"
+              },
+              "minItems": 1
+            },
+            "disclosure_review": {
+              "$ref": "#/$defs/DisclosureReview"
+            },
+            "output_path": {
+              "$ref": "#/$defs/StatePath"
+            }
+          },
+          "required": [
+            "dispatch_id",
+            "correction_index",
+            "lane",
+            "previous_implementation",
+            "diagnoses",
+            "disclosure_review",
+            "output_path"
+          ],
+          "additionalProperties": false
+        },
+        "unresolved": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Observation"
+          },
+          "minItems": 0
+        }
+      },
+      "required": [
+        "schema_version",
+        "artifact_kind",
+        "artifact_id",
+        "task",
+        "workflow_profile",
+        "producer_role",
+        "consumer_role",
+        "visibility",
+        "governor",
+        "task_contract",
+        "predecessors",
+        "replaces",
+        "payload",
+        "unresolved"
+      ],
+      "additionalProperties": false
+    },
+    "reviewer-launch": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": "1.0"
+        },
+        "artifact_kind": {
+          "const": "reviewer-launch"
+        },
+        "artifact_id": {
+          "$ref": "#/$defs/ID"
+        },
+        "task": {
+          "$ref": "#/$defs/Task"
+        },
+        "workflow_profile": {
+          "const": "functional-development-v1"
+        },
+        "producer_role": {
+          "const": "orchestrator"
+        },
+        "consumer_role": {
+          "const": "reviewer"
+        },
+        "visibility": {
+          "const": "terminal-review"
+        },
+        "governor": {
+          "$ref": "#/$defs/Governor"
+        },
+        "task_contract": {
+          "$ref": "#/$defs/KRef"
+        },
+        "predecessors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ArtifactRef"
+          },
+          "minItems": 0
+        },
+        "replaces": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Replacement"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "dispatch_id": {
+              "$ref": "#/$defs/ID"
+            },
+            "review_id": {
+              "$ref": "#/$defs/ID"
+            },
+            "terminal_reason": {
+              "enum": [
+                "TESTER_PASS",
+                "CORRECTIONS_EXHAUSTED",
+                "TEST_GATE_INVALID",
+                "CONTRACT_INVALID",
+                "INTEGRITY_INVALID",
+                "HUMAN_STOP"
+              ]
+            },
+            "candidate": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Tip"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "last_implementation": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/SHA"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "source_reports": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ArtifactRef"
+              },
+              "minItems": 0
+            },
+            "output_path": {
+              "$ref": "#/$defs/StatePath"
+            },
+            "review_once": {
+              "const": true
+            },
+            "implementation_write_allowed": {
+              "const": false
+            },
+            "test_write_allowed": {
+              "const": false
+            },
+            "reopen_correction_allowed": {
+              "const": false
+            }
+          },
+          "required": [
+            "dispatch_id",
+            "review_id",
+            "terminal_reason",
+            "candidate",
+            "last_implementation",
+            "source_reports",
+            "output_path",
+            "review_once",
+            "implementation_write_allowed",
+            "test_write_allowed",
+            "reopen_correction_allowed"
+          ],
+          "additionalProperties": false
+        },
+        "unresolved": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Observation"
+          },
+          "minItems": 0
+        }
+      },
+      "required": [
+        "schema_version",
+        "artifact_kind",
+        "artifact_id",
+        "task",
+        "workflow_profile",
+        "producer_role",
+        "consumer_role",
+        "visibility",
+        "governor",
+        "task_contract",
+        "predecessors",
+        "replaces",
+        "payload",
+        "unresolved"
+      ],
+      "additionalProperties": false
+    },
+    "reviewer-report": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": "1.0"
+        },
+        "artifact_kind": {
+          "const": "reviewer-report"
+        },
+        "artifact_id": {
+          "$ref": "#/$defs/ID"
+        },
+        "task": {
+          "$ref": "#/$defs/Task"
+        },
+        "workflow_profile": {
+          "const": "functional-development-v1"
+        },
+        "producer_role": {
+          "const": "reviewer"
+        },
+        "consumer_role": {
+          "const": "orchestrator"
+        },
+        "visibility": {
+          "const": "terminal-review"
+        },
+        "governor": {
+          "$ref": "#/$defs/Governor"
+        },
+        "task_contract": {
+          "$ref": "#/$defs/KRef"
+        },
+        "predecessors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ArtifactRef"
+          },
+          "minItems": 0
+        },
+        "replaces": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Replacement"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "dispatch_id": {
+              "$ref": "#/$defs/ID"
+            },
+            "review_id": {
+              "$ref": "#/$defs/ID"
+            },
+            "verdict": {
+              "enum": [
+                "APPROVED",
+                "REJECTED"
+              ]
+            },
+            "findings": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "$ref": "#/$defs/ID"
+                  },
+                  "severity": {
+                    "enum": [
+                      "BLOCKER",
+                      "MAJOR",
+                      "MINOR"
+                    ]
+                  },
+                  "requirement_id": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/ID"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "location": {
+                    "$ref": "#/$defs/Text"
+                  },
+                  "evidence": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/$defs/EvidenceRef"
+                    },
+                    "minItems": 0
+                  },
+                  "conclusion": {
+                    "$ref": "#/$defs/Text"
+                  }
+                },
+                "required": [
+                  "id",
+                  "severity",
+                  "requirement_id",
+                  "location",
+                  "evidence",
+                  "conclusion"
+                ],
+                "additionalProperties": false
+              },
+              "minItems": 0
+            },
+            "lessons": {
+              "$ref": "#/$defs/EvidenceRef"
+            },
+            "salvage": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "source_commit": {
+                    "$ref": "#/$defs/SHA"
+                  },
+                  "retained_scope": {
+                    "$ref": "#/$defs/Text"
+                  },
+                  "limitation": {
+                    "$ref": "#/$defs/Text"
+                  }
+                },
+                "required": [
+                  "source_commit",
+                  "retained_scope",
+                  "limitation"
+                ],
+                "additionalProperties": false
+              },
+              "minItems": 0
+            }
+          },
+          "required": [
+            "dispatch_id",
+            "review_id",
+            "verdict",
+            "findings",
+            "lessons",
+            "salvage"
+          ],
+          "additionalProperties": false
+        },
+        "unresolved": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Observation"
+          },
+          "minItems": 0
+        }
+      },
+      "required": [
+        "schema_version",
+        "artifact_kind",
+        "artifact_id",
+        "task",
+        "workflow_profile",
+        "producer_role",
+        "consumer_role",
+        "visibility",
+        "governor",
+        "task_contract",
+        "predecessors",
+        "replaces",
+        "payload",
+        "unresolved"
+      ],
+      "additionalProperties": false
+    },
+    "terminal-record": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": "1.0"
+        },
+        "artifact_kind": {
+          "const": "terminal-record"
+        },
+        "artifact_id": {
+          "$ref": "#/$defs/ID"
+        },
+        "task": {
+          "$ref": "#/$defs/Task"
+        },
+        "workflow_profile": {
+          "const": "functional-development-v1"
+        },
+        "producer_role": {
+          "const": "orchestrator"
+        },
+        "consumer_role": {
+          "const": "human"
+        },
+        "visibility": {
+          "const": "terminal-review"
+        },
+        "governor": {
+          "$ref": "#/$defs/Governor"
+        },
+        "task_contract": {
+          "$ref": "#/$defs/KRef"
+        },
+        "predecessors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ArtifactRef"
+          },
+          "minItems": 0
+        },
+        "replaces": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Replacement"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "result": {
+              "enum": [
+                "SUCCESS",
+                "FAILURE"
+              ]
+            },
+            "review": {
+              "$ref": "#/$defs/ArtifactRef"
+            },
+            "candidate_index": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Index"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "correction_count": {
+              "$ref": "#/$defs/Index"
+            },
+            "accepted_candidate": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/SHA"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "preserved_implementation": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/SHA"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "disposition": {
+              "enum": [
+                "OPEN_SUCCESS_PR",
+                "RECORD_FAILURE",
+                "MERGED"
+              ]
+            },
+            "pr": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "url": {
+                      "$ref": "#/$defs/Text"
+                    },
+                    "head_sha": {
+                      "$ref": "#/$defs/SHA"
+                    },
+                    "merge_sha": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/$defs/SHA"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "url",
+                    "head_sha",
+                    "merge_sha"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "final_decision": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ArtifactRef"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "remaining_defects": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Text"
+              },
+              "minItems": 0
+            },
+            "salvage": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/EvidenceRef"
+              },
+              "minItems": 0
+            }
+          },
+          "required": [
+            "result",
+            "review",
+            "candidate_index",
+            "correction_count",
+            "accepted_candidate",
+            "preserved_implementation",
+            "disposition",
+            "pr",
+            "final_decision",
+            "remaining_defects",
+            "salvage"
+          ],
+          "additionalProperties": false
+        },
+        "unresolved": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Observation"
+          },
+          "minItems": 0
+        }
+      },
+      "required": [
+        "schema_version",
+        "artifact_kind",
+        "artifact_id",
+        "task",
+        "workflow_profile",
+        "producer_role",
+        "consumer_role",
+        "visibility",
+        "governor",
+        "task_contract",
+        "predecessors",
+        "replaces",
+        "payload",
+        "unresolved"
+      ],
+      "additionalProperties": false
+    },
+    "delivery-repair": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": "1.0"
+        },
+        "artifact_kind": {
+          "const": "delivery-repair"
+        },
+        "artifact_id": {
+          "$ref": "#/$defs/ID"
+        },
+        "task": {
+          "$ref": "#/$defs/Task"
+        },
+        "workflow_profile": {
+          "const": "functional-development-v1"
+        },
+        "producer_role": {
+          "const": "orchestrator"
+        },
+        "consumer_role": {
+          "enum": [
+            "tester",
+            "worker",
+            "reviewer",
+            "orchestrator",
+            "human"
+          ]
+        },
+        "visibility": {
+          "enum": [
+            "public-task",
+            "tester-confidential",
+            "orchestrator-confidential",
+            "terminal-review"
+          ]
+        },
+        "governor": {
+          "$ref": "#/$defs/Governor"
+        },
+        "task_contract": {
+          "$ref": "#/$defs/KRef"
+        },
+        "predecessors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ArtifactRef"
+          },
+          "minItems": 0
+        },
+        "replaces": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Replacement"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "dispatch_id": {
+              "$ref": "#/$defs/ID"
+            },
+            "original": {
+              "$ref": "#/$defs/ArtifactRef"
+            },
+            "rejection": {
+              "$ref": "#/$defs/ArtifactRef"
+            },
+            "lane": {
+              "$ref": "#/$defs/Lane"
+            },
+            "replacement_output": {
+              "$ref": "#/$defs/StatePath"
+            },
+            "preserve_tip": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/SHA"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "preserve_candidate_index": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Index"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "preserve_correction_count": {
+              "$ref": "#/$defs/Index"
+            },
+            "preserve_review_id": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ID"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "business_verdict_change_allowed": {
+              "const": false
+            }
+          },
+          "required": [
+            "dispatch_id",
+            "original",
+            "rejection",
+            "lane",
+            "replacement_output",
+            "preserve_tip",
+            "preserve_candidate_index",
+            "preserve_correction_count",
+            "preserve_review_id",
+            "business_verdict_change_allowed"
+          ],
+          "additionalProperties": false
+        },
+        "unresolved": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Observation"
+          },
+          "minItems": 0
+        }
+      },
+      "required": [
+        "schema_version",
+        "artifact_kind",
+        "artifact_id",
+        "task",
+        "workflow_profile",
+        "producer_role",
+        "consumer_role",
+        "visibility",
+        "governor",
+        "task_contract",
+        "predecessors",
+        "replaces",
+        "payload",
+        "unresolved"
+      ],
+      "additionalProperties": false
+    },
+    "guard-result": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": "1.0"
+        },
+        "artifact_kind": {
+          "const": "guard-result"
+        },
+        "artifact_id": {
+          "$ref": "#/$defs/ID"
+        },
+        "producer_role": {
+          "const": "guard"
+        },
+        "consumer_role": {
+          "$ref": "#/$defs/Role"
+        },
+        "visibility": {
+          "$ref": "#/$defs/Visibility"
+        },
+        "operation_id": {
+          "$ref": "#/$defs/ID"
+        },
+        "phase": {
+          "enum": [
+            "PARSE",
+            "SHAPE",
+            "REFERENCES",
+            "CONTEXT",
+            "CHECK",
+            "EXECUTE",
+            "EVIDENCE"
+          ]
+        },
+        "status": {
+          "enum": [
+            "CHECKED",
+            "REJECTED",
+            "EXEC_ERROR",
+            "TIMED_OUT"
+          ]
+        },
+        "input": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/StatePath"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "artifact_id": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ID"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "sha256": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Digest"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "path",
+            "artifact_id",
+            "sha256"
+          ],
+          "additionalProperties": false
+        },
+        "trusted_context": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "task": {
+                  "$ref": "#/$defs/Task"
+                },
+                "governor": {
+                  "$ref": "#/$defs/Governor"
+                },
+                "task_contract": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/KRef"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "task",
+                "governor",
+                "task_contract"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "predecessors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ArtifactRef"
+          },
+          "minItems": 0
+        },
+        "command_started": {
+          "enum": [
+            "NOT_STARTED",
+            "STARTED",
+            "UNKNOWN"
+          ]
+        },
+        "violations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "rule_id": {
+                "$ref": "#/$defs/ID"
+              },
+              "field_pointer": {
+                "$ref": "#/$defs/Text"
+              },
+              "safe_diagnostic": {
+                "$ref": "#/$defs/Text"
+              }
+            },
+            "required": [
+              "rule_id",
+              "field_pointer",
+              "safe_diagnostic"
+            ],
+            "additionalProperties": false
+          },
+          "minItems": 0
+        },
+        "exit_code": {
+          "$ref": "#/$defs/Int"
+        },
+        "evidence_available": {
+          "$ref": "#/$defs/Bool"
+        }
+      },
+      "required": [
+        "schema_version",
+        "artifact_kind",
+        "artifact_id",
+        "producer_role",
+        "consumer_role",
+        "visibility",
+        "operation_id",
+        "phase",
+        "status",
+        "input",
+        "trusted_context",
+        "predecessors",
+        "command_started",
+        "violations",
+        "exit_code",
+        "evidence_available"
+      ],
+      "additionalProperties": false
+    },
+    "TrustedContext": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": "1.0"
+        },
+        "operation_id": {
+          "$ref": "#/$defs/ID"
+        },
+        "task": {
+          "$ref": "#/$defs/Task"
+        },
+        "governor": {
+          "$ref": "#/$defs/Governor"
+        },
+        "task_contract": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/KRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "consumer_role": {
+          "$ref": "#/$defs/Role"
+        },
+        "checkpoint": {
+          "$ref": "#/$defs/ID"
+        },
+        "worktree_root": {
+          "$ref": "#/$defs/AbsolutePath"
+        },
+        "expected_head": {
+          "$ref": "#/$defs/SHA"
+        },
+        "predecessor_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ArtifactRef"
+          },
+          "minItems": 0
+        },
+        "central_check": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "$ref": "#/$defs/StatePath"
+                },
+                "sha256": {
+                  "$ref": "#/$defs/Digest"
+                }
+              },
+              "required": [
+                "path",
+                "sha256"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "schema_version",
+        "operation_id",
+        "task",
+        "governor",
+        "task_contract",
+        "consumer_role",
+        "checkpoint",
+        "worktree_root",
+        "expected_head",
+        "predecessor_refs",
+        "central_check"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

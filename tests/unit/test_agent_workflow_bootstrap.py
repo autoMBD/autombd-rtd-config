@@ -54,7 +54,7 @@ import sys
 import pytest
 
 
-CONTRACT_PATH = Path("agent-discipline/workflow-contract.json")
+CONTRACT_PATH = Path("agent-discipline/contracts/workflow-v1.json")
 GATE_PATH = Path(
     "agent-discipline/skills/agent-workflow/scripts/workflow_gate.py"
 )
@@ -166,8 +166,9 @@ def _load_contract() -> dict[str, object]:
 def _contract_blob_sha(repository_path: Path = Path(".")) -> str:
     return _git(
         repository_path,
-        "rev-parse",
-        f"HEAD:{CONTRACT_PATH.as_posix()}",
+        "hash-object",
+        f"--path={CONTRACT_PATH.as_posix()}",
+        CONTRACT_PATH.as_posix(),
     ).stdout.strip()
 
 
@@ -349,12 +350,7 @@ def _valid_complete_record() -> dict[str, object]:
 def test_contract_blob_identity_survives_checkout_line_ending_conversion(
     tmp_path,
 ):
-    canonical_payload = _git(
-        Path("."),
-        "show",
-        f"HEAD:{CONTRACT_PATH.as_posix()}",
-        text=False,
-    ).stdout
+    canonical_payload = CONTRACT_PATH.read_bytes()
     assert _contract_blob_sha() == CANONICAL_CONTRACT_BLOB_SHA
 
     repository_path = tmp_path / "contract-checkout"

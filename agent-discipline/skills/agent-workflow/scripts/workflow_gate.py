@@ -40,11 +40,11 @@
 # File:        workflow_gate.py
 # Author:      TkungL <tkung.lqk@foxmail.com>
 # Date:        2026-08-03
-# Version:     0.1.0
-# Description: Validate the closed P0 agent workflow contract and evidence.
+# Version:     0.2.0
+# Description: Validate v2 workflow declarations and explicit legacy evidence.
 # =================================================================================
 
-"""Small, fail-closed validators for the P0 agent workflow evidence model."""
+"""Contract-only v2 validation and explicit legacy v1 evidence compatibility."""
 
 from __future__ import annotations
 
@@ -72,6 +72,33 @@ _CONTRACT_KEYS = {
     "object_fields", "preflight_item_statuses", "finding_sources",
     "role_permissions",
 }
+_V2_CONTRACT_KEYS = {
+    "schema_version", "contract_version", "workflow_profile", "artifact_schema",
+    "registry", "legacy_contract", "lifecycle", "deferred_runtime_capabilities",
+}
+_V2_REFERENCES = {
+    "artifact_schema": "agent-discipline/skills/agent-workflow/schemas/handoff-v1.schema.json",
+    "registry": "agent-discipline/skills/agent-workflow/schemas/functional-development-v1.json",
+    "legacy_contract": "agent-discipline/contracts/workflow-v1.json",
+}
+_V2_LIFECYCLE = {
+    "parallel_lanes": True,
+    "gate1_requires_worker_ready": False,
+    "frozen_test": True,
+    "initial_candidate": 0,
+    "max_corrections": 3,
+    "max_candidates": 4,
+    "incremental_same_lane": True,
+    "terminal_review_once": True,
+    "review_on_success_and_failure": True,
+    "pr_head": "accepted_candidate",
+    "pr_includes_test_and_implementation": True,
+    "kpi_in_functional_gate": False,
+}
+_V2_DEFERRED = [
+    "transition-executor", "remote-authority-verification", "candidate-direct-union",
+    "capability-sandbox", "global-exactly-once", "kpi-profile",
+]
 _OBJECT_FIELD_KEYS = {
     "contract", "issue", "classification", "preflight", "preflight_item",
     "authority", "human_review_1", "candidate", "tester", "reviewer",
@@ -169,9 +196,17 @@ def _blob_sha(data: bytes) -> str:
     return hashlib.sha1(header + data).hexdigest()
 
 
+def _contract_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    value = {}
+    for name, item in pairs:
+        _require(name not in value, f"duplicate contract member: {name}")
+        value[name] = item
+    return value
+
+
 def _read_contract(contract_path: Any) -> tuple[dict[str, Any], bytes]:
     data = Path(contract_path).read_bytes()
-    value = json.loads(data.decode("utf-8"))
+    value = json.loads(data.decode("utf-8"), object_pairs_hook=_contract_object)
     _require(isinstance(value, dict), "contract JSON must contain an object")
     return value, data
 
@@ -180,6 +215,29 @@ def validate_contract(contract, *, contract_path):
     """Validate a contract object against the authoritative committed JSON path."""
     authoritative, _ = _read_contract(contract_path)
     _require(contract == authoritative, "contract object differs from contract_path")
+    version = contract.get("contract_version")
+    _require(_is_int(version) and version in (1, 2), "unsupported workflow contract_version; expected 1 or 2")
+    if version == 2:
+        _validate_v2_contract(contract)
+        return
+    _require("schema_version" not in contract, "unsupported workflow schema_version for legacy v1")
+    _validate_v1_contract(contract)
+
+
+def _validate_v2_contract(contract: dict[str, Any]) -> None:
+    _require(set(contract) == _V2_CONTRACT_KEYS, "v2 contract top-level fields are not closed")
+    _require(_is_int(contract["schema_version"]) and contract["schema_version"] == 2, "unsupported workflow schema_version; v2 requires integer 2")
+    _require(contract["workflow_profile"] == "functional-development-v1", "unsupported workflow_profile")
+    for name, expected in _V2_REFERENCES.items():
+        _require(contract[name] == expected, f"v2 {name} must reference the approved repo-relative authority {expected}")
+    lifecycle = _closed_object(contract["lifecycle"], list(_V2_LIFECYCLE), "lifecycle")
+    for name, expected in _V2_LIFECYCLE.items():
+        actual = lifecycle[name]
+        _require(type(actual) is type(expected) and actual == expected, f"lifecycle.{name} must be {expected!r} with its exact type")
+    _require(contract["deferred_runtime_capabilities"] == _V2_DEFERRED, "deferred_runtime_capabilities must preserve the approved capability boundary")
+
+
+def _validate_v1_contract(contract: dict[str, Any]) -> None:
     _require(set(contract) == _CONTRACT_KEYS, "contract top-level fields are not closed")
     _require(_is_int(contract["contract_version"]) and contract["contract_version"] == 1, "contract_version must be 1")
     _unique_strings(contract["issue_classes"], "issue_classes", length=7)
@@ -207,9 +265,21 @@ def validate_contract(contract, *, contract_path):
         _unique_strings(values, f"role_permissions.{name}")
 
 
+def load_contract(contract_path):
+    """Load and validate the explicitly supplied v1 or v2 contract path."""
+    contract, _ = _read_contract(contract_path)
+    validate_contract(contract, contract_path=contract_path)
+    return contract
+
+
 def _contract_context(contract_path: Any) -> tuple[dict[str, Any], str]:
     contract, data = _read_contract(contract_path)
     validate_contract(contract, contract_path=contract_path)
+    _require(
+        contract["contract_version"] == 1,
+        "v2 workflow records/manifests are unsupported by the legacy validator; "
+        "use handoff_guard.py validate-artifact, or validate-contract for the declaration only",
+    )
     return contract, _blob_sha(data)
 
 
@@ -769,11 +839,13 @@ def audit_bootstrap_clearance(repository_path, candidate_sha, deployment_paths, 
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Validate P0 agent workflow evidence")
+    parser = argparse.ArgumentParser(description="Validate workflow declarations or explicit legacy v1 records")
     subparsers = parser.add_subparsers(dest="command", required=True)
-    validate = subparsers.add_parser("validate", help="validate a workflow record")
+    validate = subparsers.add_parser("validate", aliases=["validate-record"], help="validate a legacy v1 workflow record")
     validate.add_argument("--contract", required=True)
     validate.add_argument("--record", required=True)
+    contract = subparsers.add_parser("validate-contract", help="validate a v1/v2 declaration without any workflow record")
+    contract.add_argument("--contract", required=True)
     return parser
 
 
@@ -781,18 +853,17 @@ def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
         contract_path = Path(args.contract)
-        contract = json.loads(contract_path.read_text(encoding="utf-8"))
-        record = json.loads(Path(args.record).read_text(encoding="utf-8"))
+        load_contract(contract_path)
+        if args.command != "validate-contract":
+            record = json.loads(Path(args.record).read_text(encoding="utf-8"))
+            validate_record(record, contract_path=contract_path)
     except (OSError, UnicodeError, json.JSONDecodeError) as exc:
         print(f"input error: {exc}", file=sys.stderr)
         return 2
-    try:
-        validate_contract(contract, contract_path=contract_path)
-        validate_record(record, contract_path=contract_path)
     except WorkflowValidationError as exc:
         print(f"validation error: {exc}", file=sys.stderr)
         return 1
-    print("workflow validation passed")
+    print("workflow contract validation passed" if args.command == "validate-contract" else "workflow validation passed")
     return 0
 
 

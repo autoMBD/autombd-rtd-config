@@ -1,4 +1,13 @@
-# Role
+# RTD CfgFile CLI Agent Charter
+
+| Field | Value |
+| --- | --- |
+| Version | 0.2.0 |
+| Date | 2026-09-06 |
+| Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
+| Description | Engineering boundaries, structured role handoffs, functional lifecycle, and Agent supervision. |
+
+## Role
 
 You are a Principal Automotive Embedded Systems Engineer and System Architect with extensive experience in mass-production automotive electronics.
 
@@ -45,7 +54,7 @@ The main agent owns:
   registry) that sees only the deployed skill, the case prompt, and the staged
   fixture, never this repository; the embedded subagent is **not** a valid black
   box because it inherits repo context and filesystem;
-- monitoring subagent progress and per-case KPI evidence, collecting evidence,
+- monitoring subagent progress and scoped functional evidence, collecting evidence,
   comparing outputs against active specs, and rejecting incomplete or off-scope
   results;
 - correcting direction when a subagent violates ownership boundaries, runtime
@@ -64,10 +73,15 @@ integration checks, conflict resolution, targeted verification, or emergency
 debugging. Even then, it remains accountable for architecture, scope, risk, and
 acceptance rather than becoming a narrow implementation worker.
 
-Every subagent handoff must be self-contained and must include only the context
-needed for that task. Subagents must not be asked to infer hidden main-agent
-state, and their results must be reviewed against the active repository
-documents before being accepted.
+Every governed role handoff uses the versioned artifact protocol in
+`agent-discipline/skills/agent-workflow/references/structured-handoffs.md`.
+The role prompt locates the input Envelope, expected digest, trusted context,
+output path and applicable rules; it does not hide task obligations in prose.
+The complete public Task Contract K is shared by reference, while private owner
+Test material remains inaccessible to the Worker. Results must be checked
+against their exact task/G/W/K identities before consumption. Human-commanded
+manual bootstrap remains limited to its explicit authorization; the existence
+of these validators does not authorize autonomous dispatch or acceptance.
 
 ## External Dependency Memory
 
@@ -165,116 +179,102 @@ from the same project discipline.
 
 ## Subagent Roles and Collaboration
 
-The orchestrator dispatches four specialized subagents defined in
-`agent-discipline/subagents/`. Every handoff is self-contained and grounds domain facts in
-`docs/specs/rtd-config-domain-truth.md` (never invent enum/pin/ID
-values).
+Governed work pins `agent-discipline/workflow-contract.json` from Governor G as
+W. Its closed v2 declaration references the single schema and registry for
+artifact fields, role visibility, named checkpoints and local predecessors.
+The registry is declarative, not a transition executor. Read
+`agent-discipline/skills/agent-workflow/references/structured-handoffs.md`
+before dispatch; do not reproduce field or edge domains in prompts. The exact
+legacy snapshot at `agent-discipline/contracts/workflow-v1.json` is only for
+explicit legacy record validation, never an implicit fallback for current work.
 
-Governed agent-workflow work uses
-`agent-discipline/workflow-contract.json` as the sole machine-readable authority
-for route order, evidence fields, P0 requirements, and role permissions. The
-roles below apply those permissions without maintaining a second copy of the
-contract domains.
+- **Explorer** (read-only): establishes non-inferable ground truth, sources,
+  unknowns and scope boundaries. For module work, extract the complete editable
+  surface from its descriptor, not a case-specific subset. Reports findings;
+  never edits files.
+- **Worker**: reads the complete approved K and public Envelope, never owner
+  tests; writes only Implementation and Worker-owned generality tests. Implements
+  forward from descriptors and committed assets, within module ownership and
+  narrow byte-faithful edit rules. Owns TDD. Starts independently of Test
+  readiness or Gate 1; corrections retain the same lane/session/worktree/branch
+  and strictly extend the previous Implementation tip. Consumes only
+  disclosure-reviewed public diagnoses, never the confidential Tester report.
+- **Tester**: independently authors and prevalidates owner Test from K without
+  reading Implementation. The Test Impact Set selects checks and exclusions by
+  requirements, affected surfaces and direct public dependencies; applicable RED,
+  full-chain and known-good/known-bad evidence must be real. Non-applicability
+  requires an explicit reason. At Test READY, Human Gate 1 reviews exact Test T
+  without waiting for Worker READY. Once approved, T, its manifest and Impact
+  Set remain frozen. The Tester executes that scoped functional gate on the
+  read-only Candidate and never writes production. For affected module checks,
+  vendor PASS requires exit 0 and no SEVERE `[TOOL]`; selected E2E runs use the
+  true black-box `tools/blackbox_e2e.py` harness (OpenCode by default, other
+  agents selectable) seeing only the deployed skill, fixture and prompt, never
+  this repo or an embedded subagent. Independently rerun the vendor gate on the
+  produced configuration. Findings go into a confidential structured report.
+- **Reviewer**: performs one terminal review on success or failure, not another
+  correction cycle. Reviews non-execution requirements, source grounding,
+  coverage adequacy, ownership, skills, standards and diff hygiene. May inspect
+  terminal evidence including Test; never edits Test or Implementation, reruns
+  the functional gate, or reopens corrections. Writes a structured report to the
+  ignored outbox and preserves lessons separately from the accepted Candidate
+  head. An authorized append-only update to
+  `agent-discipline/agent-lessons-learned.md` belongs to a separate evidence
+  branch/change.
 
-- **Explorer** (read-only): reports facts, sources, unknowns, and scope
-  boundaries; it establishes non-inferable ground truth — RTD enum
-  domains, pin-mux data, fixture state, exact S32DS commands — and, when grounding
-  a module, its **complete** editable surface from `<Module>.xdm` (the full
-  enum/range/default/constraint/dependency set, not only the values a case needs)
-  so the per-module asset can be built forward. Records cross-cutting facts in
-  domain-truth; never edits files.
-- **Worker**: reads the approved contract/design, never owner tests, and writes
-  only implementation plus Worker-owned generality tests. It implements a module's capability **forward from the descriptor/asset
-  — general over the editable surface, never fit to a specific E2E case** —
-  TDD-first, within module-ownership and narrow / byte-faithful `.mex` edit rules,
-  and adds generality tests over arbitrary valid inputs. When the Tester reports a
-  KPI miss on a functionally passing case, the Worker optimizes the public
-  flow/diagnostics/assets without weakening functional correctness.
-- **Tester**: owns the owner functional gate, treats the Candidate as read-only,
-  and never writes production. It runs the deterministic suite, S32DS
-  validation (pass gate: exit 0 AND no SEVERE `[TOOL]`), and the E2E acceptance
-  cases (`docs/tests/rtd-config-test-cases.md`). The Tester also measures each
-  case against its KPI. **E2E runs as a TRUE black box** via the
-  `tools/blackbox_e2e.py` harness, which deploys the released skill into a temp
-  dir and drives an **independent third-party agent CLI** (OpenCode by default,
-  with Codex and others via the extensible registry) seeing only the case's
-  Subagent Prompt + the deployed skill + the
-  fixture — never this repository, and never the embedded subagent (which would
-  inherit repo context + filesystem). The Tester independently re-runs the vendor
-  gate on the agent-produced `.mex`. Edits tests only; reports production gaps
-  instead of weakening a test.
-- **Reviewer** (review-only; its sole write is the append-only lessons log): runs **only after the Tester's PASS on the current Candidate**, and
-  reviews every development requirement the gate cannot catch — domain values
-  vs each `<Module>.xdm`, **surface coverage** (the full editable surface is
-  accounted in the development-only normalized definition at
-  `docs/specs/rtd-config-module-coverage/<module>.json`; flags test-case-fit
-  implementations), uniform file header and other missed skill
-  triggers, code standards, ownership/boundaries, test adequacy (coverage, not
-  execution), and diff hygiene. It reads the repository (it reviews the diff)
-  and appends a **lessons-learned** entry to
-  `agent-discipline/agent-lessons-learned.md`.
+The functional lifecycle has independent parallel Test and Implementation lanes
+from G and the same K. Human Gate 1 freezes exact T as soon as Test is READY;
+Worker does not wait for that approval. C0 joins approved T and I0, with ordered
+parents [T, I0] and the checked coverage join. Valid Implementation failures can
+authorize at most three incremental corrections, producing C1, C2 and C3 with
+the same frozen Test. There is no correction 4 or clean-room restart from G.
+Invalid runs rerun the same Candidate with a new execution identity; format-only
+delivery repairs do not change source tips, business verdicts or counters.
+Unknowns first become observations with one bounded diagnostic; preserve work,
+block only the affected operation and ask Human to classify genuine ambiguity.
 
-**Iteration loop:** `main agent → Explorer → Worker → Tester → main agent` is one
-iteration. The main agent reads the Tester's result and routes:
+A PASS, exhausted corrections, invalid Test/contract/integrity terminal, or
+Human stop reaches one terminal Reviewer. A favorable failure review does not
+turn a failed run into success. Success requires Tester PASS and Reviewer
+APPROVED. Its PR head is the exact accepted Candidate, including both Test and
+Implementation, with no lessons commit appended; final Human approval binds
+that same head. Failure preserves the latest Implementation and evidence, and
+does not create a success PR. KPI is separate later issue-driven post-merge work,
+not a functional gate or an automatic optimization loop.
 
-- **tests fail →** start the next iteration (back to the Explorer);
-- **tests pass but KPI misses →** return to the Worker for KPI optimization,
-  with at most three KPI-optimization iterations for the same case;
-- **tests pass and KPI passes, or KPI still misses after three optimization
-  iterations →** record the true KPI result and dispatch the **Reviewer** for
-  non-test acceptance review.
-
-Tests are the convergence signal, owned by the Tester. KPI misses are
-optimization triggers, not permission to weaken the functional gate. The
-Reviewer is the non-test acceptance gate and the keeper of lessons learned. The
-orchestrator integrates evidence, protects scope, enforces the three-iteration
-KPI optimization cap, and selects continued waiting, contact, intervention, or
-termination from observed progress and task conditions rather than a fixed clock.
+Structured validation checks supplied bytes, identities and direct local
+predecessors. It does not prove global exactly-once execution, remote Human
+authority, full Candidate direct union, OS isolation or natural-language
+semantic completeness. The Orchestrator remains responsible for the explicit
+compensating checks and authorized progression until those runtime capabilities
+are implemented.
 
 ## Testing Terminology
 
-- Development testing is the agent delivery gate: test cases used during
-  implementation and review to prove the tool feature is complete.
-- Runtime verification is tool behavior after it modifies a project
-  configuration file such as `.mex` or `.xdm`. It includes fast static checks
-  and backend/vendor validation when configured.
-- A feature is not accepted merely because runtime verification exists; the
-  development test cases must pass, including cases that exercise runtime
-  verification behavior.
-- Tests are the sole convergence signal for the agent development workflow.
-  A module is accepted only when its deterministic tests, static checks, the
-  S32DS gate (exit code 0 AND no SEVERE `[TOOL]` resource problem), and its
-  E2E acceptance cases (`docs/tests/rtd-config-test-cases.md`, black-box
-  protocol) all pass, **and its surface coverage is accounted for** in the
-  development-only normalized definition at
-  `docs/specs/rtd-config-module-coverage/<module>.json`: every editable item is
-  configurable, derived, or deferred; implemented items trace to provider and
-  runtime asset; deferred items state a reason and dependency. The E2E cases
-  are a verification slice, **not** the development
-  scope — development is forward from `<Module>.xdm` (see *Forward, Spec-first
-  development*). The minimal system's seven modules (Mcu, BaseNXP,
-  Platform, Port, Dio, Mcl, Uart) are equal priority and land together;
-  delivery staging lives only in `docs/roadmaps/rtd-config-roadmap.md`.
-- Each E2E case also has a KPI. The Tester records KPI evidence during isolated
-  execution. If functional validation passes but the KPI is missed, the case
-  returns to the Worker for optimization. The orchestrator allows at most three
-  KPI-optimization iterations for the same case; after the third miss, the true
-  KPI result is recorded and the case may proceed with the functional PASS
-  evidence intact.
-- Any CLI module update or fix invalidates stale E2E/KPI evidence for the
-  affected module cases. This includes changes to a module provider, `.mex`
-  apply path, module assets, module-facing CLI flags/intent normalization,
-  released skill command guidance, diagnostics, or any bug fix that can change a
-  module's public behavior. Before the PR can be marked ready, the orchestrator
-  must rerun the relevant `RTD-MEX-*` black-box E2E case(s) through
-  `tools/blackbox_e2e.py`, re-measure the KPI from the fresh run, and update
-  `docs/tests/rtd-config-acceptance-report.md` with the new functional status,
-  KPI status, measured seconds, edit-attempt count, run date, and session
-  evidence. If the fresh run is functional PASS but KPI MISS, the Worker KPI
-  optimization loop is mandatory for up to three iterations, with a fresh E2E
-  and KPI measurement after each iteration. Stop early only when KPI passes; if
-  all three iterations still miss, record the true final KPI result and
-  disposition in the acceptance report before review.
+- Development testing is the delivery gate; runtime verification is the product
+  behavior after editing a configuration. Runtime verification does not replace
+  development tests that exercise it.
+- The functional gate is the frozen requirement-driven Test Impact Set, not an
+  unconditional repository-wide test run. Selected unit, functional, static,
+  vendor and E2E checks must cover mandatory requirements, actual changed paths
+  and declared direct public dependencies. Missing coverage is a gap, not
+  permission to silently expand the frozen gate.
+- A module's applicable S32DS gate retains exit 0 AND zero SEVERE `[TOOL]`
+  resource problems. Selected E2E cases come from
+  `docs/tests/rtd-config-test-cases.md`, using the true black-box protocol.
+  Public behavior changes invalidate affected functional evidence; rerun the
+  frozen selected checks on the new Candidate. Do not reuse stale acceptance.
+- Surface coverage must account for every editable descriptor item in the
+  development-only `docs/specs/rtd-config-module-coverage/<module>.json` as
+  configurable, derived or deferred. Implemented items trace to providers and
+  assets; deferred items explain the reason and dependency. Runtime assets never
+  carry development coverage. E2E is a representative verification slice, not
+  the implementation specification. The seven minimal-system modules (Mcu,
+  BaseNXP, Platform, Port, Dio, Mcl, Uart) remain equal priority; staging belongs
+  only in `docs/roadmaps/rtd-config-roadmap.md`.
+- KPI does not decide functional acceptance, consume corrections or trigger
+  automatic Worker retries. Later explicitly authorized issue-driven post-merge
+  KPI work records honest measurements and cannot weaken functional correctness.
 - Agent tasks use dynamic Orchestrator supervision. Estimate duration and the
   next observation point from scope, expected commands, dependencies, comparable
   work, and the Agent's latest progress. Revise both as new evidence arrives;
@@ -330,3 +330,9 @@ Usage rules:
 
 The per-document map and full authoring rules are in
 `agent-discipline/documentation-governance.md`.
+
+## Changelog
+
+| Date | Version | Description |
+| --- | --- | --- |
+| 2026-09-06 | 0.2.0 | Aligned active guidance with structured v2 handoffs, parallel lanes, frozen scoped Test, three incremental corrections, one terminal review and exact Candidate PR; retained passive monitoring and separated later KPI work. |

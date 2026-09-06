@@ -2,3 +2,6 @@
 # hashes the bytes copied by the deployer, so platform-native EOL conversion is
 # not permitted inside the published payload.
 /autombd-rtd/** text eol=lf
+
+# Preserve the original workflow v1 blob bytes for explicit legacy validation.
+/agent-discipline/contracts/workflow-v1.json text eol=lf

@@ -1,0 +1,43 @@
+{
+  "contract_version": 1,
+  "issue_classes": ["M", "B", "W", "T", "D", "N", "I"],
+  "impact_flags": ["public-behavior", "module-surface", "mex-write", "test-contract", "agent-runtime", "release-payload", "external-dependency", "safety-security", "docs-only"],
+  "strict_route": ["scope", "preflight", "ground", "author_test", "human_review_1", "implement", "candidate", "tester", "reviewer", "draft_pr", "human_review_2", "complete"],
+  "checkpoints": ["scoped", "test_approved", "candidate_built", "tester_passed", "reviewer_accepted", "draft_pr_ready", "complete"],
+  "execution_statuses": ["active", "blocked", "stopped"],
+  "verdicts": ["PASS", "FAIL", "BLOCKED"],
+  "finding_classes": ["F0", "F1", "F2", "F3", "F4"],
+  "dispositions": ["FINAL_ACCEPT", "REWORK_CURRENT_STAGE", "FREEZE_FOR_NEXT_STAGE", "DEFER_NON_BLOCKING", "BLOCK", "STOP"],
+  "requirement_ids": ["P0-01", "P0-02", "P0-03", "P0-04", "P0-05", "P0-06", "P0-07", "P0-08", "P0-09", "P0-10", "P0-11", "P0-12", "P0-13", "P0-14", "P0-15", "P0-16", "P0-17", "P0-18"],
+  "candidate_attempt": {"minimum": 1, "maximum": 3},
+  "record_fields": ["contract", "issue", "classification", "checkpoint", "execution_status", "preflight", "authority", "human_review_1", "candidate", "tester", "reviewer", "findings", "draft_pr", "final_human_review", "attempt", "blocker", "bootstrap_stage"],
+  "object_fields": {
+    "contract": ["version", "blob_sha"],
+    "issue": ["repository", "number", "title"],
+    "classification": ["issue_class", "impact_flags", "route"],
+    "preflight": ["permissions", "dependencies", "tools", "result"],
+    "preflight_item": ["name", "status", "evidence"],
+    "authority": ["base_sha", "test_sha", "implementation_sha", "authorized_reviewer"],
+    "human_review_1": ["actor", "comment_url", "test_sha", "command", "edited", "deleted"],
+    "candidate": ["sha", "parent_test_sha", "parent_implementation_sha"],
+    "tester": ["candidate_sha", "verdict", "evidence"],
+    "reviewer": ["candidate_sha", "verdict", "evidence"],
+    "finding": ["id", "source", "class", "requirement_id", "evidence", "observed", "expected", "freeze_viability", "disposition"],
+    "freeze_viability": ["identity_trustworthy", "continuity_available", "repair_without_mutation", "evidence_valid", "safe_reversible", "facts_available"],
+    "draft_pr": ["url", "candidate_sha", "is_draft"],
+    "final_human_review": ["actor", "comment_url", "candidate_sha", "decision"],
+    "attempt": ["candidate_attempt"],
+    "blocker": ["kind", "reason", "evidence"],
+    "lane_manifest": ["contract_version", "contract_blob_sha", "base_sha", "lane_sha", "requirement_ids"]
+  },
+  "preflight_item_statuses": ["available", "blocked"],
+  "finding_sources": ["tester", "reviewer"],
+  "role_permissions": {
+    "orchestrator": ["classify", "assign_disposition", "assemble_candidate", "escalate_human"],
+    "explorer": ["read", "report_facts"],
+    "worker": ["read_approved_contract", "write_implementation", "write_generality_tests"],
+    "tester": ["write_owner_tests", "read_candidate", "run_gate", "report_verdict"],
+    "reviewer": ["read_candidate", "append_lesson", "report_findings"],
+    "human": ["approve_test", "supply_blocker_input", "review_pr", "merge"]
+  }
+}
