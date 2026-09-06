@@ -41,252 +41,30 @@
 # Author:      autoMBD <tkung.lqk@foxmail.com>
 # Date:        2026-08-24
 # Version:     0.1.0
-# Description: Validate interface-handoff completeness and digest continuity.
+# Description: Compatibility adapter for v1 interface-handoff validation.
 # =================================================================================
 
 import argparse
-import hashlib
-import json
-from pathlib import Path, PureWindowsPath
-import re
-import sys
+import importlib.util
+from pathlib import Path
 
 
-TOP_LEVEL_KEYS = {
-    "schema_version",
-    "handoff_kind",
-    "issue_number",
-    "base_sha",
-    "workflow_contract_blob_sha",
-    "test_sha",
-    "consumer_role",
-    "required_interfaces",
-    "interfaces",
-    "authorities",
-    "reference_prevalidation",
-    "forbidden_sources",
-    "unresolved",
-}
-INTERFACE_KEYS = {
-    "python": {"kind", "path", "symbol", "signature"},
-    "cli": {"kind", "path", "argv", "stdin", "stdout", "stderr", "exit_codes"},
-    "json": {"kind", "path", "top_level_type", "required_keys"},
-}
-AUTHORITY_KEYS = {"kind", "id", "sha256"}
-REFERENCE_KEYS = {"receipt_sha256", "outcome"}
-SHA40_RE = re.compile(r"[0-9a-f]{40}\Z")
-SHA64_RE = re.compile(r"[0-9a-f]{64}\Z")
-PLACEHOLDERS = {"tbd", "todo", "unknown"}
+# File-anchored loading also preserves importlib-by-path callers, which need not
+# add this script directory to sys.path before importing the compatibility API.
+_spec = importlib.util.spec_from_file_location(
+    "_legacy_interface_handoff", Path(__file__).with_name("legacy_interface_handoff.py")
+)
+_legacy = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_legacy)
+
+Rejected = _legacy.Rejected
+load_packet = _legacy.load_packet
+validate_packet = _legacy.validate_packet
 
 
-class Rejected(Exception):
-    """A stable interface-handoff contract rejection."""
-
-
-def reject(message):
-    raise Rejected(message)
-
-
-def unique_object(pairs):
-    value = dict(pairs)
-    if len(value) != len(pairs):
-        reject("packet contains a duplicate object key")
-    return value
-
-
-def reject_json_constant(_value):
-    reject("packet is not strict JSON")
-
-
-def load_packet(path, expected_sha256):
-    if not isinstance(expected_sha256, str) or not SHA64_RE.fullmatch(expected_sha256):
-        reject("expected SHA-256 must be lowercase 64-hex")
-    try:
-        raw = Path(path).read_bytes()
-    except (OSError, ValueError):
-        reject("packet could not be read")
-    actual_sha256 = hashlib.sha256(raw).hexdigest()
-    if actual_sha256 != expected_sha256:
-        reject("packet SHA-256 does not match expected digest")
-    if raw.startswith(b"\xef\xbb\xbf"):
-        reject("packet must be UTF-8 without BOM")
-    try:
-        text = raw.decode("utf-8")
-    except UnicodeDecodeError:
-        reject("packet is not valid UTF-8")
-    try:
-        packet = json.loads(
-            text,
-            object_pairs_hook=unique_object,
-            parse_constant=reject_json_constant,
-        )
-    except ValueError:
-        reject("packet is not valid JSON")
-    return packet, actual_sha256
-
-
-def reject_placeholders(value):
-    if isinstance(value, str):
-        if value.strip().casefold() in PLACEHOLDERS:
-            reject("packet contains a placeholder string")
-    elif isinstance(value, list):
-        for item in value:
-            reject_placeholders(item)
-    elif isinstance(value, dict):
-        for key, item in value.items():
-            reject_placeholders(key)
-            reject_placeholders(item)
-
-
-def require_closed_object(value, keys, subject):
-    if not isinstance(value, dict) or set(value) != keys:
-        reject(f"{subject} keys do not match the closed schema")
-
-
-def is_nonempty_string(value):
-    return isinstance(value, str) and bool(value)
-
-
-def is_sha(value, pattern):
-    return isinstance(value, str) and pattern.fullmatch(value) is not None
-
-
-def is_safe_relative_path(value):
-    if not is_nonempty_string(value):
-        return False
-    if value.startswith(("/", "\\")) or PureWindowsPath(value).drive:
-        return False
-    parts = value.replace("\\", "/").split("/")
-    return all(part not in ("", ".", "..") for part in parts)
-
-
-def validate_python_interface(entry, normalized_path):
-    if not is_nonempty_string(entry["symbol"]):
-        reject("python symbol must be a nonempty string")
-    if not is_nonempty_string(entry["signature"]):
-        reject("python signature must be a nonempty string")
-    return "python", normalized_path, entry["symbol"]
-
-
-def validate_cli_interface(entry, normalized_path):
-    argv = entry["argv"]
-    if not isinstance(argv, list) or not argv or not all(is_nonempty_string(item) for item in argv):
-        reject("cli argv must contain nonempty strings")
-    for field in ("stdin", "stdout", "stderr"):
-        if not is_nonempty_string(entry[field]):
-            reject(f"cli {field} must be a nonempty string")
-    exit_codes = entry["exit_codes"]
-    if (
-        not isinstance(exit_codes, list)
-        or not exit_codes
-        or not all(type(code) is int and 0 <= code <= 255 for code in exit_codes)
-        or len(exit_codes) != len(set(exit_codes))
-    ):
-        reject("cli exit_codes must contain unique integers in 0..255")
-    return "cli", normalized_path, tuple(argv)
-
-
-def validate_json_interface(entry, normalized_path):
-    if entry["top_level_type"] not in ("object", "array"):
-        reject("json top_level_type must be object or array")
-    required_keys = entry["required_keys"]
-    if (
-        not isinstance(required_keys, list)
-        or not required_keys
-        or not all(is_nonempty_string(key) for key in required_keys)
-        or len(required_keys) != len(set(required_keys))
-    ):
-        reject("json required_keys must contain unique nonempty strings")
-    return "json", normalized_path, entry["top_level_type"]
-
-
-def validate_interfaces(packet):
-    required = packet["required_interfaces"]
-    if (
-        not isinstance(required, list)
-        or not required
-        or not all(isinstance(kind, str) and kind in INTERFACE_KEYS for kind in required)
-        or len(required) != len(set(required))
-    ):
-        reject("required_interfaces must be a nonempty unique subset of python, cli, json")
-
-    interfaces = packet["interfaces"]
-    if not isinstance(interfaces, list) or not interfaces:
-        reject("interfaces must be a nonempty list")
-
-    identities = set()
-    declared_kinds = set()
-    validators = {
-        "python": validate_python_interface,
-        "cli": validate_cli_interface,
-        "json": validate_json_interface,
-    }
-    for entry in interfaces:
-        if not isinstance(entry, dict):
-            reject("each interface must be an object")
-        kind = entry.get("kind")
-        if not isinstance(kind, str) or kind not in INTERFACE_KEYS:
-            reject("interface kind must be python, cli, or json")
-        require_closed_object(entry, INTERFACE_KEYS[kind], f"{kind} interface")
-        if not is_safe_relative_path(entry["path"]):
-            reject("interface path must be a safe repository-relative path")
-        normalized_path = entry["path"].replace("\\", "/")
-        identity = validators[kind](entry, normalized_path)
-        if identity in identities:
-            reject("interface identities must be unique")
-        identities.add(identity)
-        declared_kinds.add(kind)
-    if declared_kinds != set(required):
-        reject("interface kinds must equal required_interfaces")
-
-
-def validate_authorities(authorities):
-    if not isinstance(authorities, list) or not authorities:
-        reject("authorities must be a nonempty list")
-    identities = set()
-    for authority in authorities:
-        require_closed_object(authority, AUTHORITY_KEYS, "authority")
-        if authority["kind"] not in ("issue_body", "issue_comment"):
-            reject("authority kind must be issue_body or issue_comment")
-        if type(authority["id"]) is not int or authority["id"] <= 0:
-            reject("authority id must be a positive integer")
-        if not is_sha(authority["sha256"], SHA64_RE):
-            reject("authority sha256 must be lowercase 64-hex")
-        identity = authority["kind"], authority["id"]
-        if identity in identities:
-            reject("authority identities must be unique")
-        identities.add(identity)
-
-
-def validate_reference_prevalidation(value):
-    require_closed_object(value, REFERENCE_KEYS, "reference_prevalidation")
-    if not is_sha(value["receipt_sha256"], SHA64_RE):
-        reject("reference receipt_sha256 must be lowercase 64-hex")
-    if value["outcome"] != "PASS":
-        reject("reference prevalidation outcome must be PASS")
-
-
-def validate_packet(packet):
-    require_closed_object(packet, TOP_LEVEL_KEYS, "packet")
-    reject_placeholders(packet)
-    if type(packet["schema_version"]) is not int or packet["schema_version"] != 1:
-        reject("schema_version must be integer 1")
-    if packet["handoff_kind"] != "owner-test-to-worker":
-        reject("handoff_kind must be owner-test-to-worker")
-    if type(packet["issue_number"]) is not int or packet["issue_number"] <= 0:
-        reject("issue_number must be a positive integer")
-    for field in ("base_sha", "workflow_contract_blob_sha", "test_sha"):
-        if not is_sha(packet[field], SHA40_RE):
-            reject(f"{field} must be a lowercase full SHA")
-    if packet["consumer_role"] != "worker":
-        reject("consumer_role must be worker")
-    validate_interfaces(packet)
-    validate_authorities(packet["authorities"])
-    validate_reference_prevalidation(packet["reference_prevalidation"])
-    if packet["forbidden_sources"] != ["owner_test_source", "owner_test_literals"]:
-        reject("forbidden_sources must match the closed ordered declaration")
-    if packet["unresolved"] != []:
-        reject("unresolved must be an empty list")
+def __getattr__(name):
+    """Keep existing validator helpers and constants importable."""
+    return getattr(_legacy, name)
 
 
 def parse_args():
@@ -300,18 +78,7 @@ def parse_args():
 
 def main():
     args = parse_args()
-    try:
-        packet, packet_sha256 = load_packet(args.packet, args.expected_sha256)
-        validate_packet(packet)
-    except Rejected as failure:
-        print(f"interface handoff rejected: {failure}", file=sys.stderr)
-        return 1
-    except RecursionError:
-        print("interface handoff rejected: packet nesting is too deep", file=sys.stderr)
-        return 1
-    receipt = {"schema_version": 1, "packet_sha256": packet_sha256, "outcome": "PASS"}
-    print(json.dumps(receipt, separators=(",", ":")))
-    return 0
+    return _legacy.run_validation(args.packet, args.expected_sha256)
 
 
 if __name__ == "__main__":

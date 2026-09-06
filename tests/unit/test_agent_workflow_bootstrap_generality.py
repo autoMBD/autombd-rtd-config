@@ -57,7 +57,7 @@ import pytest
 
 
 ROOT = Path(__file__).resolve().parents[2]
-CONTRACT_PATH = ROOT / "agent-discipline" / "workflow-contract.json"
+CONTRACT_PATH = ROOT / "agent-discipline" / "contracts" / "workflow-v1.json"
 CASE_CATALOG_PATH = ROOT / "docs" / "tests" / "rtd-config-test-cases.md"
 TEST_STRATEGY_PATH = ROOT / "docs" / "tests" / "rtd-config-test-strategy.md"
 GATE_PATH = (

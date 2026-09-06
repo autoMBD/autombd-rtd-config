@@ -2,10 +2,10 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.12.0 |
+| Version | 0.12.2 |
 | Date | 2026-09-06 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
-| Status | Phase 0 merged; #95 awaiting Human review; three-tier testing and issue-driven local KPI design recorded, not implemented |
+| Status | #93 manual implementation and focused verification completed in the feature worktree; Human inspection pending; no commit, push or merge |
 | Description | Agent Loop 的 Category B trust-tracing lane：保留现状审计与历史教训，维护结构化交接、统一守卫、双 lane 与 Candidate 0 加三次修正、人工自举、动态监督和工具超时，并记录三级测试、RTD CfgFile CLI 单向 KPI Issue 与本地结果展示的批准设计及实施边界。 |
 
 ## 0. Trust-tracing lane 的权威与维护边界
@@ -30,6 +30,10 @@
 要求纠正的设计正文和派生快照可以更新，但必须记录版本与纠正依据。
 
 ## 1. 审阅结论
+
+§1–§7 保留审阅基线 `9331d668...` 的盘点与历史结论，不用未合并代码改写历史。
+当前执行状态以 §14.1 与 BT-0011 为准：Human 已批准 #93 编码，结构化协议与统一
+守卫已在功能分支工作区实现并完成定向验证，但尚未提交、合并或部署到 Agent 平台目录。
 
 ### 1.1 本版对前版结论的纠偏
 
@@ -3364,11 +3368,11 @@ Tester/Reviewer results 和 observations。下一个 stage 必须从已验收合
 | Trace lane | `agent-discipline/agent-loop-bootstrap-trust-trace.md` |
 | Audited Governor | `9331d6684d4cfb977212ef60e70771e36c065b7c` |
 | Audited Workflow Contract blob | `b747065ac2fafa03d35d7a94b39d52d70f1de416` |
-| Execution Governor | `2631060b80c1192729be99690f9de2d726d66d44` — PR #99 accepted merge; trust-trace blob `ed14ed830d2fbe3765bc424587925a054bb1b059` |
-| Design state | v0.12.0 保留 exact accepted Candidate PR 纠正，新增三级测试、RTD CfgFile CLI 专属单向 KPI Issue、PR 时建单/merge 后人工启动、历史用例迁移、JSON 与美观 Dashboard；#100/#101/#102 跟踪尚未实现的能力。#95 仍待 Human 验收；workflow contract、角色运行代码与 #98 adapter 本轮未改 |
-| Active bootstrap package | Human 在 #99 合并后明确要求直接解决下一 issue；已核对 #57 索引与合并 receipts，进入 #95。分支 `codex/issue-95-dynamic-agent-supervision` 的实现与 focused checks 完成后等待 Human 检查；#93 仍等待 #95 accepted merge |
+| Execution Governor | `0e4aa7613a39c55a1c6afb1c03cbe9d793b4f674` — Human 关闭 #95 并命令继续后核实的远程 master；保留现有提交，不伪造 #95 PR merge receipt |
+| Design state | 已批准架构不变；Human 审阅协议完整性映射后批准执行。工作区现有 Wv2 声明、14 类结构化 artifact、统一守卫与角色指南；旧 Wv1 exact snapshot 保留。均未合并，不冒充主线已部署能力 |
+| Active bootstrap package | #93 manual Phase 3 实现及定向验证完成，等待 Human 检查；分支 `codex/issue-93-structured-handoffs`，upstream 为同名远端跟踪分支；#95 不重开 |
 | Candidate/correction state | none；不得用历史 `candidate_attempt` 伪造新模型 |
-| Next allowed operation | Human 本次授权更新本文、ignored 执行计划、同步远程 issues 并创建必要 tracking；完成一致性与远程回读后提交结果。该授权不包含代码实现、commit/PR/merge、启动 #93 或 KPI 执行；#95 既有 focused verification 仅为历史代码证据 |
+| Next allowed operation | Human 检查实际 diff 与交付报告，再明确授权后续修订/提交/PR；不自动合并、启动 #85、KPI 或新 Loop。协议草案原字节保留，实施补充及证据位于 ignored .agent-state/plans |
 
 ### 14.2 Append-only event schema
 
@@ -3602,6 +3606,52 @@ next_allowed_operation: verify local document/plan and remote receipts, then rep
 supersedes: earlier proposal of no KPI Human Gate, generic-feature KPI, automatic merge-trigger/local CT, and functional premerge KPI optimization counters; BT-0008 remote-sync restriction is superseded only by this explicit synchronization authority; historical test/verdict/event/changelog bytes remain unchanged
 ```
 
+#### BT-0010 — Human closed #95 and started #93 manual contract preparation
+
+```text
+trace_id: BT-0010
+observed_at_utc: 2026-09-05T20:11:56Z
+issue / task_run / stage: #93 / issue93-manual-contract-draft / manual-phase-3-contract-preparation
+event / actor: MANUAL_NEXT_PACKAGE_STARTED / Orchestrator under Human instruction
+authority: Human "设置好了，仓库现在只允许走PR。我把#95关闭了，#95就此揭过。继续推进下一步。"
+G: 0e4aa7613a39c55a1c6afb1c03cbe9d793b4f674
+W: b747065ac2fafa03d35d7a94b39d52d70f1de416 — unchanged
+K / T / I / C: NOT_CREATED — concrete protocol draft is not a task K or acceptance artifact
+candidate_index / correction_count: NOT_STARTED / 0
+input_digests: exact G and W above; approved trust-trace v0.12.0; current #93 body and manual-bootstrap comment 5541711518
+output_digests: ignored issue93-handoff-protocol-draft.md, issue93-implementation-plan.md and updated execution plan; hashes recorded in the #57 execution index, not self-embedded
+Test Impact Set / mandatory acceptance: NOT_RUN — document consistency and branch identity checks only
+raw Tester report / Worker Correction Envelope: NOT_APPLICABLE
+observations: GitHub readback confirms #95 closed/completed; existing source retained without rewriting history; #93 remote/local branch and same-name upstream verified; Human reports master PR protection configured, not independently claimed as a tested capability
+bounded diagnostic: read-only #88/#90 compatibility inspection confirms successful-CHECKED ordering gap and affected legacy test setup; no runtime/test changes
+disposition: PREPARE_CONCRETE_PROTOCOL_FOR_HUMAN_REVIEW
+next_allowed_operation: present unapproved local contract draft; subsequent coding/verification/PR/merge remains Human-commanded
+supersedes: BT-0009 next-operation restriction only for Human-authorized #93 start; no historical evidence or approved normative design rewritten
+```
+
+#### BT-0011 — Human-commanded #93 implementation verified, awaiting inspection
+
+```text
+trace_id: BT-0011
+observed_at_utc: 2026-09-06T04:34:35Z
+issue / task_run / stage: #93 / issue93-manual-implementation / manual-phase-3-delivery
+event / actor: MANUAL_IMPLEMENTATION_VERIFIED / Orchestrator under Human command
+authority: Human "批准执行" after protocol draft and completeness mapping review
+G: 0e4aa7613a39c55a1c6afb1c03cbe9d793b4f674 — HEAD unchanged
+W: b747065ac2fafa03d35d7a94b39d52d70f1de416 — exact governing baseline blob; local Wv2 is not a new committed Governor
+K / T / I / C: NOT_CREATED — manual code/tests and synthetic fixture histories are not real acceptance lanes or Candidates
+candidate_index / correction_count: NOT_STARTED / 0
+input_digests: reviewed draft SHA256 ea226ba2309f37794dd0a62a88e6b4397491c4be62ceff67e8870be0fd6ee9d5; approved implementation supplement retains scoped authority
+output_digests: local Wv2 raw SHA256 854b573f46df069199cff1297ba864e70af148cf6b5818f35856976376eb9438; final A source/test hashes recorded in ignored issue93-final-verification.md; no new commit or remote receipt
+Test Impact Set / mandatory acceptance: selected new/changed/affected checks only; final A 83 passed in 132.31s; unchanged B 70 passed / 267 subtests and C 86 passed retained with unchanged source/test hashes; no full suite, S32DS, E2E or KPI
+raw Tester report / Worker Correction Envelope: NOT_APPLICABLE — independent manual verification report, not governed Tester acceptance or Worker correction accounting
+observations: all 14 artifact kinds, typed attachments, G/W/K/dispatch bindings, dual views, incremental source, STOP/repair identities, CHECKED/run prerequisite and explicit v1/v2 migration implemented; four spec omissions, a STOP regression and cache/path defects were reproduced and fixed in the same retained source before Human inspection; independent scoped spec/quality checks closed the confirmed findings
+bounded diagnostic: same-cache-family weak/strong validation bypass confirmed and repaired without new schema or isolation scope; generic Skill helper lacked PyYAML, alternative runtime lookup returned no usable result and was canceled; focused Skill behavior/frontmatter/link checks passed
+disposition: WAIT_FOR_HUMAN_DIFF_INSPECTION — uncommitted and unmerged; no GUI, deployment, automatic Loop, remote mutation or source discard
+next_allowed_operation: present actual delivery and verification evidence; further correction, submission, PR and merge remain Human-commanded; #85 stays pending
+supersedes: BT-0010 next-operation restriction only after Human coding approval; previous audit, failures, receipts and changelog preserved
+```
+
 ## Appendix A — 证据索引
 
 ### A.1 当前主线文件
@@ -3755,6 +3805,8 @@ canonical execution index，不另建竞争清单。
 
 | Version | Date | Changes |
 | --- | --- | --- |
+| 0.12.2 | 2026-09-06 | Recorded Human-commanded #93 implementation, final scoped verification and independent closure of actual findings in BT-0011; distinguished unmerged worktree capability from the preserved audit baseline, retained source and old evidence, and stopped for Human inspection without commit/PR/merge. |
+| 0.12.1 | 2026-09-06 | Recorded Human closure of #95 and manual #93 contract preparation, verified the same-name published branch/upstream, and appended BT-0010; new wire details remain an unapproved ignored draft rather than active rules. |
 | 0.12.0 | 2026-09-06 | Recorded Human-approved Worker-unit / Tester-functional / CLI-only comprehensive KPI tiers; defined Reviewer-to-PR ticket intake, merge plus Human-start prerequisites, one-way KPI issue with Human case/result review and no Worker correction, direct legacy case migration without retrospective test backfill, local JSON/Dashboard delivery and deferred server CT; split #100/#101/#102, narrowed #98 dependencies, synchronized current planning authority and added BT-0009 while preserving historical events and changelog rows. |
 | 0.11.0 | 2026-09-05 | Corrected the full document to deliver the exact accepted Candidate as PR head, including frozen Test and final Implementation; withdrew the Implementation-only and Test-in-history-as-contamination interpretations, aligned finalization/#93/#86/bootstrap guidance, distinguished manual Phases 0–3, and added BT-0008 without rewriting prior events or changelog rows. |
 | 0.10.0 | 2026-09-05 | Recorded PR #99 acceptance and the Human-commanded direct #95 branch implementation, focused monitoring/timeout compatibility evidence, deferred deployment/#98 boundaries, and BT-0007; preserved earlier trace events and audit baselines. |

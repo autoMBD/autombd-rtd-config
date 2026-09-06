@@ -1,0 +1,253 @@
+{
+  "schema_version": "1.0",
+  "workflow_profile": "functional-development-v1",
+  "artifacts": {
+    "task-contract": {
+      "producer": "orchestrator",
+      "consumers": [
+        "orchestrator"
+      ],
+      "visibility": [
+        "public-task"
+      ],
+      "worker_readable": true
+    },
+    "test-launch": {
+      "producer": "orchestrator",
+      "consumers": [
+        "tester"
+      ],
+      "visibility": [
+        "tester-confidential"
+      ],
+      "worker_readable": false
+    },
+    "worker-launch": {
+      "producer": "orchestrator",
+      "consumers": [
+        "worker"
+      ],
+      "visibility": [
+        "public-task"
+      ],
+      "worker_readable": true
+    },
+    "test-gate-report": {
+      "producer": "tester",
+      "consumers": [
+        "orchestrator"
+      ],
+      "visibility": [
+        "tester-confidential"
+      ],
+      "worker_readable": false
+    },
+    "implementation-report": {
+      "producer": "worker",
+      "consumers": [
+        "orchestrator"
+      ],
+      "visibility": [
+        "public-task"
+      ],
+      "worker_readable": true
+    },
+    "human-decision": {
+      "producer": "human",
+      "consumers": [
+        "orchestrator"
+      ],
+      "visibility": [
+        "tester-confidential",
+        "terminal-review"
+      ],
+      "worker_readable": false
+    },
+    "candidate-test-envelope": {
+      "producer": "orchestrator",
+      "consumers": [
+        "tester"
+      ],
+      "visibility": [
+        "tester-confidential"
+      ],
+      "worker_readable": false
+    },
+    "tester-confidential-report": {
+      "producer": "tester",
+      "consumers": [
+        "orchestrator"
+      ],
+      "visibility": [
+        "tester-confidential"
+      ],
+      "worker_readable": false
+    },
+    "worker-correction-envelope": {
+      "producer": "orchestrator",
+      "consumers": [
+        "worker"
+      ],
+      "visibility": [
+        "public-task"
+      ],
+      "worker_readable": true
+    },
+    "reviewer-launch": {
+      "producer": "orchestrator",
+      "consumers": [
+        "reviewer"
+      ],
+      "visibility": [
+        "terminal-review"
+      ],
+      "worker_readable": false
+    },
+    "reviewer-report": {
+      "producer": "reviewer",
+      "consumers": [
+        "orchestrator"
+      ],
+      "visibility": [
+        "terminal-review"
+      ],
+      "worker_readable": false
+    },
+    "terminal-record": {
+      "producer": "orchestrator",
+      "consumers": [
+        "human"
+      ],
+      "visibility": [
+        "terminal-review"
+      ],
+      "worker_readable": false
+    },
+    "delivery-repair": {
+      "worker_conditional_visibility": ["public-task"],
+      "producer": "orchestrator",
+      "consumers": [
+        "tester",
+        "worker",
+        "reviewer",
+        "orchestrator",
+        "human"
+      ],
+      "visibility": [
+        "public-task",
+        "tester-confidential",
+        "orchestrator-confidential",
+        "terminal-review"
+      ],
+      "worker_readable": false
+    },
+    "guard-result": {
+      "worker_conditional_visibility": ["public-task"],
+      "producer": "guard",
+      "consumers": [
+        "orchestrator",
+        "tester",
+        "worker",
+        "reviewer",
+        "human"
+      ],
+      "visibility": [
+        "public-task",
+        "tester-confidential",
+        "orchestrator-confidential",
+        "terminal-review"
+      ],
+      "worker_readable": false
+    }
+  },
+  "checkpoints": {
+    "task-contract": {
+      "artifact_kind": "task-contract",
+      "required_predecessors": [],
+      "local_rule": "task-contract"
+    },
+    "test-launch": {
+      "artifact_kind": "test-launch",
+      "required_predecessors": [
+        "task-contract"
+      ],
+      "local_rule": "test-launch"
+    },
+    "worker-launch": {
+      "artifact_kind": "worker-launch",
+      "required_predecessors": [
+        "task-contract"
+      ],
+      "local_rule": "worker-launch"
+    },
+    "test-gate-report": {
+      "artifact_kind": "test-gate-report",
+      "required_predecessors": [
+        "test-launch"
+      ],
+      "local_rule": "test-gate-report"
+    },
+    "implementation-report": {
+      "artifact_kind": "implementation-report",
+      "required_predecessors": [],
+      "local_rule": "implementation-report"
+    },
+    "human-decision": {
+      "artifact_kind": "human-decision",
+      "required_predecessors": [],
+      "local_rule": "human-decision"
+    },
+    "candidate-test-envelope": {
+      "artifact_kind": "candidate-test-envelope",
+      "required_predecessors": [
+        "human-decision",
+        "test-gate-report",
+        "implementation-report"
+      ],
+      "local_rule": "candidate-test-envelope"
+    },
+    "tester-confidential-report": {
+      "artifact_kind": "tester-confidential-report",
+      "required_predecessors": [
+        "candidate-test-envelope"
+      ],
+      "local_rule": "tester-confidential-report"
+    },
+    "worker-correction-envelope": {
+      "artifact_kind": "worker-correction-envelope",
+      "required_predecessors": [
+        "implementation-report"
+      ],
+      "local_rule": "worker-correction-envelope"
+    },
+    "reviewer-launch": {
+      "artifact_kind": "reviewer-launch",
+      "required_predecessors": [],
+      "local_rule": "reviewer-launch"
+    },
+    "reviewer-report": {
+      "artifact_kind": "reviewer-report",
+      "required_predecessors": [
+        "reviewer-launch"
+      ],
+      "local_rule": "reviewer-report"
+    },
+    "terminal-record": {
+      "artifact_kind": "terminal-record",
+      "required_predecessors": [
+        "reviewer-report"
+      ],
+      "local_rule": "terminal-record"
+    },
+    "delivery-repair": {
+      "artifact_kind": "delivery-repair",
+      "required_predecessors": [],
+      "local_rule": "delivery-repair"
+    },
+    "guard-result": {
+      "artifact_kind": "guard-result",
+      "required_predecessors": [],
+      "local_rule": "guard-result"
+    }
+  }
+}

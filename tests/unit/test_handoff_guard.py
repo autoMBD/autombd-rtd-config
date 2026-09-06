@@ -83,7 +83,7 @@ class HandoffGuardTests(unittest.TestCase):
             TEST_TMP_PARENT.rmdir()
 
     def setUp(self):
-        self._temp = tempfile.TemporaryDirectory(dir=TEST_TMP_PARENT)
+        self._temp = tempfile.TemporaryDirectory(prefix="issue93-b-guard-", dir=TEST_TMP_PARENT)
         self.root = Path(self._temp.name)
         self.assertEqual(TEST_TMP_PARENT.resolve(), self.root.resolve().parent)
         self.repo = self.root / "lane"
@@ -198,6 +198,95 @@ class HandoffGuardTests(unittest.TestCase):
         )
         return [sys.executable, "-c", code, str(self.sentinel), *extra]
 
+    def check(self):
+        result = self.guard("check-handoff", "--manifest", self.manifest,
+                            "--receipt", self.receipt, "--event-log", self.events)
+        self.assertEqual(0, result.returncode, result.stderr)
+
+    def test_run_requires_successful_checked_immediately_before_it(self):
+        for outcome, operation, exit_code, error in (
+            ("PREPARED", "prepare", 0, None),
+            ("REJECTED", "check-handoff", 1, "previous rejection"),
+            ("EXITED", "run", 0, None),
+            ("TIMED_OUT", "run", 124, "previous timeout"),
+            ("CHECKED", "check-handoff", 1, None),
+            ("CHECKED", "check-handoff", 0, "not successful"),
+            ("CHECKED", "run", 0, None),
+            ("CHECKED", "check-handoff", False, None),
+        ):
+            with self.subTest(outcome=outcome, operation=operation, exit_code=exit_code, error=error):
+                self.sentinel.unlink(missing_ok=True)
+                argv = self.counting_command()
+                self.assertEqual(0, self.prepare(argv).returncode)
+                receipt = json.loads(self.receipt.read_bytes())
+                receipt.update(outcome=outcome, operation=operation, exit_code=exit_code, error=error)
+                raw = json.dumps(receipt, sort_keys=True, separators=(",", ":")).encode()
+                self.receipt.write_bytes(raw)
+                self.events.write_bytes(raw + b"\n")
+                result = self.guard("run", "--manifest", self.manifest,
+                                    "--receipt", self.receipt, "--event-log", self.events)
+                self.assertEqual(1, result.returncode, result.stderr)
+                self.assertFalse(self.sentinel.exists())
+                rejected, _ = self.receipt_and_events()
+                self.assertIn("successful CHECKED", rejected["error"])
+                self.assert_rejection_receipt(rejected, "run", self.manifest.read_bytes(), argv, self.head)
+
+    def test_run_rejects_checked_receipt_not_exact_last_event(self):
+        for mutation in ("missing", "empty", "malformed", "older", "different-bytes", "trailing-blank"):
+            with self.subTest(mutation=mutation):
+                self.sentinel.unlink(missing_ok=True)
+                self.assertEqual(0, self.prepare(self.counting_command()).returncode)
+                prepared = self.receipt.read_bytes()
+                self.check()
+                checked = self.receipt.read_bytes()
+                if mutation == "missing":
+                    self.events.unlink()
+                else:
+                    data = {
+                        "empty": b"",
+                        "malformed": b"{\n",
+                        "older": checked + b"\n" + prepared + b"\n",
+                        "different-bytes": json.dumps(json.loads(checked)).encode() + b"\n",
+                        "trailing-blank": checked + b"\n\n",
+                    }[mutation]
+                    self.events.write_bytes(data)
+                result = self.guard("run", "--manifest", self.manifest,
+                                    "--receipt", self.receipt, "--event-log", self.events)
+                self.assertEqual(1, result.returncode, result.stderr)
+                self.assertFalse(self.sentinel.exists())
+                receipt = json.loads(self.receipt.read_bytes())
+                self.assertIn("event", receipt["error"])
+                self.assertEqual(self.head, receipt["actual_head"])
+
+    def test_run_requires_new_check_after_exit_and_rejects_replayed_receipt(self):
+        self.assertEqual(0, self.prepare(self.counting_command()).returncode)
+        self.check()
+        checked = self.receipt.read_bytes()
+        result = self.guard("run", "--manifest", self.manifest,
+                            "--receipt", self.receipt, "--event-log", self.events)
+        self.assertEqual(0, result.returncode, result.stderr)
+        result = self.guard("run", "--manifest", self.manifest,
+                            "--receipt", self.receipt, "--event-log", self.events)
+        self.assertEqual(1, result.returncode, result.stderr)
+        self.assertEqual("1", self.sentinel.read_text())
+        self.receipt.write_bytes(checked)
+        result = self.guard("run", "--manifest", self.manifest,
+                            "--receipt", self.receipt, "--event-log", self.events)
+        self.assertEqual(1, result.returncode, result.stderr)
+        self.assertEqual("1", self.sentinel.read_text())
+        self.check()
+        result = self.guard("run", "--manifest", self.manifest,
+                            "--receipt", self.receipt, "--event-log", self.events)
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual("2", self.sentinel.read_text())
+
+    def test_validate_artifact_cli_declares_approved_arguments(self):
+        result = self.guard("validate-artifact", "--help")
+        self.assertEqual(0, result.returncode, result.stderr)
+        for option in ("--artifact", "--expected-sha256", "--context", "--view", "--result",
+                       "orchestrator-full", "consumer-local"):
+            self.assertIn(option, result.stdout)
+
     def test_temporary_root_is_direct_child_of_canonical_tests_tmp(self):
         self.assertEqual(TEST_TMP_PARENT.resolve(), self.root.resolve().parent)
 
@@ -270,6 +359,7 @@ class HandoffGuardTests(unittest.TestCase):
 
     def test_wrong_cwd_rejects_before_spawn(self):
         self.assertEqual(0, self.prepare(self.counting_command()).returncode)
+        self.check()
         result = self.guard("run", "--manifest", self.manifest, "--receipt", self.receipt,
                             "--event-log", self.events, cwd=self.root)
         self.assertEqual(1, result.returncode)
@@ -301,6 +391,8 @@ class HandoffGuardTests(unittest.TestCase):
                         result = self.prepare(argv, base=invalid_base)
                     else:
                         self.assertEqual(0, self.prepare(argv).returncode)
+                        if operation == "run":
+                            self.check()
                         manifest = json.loads(self.manifest.read_text(encoding="utf-8"))
                         manifest["base_sha"] = invalid_base
                         manifest_bytes = self.write_manifest(manifest)
@@ -311,7 +403,11 @@ class HandoffGuardTests(unittest.TestCase):
                         )
                     self.assertEqual(1, result.returncode, result.stderr)
                     self.assertFalse(self.sentinel.exists())
-                    self.assertEqual("REJECTED", self.receipt_and_events()[0]["outcome"])
+                    receipt = self.receipt_and_events()[0]
+                    self.assertEqual("REJECTED", receipt["outcome"])
+                    expected = ("base_sha does not name a commit" if label == "existing-noncommit"
+                                else "Git identity command failed")
+                    self.assertEqual(expected, receipt["error"])
 
     def test_prepared_manifest_hash_rejects_every_legal_manifest_rewrite_before_spawn(self):
         mutations = {
@@ -330,6 +426,8 @@ class HandoffGuardTests(unittest.TestCase):
                     self.sentinel.unlink(missing_ok=True)
                     argv = self.counting_command()
                     self.assertEqual(0, self.prepare(argv).returncode)
+                    if operation == "run":
+                        self.check()
                     manifest = json.loads(self.manifest.read_text(encoding="utf-8"))
                     mutate(manifest)
                     self.write_manifest(manifest)
@@ -339,11 +437,14 @@ class HandoffGuardTests(unittest.TestCase):
                     )
                     self.assertEqual(1, result.returncode, result.stderr)
                     self.assertFalse(self.sentinel.exists())
-                    self.assertEqual("REJECTED", self.receipt_and_events()[0]["outcome"])
+                    receipt = self.receipt_and_events()[0]
+                    self.assertEqual("REJECTED", receipt["outcome"])
+                    self.assertIn("current manifest digest", receipt["error"])
 
     def test_stale_manifest_after_new_commit_rejects_before_spawn(self):
         argv = self.counting_command()
         self.assertEqual(0, self.prepare(argv).returncode)
+        self.check()
         manifest_bytes = self.manifest.read_bytes()
         (self.repo / "later.txt").write_text("later", encoding="utf-8")
         self.git("add", "later.txt")
@@ -355,6 +456,7 @@ class HandoffGuardTests(unittest.TestCase):
         self.assertFalse(self.sentinel.exists())
         receipt, _ = self.receipt_and_events()
         self.assert_rejection_receipt(receipt, "run", manifest_bytes, argv, actual_head)
+        self.assertEqual("current HEAD does not match lane_sha", receipt["error"])
 
     def test_check_handoff_rejects_changed_contract_blob(self):
         argv = self.counting_command()
@@ -484,22 +586,25 @@ class HandoffGuardTests(unittest.TestCase):
     def test_timeout_returns_124_and_records_timeout(self):
         code = "from pathlib import Path; import sys,time; Path(sys.argv[1]).write_text('started'); time.sleep(5)"
         self.assertEqual(0, self.prepare([sys.executable, "-c", code, str(self.sentinel)], timeout=1).returncode)
+        self.check()
         started = time.monotonic()
         result = self.guard("run", "--manifest", self.manifest, "--receipt", self.receipt,
                             "--event-log", self.events)
         self.assertEqual(124, result.returncode)
         self.assertLess(time.monotonic() - started, 4)
+        self.assertEqual("started", self.sentinel.read_text())
         receipt, _ = self.receipt_and_events()
         self.assertEqual(("TIMED_OUT", 124), (receipt["outcome"], receipt["exit_code"]))
 
     def test_child_nonzero_exit_is_passed_through_with_evidence(self):
         argv = [sys.executable, "-c", "import sys; sys.exit(7)"]
         self.assertEqual(0, self.prepare(argv).returncode)
+        self.check()
         result = self.guard("run", "--manifest", self.manifest, "--receipt", self.receipt,
                             "--event-log", self.events)
         self.assertEqual(7, result.returncode)
         receipt, events = self.receipt_and_events()
-        self.assertEqual(("EXITED", 7, 2), (receipt["outcome"], receipt["exit_code"], len(events)))
+        self.assertEqual(("EXITED", 7, 3), (receipt["outcome"], receipt["exit_code"], len(events)))
 
     def test_nul_in_manifest_argv_records_exec_error_without_spawn_or_traceback(self):
         self.assertEqual(0, self.prepare(self.counting_command()).returncode)
@@ -507,24 +612,27 @@ class HandoffGuardTests(unittest.TestCase):
         data["argv"] = self.counting_command("\0")
         manifest_bytes = self.write_manifest(data)
         self.repin_receipt_to_manifest(manifest_bytes)
+        self.check()
         result = self.guard("run", "--manifest", self.manifest, "--receipt", self.receipt,
                             "--event-log", self.events)
         self.assertEqual(2, result.returncode)
         self.assertNotIn("Traceback", result.stderr)
         self.assertFalse(self.sentinel.exists())
         receipt, events = self.receipt_and_events()
-        self.assertEqual(("EXEC_ERROR", 2, 2),
+        self.assertEqual(("EXEC_ERROR", 2, 3),
                          (receipt["outcome"], receipt["exit_code"], len(events)))
+        self.assertIn("null", receipt["error"].lower())
 
     def test_unlaunchable_executable_records_exec_error_without_child_marker(self):
         self.assertEqual(0, self.prepare([str(self.sentinel)]).returncode)
+        self.check()
         result = self.guard("run", "--manifest", self.manifest, "--receipt", self.receipt,
                             "--event-log", self.events)
         self.assertEqual(2, result.returncode)
         self.assertNotIn("Traceback", result.stderr)
         self.assertFalse(self.sentinel.exists())
         receipt, events = self.receipt_and_events()
-        self.assertEqual(("EXEC_ERROR", 2, 2),
+        self.assertEqual(("EXEC_ERROR", 2, 3),
                          (receipt["outcome"], receipt["exit_code"], len(events)))
 
     def test_shell_metacharacters_are_literal_arguments(self):
@@ -534,6 +642,7 @@ class HandoffGuardTests(unittest.TestCase):
         literal = ["&&", "echo owned", ">", str(side_effect), "$(echo nope)"]
         argv = [sys.executable, "-c", code, str(captured), *literal]
         self.assertEqual(0, self.prepare(argv).returncode)
+        self.check()
         result = self.guard("run", "--manifest", self.manifest, "--receipt", self.receipt,
                             "--event-log", self.events)
         self.assertEqual(0, result.returncode, result.stderr)
@@ -542,12 +651,14 @@ class HandoffGuardTests(unittest.TestCase):
 
     def test_evidence_failure_before_spawn_returns_2(self):
         self.assertEqual(0, self.prepare(self.counting_command()).returncode)
+        self.check()
         bad_receipt = self.root / "receipt-directory"
         bad_receipt.mkdir()
         result = self.guard("run", "--manifest", self.manifest, "--receipt", bad_receipt,
                             "--event-log", self.events)
         self.assertEqual(2, result.returncode)
         self.assertFalse(self.sentinel.exists())
+        self.assertIn("evidence error", result.stderr)
 
     def test_post_child_evidence_failure_does_not_relaunch(self):
         code = (
@@ -556,10 +667,13 @@ class HandoffGuardTests(unittest.TestCase):
         )
         argv = [sys.executable, "-c", code, str(self.sentinel), str(self.events)]
         self.assertEqual(0, self.prepare(argv).returncode)
+        self.check()
         result = self.guard("run", "--manifest", self.manifest, "--receipt", self.receipt,
                             "--event-log", self.events)
         self.assertEqual(2, result.returncode)
         self.assertEqual("1", self.sentinel.read_text(encoding="utf-8"))
+        self.assertTrue(self.events.is_dir())
+        self.assertIn("evidence error", result.stderr)
 
 
 if __name__ == "__main__":

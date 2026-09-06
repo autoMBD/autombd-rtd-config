@@ -51,6 +51,9 @@ from pathlib import Path, PureWindowsPath
 
 MANIFEST_KEYS = {"schema_version", "role", "git_top_level", "base_sha", "lane_sha",
                  "contract_path", "contract_blob_sha", "argv", "timeout_seconds"}
+RECEIPT_KEYS = {"schema_version", "operation", "started_at_utc", "ended_at_utc", "cwd",
+                "git_top_level", "expected_head", "actual_head", "manifest_path",
+                "manifest_sha256", "argv", "timeout_seconds", "outcome", "exit_code", "error"}
 SHA_RE, ROLE_RE = re.compile(r"[0-9a-f]{40}\Z"), re.compile(r"[a-z][a-z0-9_-]*\Z")
 
 
@@ -196,14 +199,36 @@ def load_manifest(path, ctx):
 
 def verify_receipt(path, manifest_sha256):
     try:
-        value = json.loads(
-            Path(path).read_bytes().decode("utf-8"), object_pairs_hook=unique_object
-        )
+        raw = Path(path).read_bytes()
+        value = json.loads(raw.decode("utf-8"), object_pairs_hook=unique_object)
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
         raise Rejected("prior receipt is missing or malformed") from error
     isinstance(value, dict) or reject("prior receipt is malformed")
     value.get("manifest_sha256") == manifest_sha256 or reject(
             "prior receipt does not match the current manifest digest")
+    return value, raw
+
+
+def verify_checked_receipt(prior_receipt, event_path, ctx):
+    value, raw = prior_receipt
+    (set(value) == RECEIPT_KEYS and type(value.get("schema_version")) is int
+     and value["schema_version"] == 1 and value.get("operation") == "check-handoff"
+     and value.get("outcome") == "CHECKED" and type(value.get("exit_code")) is int
+     and value["exit_code"] == 0 and value.get("error") is None) or reject(
+            "run requires the immediately preceding successful CHECKED receipt")
+    for field in ("cwd", "git_top_level", "expected_head", "actual_head", "manifest_path",
+                  "manifest_sha256", "argv", "timeout_seconds"):
+        type(value[field]) is type(ctx[field]) and value[field] == ctx[field] or reject(
+            f"successful CHECKED receipt {field} does not match current identity")
+    try:
+        with Path(event_path).open("rb") as stream:
+            last_event = b""
+            for last_event in stream:
+                pass
+    except OSError as error:
+        raise Rejected("prior event log is missing or unreadable") from error
+    last_event == raw + b"\n" or reject(
+            "successful CHECKED receipt does not match the immediately preceding event")
 
 
 def parse_args():
@@ -223,6 +248,13 @@ def parse_args():
         command = commands.add_parser(operation)
         for option in ("manifest", "receipt", "event-log"):
             command.add_argument(f"--{option}", required=True)
+    artifact = commands.add_parser("validate-artifact")
+    for option in ("artifact", "expected-sha256", "context", "result"):
+        artifact.add_argument(f"--{option}", required=True)
+    artifact.add_argument("--view", choices=("orchestrator-full", "consumer-local"), required=True)
+    interface = commands.add_parser("validate-interface")
+    interface.add_argument("--packet", required=True)
+    interface.add_argument("--expected-sha256", required=True)
     args = parser.parse_args()
     if args.operation == "prepare":
         if not args.command or args.command[0] != "--": parser.error("prepare requires -- CMD [ARG...]")
@@ -232,6 +264,12 @@ def parse_args():
 
 def main():
     args = parse_args()
+    if args.operation == "validate-artifact":
+        from structured_handoff import run_validation
+        return run_validation(args.artifact, args.expected_sha256, args.context, args.view, args.result)
+    if args.operation == "validate-interface":
+        from legacy_interface_handoff import run_validation
+        return run_validation(args.packet, args.expected_sha256)
     ctx = {"operation": args.operation, "started_at_utc": utc_now(), "cwd": canonical(Path.cwd()),
            "git_top_level": None, "expected_head": None, "actual_head": None,
            "manifest_path": canonical(args.manifest), "manifest_sha256": None,
@@ -256,7 +294,7 @@ def main():
             print("handoff guard rejected a path alias with the contract", file=sys.stderr); return 1
         probe(args.receipt, args.event_log)
         if args.operation != "prepare":
-            verify_receipt(args.receipt, ctx["manifest_sha256"])
+            prior_receipt = verify_receipt(args.receipt, ctx["manifest_sha256"])
         executable = trusted_git(ctx["cwd"], manifest["git_top_level"])
         verify_identity(manifest, ctx, executable)
         if args.operation == "prepare":
@@ -266,6 +304,7 @@ def main():
         elif args.operation == "check-handoff":
             outcome, code = "CHECKED", 0
         else:
+            verify_checked_receipt(prior_receipt, args.event_log, ctx)
             result = subprocess.run(manifest["argv"], cwd=manifest["git_top_level"], shell=False,
                                     timeout=manifest["timeout_seconds"])
             outcome, code = "EXITED", result.returncode
