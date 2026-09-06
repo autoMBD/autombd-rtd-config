@@ -2,7 +2,7 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.8.0 |
+| Version | 0.9.0 |
 | Date | 2026-09-06 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Tracks how review comments were resolved across design document revisions. |
@@ -125,6 +125,7 @@ workflow as that process becomes concrete.
 | ID | Original area | Comment intent | Resolution | Target document |
 | --- | --- | --- | --- | --- |
 | TEST-DOC-01 | [#85 Human Test Gate rejection](https://github.com/autoMBD/autombd-rtd-config/issues/85#issuecomment-5559022292) and confirming Human instruction | Human reviews readable case documents; incrementally classify functional cases by Agent/RTD CfgFile CLI; separate KPI and no historical backfill | Added reusable discipline, Tester/Worker/Reviewer boundaries and exact doc/script Test binding. #85 remains a rejected, unapproved Test until the revised document-led packet is approved; retained Implementation is unchanged. | `AGENTS.md`; `agent-discipline/documentation-governance.md`; role definitions; structured-handoff reference; #85 Test lane catalogue |
+| TEST-DOC-02 | Human review of `agent-functional-test-cases.md`: a monolithic catalogue grows too quickly; local `payload.requirements` is not a durable review source | One shared explanation/index, feature-scoped case references without execution steps, and a separate requirements file; primarily review requirements plus cases at Test Gate | Replaced the growing type catalogue rule with linked feature references; required complete readable requirements/source mapping and concise case tables. Reports/scripts retain execution detail and automation mapping. Updated only the requested policy branch; existing #85 Test/Implementation are not revised by this policy edit. | `agent-discipline/documentation-governance.md`; `AGENTS.md`; Tester/Worker/Reviewer definitions; structured-handoff reference |
 
 ## Changelog
 
@@ -141,3 +142,4 @@ workflow as that process becomes concrete.
 | 2026-06-15 | 0.6.0 | Issue #7 reorganization: moved from `docs/common/rtd-config-core-comments-tracking.md` to `agent-discipline/owner-review-comments.md`; updated all archive path references from `docs/OBSOLETE_NEVER_TOUCH!!!/` to `agent-discipline/review-archive/`. |
 | 2026-06-29 | 0.7.0 | Issue #35: renamed the review archive directory to `agent-discipline/review-archive-NOT-USED-NEVER-TOUCH!!!/` to make its frozen, never-a-requirements-source status explicit; updated the active archive pointers above. Frozen changelog rows retain the historical path. |
 | 2026-09-06 | 0.8.0 | Tracked the prospective document-first functional Test review decision, type catalogues, exact Test binding and separate KPI ownership without retrospective case-document work. |
+| 2026-09-06 | 0.9.0 | Recorded the Human-requested shared guide, feature-specific case references and durable requirements as the two primary Test review files, replacing the monolithic detailed-case format. |

@@ -2,7 +2,7 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.1.9 |
+| Version | 0.1.10 |
 | Date | 2026-09-06 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Documentation-governance rules for the RTD CfgFile CLI project. Defines the two-category split, official tool name, changelog integrity, archive policy, and the authoritative cross-category documentation map. |
@@ -18,15 +18,15 @@ The official tool name in all active documentation is **RTD CfgFile CLI**.
 All project documents fall into exactly one of two physically separated
 categories:
 
-- **Category A — Development documentation** (`docs/` and RTD CfgFile CLI
-  functional case catalogues under `tests/doc/`): pure project and
+- **Category A — Development documentation** (`docs/` and agent-agnostic RTD
+  CfgFile CLI feature references under `tests/doc/`): pure project and
   engineering content; self-contained and agent-agnostic. Contains zero
   agent-discipline content and carries no pointers or links to agent-discipline
   documents. Includes specs (architecture, domain truth), test documents
   (strategy, cases, acceptance report), the roadmap, and references.
 - **Category B — Agent discipline** (`AGENTS.md` at repo root,
-  `agent-discipline/subagents/`, `agent-discipline/`, and Agent functional case
-  catalogues/shared catalogue navigation in `tests/doc/`): agent charter, role definitions, iteration loop,
+  `agent-discipline/subagents/`, `agent-discipline/`, and Agent feature references,
+  Agent-bearing requirement snapshots and shared guidance in `tests/doc/`): agent charter, role definitions, iteration loop,
   KPI policies, review records, lessons learned, and this governance document.
 
 Cross-category pointers are allowed from Category B to Category A (e.g.,
@@ -35,46 +35,73 @@ to Category B.
 
 ### Functional case documents and Human review
 
-Effective for new issue work, explicitly including ongoing #85, maintain
-functional case documents in `tests/doc/`, classified by the tested subject.
-Use one incremental catalogue per type, not a new disconnected document for
-every issue. The initial types are:
+Effective for new issue work, explicitly including ongoing #85, keep functional
+documentation in `tests/doc/` using one short general guide/index and separate
+feature references, grouped by subject (Agent / RTD CfgFile CLI). Do not append
+every feature's cases to an ever-growing type-wide document. Use stable feature
+names rather than creating a duplicate document for each follow-up issue.
 
-| Type | Catalogue | Category |
-| --- | --- | --- |
-| Agent framework/tools | `tests/doc/agent-functional-test-cases.md` | B |
-| RTD CfgFile CLI | `tests/doc/rtdcfg-cli-functional-test-cases.md` | A |
+The layout below illustrates #85; these paths are a convention, not a claim
+that the feature files have already been delivered by this policy change:
 
-Create a catalogue when an applicable new issue contributes cases; do not add
-empty catalogues or reconstruct historical features just to fill this table.
-An optional `tests/doc/README.md` is catalogue navigation, not another case
-source. The shared directory does not weaken the A/B content and link boundary.
+| File | Content |
+| --- | --- |
+| `tests/doc/README.md` | Shared explanation and an index: type, feature, requirements link, cases link. No copies of feature requirements/cases or per-run evidence. |
+| `tests/doc/reference/agent/workflow-transition-requirements.md` | Standalone readable rendering of the feature's complete `K.payload.requirements`. |
+| `tests/doc/reference/agent/workflow-transition-cases.md` | That feature's concise case table only, apart from normal title/metadata/changelog. |
 
-Tester derives case documents from public requirements/K without reading the
-Worker Implementation, then implements the documented cases as test scripts.
-Each case must be understandable without reading Python: identify the case and
-requirement/purpose, preconditions and inputs, actions, observable expected
-results and pass/fail criteria. Provide a mapping to automated checks so the
-Orchestrator can verify document/code correspondence. Choose a readable layout;
-do not create a second machine schema or duplicate every parameter expansion
-when a clearly described variant table expresses the same case.
+Other Agent features reuse `reference/agent/`; product features use
+`reference/rtdcfg-cli/`. Add index links when an applicable new issue supplies
+the two references; do not create empty feature files or backfill old features.
+The previous `agent-functional-test-cases.md` monolith is not the continuing
+layout: split its in-progress #85 content when that Test delivery is next revised.
 
-Human Gate 1 reviews the case document, not source code as a substitute case
-specification. Publish its exact-commit document link and the current issue's
-case additions/changes as the primary review entry. Test source and evidence
-remain available for audit, but Human is not required to reverse-engineer them.
-The exact Test commit contains both catalogue changes and automation. Approval
-freezes both with the manifest/Impact Set; a doc-only approval must not silently
-authorize different executable Test bytes. This adds no second Human gate.
+The requirements reference must retain every requirement ID, full obligation
+and source association in `payload.requirements`; resolve authority IDs to
+durable issue/specification/decision references, not only ignored local files.
+Identify the source K revision/digest for reconciliation. If an obligation needs
+an interface or decision table to be understandable, provide a durable exact
+source link or the necessary public definition in this same requirements file.
+A label such as "R01–R25" without accessible requirement text is insufficient.
+This is a durable review rendering, not a new authority or replacement for the
+complete K used by both Agents. Keep dispatch paths, private reports and the
+rest of the runtime envelope out of it; do not commit `.agent-state/` wholesale.
+Orchestrator owns fidelity to K and supplies the same public requirements to
+both lanes; Tester packages the checked rendering with the Test review files.
+Resolve any real requirement disagreement through K, never silently in the doc.
 
-Extend the accepted catalogue for later issues, preserving accepted case IDs,
-meaning and history. A requirement-driven change to an existing case must be
-identified and reviewed; do not silently weaken it. For #85, reconcile the
-retained pre-approval tests with a requirement-derived document; preserve
-compatible code rather than pretending the missing document existed earlier.
-Current/unaccepted case documents are confidential owner Test, just like its
-scripts; Worker sees neither. Accepted catalogue content already in G remains
-normal regression material under the existing isolation rule.
+Tester derives cases from the public requirements without reading Worker
+Implementation. Use a concise table: case ID, requirement ID, scenario and
+expected result. Include only the conditions needed to distinguish the case;
+do not add per-case execution steps, setup procedures, command sequences,
+automation-node inventories or run results. Those details belong in scripts
+and existing structured reports/Impact Set. Orchestrator still checks the
+requirement-to-case-to-script mapping; a shorter Human document does not weaken
+the executable assertions or reduce the selected functional scope.
+
+At Gate 1, Tester supplies exact-Test-commit links to **two primary review
+files: the feature requirements and its cases**, plus their changes. The general
+guide links both; Human need not infer requirements from local K or cases from
+code, nor review every handoff field. The Test commit contains those documents,
+the corresponding index update and automation. The existing approval freezes
+their exact bytes with T/manifest/Impact Set; this adds no extra Human gate.
+Prevalidation details and results remain supporting evidence, not case prose.
+
+Later issues update only their affected feature references and index entry,
+preserving accepted case IDs and history. A changed requirement or expectation
+must be identified for review, not silently weakened. Requirement-only content
+is public task material and can reach Worker through the reviewed public
+handoff; current/unaccepted case references and scripts remain hidden Test.
+Do not send Worker the case-bearing index, Test worktree or a mixed document
+bundle to obtain public requirements. Accepted cases already in G retain their
+normal regression status.
+
+The shared guide and Agent references are Category B. Pure product cases and
+requirements are Category A; a full K requirements rendering containing Agent
+delivery obligations is Category B even for a product feature. Classify by
+content: the shared Category B index may link both, but a Category A case file
+must not link to Agent discipline or carry its text. Requirement IDs can map
+through the shared index/report without that forbidden reverse link.
 
 KPI case documents stay in `docs/tests/` and are created/updated by their KPI
 test issues, with the separate Human case review and local execution lifecycle.
@@ -151,7 +178,7 @@ paths are relative to the repository root.
 | `docs/tests/rtd-config-test-strategy.md` | Test method: layers, gate, acceptance rule, hygiene | domain-truth, test cases |
 | `docs/tests/rtd-config-test-cases.md` | E2E acceptance case catalog (`RTD-MEX-*`) | test strategy, domain-truth, fixtures |
 | `docs/tests/rtd-config-acceptance-report.md` | Recorded acceptance evidence and current status | test cases, test strategy |
-| `tests/doc/rtdcfg-cli-functional-test-cases.md` (when first needed) | Incremental Human-reviewed functional cases for new RTD CfgFile CLI issues | public product requirements, corresponding test scripts |
+| `tests/doc/reference/rtdcfg-cli/*-cases.md` and agent-agnostic `*-requirements.md` (when needed) | Feature-scoped product requirements/cases, not a type-wide monolith | public product requirements |
 | `docs/roadmaps/rtd-config-roadmap.md` | **The only place stages live**: the basic delivery route | — |
 | `docs/references/rtd-config-source-materials.md` | Catalog of development-time inputs (Excel, `.xdm`, vendor docs) | — |
 
@@ -163,8 +190,9 @@ paths are relative to the repository root.
 | `agent-discipline/subagents/explorer.md` | Explorer role definition | AGENTS.md, domain-truth |
 | `agent-discipline/subagents/worker.md` | Worker role definition | AGENTS.md, domain-truth |
 | `agent-discipline/subagents/tester.md` | Tester role definition | AGENTS.md, test cases |
-| `tests/doc/agent-functional-test-cases.md` | Incremental Human-reviewed functional cases for new Agent issues, beginning with #85 | public Agent requirements, corresponding test scripts |
-| `tests/doc/README.md` (optional) | Navigation of type-classified functional catalogues; no duplicate cases | Agent and RTD CfgFile CLI catalogues |
+| `tests/doc/README.md` | Short shared explanation and type/feature index; no copied case/requirement bodies | Each feature's requirements and cases |
+| `tests/doc/reference/agent/*-requirements.md` and `*-cases.md` | Separate durable requirements and concise cases for each Agent feature | public Agent requirements and decisions |
+| Agent-bearing `tests/doc/reference/rtdcfg-cli/*-requirements.md` (when needed) | Full public requirement rendering that also contains Agent delivery obligations | public task requirements and decisions; no Category A inbound links |
 | `agent-discipline/subagents/reviewer.md` | Reviewer role definition | AGENTS.md, agent-lessons-learned |
 | `agent-discipline/skills/external-dependency-memory/SKILL.md` | Skill for reusing local external dependency evidence across agents and conversations | AGENTS.md, source materials |
 | `agent-discipline/owner-review-comments.md` | Review-comment resolutions across rounds | agent-discipline/review-archive-NOT-USED-NEVER-TOUCH!!!/ |
@@ -204,6 +232,7 @@ flowchart TD
 
 | Date | Version | Description |
 | --- | --- | --- |
+| 2026-09-06 | 0.1.10 | Replaced growing type-wide catalogues with one guide/index and feature references; made complete durable requirements plus concise cases the two Gate review files, without procedural case prose or changed isolation/KPI scope. |
 | 2026-09-06 | 0.1.9 | Established prospective type-classified functional case catalogues and document-first Human Test review, exact doc/script binding, incremental ownership and distinct KPI issue-maintained documents; no historical backfill. |
 | 2026-08-29 | 0.1.8 | Renamed the Agent Loop review as the bootstrap trust-tracing lane and documented its split baseline/design/snapshot/append-only-event responsibilities. |
 | 2026-08-29 | 0.1.7 | Added the Agent Loop framework review and limited-bootstrap design to the authoritative Category B documentation map. |

@@ -9,7 +9,7 @@ model: sonnet
 
 | Field | Value |
 | --- | --- |
-| Version | 0.2.1 |
+| Version | 0.2.2 |
 | Date | 2026-09-06 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Independent owner-Test prevalidation and frozen scoped functional execution. |
@@ -47,11 +47,14 @@ success or failure, not after each failed Candidate.
 
 - **Human-readable cases:** for new issues (including #85), follow the
   [functional case documentation rules](../documentation-governance.md#functional-case-documents-and-human-review).
-  Derive and incrementally maintain the appropriate `tests/doc/` type catalogue
-  from K, then implement its cases. Return the exact document location, case
-  additions/changes and document-to-check mapping with Test READY. Human reviews
-  that document, not code as its replacement; keep document and scripts in the
-  same exact Test commit. Do not backfill accepted historical features. KPI
+  Keep shared guidance/index in `tests/doc/README.md`; maintain separate feature
+  requirements and concise case-table references. Package the complete readable
+  `K.payload.requirements` rendering checked by Orchestrator; derive cases from
+  it, not Worker code. Do not put execution steps, setup/commands, node inventories
+  or run evidence in case prose. With Test READY return exact-commit links and
+  changes for both feature files, plus the separate report's case-to-check mapping.
+  Human primarily reviews requirements and cases; keep them, index changes and
+  scripts in the same Test. Do not backfill accepted historical features. KPI
   documents remain `docs/tests/` and are maintained only through KPI test issues.
 - **Coverage:** every mandatory requirement must map to a deterministic test, and
   the suite must include **generality tests** over arbitrary valid inputs across
@@ -129,3 +132,4 @@ identities and verdicts. Never claim success without the real evidence.
 | --- | --- | --- |
 | 2026-09-06 | 0.2.0 | Introduced independent Test prevalidation, early Gate 1, frozen scoped execution and confidential structured reports; preserved true black-box and monitoring boundaries and separated KPI. |
 | 2026-09-06 | 0.2.1 | Made prospective functional case documentation the Human review entry and required traceable doc/script delivery without historical backfill or KPI mixing. |
+| 2026-09-06 | 0.2.2 | Made feature requirements and concise cases the paired review delivery, separated shared guidance and execution detail, and preserved script/report traceability. |

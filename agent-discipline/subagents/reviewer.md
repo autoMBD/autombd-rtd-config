@@ -9,7 +9,7 @@ model: opus
 
 | Field | Value |
 | --- | --- |
-| Version | 0.2.1 |
+| Version | 0.2.2 |
 | Date | 2026-09-06 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | One terminal non-execution review with source-preserving reports and separate lessons. |
@@ -44,9 +44,11 @@ and business verdict; it is not a second review.
 4. **Test adequacy (coverage, not execution).** Every mandatory "must" has a real,
    non-stub test. You judge whether the tests *exercise the requirement*; you do
    **not** re-run the gate — that is the Tester's authority.
-   For new issues including #85, check that the Human-reviewed `tests/doc/`
-   catalogue and executed scripts belong to the same frozen Test, and that
-   documented inputs/actions/expected outcomes correspond to the checks. Apply
+   For new issues including #85, check that the two Human-reviewed feature
+   references (requirements and cases), their index and scripts belong to the
+   same frozen Test. Check the requirements rendering against K and case
+   scenarios/expected results against the reported automation mapping; do not
+   demand execution steps or run evidence in the concise case file. Apply
    the [documentation scope rule](../documentation-governance.md#functional-case-documents-and-human-review):
    no historical backfill, KPI documents owned separately in `docs/tests/`.
 5. **Lifecycle evidence hygiene.** Test and Impact Set remain frozen; corrections
@@ -98,3 +100,4 @@ honestly instead of manufacturing a review verdict.
 | --- | --- | --- |
 | 2026-09-06 | 0.2.0 | Replaced PASS-only review with one structured terminal review on success or failure; separated reports and lessons from accepted Candidate source and prohibited reopened corrections. |
 | 2026-09-06 | 0.2.1 | Added non-execution review of Human case-document and frozen script correspondence with prospective-only scope and separate KPI ownership. |
+| 2026-09-06 | 0.2.2 | Aligned review to separate durable requirements and concise cases, retaining exact Test binding and report-based automation traceability. |

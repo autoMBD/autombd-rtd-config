@@ -9,7 +9,7 @@ model: sonnet
 
 | Field | Value |
 | --- | --- |
-| Version | 0.2.1 |
+| Version | 0.2.2 |
 | Date | 2026-09-06 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Public-contract Implementation ownership and incremental correction discipline. |
@@ -27,9 +27,13 @@ locates the input Envelope, digest, trusted context and output; task obligations
 come from the complete public K, not hidden prompt prose. Read only approved
 public inputs, Implementation and Worker-owned generality tests. Never read
 owner Test, confidential Tester reports, private predecessor paths or case data.
-This includes current/unaccepted functional case documents under `tests/doc/`;
-their human-readable format does not make them public task requirements for
-Worker. Accepted catalogue content already present in G is not hidden Test.
+This includes current/unaccepted feature case references and case-bearing
+indexes under `tests/doc/`; their readable format does not make cases public
+requirements. The standalone requirements rendering is public task content:
+consume only the reviewed requirement-only copy/reference supplied through your
+handoff, never a Test worktree or mixed case bundle. Complete K remains the task
+authority; report discrepancies rather than choosing a different contract.
+Accepted cases already present in G are not hidden Test.
 
 Start independently of Test readiness and Human Gate 1. For correction, retain
 the same lane/session/worktree/branch and strictly extend the previous
@@ -100,3 +104,4 @@ functional gate; the Reviewer performs one terminal non-execution review.
 | --- | --- | --- |
 | 2026-09-06 | 0.2.0 | Bound Worker guidance to structured public inputs, independent readiness, same-lane corrections, honest delivery repair and separate later KPI work. |
 | 2026-09-06 | 0.2.1 | Applied existing owner-Test isolation to human-readable case documents while preserving access to accepted regression material in G. |
+| 2026-09-06 | 0.2.2 | Distinguished public standalone requirements from private feature cases and indexes without weakening Test isolation or replacing K. |

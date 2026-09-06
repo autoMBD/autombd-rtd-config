@@ -2,7 +2,7 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.2.1 |
+| Version | 0.2.2 |
 | Date | 2026-09-06 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Engineering boundaries, structured role handoffs, functional lifecycle, and Agent supervision. |
@@ -251,13 +251,15 @@ are implemented.
 
 ## Testing Terminology
 
-- For new issues, explicitly including #85, Tester maintains human-readable
-  functional case catalogues under `tests/doc/`, grouped by subject (Agent and
-  RTD CfgFile CLI), incrementally extending each accepted catalogue. Human Gate
-  1 reviews the case document; automation implements it. The exact Test commit
-  includes and freezes both document and scripts. The Orchestrator verifies
-  their correspondence instead of asking Human to infer cases from code.
-  Current/unaccepted case documents are hidden Test material for Worker.
+- For new issues, explicitly including #85, `tests/doc/README.md` holds shared
+  guidance and a type/feature index, linking separate feature requirements and
+  case references. Persist the complete `K.payload.requirements` as readable
+  requirements, not an inaccessible local-K citation. Cases use a concise table
+  without execution steps or per-run evidence. Human Gate 1 primarily reviews
+  those two feature files. Orchestrator checks requirements against K and
+  case-to-script correspondence; the same Test freezes documents and scripts.
+  Public requirements may reach Worker through its reviewed handoff; current/
+  unaccepted cases, scripts and the case-bearing index remain hidden Test.
   KPI case documents remain under `docs/tests/`, maintained by KPI test issues.
   Do not backfill case documents for historical accepted features. See the
   functional case documentation rules in `agent-discipline/documentation-governance.md`.
@@ -315,8 +317,8 @@ are implemented.
 Project documentation is split into two physically separated categories, and the
 agent respects the boundary in both directions:
 
-- **Category A — development documentation (`docs/`, plus RTD CfgFile CLI
-  functional case catalogues in `tests/doc/`)**: pure project/engineering
+- **Category A — development documentation (`docs/`, plus agent-agnostic RTD
+  CfgFile CLI feature references in `tests/doc/`)**: pure project/engineering
   content — architecture and contract (`specs/`), the test method and cases
   (`tests/`), delivery staging (`roadmaps/`), and development inputs
   (`references/`). Self-contained and agent-agnostic: **no** agent-discipline
@@ -326,10 +328,10 @@ agent respects the boundary in both directions:
   (`AGENTS.md`), the role definitions (`agent-discipline/subagents/`), and the charter's
   supplements (`agent-discipline/`: the lessons log, the owner's review-comment
   tracker, the documentation-governance rules, and the read-only review archive).
-  Agent functional case catalogues and their shared navigation in `tests/doc/`
-  also belong to Category B. Category B **may** reference Category A;
-  Category A must never reference B. Classify case files by their subject;
-  the shared directory is not permission to mix Agent rules into product cases.
+  The shared `tests/doc/` guide, Agent feature references and requirements
+  renderings containing Agent obligations also belong to Category B. Category B
+  **may** reference Category A; Category A must never reference B. Classify by
+  content; the shared directory does not permit Agent rules in product cases.
 
 Usage rules:
 
@@ -351,3 +353,4 @@ The per-document map and full authoring rules are in
 | --- | --- | --- |
 | 2026-09-06 | 0.2.0 | Aligned active guidance with structured v2 handoffs, parallel lanes, frozen scoped Test, three incremental corrections, one terminal review and exact Candidate PR; retained passive monitoring and separated later KPI work. |
 | 2026-09-06 | 0.2.1 | Required prospective type-classified functional case documents as Human Gate 1's review surface, bound documents and scripts to the same Test, and retained separate issue-owned KPI documents without historical backfill. |
+| 2026-09-06 | 0.2.2 | Split functional review documentation into shared guidance and feature requirements/cases, made the two feature files primary for Human review, and retained public-requirement/private-case separation. |

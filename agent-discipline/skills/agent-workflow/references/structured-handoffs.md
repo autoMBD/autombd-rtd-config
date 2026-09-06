@@ -2,7 +2,7 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.1.1 |
+| Version | 0.1.2 |
 | Date | 2026-09-06 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Functional-development role interfaces, local delivery validation, confidentiality, and explicit legacy migration boundaries. |
@@ -28,12 +28,14 @@ diagnostic text. The guard checks shape, bindings and local order; it does not
 prove a natural-language requirement true, authenticate a Human, or discover
 all affected code automatically. Human Gate 1 reviews the Test Gate; it does not
 require Human review of the Worker's Implementation or every protocol field.
-For new issues including #85, its primary review surface is the type-classified
-functional case document under `tests/doc/`, not a source diff from which Human
-must infer cases. Follow the [documentation rules](../../../documentation-governance.md#functional-case-documents-and-human-review).
-Tester derives the document from K and implements it; Orchestrator verifies
-case-to-script correspondence. The exact Test commit binds both document and
-scripts, so the existing Test tip/manifest/Impact Set freeze still applies.
+For new issues including #85, its primary review surfaces are two feature
+references under `tests/doc/`: the complete readable `K.payload.requirements`
+and a concise case table. Shared explanation/index links both without copying
+their bodies. Follow the [documentation rules](../../../documentation-governance.md#functional-case-documents-and-human-review).
+Orchestrator checks requirement fidelity; Tester derives and implements cases.
+Execution steps, automation mapping and prevalidation evidence stay in scripts/
+reports, not the case reference. Exact Test binds both feature documents, index
+changes and scripts; the existing Test tip/manifest/Impact Set freeze applies.
 Use existing report coverage/locations and exact-commit links; this rule adds
 no artifact kind, schema member, extra approval stage or executable validator.
 
@@ -106,8 +108,11 @@ and prevalidation happen independently of Worker implementation. After Gate 1,
 Tester can read Test and Candidate Implementation to diagnose results but cannot
 modify either. Worker never reads the current or unaccepted hidden Test; normal
 accepted regression code already in G is not a hidden source.
-The same visibility boundary applies to case documents: current/unaccepted
-catalogues are never Worker inputs. KPI documents stay under `docs/tests/`,
+Current/unaccepted case references and case-bearing indexes are never Worker
+inputs. The standalone requirements rendering is public, supplied separately
+through the reviewed handoff without Test worktree/case access. Its durable
+repository copy supports Human review; it neither replaces complete K nor
+requires committing runtime `.agent-state/` artifacts. KPI documents stay under `docs/tests/`,
 maintained by separate KPI test issues; historical accepted features are not
 retroactively required to receive functional case documents.
 
@@ -258,3 +263,4 @@ case review, results and dashboard are separate #100–#102 work.
 | --- | --- | --- |
 | 2026-09-06 | 0.1.0 | Documented structured functional handoffs, scoped evidence, safe diagnostics, local guard boundaries and explicit legacy migration. |
 | 2026-09-06 | 0.1.1 | Bound document-first Human Test review to existing exact Test artifacts, type-classified prospective catalogues and the unchanged confidentiality/KPI boundaries. |
+| 2026-09-06 | 0.1.2 | Split the review surface into durable public requirements and concise private cases with a shared index; kept executable evidence in existing reports and added no schema or Gate. |
