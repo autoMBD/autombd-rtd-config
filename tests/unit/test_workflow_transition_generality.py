@@ -40,7 +40,7 @@
 # File:        test_workflow_transition_generality.py
 # Author:      autoMBD <tkung.lqk@foxmail.com>
 # Date:        2026-09-06
-# Version:     0.1.0
+# Version:     0.1.1
 # Description: Independent Worker tests of public transition histories.
 # =================================================================================
 
@@ -75,7 +75,7 @@ def history(api, request):
     return History(api, request.param)
 
 
-def rejected(h, ref, code, *, event=None, state=None, context=None):
+def rejected(h, ref, code, *, event=None, state=None, context=None, pointer=None):
     event = event or h.event(ref)
     state = h.state if state is None else state
     context = h.context if context is None else context
@@ -84,6 +84,8 @@ def rejected(h, ref, code, *, event=None, state=None, context=None):
         h.module.transition(state, event, context=context)
     assert caught.value.code == code
     assert caught.value.pointer.startswith("/")
+    if pointer is not None:
+        assert caught.value.pointer == pointer
     assert caught.value.as_dict() == {"error": {"code": code, "pointer": caught.value.pointer,
                                                 "message": caught.value.message}}
     assert (state, event, context) == before
@@ -667,6 +669,34 @@ def test_rerun_dispatch_cannot_reuse_any_accepted_dispatch(history):
     h.body(fresh)["predecessors"] += [old, invalid]
     fresh["sha256"] = digest(h.body(fresh))
     rejected(h, fresh, "STALE_EVENT")
+
+
+@pytest.mark.parametrize("field", ["execution_id", "dispatch_id"])
+@pytest.mark.parametrize("reuse_current", [False, True])
+@pytest.mark.parametrize("missing_checks", [False, True])
+def test_rerun_historical_identity_has_stale_precedence_and_exact_pointer(
+        history, field, reuse_current, missing_checks):
+    h = history
+    h.assembled()
+    historical = h.state["candidate"]["envelope"]
+    h.result("INVALID_RUN")
+    h.candidate(rerun=True)
+    current = h.state["candidate"]["envelope"]
+    invalid = h.result("INVALID_RUN")
+    reused = current if reuse_current else historical
+    fresh = report_copy(h, current, rerun_of=invalid,
+                        execution_id=f"{h.seed}-fresh-execution",
+                        dispatch_id=f"{h.seed}-fresh-dispatch")
+    body = h.body(fresh)
+    body["payload"][field] = h.body(reused)["payload"][field]
+    body["predecessors"] += [current, invalid]
+    fresh["sha256"] = digest(body)
+    event = h.event(fresh)
+    context = copy.deepcopy(h.context)
+    if missing_checks:
+        context["checks"] = []
+    rejected(h, fresh, "STALE_EVENT", event=event, context=context,
+             pointer=f"/artifact/payload/{field}")
 
 
 def test_missing_receipt_identity_is_invalid_evidence_not_stale(history):

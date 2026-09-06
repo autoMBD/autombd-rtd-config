@@ -40,7 +40,7 @@
 # File:        workflow_transition_rules.py
 # Author:      autoMBD <tkung.lqk@foxmail.com>
 # Date:        2026-09-06
-# Version:     0.1.0
+# Version:     0.1.1
 # Description: Pure global lifecycle and identity rules for transitions.
 # =================================================================================
 
@@ -435,8 +435,8 @@ def business_plan(state, artifact, ref, memory, decision):
             evidence(p["candidate"]["parents"] == [commit(p["test_tip"]), commit(p["implementation_tip"])],
                      "payload/candidate/parents")
             for old in history_bodies(state, memory):
-                stale(p["execution_id"] != old["payload"].get("execution_id") and
-                      p["dispatch_id"] != old["payload"].get("dispatch_id"), "payload/execution_id")
+                for field in ("execution_id", "dispatch_id"):
+                    stale(p[field] != old["payload"].get(field), "payload/" + field)
             if p["rerun_of"]:
                 order(state["candidate"] is not None and state["candidate"]["result"] is not None)
                 if tester:

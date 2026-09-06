@@ -2,7 +2,7 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.1.0 |
+| Version | 0.1.1 |
 | Date | 2026-09-06 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Public memory-only transition API, wire, lifecycle, error order and evidence boundary. |
@@ -142,7 +142,13 @@ both actual facts.
 
 Reruns retain Candidate, Test/Implementation tips, manifests, Impact Set,
 coverage join and indices. Execution and dispatch identities cannot be reused.
-Stale former-execution results cannot become the current result.
+A proposed new rerun reusing either identity from accepted history is
+`STALE_EVENT` at identity priority 3, even with otherwise current bindings.
+Available reuse facts take precedence over absent receipts; the pointer names
+the reused `execution_id` or `dispatch_id` field. This differs from replaying
+the exact current artifact, which is `DUPLICATE_EVENT` when no higher-priority
+identity drift exists. Stale former-execution results cannot become the current
+result.
 
 For an already consumed repaired report, replacement does not reapply the
 business transition. Historical bytes remain unchanged. A repaired Reviewer
@@ -231,3 +237,4 @@ approval.
 | Date | Version | Description |
 | --- | --- | --- |
 | 2026-09-06 | 0.1.0 | Documented memory-only API, wire, lifecycle, evidence, errors, CLI, trust limits and salvage. |
+| 2026-09-06 | 0.1.1 | Clarified historical rerun identity reuse as priority-3 STALE_EVENT with its offending field pointer. |
