@@ -740,7 +740,9 @@ def test_cli_unreadable_file_and_transition_rejection(api):
         # Fault injection at the public reducer call tests only the thin adapter's
         # promised exception routing; it does not alter or inspect production internals.
         driver = """import runpy, sys
+from pathlib import Path
 target, mode = sys.argv[1:3]
+sys.path.insert(0, str(Path(target).resolve().parent))
 sys.argv = [target] + sys.argv[3:]
 def fault(frame, event, arg):
     if event == 'call' and frame.f_code.co_name == 'transition' and 'WorkflowTransitionError' in frame.f_globals:
