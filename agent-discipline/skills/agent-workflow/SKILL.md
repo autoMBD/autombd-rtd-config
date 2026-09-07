@@ -7,8 +7,8 @@ description: Validate structured role handoffs and exact identities for the func
 
 | Field | Value |
 | --- | --- |
-| Version | 0.2.0 |
-| Date | 2026-09-06 |
+| Version | 0.2.3 |
+| Date | 2026-09-08 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Structured role handoff guidance, declarative lifecycle boundaries, legacy compatibility and passive monitoring. |
 
@@ -30,6 +30,13 @@ hints in prose.
 Human-commanded manual bootstrap remains bounded by its explicit authorization.
 A passing checker does not authorize dispatch, Candidate assembly, acceptance,
 remote writes, deployment or progression.
+The normal complete profile has two routine Human reviews: Test Gate, then
+exact Candidate PR or terminal failure review. Intermediate Agent checkpoints
+are not additional Human gates. Read the protocol's
+[Human review boundaries](references/structured-handoffs.md#human-review-boundaries-and-bootstrap)
+and [terminal finding route](references/structured-handoffs.md#reviewer-findings-become-follow-up-issues).
+Preserve stepwise bootstrap authority without generalizing it to future runs.
+Never launch initialization GUI during an automated Loop.
 
 ## Functional lifecycle
 
@@ -39,19 +46,33 @@ remote writes, deployment or progression.
   Worker owns TDD and generality tests, without access to owner Test.
 - Human Gate 1 reviews exact Test T as soon as Test is READY, without waiting
   for Worker READY. Worker does not wait for Gate 1 to implement. Approval
-  freezes T, its manifest and Impact Set; do not expand the scoped functional
-  gate in response to a Candidate.
+  freezes reviewed cases, assertions, expected results and selected acceptance
+  scope. Preserve the approved T as the original source anchor; do not expand
+  the scoped functional gate in response to a Candidate.
 - C0 binds approved T and I0, their manifests and checked coverage join. Valid
   Implementation failures permit three incremental corrections (C1..C3), using
   the same Worker lane/session/worktree/branch and strict Implementation
-  ancestry. Invalid runs rerun the same Candidate with a new execution identity.
+  ancestry. Invalid runs with unchanged source rerun the same Candidate with a
+  new execution identity.
   Delivery repair changes format/evidence references only, not source or counts.
+- Apply the [shared non-case repair boundary](references/structured-handoffs.md#frozen-cases-and-non-case-repairs).
+  Tester may repair non-case drivers/support/metadata without another approval;
+  changing frozen cases requires Human approval first. Record real new source
+  lineage when source changes, recheck delivery and rerun affected checks.
+  Orchestrator repairs execution handoffs and directs retest; if ambiguity
+  affected Implementation and valid cases expose a defect, remove the public
+  ambiguity before the original Worker fixes it in a counted attempt. Do not
+  claim unchanged source, a free Worker retry or a runtime capability that the
+  current guard cannot represent.
 - The Tester sends its full report only to the Orchestrator. Worker receives
   disclosure-reviewed public diagnoses with actionable production locations and
   public requirement/rule references. Consumer-local validation must not open
   confidential predecessor paths; bind the supplied safe central CHECKED result.
-- Reach one terminal Reviewer on success or failure; do not use review as
-  another correction cycle. Success requires Tester PASS plus Reviewer APPROVED.
+- Reach one terminal Reviewer on success or failure; new Implementation defects
+  go to independent issues with priority/impact/evidence for final Human
+  disposition, not another old-task correction cycle. Encoded automatic success
+  requires Tester PASS plus Reviewer APPROVED; preserve any different explicit
+  Human disposition separately without inventing a verdict.
   The success PR head is the exact accepted Candidate including Test and
   Implementation; lessons and review artifacts stay outside that head.
   Failure preserves the latest Implementation and does not become a success PR.
@@ -168,3 +189,6 @@ lane/session/Implementation identity.
 | Date | Version | Description |
 | --- | --- | --- |
 | 2026-09-06 | 0.2.0 | Migrated active guidance to W v2 structured handoffs, parallel readiness, frozen scoped functional checks and terminal review; documented explicit v1 compatibility and retained #95 monitoring. |
+| 2026-09-07 | 0.2.1 | Routed metadata-only repairs through the shared case-freeze boundary, preserving source and accounting while documenting separate driver/source authority and runtime limits. |
+| 2026-09-07 | 0.2.2 | Routed authorized non-case Tester support repair and corrected execution retests separately from counted Worker fixes, preserving frozen case approval and truthful revised source identities. |
+| 2026-09-08 | 0.2.3 | Linked two routine Human reviews and independent terminal-finding issues, preserving explicit bootstrap and runtime limits. |

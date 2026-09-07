@@ -2,8 +2,8 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.1.2 |
-| Date | 2026-09-06 |
+| Version | 0.1.5 |
+| Date | 2026-09-08 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Functional-development role interfaces, local delivery validation, confidentiality, and explicit legacy migration boundaries. |
 
@@ -35,7 +35,8 @@ their bodies. Follow the [documentation rules](../../../documentation-governance
 Orchestrator checks requirement fidelity; Tester derives and implements cases.
 Execution steps, automation mapping and prevalidation evidence stay in scripts/
 reports, not the case reference. Exact Test binds both feature documents, index
-changes and scripts; the existing Test tip/manifest/Impact Set freeze applies.
+changes and scripts. The reviewed cases and expected results are frozen;
+non-case delivery and execution support follow the repair boundary below.
 Use existing report coverage/locations and exact-commit links; this rule adds
 no artifact kind, schema member, extra approval stage or executable validator.
 
@@ -86,6 +87,37 @@ CONTINUE.
 
 ## Functional-development handoff map
 
+### Human review boundaries and bootstrap
+
+The normal complete functional-development workflow has exactly two routine
+Human review boundaries:
+
+1. **Test Gate approval:** review the feature requirements and case table as
+   the Test Gate as soon as Test is READY, without waiting for Worker READY.
+2. **Final review:** review the exact Candidate PR and terminal findings on the
+   functional-PASS path, or the terminal failure report and retained work on
+   the failure path. Failure review does not create a success PR.
+
+These are Human reviews, distinct from the single Agent Reviewer. K compilation,
+lane launch/readiness, prevalidation, handoff validation, disclosure review,
+metadata/support repair and in-budget Worker corrections are Agent-owned work,
+not additional routine Human gates. A scoped development authorization lets
+Orchestrator coordinate those steps; it does not grant merge or unrelated
+authority. Real new requirements or frozen-case changes require the relevant
+Human decision; case changes amend the Test Gate approval, not a third standard
+gate. Resolve ambiguity from existing public authority before asking Human for
+a genuinely missing semantic or operational decision.
+
+Manual bootstrap may deliberately require Human involvement at each step.
+Keep that run's explicit authority separate; do not turn its observation points
+or one-off exceptions into permanent gates. The authorized post-terminal #85 C2
+repair is retained history, not the normal route for later Reviewer findings.
+Missing runtime support is recorded honestly; written policy is not a deployed
+executor or a CHECKED receipt. Discipline improvements remain a separate
+reviewed change, not merge-only edits to the functional Candidate.
+
+### Artifact boundaries
+
 | Boundary | Artifact | Required meaning |
 | --- | --- | --- |
 | Authority compilation | task-contract | One public K for both lanes; evidence-backed requirements and precedence, no hidden cases |
@@ -105,8 +137,10 @@ CONTINUE.
 
 Tester is one role with two phases, not a new Test-author role. Gate authoring
 and prevalidation happen independently of Worker implementation. After Gate 1,
-Tester can read Test and Candidate Implementation to diagnose results but cannot
-modify either. Worker never reads the current or unaccepted hidden Test; normal
+Tester can read Test and Candidate Implementation to diagnose results. Executed
+snapshots remain read-only; Tester may repair its non-case support in its own
+lane under the shared boundary below, never production or unapproved case
+semantics. Worker never reads the current or unaccepted hidden Test; normal
 accepted regression code already in G is not a hidden source.
 Current/unaccepted case references and case-bearing indexes are never Worker
 inputs. The standalone requirements rendering is public, supplied separately
@@ -130,17 +164,100 @@ I3 and C1, C2 or C3. Each I continues the same Worker lane and is a strict
 descendant of the prior I; commits within a lane are not correction counts.
 Do not rebuild the same implementation as a fresh sibling from G.
 
-Within the approved series, K, Test, its manifest and the Test Impact Set stay
-frozen. An invalid execution can be repeated against the same Candidate using
-a new execution identity, without a new Candidate or correction. It is not
-permission to self-exempt an ambiguous implementation failure: escalate unclear
-responsibility to Human with evidence.
+Within the approved series, K and the reviewed cases, scenarios, assertions,
+expected results and selected acceptance scope remain controlling. Changing a
+frozen case requires prior Human approval. The approved Test tip is preserved as
+the original source anchor; non-case support repairs bind their actual new
+source identities and unchanged case approval as specified below. Never pretend
+changed source still has the old T SHA or reuse stale execution evidence.
+An invalid execution with unchanged source can repeat against the same Candidate
+using a new execution identity, without a Worker correction. Source-changing
+support repair requires a newly bound executable snapshot, not that same-source
+retry. Neither path exempts a valid Implementation failure from correction
+accounting; refer genuine unresolved responsibility to Human with evidence.
 
 Before Gate 1, a genuine K change produces a complete new revision, its change
 authority, updated Test and Worker Envelopes, and explicit acknowledgements from
 both lanes. Acknowledgement is not READY. Preserve unaffected source and list
-invalidated receipts. After Gate 1, do not mutate K/Test behind the existing
-approval; report the invalid series and obtain the required Human disposition.
+invalidated receipts. After Gate 1, do not mutate K or frozen cases behind the
+existing approval: obtain the required Human decision before a semantic change.
+An unchanged-case support repair follows the local path below; it is not by
+itself an invalid-series or terminal condition.
+
+### Frozen cases and non-case repairs
+
+Human freezes the reviewed cases: scenarios, discriminating inputs/conditions,
+assertions, expected results and pass/fail criteria, with their selected checks
+and exclusions. A change to those semantics requires Human approval before it
+is made, whether it appears in case prose, an assertion, a fixture or a driver.
+File location or a "support-only" label does not decide the boundary.
+
+Tester may repair its non-case metadata, execution drivers and support without
+another Human approval when those frozen semantics remain unchanged. Tester
+never fixes Worker production code. Orchestrator owns corrected execution
+handoffs and disclosure; implementation failures remain the original Worker's
+normal incremental corrections. Apply the following distinction:
+
+| Observed problem | Required action | Accounting and approval |
+| --- | --- | --- |
+| Erroneous delivery metadata only | Return it to its original producer; correct and recheck the delivery | Same source and historical verdict; no Worker attempt or repeated case approval |
+| Tester-owned non-case driver/support defect | Tester repairs its own lane; Orchestrator checks unchanged cases and binds corrected source/delivery; Tester reruns affected checks | New source/execution identities where bytes changed; no Worker attempt or new Human approval |
+| Orchestrator handoff mistake prevents or misdirects test execution | Orchestrator rewrites the affected handoff, removes ambiguity and sends rechecked inputs for Tester to retest | No Implementation failure inferred solely from broken execution; no Worker attempt for the handoff repair/retest |
+| A handoff ambiguity affected delivered Implementation and a valid case exposes its defect | Preserve the valid failure; Orchestrator removes public ambiguity before the next attempt; original Worker performs the incremental fix | Normal valid-failure path consumes one Worker attempt within the existing budget; no free restart or metadata exemption |
+
+If both execution support and Implementation are affected, first restore a
+trustworthy execution path, then use the real case result to route the
+Implementation defect. Do not relabel a valid failure as a delivery problem,
+weaken its expected result, or escalate every local mistake to a global terminal.
+
+A metadata-only repair must preserve the reviewed scenarios, discriminating
+conditions, assertions, expected results and pass/fail criteria, selected checks
+and exclusions, exact source tips and actual source inventory/content, recorded
+business verdicts and lifecycle identities/counts. It may describe an already
+existing dependency accurately;
+it must not invent a dependency or missing predecessor, change actual coverage,
+add/remove a check, replace a command, or relabel a failed result as PASS.
+Manifest/reference corrections must still describe that same existing source;
+their metadata is not immune to repair, and a changed digest needs fresh checks.
+For Human decisions this also preserves the original gate, decision and exact
+subject identity. A format fix cannot change REQUEST_CHANGES to APPROVE or
+redirect approval to another Test/Candidate. Do not infer missing business
+fields from the desired next action; actual binding drift is not metadata repair.
+
+The original producer supplies corrected delivery bytes at a new artifact
+path/identity, with the original input/rejection, reason and precise diff retained. The
+Orchestrator reviews semantic equivalence and disclosure, reconciles affected
+references to the new digest, then obtains fresh central and consumer checks
+before consumption. A metadata-only reconciled report/approval reference is not
+a new READY, Human vote, execution, Candidate or correction. Never rewrite
+original approval or run evidence, or reuse a receipt for changed bytes.
+Unaffected functional evidence need not rerun merely because descriptive
+metadata changed; a corrected execution handoff requires the directed retest.
+
+Repair of test execution code (for example a loader or fault-injection driver)
+is source repair, not metadata repair. When it is genuinely non-case support,
+Tester may perform it under this rule without a separate Human source-repair
+approval. Keep the original Test/source, failure and Human approval; record the
+incremental old/new source tips, changed files/digests and why all frozen case
+semantics are unchanged. Update source inventories/manifests, affected references
+and the exact executable Test/Candidate binding. A source change cannot claim
+the old Test or Candidate SHA. Orchestrator reissues the affected execution
+handoff; Tester reruns the affected selected checks and records fresh execution
+identities/results. This does not consume or reset a Worker attempt. A real
+case or requirement change still needs Human approval; ambiguity about that
+boundary blocks only the affected repair while the distinction is resolved.
+
+Use registered `delivery-repair` when it represents the real rejected delivery.
+The current validator still restricts that variant to a directly rejected
+artifact and preserves whole attachment references such as `impact_set`.
+That historical variant does not represent a non-case source-changing repair.
+These instructions change discipline, not the guard/schema or deployed runtime.
+Where the authorized metadata/support repair cannot be represented, record the
+precise limitation and use an authorized, auditable manual-bootstrap handoff
+with the real lineage and renewed checks. Ask only for genuinely missing
+operational authority, not a new approval for already-authorized unchanged-case
+Tester repair. Never fabricate rejection, relax a guard, manufacture CHECKED,
+or use unsupported representation alone to declare terminal functional failure.
 
 ## Scoped evidence and the diagnostic bridge
 
@@ -208,6 +325,9 @@ capability isolation. Those boundaries remain explicit.
 | Condition | Owning action | Resume condition |
 | --- | --- | --- |
 | Missing/illegal member or wrong reference | Original producer receives delivery-repair | Corrected delivery passes; source, verdict and counters unchanged |
+| Incorrect handoff metadata after Test approval | Original producer repairs under the shared non-case boundary | Same cases/scope and source; corrected bytes/references checked, no repeated case approval or Worker correction |
+| Non-case Tester support or execution-handoff defect | Tester repairs its support; Orchestrator corrects and rechecks execution handoff | Preserved cases; actual source lineage, fresh affected execution evidence, no Worker attempt |
+| Handoff ambiguity affected Implementation and valid testing exposes a defect | Orchestrator removes public ambiguity before the next attempt; original Worker fixes | Normal incremental valid-failure correction consumes an attempt; no clean-room restart |
 | Wrong cwd/HEAD/G/W/K or stale local copy | Orchestrator checks and restores only the correct owned context | Actual identities agree; do not overwrite user changes or rebase to hide drift |
 | Missing predecessor or skipped check | Orchestrator supplies the real missing step | Verified local order; do not invent a success receipt |
 | Private data in Worker-visible delivery | Orchestrator rejects before sending and repeats disclosure review | Public actionable delivery; an actual prior leak must still be recorded |
@@ -238,6 +358,47 @@ Implementation. Reviewer lessons and execution records stay outside that head;
 there is no lesson child commit substituted for the accepted Candidate. Final
 approval and merge evidence must bind that same delivery. PR-only repository
 protection is not bypassed by this local protocol.
+Before requesting review, push the exact intended branch with an explicit
+source:destination refspec, set its matching upstream and verify the remote
+head. Never let a feature/policy branch track master or use an ambiguous push.
+Publish or update the issue's current review entry with exact-commit links;
+local artifacts alone are not a usable remote review packet. A replacement
+packet supersedes the prior entry explicitly without rewriting old approvals.
+
+### Reviewer findings become follow-up issues
+
+A new Implementation defect discovered by the terminal Reviewer goes to an
+independent issue, not the old task's remaining attempts. Reviewer owns the
+technical description/evidence; Orchestrator publishes and links the issue when
+Reviewer has no authorized remote-write interface. Check for an equivalent
+issue first. Publication does not authorize another Worker or repair cycle.
+
+Each issue identifies the original task/Candidate and finding, public
+requirement, affected production surface, expected versus observed or statically
+inferred behavior, evidence/uncertainty, impact/risk, recommended priority with
+rationale, and implications for the current Candidate's merge. Keep hidden case
+literals, assertions and confidential reports out of public diagnoses. Use
+existing finding/evidence fields plus the issue body; do not invent members in
+the closed handoff schema.
+
+Human decides immediate/deferred treatment and current Candidate disposition
+at final review. A finding is neither automatically global-blocking nor
+automatically harmless because Tester passed: PASS establishes tested scope,
+not absence of other defects. A new issue cannot erase a mandatory/safety
+failure, reset the old budget, relabel a verdict or grant merge permission.
+A Human-selected follow-up has its own scoped G/K/Test and lifecycle, preserving
+reusable Implementation instead of rewriting it. Frozen-case changes still
+require their Test Gate approval.
+
+Keep the single Reviewer report and old Tester verdict immutable. Do not
+dispatch a second Reviewer or post-terminal correction by default. Existing
+automatic success validation still requires Tester PASS and Reviewer APPROVED;
+where explicit Human disposition differs from that encoded route, preserve it
+as manual authority, not a fabricated APPROVED or automatic SUCCESS.
+Runtime/intake support belongs to follow-on packages; this documentation change
+does not implement it.
+
+### Compatibility and runtime limits
 
 Legacy W v1 is preserved at `agent-discipline/contracts/workflow-v1.json` for
 explicit validation of old records. Active W v2 declares the new lifecycle and
@@ -264,3 +425,6 @@ case review, results and dashboard are separate #100–#102 work.
 | 2026-09-06 | 0.1.0 | Documented structured functional handoffs, scoped evidence, safe diagnostics, local guard boundaries and explicit legacy migration. |
 | 2026-09-06 | 0.1.1 | Bound document-first Human Test review to existing exact Test artifacts, type-classified prospective catalogues and the unchanged confidentiality/KPI boundaries. |
 | 2026-09-06 | 0.1.2 | Split the review surface into durable public requirements and concise private cases with a shared index; kept executable evidence in existing reports and added no schema or Gate. |
+| 2026-09-07 | 0.1.3 | Distinguished frozen case semantics from repairable delivery metadata; defined same-producer repair, semantic/digest checks and unchanged accounting, while separating Test-driver source changes and current runtime limitations. |
+| 2026-09-07 | 0.1.4 | Applied Human's non-case repair authority to Tester support, preserved case-change approval and real source lineage, and separated execution-handoff retests from counted Implementation corrections without claiming runtime changes. |
+| 2026-09-08 | 0.1.5 | Defined two routine Human reviews, issue-based terminal findings and preserved bootstrap exceptions; required Human-decision preservation in format repairs and exact remote review delivery, without claiming runtime changes. |

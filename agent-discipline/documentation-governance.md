@@ -2,8 +2,8 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.1.10 |
-| Date | 2026-09-06 |
+| Version | 0.1.13 |
+| Date | 2026-09-08 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Documentation-governance rules for the RTD CfgFile CLI project. Defines the two-category split, official tool name, changelog integrity, archive policy, and the authoritative cross-category documentation map. |
 
@@ -83,9 +83,25 @@ At Gate 1, Tester supplies exact-Test-commit links to **two primary review
 files: the feature requirements and its cases**, plus their changes. The general
 guide links both; Human need not infer requirements from local K or cases from
 code, nor review every handoff field. The Test commit contains those documents,
-the corresponding index update and automation. The existing approval freezes
-their exact bytes with T/manifest/Impact Set; this adds no extra Human gate.
+the corresponding index update and automation. Preserve that exact T and Human
+approval as the original review evidence. Human freezes case semantics and
+expected results, not non-case metadata or execution support. Under the
+[shared non-case repair rules](skills/agent-workflow/references/structured-handoffs.md#frozen-cases-and-non-case-repairs),
+Tester may repair its non-case drivers/support without another approval; source
+changes require actual new source/digest lineage, revised execution bindings and
+fresh affected results. Metadata-only repair keeps source unchanged. Neither
+path consumes a Worker attempt; changing frozen cases requires prior Human
+approval. Historical document links/approval are retained, not overwritten to
+make repaired support appear to have been in the originally reviewed Test.
 Prevalidation details and results remain supporting evidence, not case prose.
+The complete normal functional workflow has two routine Human review boundaries:
+this Test Gate and final exact-Candidate PR review or terminal failure review.
+Document formatting, metadata repair and Agent handoff checks do not add Human
+gates. Stepwise Human bootstrap is a separately authorized temporary mode.
+Reviewer-discovered defects are captured as independent issues with priority,
+impact and evidence for final Human disposition, not new chapters of an old
+correction cycle. Follow the shared terminal-finding route; no hidden cases
+are published as the follow-up issue's Implementation specification.
 
 Later issues update only their affected feature references and index entry,
 preserving accepted case IDs and history. A changed requirement or expectation
@@ -232,6 +248,9 @@ flowchart TD
 
 | Date | Version | Description |
 | --- | --- | --- |
+| 2026-09-08 | 0.1.13 | Clarified two routine Human reviews and issue-based terminal findings without adding case-review burdens or publishing hidden cases. |
+| 2026-09-07 | 0.1.12 | Preserved original case-review evidence while permitting non-case Tester support repairs without renewed approval, with revised source identities and affected execution evidence kept separate from frozen case semantics. |
+| 2026-09-07 | 0.1.11 | Separated frozen reviewed cases/source binding from repairable handoff metadata and linked the shared no-reapproval/no-correction repair boundary. |
 | 2026-09-06 | 0.1.10 | Replaced growing type-wide catalogues with one guide/index and feature references; made complete durable requirements plus concise cases the two Gate review files, without procedural case prose or changed isolation/KPI scope. |
 | 2026-09-06 | 0.1.9 | Established prospective type-classified functional case catalogues and document-first Human Test review, exact doc/script binding, incremental ownership and distinct KPI issue-maintained documents; no historical backfill. |
 | 2026-08-29 | 0.1.8 | Renamed the Agent Loop review as the bootstrap trust-tracing lane and documented its split baseline/design/snapshot/append-only-event responsibilities. |
