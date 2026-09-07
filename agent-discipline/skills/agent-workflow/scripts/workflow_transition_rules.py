@@ -39,8 +39,8 @@
 # Project:     RTD CfgFile CLI <https://github.com/autoMBD/autombd-rtd-config>
 # File:        workflow_transition_rules.py
 # Author:      autoMBD <tkung.lqk@foxmail.com>
-# Date:        2026-09-06
-# Version:     0.1.1
+# Date:        2026-09-07
+# Version:     0.1.2
 # Description: Pure global lifecycle and identity rules for transitions.
 # =================================================================================
 
@@ -177,6 +177,7 @@ def business_plan(state, artifact, ref, memory, decision):
     original = memory.get(replacement["original"]) if replacement else None
     original_payload = payload(original)
     repaired_dispatch = False
+    preserves_business = not replacement
 
     def ck(condition, code, field):
         decision.check(condition, code, "/artifact/" + field)
@@ -219,6 +220,8 @@ def business_plan(state, artifact, ref, memory, decision):
                     "disposition", "pr", "final_decision", "revision_ack")
                 for field in preserved:
                     evidence(p.get(field) == original_payload.get(field), "payload/" + field)
+                preserves_business = all(p.get(field) == original_payload.get(field)
+                                         for field in preserved)
                 required_business = {"test-gate-report": "status", "implementation-report": "status",
                     "tester-confidential-report": "outcome", "reviewer-report": "verdict",
                     "terminal-record": "result"}.get(kind)
@@ -273,6 +276,14 @@ def business_plan(state, artifact, ref, memory, decision):
 
     # Logical repair does not replay READY, correction, execution or review.
     if accepted_replacement:
+        # The accepted original established these identities independently of
+        # whether the replacement preserves its other business values.
+        for field in ("lane", "execution_id", "review_id"):
+            if field in original_payload:
+                stale(p.get(field) == original_payload[field], "payload/" + field)
+        if "dispatch_id" in original_payload:
+            stale(p.get("dispatch_id") == original_payload["dispatch_id"] or repaired_dispatch,
+                  "payload/dispatch_id")
         _replace_slots(result, replacement["original"], ref)
         return result
 
@@ -336,7 +347,7 @@ def business_plan(state, artifact, ref, memory, decision):
             illegal(bool(pending), "payload/implementation_index")
         if present:
             status = p["status"]
-            if lane == "worker" and pending and launch:
+            if lane == "worker" and pending and launch and preserves_business:
                 stale(p["implementation_index"] == launch["correction_index"], "payload/implementation_index")
                 stale(p["previous_implementation"] == launch["previous_implementation"], "payload/previous_implementation")
             if status == "K_ACK":
@@ -368,7 +379,7 @@ def business_plan(state, artifact, ref, memory, decision):
                     evidence(p[tip_key] is not None and p["manifest"] is not None, "payload/" + tip_key)
                     if lane == "test":
                         evidence(p["impact_set"] is not None, "payload/impact_set")
-                    elif pending:
+                    elif pending and preserves_business:
                         if launch:
                             stale(p["implementation_index"] == launch["correction_index"], "payload/implementation_index")
                             stale(p["previous_implementation"] == launch["previous_implementation"], "payload/previous_implementation")
@@ -377,7 +388,8 @@ def business_plan(state, artifact, ref, memory, decision):
                                   p["previous_implementation"] == commit(impl["implementation_tip"]),
                                   "payload/previous_implementation")
                         result["worker"]["pending_correction"] = None
-                    else:
+                    elif preserves_business and not state["candidate"] and not (
+                            state["stop"] or state["review"] or state["terminal"]):
                         stale(p["implementation_index"] == 0 and p["previous_implementation"] is None,
                               "payload/implementation_index")
                     result[lane]["ready"] = ref
@@ -391,7 +403,7 @@ def business_plan(state, artifact, ref, memory, decision):
                 if test:
                     stale(p["subject_sha"] == commit(test["test_tip"]), "payload/subject_sha")
                     ready_body = memory.get(state["test"]["ready"])
-                    stale(ready_body["task_contract"] == current_k, "task_contract")
+                    order(ready_body["task_contract"] == current_k)
                 direct(state["test"]["ready"])
                 if p["decision"] == "APPROVE":
                     result["test"]["approval"] = ref
@@ -416,13 +428,16 @@ def business_plan(state, artifact, ref, memory, decision):
         order(state["test"]["approval"] is not None and state["test"]["ready"] is not None
               and state["worker"]["ready"] is not None)
         illegal(not state["worker"]["pending_correction"], "payload/candidate_index")
+        next_implementation = bool(candidate and impl and
+            impl["implementation_index"] == candidate["candidate_index"] + 1 and
+            not state["worker"]["pending_correction"])
         if present:
             for needed in (state["test"]["approval"], state["test"]["ready"], state["worker"]["ready"]):
                 direct(needed)
             for report_ref in (state["test"]["ready"], state["worker"]["ready"]):
                 report = memory.get(report_ref)
                 if report:
-                    stale(report["task_contract"] == current_k, "task_contract")
+                    order(report["task_contract"] == current_k)
             if test:
                 for key, target in (("test_tip", "test_tip"), ("test_manifest", "manifest"),
                                     ("impact_set", "impact_set")):
@@ -430,8 +445,10 @@ def business_plan(state, artifact, ref, memory, decision):
             if impl:
                 stale(p["implementation_tip"] == impl["implementation_tip"], "payload/implementation_tip")
                 stale(p["implementation_manifest"] == impl["manifest"], "payload/implementation_manifest")
-                stale(p["candidate_index"] == impl["implementation_index"], "payload/candidate_index")
-            stale(p["candidate_index"] == p["correction_count"], "payload/correction_count")
+                if preserves_business and (not state["candidate"] or p["rerun_of"] or next_implementation):
+                    stale(p["candidate_index"] == impl["implementation_index"], "payload/candidate_index")
+            if preserves_business:
+                stale(p["candidate_index"] == p["correction_count"], "payload/correction_count")
             evidence(p["candidate"]["parents"] == [commit(p["test_tip"]), commit(p["implementation_tip"])],
                      "payload/candidate/parents")
             for old in history_bodies(state, memory):
@@ -454,14 +471,15 @@ def business_plan(state, artifact, ref, memory, decision):
                 order(state["candidate"]["result"] is not None)
                 if tester:
                     illegal(outcome == "IMPLEMENTATION_FAIL", "payload/candidate_index")
-                if candidate:
-                    illegal(p["candidate_index"] > candidate["candidate_index"], "payload/candidate_index")
-                    if p["candidate_index"] > candidate["candidate_index"]:
-                        stale(p["candidate_index"] == candidate["candidate_index"] + 1, "payload/candidate_index")
-                stale(p["previous_candidate"] == state["candidate"]["envelope"], "payload/previous_candidate")
-                direct(state["candidate"]["envelope"])
+                if candidate and impl:
+                    illegal(next_implementation, "payload/candidate_index")
+                if next_implementation and preserves_business:
+                    stale(p["candidate_index"] == candidate["candidate_index"] + 1, "payload/candidate_index")
+                    stale(p["previous_candidate"] == state["candidate"]["envelope"], "payload/previous_candidate")
+                    direct(state["candidate"]["envelope"])
             else:
-                stale(p["candidate_index"] == 0 and p["previous_candidate"] is None, "payload/candidate_index")
+                if preserves_business:
+                    stale(p["candidate_index"] == 0 and p["previous_candidate"] is None, "payload/candidate_index")
             result["candidate"] = {"envelope": ref, "result": None}
     elif kind == "tester-confidential-report":
         order(state["candidate"] is not None)
@@ -508,7 +526,9 @@ def business_plan(state, artifact, ref, memory, decision):
                     outcome == "IMPLEMENTATION_FAIL" and candidate.get("candidate_index", 0) < 3),
                     "payload/terminal_reason")
         reason = ("HUMAN_STOP" if state["stop"] else "TESTER_PASS" if outcome == "PASS" else
-                  "CORRECTIONS_EXHAUSTED" if outcome == "IMPLEMENTATION_FAIL" else outcome)
+                  "CORRECTIONS_EXHAUSTED" if outcome == "IMPLEMENTATION_FAIL" and
+                  candidate.get("candidate_index") == 3 else outcome if outcome in
+                  ("TEST_GATE_INVALID", "CONTRACT_INVALID", "INTEGRITY_INVALID") else None)
         if present:
             if reason:
                 stale(p["terminal_reason"] == reason, "payload/terminal_reason")

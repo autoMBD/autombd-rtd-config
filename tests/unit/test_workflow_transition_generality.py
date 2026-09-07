@@ -39,8 +39,8 @@
 # Project:     RTD CfgFile CLI <https://github.com/autoMBD/autombd-rtd-config>
 # File:        test_workflow_transition_generality.py
 # Author:      autoMBD <tkung.lqk@foxmail.com>
-# Date:        2026-09-06
-# Version:     0.1.1
+# Date:        2026-09-07
+# Version:     0.1.2
 # Description: Independent Worker tests of public transition histories.
 # =================================================================================
 
@@ -850,3 +850,226 @@ def test_invalid_execution_allows_only_reference_repair_of_accepted_ready(histor
     assert h.state["worker"]["pending_correction"] is None
     changed = report_copy(h, original, status="NOT_READY")
     rejected(h, changed, "ILLEGAL_TRANSITION")
+
+
+def applicability_rejected(h, ref, expected, drift, missing_checks, active_field):
+    """Keep genuine identity errors independent from ineligible progression."""
+    body = h.body(ref)
+    if drift == "task":
+        body["task"] = dict(h.task, task_run=f"{h.seed}-another-run")
+    elif drift == "active":
+        body["payload"][active_field] = (
+            h.tip("unrelated-subject") if active_field in ("candidate", "implementation_tip")
+            else h.sha("unrelated-subject") if active_field == "subject_sha"
+            else f"{h.seed}-unrelated-dispatch")
+    ref["sha256"] = digest(body)
+    event = h.event(ref)
+    context = copy.deepcopy(h.context)
+    if missing_checks:
+        context["checks"] = []
+    rejected(h, ref, "STALE_EVENT" if drift else expected,
+             event=event, context=context)
+
+
+@pytest.mark.parametrize("drift", [None, "task", "active"])
+@pytest.mark.parametrize("missing_checks", [False, True])
+@pytest.mark.parametrize("index", [0, 1])
+def test_applicability_unchanged_implementation_cannot_derive_next_candidate(
+        history, drift, missing_checks, index):
+    h = history
+    h.assembled()
+    h.result("IMPLEMENTATION_FAIL")
+    old = h.state["candidate"]["envelope"]
+    # A fresh delivery identity does not authorize a next Candidate from I0.
+    ref = report_copy(h, old, dispatch_id=f"{h.seed}-fresh-candidate-dispatch",
+                      execution_id=f"{h.seed}-fresh-execution",
+                      candidate_index=index, correction_count=index)
+    applicability_rejected(h, ref, "ILLEGAL_TRANSITION", drift, missing_checks,
+                           "implementation_tip")
+
+
+@pytest.mark.parametrize("drift", [None, "task", "active"])
+@pytest.mark.parametrize("outcome", ["IMPLEMENTATION_FAIL", "INVALID_RUN", "PASS"])
+def test_applicability_post_candidate_ready_needs_real_correction(history, drift, outcome):
+    h = history
+    h.assembled()
+    h.result(outcome)
+    old = h.state["worker"]["ready"]
+    ref = report_copy(h, old, implementation_index=1,
+                      previous_implementation=h.body(old)["payload"]["implementation_tip"]["commit"],
+                      implementation_tip=h.tip("unauthorized-next"))
+    applicability_rejected(h, ref, "ILLEGAL_TRANSITION", drift, True, "dispatch_id")
+
+
+@pytest.mark.parametrize("drift", [None, "task", "active"])
+@pytest.mark.parametrize("outcome", ["IMPLEMENTATION_FAIL", "INVALID_RUN"])
+@pytest.mark.parametrize("reason", ["CORRECTIONS_EXHAUSTED", "TESTER_PASS"])
+def test_applicability_nonterminal_outcome_has_no_review_reason(history, drift, outcome, reason):
+    h = history
+    h.assembled()
+    report = h.result(outcome)
+    cp = h.body(h.state["candidate"]["envelope"])["payload"]
+    ref = h.make("reviewer-launch", {
+        "dispatch_id": f"{h.seed}-premature-review-dispatch",
+        "review_id": f"{h.seed}-premature-review", "terminal_reason": reason,
+        "candidate": cp["candidate"],
+        "last_implementation": cp["implementation_tip"]["commit"],
+        "source_reports": [report]}, [report])
+    applicability_rejected(h, ref, "ILLEGAL_TRANSITION", drift, True, "candidate")
+
+
+@pytest.mark.parametrize("drift", [None, "task", "active"])
+@pytest.mark.parametrize("decision", ["APPROVE", "REQUEST_CHANGES"])
+@pytest.mark.parametrize("acknowledged", [False, True])
+def test_applicability_retained_old_ready_is_ineligible_not_incoming_drift(
+        history, drift, decision, acknowledged):
+    h = history
+    h.start()
+    for lane in ("test", "worker"):
+        h.launch(lane)
+        h.ready(lane)
+    old_ready = h.state["test"]["ready"]
+    revise(h)
+    if acknowledged:
+        for lane in ("worker", "test"):
+            acknowledge(h, lane)
+    ref = h.make("human-decision", {"gate": "TEST", "decision": decision,
+        "subject_sha": h.body(old_ready)["payload"]["test_tip"]["commit"]}, [old_ready])
+    applicability_rejected(h, ref, "OUT_OF_ORDER_EVENT", drift, True, "subject_sha")
+
+
+@pytest.mark.parametrize("drift", [None, "task", "active"])
+@pytest.mark.parametrize("accepted", [False, True])
+@pytest.mark.parametrize("index", [1, 3])
+def test_applicability_replacement_index_is_preservation_evidence(history, drift, accepted, index):
+    h = history
+    h.start()
+    launch = h.launch("worker")
+    lp = h.body(launch)["payload"]
+    original = h.make("implementation-report", {"status": "READY", "lane": lp["lane"],
+        "dispatch_id": lp["dispatch_id"], "revision_ack": None,
+        "implementation_index": 0, "previous_implementation": None,
+        "implementation_tip": h.tip("repair-original")}, [launch])
+    if accepted:
+        h.consume(original)
+    rejection = rejected_receipt(h, original)
+    ref = report_copy(h, original, implementation_index=index)
+    body = h.body(ref)
+    body["replaces"] = {"original": original, "guard_result": rejection}
+    body["predecessors"] += [original, rejection]
+    applicability_rejected(h, ref, "INVALID_EVIDENCE", drift, False, "dispatch_id")
+
+
+def test_applicability_current_k_candidate_waits_for_current_worker_ready(history):
+    h = history
+    h.start()
+    for lane in ("worker", "test"):
+        h.launch(lane)
+        h.ready(lane)
+    revise(h)
+    for lane in ("worker", "test"):
+        acknowledge(h, lane)
+    h.ready("test")
+    h.approve()
+    before = copy.deepcopy(h.state)
+    with pytest.raises(h.module.WorkflowTransitionError) as caught:
+        h.candidate()
+    assert caught.value.code == "OUT_OF_ORDER_EVENT"
+    assert h.state == before
+    h.ready("worker")
+    h.candidate()
+
+
+@pytest.mark.parametrize("field", ["implementation_index", "previous_implementation"])
+def test_applicability_real_pending_correction_keeps_progression_identity(history, field):
+    h = history
+    h.assembled()
+    h.result("IMPLEMENTATION_FAIL")
+    pending = h.correction()
+    p = h.body(pending)["payload"]
+    ref = h.make("implementation-report", {"status": "READY", "revision_ack": None,
+        "lane": p["lane"], "dispatch_id": p["dispatch_id"], "implementation_index": 1,
+        "previous_implementation": p["previous_implementation"],
+        "implementation_tip": h.tip("authorized-next")}, [pending])
+    h.body(ref)["payload"][field] = 2 if field == "implementation_index" else h.sha("wrong-prior")
+    ref["sha256"] = digest(h.body(ref))
+    event = h.event(ref)
+    h.context["checks"] = []
+    rejected(h, ref, "STALE_EVENT", event=event)
+
+
+@pytest.mark.parametrize("field", ["candidate_index", "previous_candidate"])
+def test_applicability_eligible_candidate_keeps_next_action_identity(history, field):
+    h = history
+    old = h.assembled()
+    h.result("IMPLEMENTATION_FAIL")
+    h.correction()
+    previous = h.body(h.state["worker"]["ready"])["payload"]["implementation_tip"]["commit"]
+    h.ready("worker", 1, previous)
+    ip = h.body(h.state["worker"]["ready"])["payload"]
+    cp = h.body(old)["payload"]
+    ref = report_copy(h, old, dispatch_id=f"{h.seed}-new-candidate-dispatch",
+        execution_id=f"{h.seed}-new-candidate-execution", candidate_index=1, correction_count=1,
+        implementation_tip=ip["implementation_tip"], implementation_manifest=ip["manifest"],
+        candidate=h.tip("next-candidate", [cp["test_tip"]["commit"], ip["implementation_tip"]["commit"]]),
+        previous_candidate=old)
+    body = h.body(ref)
+    body["predecessors"] = [h.state["test"]["approval"], h.state["test"]["ready"],
+                            h.state["worker"]["ready"], old]
+    body["payload"][field] = 2 if field == "candidate_index" else None
+    if field == "candidate_index":
+        body["payload"]["correction_count"] = 2
+    ref["sha256"] = digest(body)
+    event = h.event(ref)
+    h.context["checks"] = []
+    rejected(h, ref, "STALE_EVENT", event=event)
+
+
+@pytest.mark.parametrize("accepted", [False, True])
+def test_applicability_repair_does_not_reinterpret_corrected_ready(history, accepted):
+    h = history
+    h.assembled()
+    h.result("IMPLEMENTATION_FAIL")
+    pending = h.correction()
+    p = h.body(pending)["payload"]
+    original = h.make("implementation-report", {"status": "READY", "revision_ack": None,
+        "lane": p["lane"], "dispatch_id": p["dispatch_id"], "implementation_index": 1,
+        "previous_implementation": p["previous_implementation"],
+        "implementation_tip": h.tip("corrected-ready", [p["previous_implementation"]])}, [pending])
+    if accepted:
+        h.consume(original)
+    rejection = rejected_receipt(h, original)
+    ref = report_copy(h, original, implementation_index=2)
+    body = h.body(ref)
+    body["replaces"] = {"original": original, "guard_result": rejection}
+    body["predecessors"] += [original, rejection]
+    ref["sha256"] = digest(body)
+    rejected(h, ref, "INVALID_EVIDENCE")
+
+
+@pytest.mark.parametrize("identity", ["lane", "execution_id", "review_id"])
+def test_applicability_consumed_replacement_keeps_established_identity(history, identity):
+    h = history
+    if identity == "lane":
+        h.start()
+        h.launch("worker")
+        original = h.ready("worker")
+    else:
+        h.assembled()
+        original = h.result("PASS")
+        if identity == "review_id":
+            h.review("TESTER_PASS")
+            original = h.reviewed()
+    rejection = rejected_receipt(h, original)
+    ref = report_copy(h, original)
+    body = h.body(ref)
+    body["replaces"] = {"original": original, "guard_result": rejection}
+    body["predecessors"] += [original, rejection]
+    if identity == "lane":
+        body["payload"][identity]["lane_id"] = f"{h.seed}-unrelated-lane"
+    else:
+        body["payload"][identity] = f"{h.seed}-unrelated-identity"
+    ref["sha256"] = digest(body)
+    event = h.event(ref)
+    h.context["checks"] = []
+    rejected(h, ref, "STALE_EVENT", event=event)

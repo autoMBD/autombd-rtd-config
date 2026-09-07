@@ -2,8 +2,8 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.1.1 |
-| Date | 2026-09-06 |
+| Version | 0.1.2 |
+| Date | 2026-09-07 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Public memory-only transition API, wire, lifecycle, error order and evidence boundary. |
 
@@ -175,6 +175,27 @@ missing; absence does not fabricate an invalid-state diagnosis. Independent
 lifecycle checks collect failures so missing receipts cannot mask observable
 stale identity or illegal routes.
 
+Priorities apply only to predicates established for the current operation.
+An unauthorized next action does not establish a hypothetical next identity.
+Repeating Candidate assembly from unchanged Implementation, submitting business
+READY after C0 without an eligible correction, and launching Reviewer from a
+non-terminal outcome are illegal routes. Next-Candidate predecessor/index and
+INITIAL READY defaults must not manufacture stale errors for those routes.
+A real pending correction still binds its exact index, previous tip and dispatch.
+
+Retained older-K READY remains valid historical state but cannot satisfy a
+current-K prerequisite. A correctly bound action awaiting eligible READY or
+required ACKs is out of order when otherwise legal. Actual incoming K or
+established subject drift remains stale.
+
+Contradicted format-replacement business values are preservation evidence,
+not a new progression authorization. They fail as `INVALID_EVIDENCE` unless
+an independent earlier-priority predicate applies; no INITIAL or correction
+identity is inferred from the altered values. Established task/G/W/K,
+lane/dispatch/execution/review identities and explicit historical identity
+reuse retain their published priority. Valid replacements still apply an
+unconsumed original once or update only consumed delivery references.
+
 ## CLI
 
 ~~~console
@@ -238,3 +259,4 @@ approval.
 | --- | --- | --- |
 | 2026-09-06 | 0.1.0 | Documented memory-only API, wire, lifecycle, evidence, errors, CLI, trust limits and salvage. |
 | 2026-09-06 | 0.1.1 | Clarified historical rerun identity reuse as priority-3 STALE_EVENT with its offending field pointer. |
+| 2026-09-07 | 0.1.2 | Explained applicable progression predicates, current-K prerequisite eligibility and replacement preservation without changing error priority. |
