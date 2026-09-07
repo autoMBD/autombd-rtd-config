@@ -405,6 +405,144 @@ def report_copy(h, ref, **changes):
     return h.register(body)
 
 
+def human_repair_original(h, scenario, accepted=True):
+    """Establish public Human bindings using independent synthetic histories."""
+    if scenario.startswith("test"):
+        h.start()
+        h.launch("test")
+        ready = h.ready("test")
+        decision = "APPROVE" if scenario == "test-approve" else "REQUEST_CHANGES"
+        original = h.make("human-decision", {"gate": "TEST", "decision": decision,
+            "subject_sha": h.body(ready)["payload"]["test_tip"]["commit"]}, [ready])
+    elif scenario == "empty-stop":
+        h.start()
+        original = h.make("human-decision", {"gate": "FINAL", "decision": "STOP",
+                                             "subject_sha": None})
+    else:
+        h.assembled(order=("test", "worker"))
+        subject = h.body(h.state["candidate"]["envelope"])["payload"]["candidate"]["commit"]
+        if scenario == "candidate-stop":
+            original = h.make("human-decision", {"gate": "FINAL", "decision": "STOP",
+                                                 "subject_sha": subject})
+        else:
+            h.result("PASS")
+            h.review("TESTER_PASS")
+            h.reviewed()
+            proposal = h.terminal("OPEN_SUCCESS_PR")
+            decision = "APPROVE" if scenario == "final-approve" else "REQUEST_CHANGES"
+            original = h.make("human-decision", {"gate": "FINAL", "decision": decision,
+                                                 "subject_sha": subject}, [proposal])
+    return h.consume(original) if accepted else original
+
+
+def human_replacement(h, original, **changes):
+    rejection = next((e["ref"] for e in h.context["artifacts"]
+        if e["body"].get("status") == "REJECTED" and
+        e["body"].get("input", {}).get("artifact_id") == original["artifact_id"]), None)
+    rejection = rejection or rejected_receipt(h, original)
+    replacement = report_copy(h, original, **changes)
+    body = h.body(replacement)
+    body["replaces"] = {"original": original, "guard_result": rejection}
+    body["predecessors"] += [original, rejection]
+    replacement["sha256"] = digest(body)
+    return replacement
+
+
+HUMAN_REPAIR_SCENARIOS = ["test-approve", "test-reject", "empty-stop",
+                        "candidate-stop", "final-approve", "final-reject"]
+
+
+@pytest.mark.parametrize("scenario", HUMAN_REPAIR_SCENARIOS)
+def test_human_repair_preserves_business_decision(history, scenario):
+    h = history
+    original = human_repair_original(h, scenario)
+    old_decision = h.body(original)["payload"]["decision"]
+    changed = "REQUEST_CHANGES" if old_decision == "APPROVE" else "APPROVE"
+    replacement = human_replacement(h, original, decision=changed)
+    rejected(h, replacement, "INVALID_EVIDENCE", pointer="/artifact/payload/decision")
+
+
+@pytest.mark.parametrize("scenario", ["test-approve", "test-reject", "candidate-stop", "empty-stop"])
+def test_human_repair_preserves_gate_without_reinterpreting_subject(history, scenario):
+    h = history
+    original = human_repair_original(h, scenario)
+    gate = "FINAL" if h.body(original)["payload"]["gate"] == "TEST" else "TEST"
+    replacement = human_replacement(h, original, gate=gate)
+    rejected(h, replacement, "INVALID_EVIDENCE", pointer="/artifact/payload/gate")
+
+
+@pytest.mark.parametrize("scenario", HUMAN_REPAIR_SCENARIOS)
+@pytest.mark.parametrize("missing_check", [False, True])
+def test_human_repair_active_subject_retains_identity_priority(history, scenario, missing_check):
+    h = history
+    original = human_repair_original(h, scenario)
+    replacement = human_replacement(h, original, subject_sha=h.sha("different-human-subject"))
+    event = h.event(replacement)
+    context = copy.deepcopy(h.context)
+    if missing_check:
+        context["checks"] = []
+    # REQUEST_CHANGES consumed its READY; no active subject may be invented.
+    expected = ("MISSING_EVIDENCE" if missing_check else "INVALID_EVIDENCE") if (
+        scenario == "test-reject") else "STALE_EVENT"
+    rejected(h, replacement, expected, event=event, context=context,
+             pointer=None if expected == "MISSING_EVIDENCE" else "/artifact/payload/subject_sha")
+
+
+@pytest.mark.parametrize("scenario", HUMAN_REPAIR_SCENARIOS)
+@pytest.mark.parametrize("accepted", [False, True])
+def test_human_repair_equivalent_delivery_changes_refs_only(history, scenario, accepted):
+    h = history
+    original = human_repair_original(h, scenario, accepted)
+    before = copy.deepcopy(h.state)
+    replacement = human_replacement(h, original)
+    h.consume(replacement)
+    if accepted:
+        expected = copy.deepcopy(before)
+        for area, field in ((expected["test"], "approval"), (expected, "stop"),
+                            (expected, "final_decision")):
+            if area[field] == original:
+                area[field] = replacement
+        expected["consumed"] = h.state["consumed"]
+        assert h.state == expected
+    else:
+        assert len(h.state["consumed"]) == len(before["consumed"]) + 1
+        if scenario == "test-reject":
+            assert h.state["test"]["ready"] is None
+
+
+def test_human_repair_historical_rejection_has_no_new_ready_subject(history):
+    h = history
+    original = human_repair_original(h, "test-reject")
+    h.ready("test")
+    new_ready = h.state["test"]["ready"]
+    replacement = human_replacement(h, original)
+    h.consume(replacement)
+    assert h.state["test"]["ready"] == new_ready
+    changed = human_replacement(h, original, subject_sha=h.sha("altered-historical-subject"))
+    rejected(h, changed, "INVALID_EVIDENCE", pointer="/artifact/payload/subject_sha")
+
+
+@pytest.mark.parametrize("field", ["gate", "decision", "subject_sha"])
+def test_human_repair_missing_fields_are_not_inferred(history, field):
+    h = history
+    original = human_repair_original(h, "empty-stop", accepted=False)
+    value = h.body(original)["payload"].pop(field)
+    original["sha256"] = digest(h.body(original))
+    replacement = human_replacement(h, original, **{field: value})
+    rejected(h, replacement, "INVALID_EVIDENCE")
+
+
+@pytest.mark.parametrize("scenario", ["test-approve", "candidate-stop", "final-reject"])
+def test_human_repair_active_subject_precedes_business_change(history, scenario):
+    h = history
+    original = human_repair_original(h, scenario)
+    old = h.body(original)["payload"]["decision"]
+    decision = "REQUEST_CHANGES" if old == "APPROVE" else "APPROVE"
+    replacement = human_replacement(h, original, decision=decision,
+                                    subject_sha=h.sha("independent-drift"))
+    rejected(h, replacement, "STALE_EVENT", pointer="/artifact/payload/subject_sha")
+
+
 def test_revised_contract_requires_both_explicit_acknowledgements(history):
     h = history
     h.start()

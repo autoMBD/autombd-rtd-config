@@ -2,7 +2,7 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.1.2 |
+| Version | 0.1.3 |
 | Date | 2026-09-07 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Public memory-only transition API, wire, lifecycle, error order and evidence boundary. |
@@ -196,6 +196,18 @@ lane/dispatch/execution/review identities and explicit historical identity
 reuse retain their published priority. Valid replacements still apply an
 unconsumed original once or update only consumed delivery references.
 
+Human-decision replacements preserve `gate`, `decision` and `subject_sha`,
+including explicit null subjects; an absent original field cannot be guessed.
+Changed gate/decision values are preservation evidence, not a new Human action.
+For an already consumed decision still held in the active approval, stop or
+final-decision slot, its original gate determines the actual Test/Candidate
+subject binding. A changed subject then remains `STALE_EVENT`, ahead of missing
+receipts or contradictory business fields. The replacement's altered gate must
+not manufacture another subject. A historical Test REQUEST_CHANGES whose READY
+was cleared has no active subject binding; its changed subject is instead
+`INVALID_EVIDENCE` when the required evidence is available. Equivalent historical
+repairs neither clear a newer READY nor reapply the old decision.
+
 ## CLI
 
 ~~~console
@@ -260,3 +272,4 @@ approval.
 | 2026-09-06 | 0.1.0 | Documented memory-only API, wire, lifecycle, evidence, errors, CLI, trust limits and salvage. |
 | 2026-09-06 | 0.1.1 | Clarified historical rerun identity reuse as priority-3 STALE_EVENT with its offending field pointer. |
 | 2026-09-07 | 0.1.2 | Explained applicable progression predicates, current-K prerequisite eligibility and replacement preservation without changing error priority. |
+| 2026-09-07 | 0.1.3 | Documented Human decision field preservation, explicit nullable subjects and independently active subject identity precedence. |

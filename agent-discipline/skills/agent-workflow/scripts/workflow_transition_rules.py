@@ -40,7 +40,7 @@
 # File:        workflow_transition_rules.py
 # Author:      autoMBD <tkung.lqk@foxmail.com>
 # Date:        2026-09-07
-# Version:     0.1.2
+# Version:     0.1.3
 # Description: Pure global lifecycle and identity rules for transitions.
 # =================================================================================
 
@@ -217,7 +217,8 @@ def business_plan(state, artifact, ref, memory, decision):
                     "preserved_implementation", "impact_set", "manifest", "test_manifest",
                     "implementation_manifest", "execution_id", "coverage_join", "rerun_of",
                     "previous_candidate", "terminal_reason", "last_implementation", "source_reports",
-                    "disposition", "pr", "final_decision", "revision_ack")
+                    "disposition", "pr", "final_decision", "revision_ack",
+                    "gate", "decision", "subject_sha")
                 for field in preserved:
                     evidence(p.get(field) == original_payload.get(field), "payload/" + field)
                 preserves_business = all(p.get(field) == original_payload.get(field)
@@ -227,6 +228,9 @@ def business_plan(state, artifact, ref, memory, decision):
                     "terminal-record": "result"}.get(kind)
                 if required_business:
                     evidence(required_business in original_payload, "replaces/original")
+                if kind == "human-decision":
+                    evidence(all(field in original_payload for field in
+                                 ("gate", "decision", "subject_sha")), "replaces/original")
                 if p.get("dispatch_id") != original_payload.get("dispatch_id"):
                     repairs = [memory.p(x) for x in state["repairs"]
                                if memory.p(x).get("original") == replacement["original"]]
@@ -284,6 +288,17 @@ def business_plan(state, artifact, ref, memory, decision):
         if "dispatch_id" in original_payload:
             stale(p.get("dispatch_id") == original_payload["dispatch_id"] or repaired_dispatch,
                   "payload/dispatch_id")
+        if kind == "human-decision":
+            # Bind the original active decision, not a gate supplied by its
+            # replacement. Historical REQUEST_CHANGES has no active subject.
+            if (original_payload.get("gate") == "TEST" and
+                    replacement["original"] == state["test"]["approval"] and test):
+                stale(p.get("subject_sha") == commit(test["test_tip"]), "payload/subject_sha")
+            elif (original_payload.get("gate") == "FINAL" and
+                    replacement["original"] in (state["stop"], state["final_decision"]) and
+                    (candidate or state["candidate"] is None)):
+                expected = commit(candidate.get("candidate")) if state["candidate"] else None
+                stale(p.get("subject_sha") == expected, "payload/subject_sha")
         _replace_slots(result, replacement["original"], ref)
         return result
 
