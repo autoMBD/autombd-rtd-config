@@ -2,8 +2,8 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.2.6 |
-| Date | 2026-09-08 |
+| Version | 0.2.7 |
+| Date | 2026-09-09 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Engineering boundaries, structured role handoffs, functional lifecycle, and Agent supervision. |
 
@@ -75,6 +75,11 @@ acceptance rather than becoming a narrow implementation worker.
 
 Every governed role handoff uses the versioned artifact protocol in
 `agent-discipline/skills/agent-workflow/references/structured-handoffs.md`.
+Before creating, transferring, indexing or cleaning local task material, follow
+[Local Execution State](agent-discipline/local-execution-state.md). Orchestrator
+owns the central navigation and selective, digest-checked lane-local transfer;
+ignored state is not automatically synchronized by Git. Do not create ad hoc
+top-level task directories or move bound historical evidence as housekeeping.
 The role prompt locates the input Envelope, expected digest, trusted context,
 output path and applicable rules; it does not hide task obligations in prose.
 The complete public Task Contract K is shared by reference, while private owner
@@ -420,3 +425,4 @@ The per-document map and full authoring rules are in
 | 2026-09-07 | 0.2.4 | Authorized unchanged-case Tester support repairs with truthful source lineage and retest, retained Human approval for case changes, and required normal counted Worker fixes after implementation-affecting handoff ambiguity is removed. |
 | 2026-09-08 | 0.2.5 | Recorded two routine Human reviews, terminal follow-up issues, bootstrap/runtime boundaries, automated-GUI prohibition and exact remote review delivery. |
 | 2026-09-08 | 0.2.6 | Made Orchestrator responsible for a substantive, source-bound Reviewer summary in the final PR or failure issue, with honest later disposition and disclosure boundaries. |
+| 2026-09-09 | 0.2.7 | Linked the single local-state policy for navigation, explicit central/lane transport, ownership and scoped cleanup without new workflow gates. |

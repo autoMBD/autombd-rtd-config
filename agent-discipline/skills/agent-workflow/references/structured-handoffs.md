@@ -2,8 +2,8 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.1.5 |
-| Date | 2026-09-08 |
+| Version | 0.1.6 |
+| Date | 2026-09-09 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Functional-development role interfaces, local delivery validation, confidentiality, and explicit legacy migration boundaries. |
 
@@ -41,6 +41,13 @@ Use existing report coverage/locations and exact-commit links; this rule adds
 no artifact kind, schema member, extra approval stage or executable validator.
 
 ## Storage, transport and dispatch
+
+Use [Local Execution State](../../../local-execution-state.md) for the single
+directory, ownership, transfer and retention rule. This section defines the
+handoff's semantic bindings, not a competing local layout. Git does not sync
+ignored state: Orchestrator delivers selective exact-byte lane-local inputs and
+checks returned reports/evidence before collecting central copies. Never mirror
+the central private directory or silently rewrite bound paths during transfer.
 
 Keep task artifacts in ignored `.agent-state/agent-loop/<run>/` storage. The
 Orchestrator maintains the canonical authority and confidential artifacts;
@@ -428,3 +435,4 @@ case review, results and dashboard are separate #100–#102 work.
 | 2026-09-07 | 0.1.3 | Distinguished frozen case semantics from repairable delivery metadata; defined same-producer repair, semantic/digest checks and unchanged accounting, while separating Test-driver source changes and current runtime limitations. |
 | 2026-09-07 | 0.1.4 | Applied Human's non-case repair authority to Tester support, preserved case-change approval and real source lineage, and separated execution-handoff retests from counted Implementation corrections without claiming runtime changes. |
 | 2026-09-08 | 0.1.5 | Defined two routine Human reviews, issue-based terminal findings and preserved bootstrap exceptions; required Human-decision preservation in format repairs and exact remote review delivery, without claiming runtime changes. |
+| 2026-09-09 | 0.1.6 | Linked the single local-state rule and made selective, byte-checked central/lane transport explicit while preserving protocol identities and historical paths. |

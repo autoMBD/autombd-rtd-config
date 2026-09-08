@@ -2,8 +2,8 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.13.0 |
-| Date | 2026-09-08 |
+| Version | 0.14.0 |
+| Date | 2026-09-09 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Tracks how review comments were resolved across design document revisions. |
 
@@ -163,6 +163,19 @@ following requirements were already present and remain controlling:
 | Worker corrections | Original Worker/lane/session/worktree/branch, strict incremental source; C0 plus three correction opportunities, not three total Candidates; private report never forwarded | Structured Handoffs: Parallel readiness; diagnostic bridge; Worker |
 | Observation and terminal handling | One bounded probe, only affected operation held; dynamic Agent supervision, no fabricated outcomes or severity escalation; exact Candidate includes Test+Implementation, lessons/policy separate | Structured Handoffs: Rejection/terminal sections; AGENTS; Reviewer |
 
+## Local execution state policy
+
+The approved local-state/storage decision is tracked separately from Test
+semantics: **LOCAL-STATE-01**. Human requested a complete local-state and
+handoff rule, confirmed `.agent-state/README.md` as the ignored navigation,
+accepted explicit selective central/worktree copies, and authorized landing on
+`codex/test-case-documentation-policy`. Resolution:
+`agent-discipline/local-execution-state.md` centralizes layout, role ownership,
+identity/format rules, non-overwriting delivery, scoped failure routing,
+Human-visible terminal output, retention and cleanup. Charter/governance/Skill/
+handoff/monitoring link it. No new runtime/schema/Gate or historical migration;
+the main work area's ignored README applies navigation locally.
+
 ## Changelog
 
 | Date | Version | Description |
@@ -183,3 +196,4 @@ following requirements were already present and remain controlling:
 | 2026-09-07 | 0.11.0 | Recorded Human's expanded non-case Tester repair authority, truthful source lineage and execution-retest routing, while preserving case-change approval and counted original-Worker fixes for implementation-affecting handoff failures. |
 | 2026-09-08 | 0.12.0 | Audited the full current #85 bootstrap series; traced prior requirements and added terminal-finding issues, two routine Human reviews, decision-preserving repairs and exact remote/GUI boundaries. |
 | 2026-09-08 | 0.13.0 | Tracked explicit Orchestrator responsibility for a substantive Reviewer summary in PR/failure review instead of local-only report paths. |
+| 2026-09-09 | 0.14.0 | Tracked the approved unified local-state rules, central/lane selective byte transfer and ignored navigation, without runtime changes or migration. |

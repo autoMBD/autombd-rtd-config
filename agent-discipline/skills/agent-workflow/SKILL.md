@@ -7,8 +7,8 @@ description: Validate structured role handoffs and exact identities for the func
 
 | Field | Value |
 | --- | --- |
-| Version | 0.2.3 |
-| Date | 2026-09-08 |
+| Version | 0.2.4 |
+| Date | 2026-09-09 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Structured role handoff guidance, declarative lifecycle boundaries, legacy compatibility and passive monitoring. |
 
@@ -26,6 +26,12 @@ the reference explains the shared protocol and limitations. Role prompts
 locate the checked Envelope/K, expected digests, trusted context, declared output
 and applicable rules. They must not hide extra task requirements or owner Test
 hints in prose.
+
+When placing, transferring or cleaning local artifacts, read
+[Local Execution State](../../local-execution-state.md). It owns layout and
+retention; do not duplicate its directory rules here. Central and lane-local
+state use explicit authorized byte copies, not automatic Git synchronization.
+Its navigation is not a runtime state machine or a new validation receipt.
 
 Human-commanded manual bootstrap remains bounded by its explicit authorization.
 A passing checker does not authorize dispatch, Candidate assembly, acceptance,
@@ -192,3 +198,4 @@ lane/session/Implementation identity.
 | 2026-09-07 | 0.2.1 | Routed metadata-only repairs through the shared case-freeze boundary, preserving source and accounting while documenting separate driver/source authority and runtime limits. |
 | 2026-09-07 | 0.2.2 | Routed authorized non-case Tester support repair and corrected execution retests separately from counted Worker fixes, preserving frozen case approval and truthful revised source identities. |
 | 2026-09-08 | 0.2.3 | Linked two routine Human reviews and independent terminal-finding issues, preserving explicit bootstrap and runtime limits. |
+| 2026-09-09 | 0.2.4 | Routed local storage, explicit selective transfers and cleanup to one shared policy without new schema fields or validator claims. |

@@ -2,8 +2,8 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.1.13 |
-| Date | 2026-09-08 |
+| Version | 0.1.14 |
+| Date | 2026-09-09 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Documentation-governance rules for the RTD CfgFile CLI project. Defines the two-category split, official tool name, changelog integrity, archive policy, and the authoritative cross-category documentation map. |
 
@@ -162,6 +162,16 @@ belong in Category A documents in agent-agnostic form. Reusable Agent workflow
 rules belong in Category B; neither category is a home for one-off execution
 state.
 
+### Local execution material
+
+[Local Execution State](local-execution-state.md) is the single rule for local
+layout, ownership, navigation, selective transfer and cleanup. The local
+`.agent-state/README.md` is ignored navigation, not the repository README or a
+second task contract. Plans remain in `plans/`; runtime handoffs and monitoring
+use their defined locations. Do not move durable code/cases/rules into ignored
+state, or commit local execution files to make them appear delivered. Existing
+bound historical material is indexed, not silently migrated or rewritten.
+
 ### Review archive is read-only
 
 `agent-discipline/review-archive-NOT-USED-NEVER-TOUCH!!!/` (formerly
@@ -215,6 +225,7 @@ paths are relative to the repository root.
 | `agent-discipline/agent-lessons-learned.md` | Reviewer's running lessons log | — |
 | `agent-discipline/agent-loop-bootstrap-trust-trace.md` | Bootstrap trust-tracing lane: frozen framework/history audit, Human-approved lifecycle design, derived current snapshot, append-only bootstrap events, and complete lessons synthesis | AGENTS.md, workflow contract, agent-lessons-learned |
 | `agent-discipline/documentation-governance.md` | This document: governance rules + documentation map | — |
+| `agent-discipline/local-execution-state.md` | Local execution layout, navigation, explicit central/lane transfer, evidence mutation and retention/cleanup | structured handoffs, monitoring |
 | `agent-discipline/review-archive-NOT-USED-NEVER-TOUCH!!!/` | Frozen review archives — never a requirements source | — |
 
 ### Standalone deliverable
@@ -248,6 +259,7 @@ flowchart TD
 
 | Date | Version | Description |
 | --- | --- | --- |
+| 2026-09-09 | 0.1.14 | Added the central local-state rule and distinguished ignored navigation, plans and execution evidence from durable documents without historical migration. |
 | 2026-09-08 | 0.1.13 | Clarified two routine Human reviews and issue-based terminal findings without adding case-review burdens or publishing hidden cases. |
 | 2026-09-07 | 0.1.12 | Preserved original case-review evidence while permitting non-case Tester support repairs without renewed approval, with revised source identities and affected execution evidence kept separate from frozen case semantics. |
 | 2026-09-07 | 0.1.11 | Separated frozen reviewed cases/source binding from repairable handoff metadata and linked the shared no-reapproval/no-correction repair boundary. |

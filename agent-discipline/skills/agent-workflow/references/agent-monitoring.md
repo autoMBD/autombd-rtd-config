@@ -2,12 +2,17 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.1.0 |
-| Date | 2026-09-05 |
+| Version | 0.1.1 |
+| Date | 2026-09-09 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Passive Agent monitoring records, explicit supervision decisions, and deterministic command timeout compatibility. |
 
 ## Responsibility and storage
+
+The [Local Execution State](../../../local-execution-state.md) policy owns
+navigation, retention and cleanup. Monitoring stays in the existing separate
+path below and joins handoffs by task_run/dispatch_id; do not duplicate these
+records into a new task-state system or mirror central private data to lanes.
 
 The Orchestrator estimates duration and the next observation point using task
 scope, expected commands, dependencies, comparable work, recent progress, and
@@ -151,4 +156,5 @@ Product/runtime defaults and script/CI deadlines remain #96/#97 work.
 | Date | Version | Description |
 | --- | --- | --- |
 | 2026-09-05 | 0.1.0 | Defined closed passive monitor records, explicit decisions, input validation, and unchanged v1 command timeout compatibility. |
+| 2026-09-09 | 0.1.1 | Linked local-state navigation/retention while preserving the existing monitoring paths, schema and passive supervision semantics. |
 
