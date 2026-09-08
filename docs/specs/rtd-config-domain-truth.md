@@ -2,8 +2,8 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.5.0 |
-| Date | 2026-06-15 |
+| Version | 0.5.2 |
+| Date | 2026-09-08 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Holds only CROSS-CUTTING truth (the S32DS headless validation flow + gate, and fixture role/usage) and the SOURCING RULE for per-module truth. Per-module valid values, constraints, and dependencies are NOT listed here — they come from each module's `.xdm` and live in that module's provider. |
 
@@ -80,13 +80,16 @@ the kind of fact that belongs in the Uart provider (from `Uart.xdm`), not here.
 Pin-mux truth (SIUL2) is owned by the Port module and committed as a single
 family-scoped asset, `autombd-rtd/assets/nxp/<family>/port/pins.json`, built
 from the pin-mux source workbook
-`D:\WorkSpace\ExploreSpace\Copy of S32K344_S32K324_S32K314_IOMUX.xlsx`
+[S32K3-IOMUX-LOCAL-9E171989AB59](../../../materials/projects/autombd-rtd-config/user-provided-2026-09-08/README.md)
 (development input only — also catalogued in the source-materials reference;
 never read at runtime). It must cover every peripheral signal and carry the
 package as an in-record field, so one file serves all of a family's packages
 (`lqfp100`, `hdqfp172`, `mapbga257`, …). The `pins.json` asset is built from that
 workbook by the committed development tool `tools/build_pins_s32k3.py` (2091
-S32K344 signals; byte-verified), and `pin-options` is verified against it.
+S32K344 signals verified record-for-record against the existing asset), and
+`pin-options` is verified against it.
+The build tool defaults to the referenced workbook in the centralized materials
+collection; `--workbook` overrides its location.
 Writing a queried pin into a `.mex` (Port apply) is the remaining Port capability.
 
 ## 2. Fixtures — role and usage
@@ -202,3 +205,5 @@ Pattern: `DMATCD<N>_IRQn` / `Dma0_Ch<N>_IRQHandler` for channel index N.
 | 2026-06-14 | 0.4.4 | Tightened the asset sourcing rule (step 3) to match the enforced LL-012 discipline: a provider loads the committed asset at runtime, or — if it embeds the constants — pins them with a code==asset test that fails on drift; a documentation-only asset with no loader and no pin is prohibited. |
 | 2026-06-13 | 0.4.3 | §4 added: S32K344 DMA ISR/IRQ cross-cutting fact (`DMATCD<N>_IRQn` / `Dma0_Ch<N>_IRQHandler`) sourced from installed-RTD Platform.epd and Dma_Ip_Irq.c; pinned in uart.json dma_hw_channel_irq_map. LL-017 provenance fix: updated uart.json dma_hw_channel_irq_map._note to credit Platform.epd/Dma_Ip_Irq.c (not the committed fixture). |
 | 2026-06-15 | 0.5.0 | Issue #7 reorganization: de-agented the §1 sourcing-rule steps — removed the Explorer/Worker/Tester/Reviewer role names from steps 2/3/5 so the spec reads as an agent-agnostic engineering process. |
+| 2026-09-08 | 0.5.1 | Replaced the old workstation workbook path with its centralized materials ID/navigation and documented explicit workbook selection. |
+| 2026-09-08 | 0.5.2 | Updated the build tool default to the relocated workbook; retained `--workbook` as an optional location override. |

@@ -49,7 +49,7 @@
 """Build script for autombd-rtd/assets/nxp/s32k3/port/pins.json.
 
 Source workbook (development-time input only — NEVER a runtime dependency):
-    D:\\WorkSpace\\ExploreSpace\\Copy of S32K344_S32K324_S32K314_IOMUX.xlsx
+    D:\\WorkSpace\\ExploreSpace\\materials\\projects\\autombd-rtd-config\\user-provided-2026-09-08\\originals\\Copy of S32K344_S32K324_S32K314_IOMUX.xlsx
 
 Reads the xlsx with stdlib zipfile + xml.etree.ElementTree (no openpyxl).
 Parses two sheets:
@@ -106,7 +106,7 @@ from pathlib import Path
 # Source workbook — development-time input ONLY, never a runtime dependency
 # ---------------------------------------------------------------------------
 DEFAULT_WORKBOOK = Path(
-    r"D:\WorkSpace\ExploreSpace\Copy of S32K344_S32K324_S32K314_IOMUX.xlsx"
+    r"D:\WorkSpace\ExploreSpace\materials\projects\autombd-rtd-config\user-provided-2026-09-08\originals\Copy of S32K344_S32K324_S32K314_IOMUX.xlsx"
 )
 
 # Output asset path relative to this script's repo root
