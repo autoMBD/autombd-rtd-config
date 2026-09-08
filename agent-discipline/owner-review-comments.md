@@ -2,7 +2,7 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.12.0 |
+| Version | 0.13.0 |
 | Date | 2026-09-08 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Tracks how review comments were resolved across design document revisions. |
@@ -147,6 +147,7 @@ functional Candidate and do not claim deployed schema/executor changes.
 | TEST-DOC-06 | The complete intended workflow has only Test Gate approval and final PR review or failure review; this bootstrap involved Human at every step | Defined exactly two routine Human review boundaries. Intermediate preparation, validation, disclosure, permitted repair and bounded correction are Agent responsibilities. Bootstrap authority is run-specific; genuinely new scope/case changes still need Human decisions, not a new routine Gate. | Structured Handoffs: Human review boundaries and bootstrap; AGENTS; roles; documentation governance; workflow Skill |
 | TEST-DOC-07 | Human-decision format replacement must not change approval semantics | Preserve gate, decision and exact subject; never infer missing business values, relabel REJECT/APPROVE or fake a guard/business event. The actual #85 implementation correction stays in its Candidate, not this policy branch. | Structured Handoffs: Frozen cases and non-case repairs |
 | TEST-DOC-08 | A remote review needs the correct published branch and current issue packet, not local-only files or a master upstream; automated Loop must not initialize GUI | Explicit branch refspec, same-name upstream and verified remote SHA; exact-commit review links and replacement packet identity. Automated Loop reuses verified environment and addresses only affected setup without GUI; #92 runtime remains deferred. | Structured Handoffs: Terminal review, PR and legacy boundaries; AGENTS; workflow Skill |
+| TEST-DOC-09 | Reviewer outputs must be visibly useful to Human: Orchestrator must at least summarize their key information in the PR | PR body (or failure issue) carries reviewed identity, original verdict, key findings/evidence/impact, scope/limits, treatment or follow-up issues, lessons and pending Human decision. Later fixes are not rewritten Reviewer approval; local-only originals are labelled, private Test material is not published. No extra review, artifact schema or Candidate commit is introduced. | AGENTS: visible Reviewer delivery before remote review; Reviewer: Output |
 
 The entire current #85 series was checked against retained decisions, launch/K
 revisions, source history, repair evidence and the single terminal review. The
@@ -181,3 +182,4 @@ following requirements were already present and remain controlling:
 | 2026-09-07 | 0.10.0 | Tracked the explicit Human case-freeze versus delivery-metadata-repair clarification and its unified discipline wording without changing functional sources or runtime validators. |
 | 2026-09-07 | 0.11.0 | Recorded Human's expanded non-case Tester repair authority, truthful source lineage and execution-retest routing, while preserving case-change approval and counted original-Worker fixes for implementation-affecting handoff failures. |
 | 2026-09-08 | 0.12.0 | Audited the full current #85 bootstrap series; traced prior requirements and added terminal-finding issues, two routine Human reviews, decision-preserving repairs and exact remote/GUI boundaries. |
+| 2026-09-08 | 0.13.0 | Tracked explicit Orchestrator responsibility for a substantive Reviewer summary in PR/failure review instead of local-only report paths. |

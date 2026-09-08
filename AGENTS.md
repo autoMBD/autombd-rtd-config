@@ -2,7 +2,7 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.2.5 |
+| Version | 0.2.6 |
 | Date | 2026-09-08 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Engineering boundaries, structured role handoffs, functional lifecycle, and Agent supervision. |
@@ -280,6 +280,22 @@ that same head. Failure preserves the latest Implementation and evidence, and
 does not create a success PR. KPI is separate later issue-driven post-merge work,
 not a functional gate or an automatic optimization loop.
 
+The Orchestrator owns visible delivery of the Reviewer's work to Human. Before
+requesting final review, place a readable Reviewer summary in the PR body, or
+in the terminal issue comment when there is no PR. Include the exact reviewed
+Candidate and review identity, original verdict, principal findings with
+severity/requirement/source evidence and impact, reviewed scope and limits,
+follow-up issue or authorized treatment status, key lessons, and the remaining
+Human decision. Explicitly state no findings when that is the actual result.
+Separate the Reviewer's original conclusions from later Orchestrator summaries,
+fixes or Human dispositions; never present an unreviewed successor as Reviewer
+APPROVED. A local ignored path, digest or generic "review completed" alone is
+not this delivery. Provide accessible evidence links where available, accurately
+label local-only originals, and check disclosure before publishing: no hidden
+owner Test literals or confidential Tester reports. Preserve original reports
+and keep lessons/evidence commits separate from the Candidate. This is the
+existing final Human review handoff, not another review or correction cycle.
+
 Before remote review, push the intended branch with an explicit refspec,
 set its same-name upstream and verify the remote SHA. Publish the current
 issue review entry with exact source links; local files or stale packets are
@@ -403,3 +419,4 @@ The per-document map and full authoring rules are in
 | 2026-09-07 | 0.2.3 | Clarified that Human freezes reviewed cases and acceptance semantics, not erroneous delivery metadata; required original-producer repair and renewed checks without new case approval or correction accounting. |
 | 2026-09-07 | 0.2.4 | Authorized unchanged-case Tester support repairs with truthful source lineage and retest, retained Human approval for case changes, and required normal counted Worker fixes after implementation-affecting handoff ambiguity is removed. |
 | 2026-09-08 | 0.2.5 | Recorded two routine Human reviews, terminal follow-up issues, bootstrap/runtime boundaries, automated-GUI prohibition and exact remote review delivery. |
+| 2026-09-08 | 0.2.6 | Made Orchestrator responsible for a substantive, source-bound Reviewer summary in the final PR or failure issue, with honest later disposition and disclosure boundaries. |

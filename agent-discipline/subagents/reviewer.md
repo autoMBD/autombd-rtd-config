@@ -9,7 +9,7 @@ model: opus
 
 | Field | Value |
 | --- | --- |
-| Version | 0.2.5 |
+| Version | 0.2.6 |
 | Date | 2026-09-08 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | One terminal non-execution review with source-preserving reports and separate lessons. |
@@ -124,6 +124,13 @@ the reviewed source. Observations and interruptions preserve evidence; estimates
 and observation windows are not deadlines. Report unresolved uncertainty
 honestly instead of manufacturing a review verdict.
 
+The Orchestrator must visibly summarize these outputs in the final PR body or
+failure issue comment under the charter's final-review delivery rule. Your
+original report and lessons remain the authority; later fixes and Human
+dispositions must be identified separately. This publication does not require
+you to review again or create a new report format. A local output path alone is
+not a sufficient Human-facing handoff.
+
 ## Changelog
 
 | Date | Version | Description |
@@ -134,3 +141,4 @@ honestly instead of manufacturing a review verdict.
 | 2026-09-07 | 0.2.3 | Required review of metadata-repair provenance and preserved case semantics without treating corrected delivery fields as changed tests or new corrections. |
 | 2026-09-07 | 0.2.4 | Aligned terminal evidence review with authorized non-case Tester repairs, actual source lineage and retests, and normal attempt accounting for implementation-affecting handoff failures. |
 | 2026-09-08 | 0.2.5 | Required issue-ready terminal defects with priority, impact and final Human disposition, without reopening old attempts or changing verdicts. |
+| 2026-09-08 | 0.2.6 | Required visible Orchestrator delivery of original review conclusions and lessons without a second review or new artifact format. |
