@@ -115,12 +115,12 @@ class History(RepairLifecycle):
             p["source"]["kind"] = kind
         self.human = self.store(body)
 
-    def test_change(self, path, *, operation="add"):
+    def test_change(self, path, *, operation="add", raw=None):
         self.git("read-tree", self.t)
         if operation == "delete":
             self.git("update-index", "--force-remove", path)
         else:
-            blob = self.git("hash-object", "-w", "--stdin", data=b"owner fixture\n")
+            blob = self.git("hash-object", "-w", "--stdin", data=raw if raw is not None else b"owner fixture\n")
             mode = {"add": "100644", "execute": "100755", "link": "120000"}[operation]
             self.git("update-index", "--add", "--cacheinfo", mode + "," + blob + "," + path)
         self.t = self.git("commit-tree", self.git("write-tree"), "-p", self.t, "-m", "public Test delta")

@@ -456,7 +456,8 @@ def test_explicit_absolute_repository_path_is_required(api, history):
 
 
 @pytest.mark.parametrize("status,exit_code,error_code", [(200, 0, None), (404, 1, "MISSING_EVIDENCE"),
-                                                        (403, 2, "REMOTE_UNAVAILABLE")])
+                                                        (403, 2, "REMOTE_UNAVAILABLE"),
+                                                        ("timeout", 124, "COMMAND_TIMEOUT")])
 def test_cli_authenticated_get_only_and_http_mapping(api, history, monkeypatch, capfdbinary,
                                                     status, exit_code, error_code):
     import runpy
@@ -480,6 +481,8 @@ def test_cli_authenticated_get_only_and_http_mapping(api, history, monkeypatch, 
         endpoint = next(str(v) for v in argv if str(v).lstrip("/").startswith("repos/"))
         endpoint = "/" + endpoint.lstrip("/")
         calls.append(endpoint)
+        if status == "timeout":
+            raise subprocess.TimeoutExpired(argv, 6.5, output=b"private-case", stderr=b"private-node")
         body = canonical(h.responses[endpoint]["body"])
         if "--include" in argv or "-i" in argv:
             body = f"HTTP/2.0 {status}\r\ncontent-type: application/json\r\n\r\n".encode() + body
@@ -500,6 +503,7 @@ def test_cli_authenticated_get_only_and_http_mapping(api, history, monkeypatch, 
         assert not captured.err and json.loads(captured.out)["status"] == "VERIFIED"
     else:
         assert not captured.out and json.loads(captured.err)["error"]["code"] == error_code
+        assert not any(secret in captured.err for secret in (b"private-case", b"private-node", b"Traceback"))
     assert calls
 
 def test_closed_authority_result_schema_only(api, history):
@@ -543,4 +547,56 @@ def test_candidate_merge_only_tree_tamper_is_rejected(api, history, variant):
     body["payload"]["candidate"] = h.tip(candidate)
     h.c = h.store(body)
     h.bridge.consume(h.c)
+    assert_error(api, lambda: h.verify(api), "INVALID_EVIDENCE")
+
+
+def test_registered_support_does_not_relabel_old_execution(api, history):
+    h = history.ready().candidate_ready()
+    old_candidate = h.objects[h.c["artifact_id"]]["payload"]["candidate"]["commit"]
+    invalid = h.report("INVALID_RUN")
+    h.bridge.consume(invalid)
+    repair = h.support()
+    h.bridge.consume(repair)
+    repaired_test = h.objects[repair["artifact_id"]]["payload"]["to_test_tip"]["commit"]
+    before = h.verify(api)
+    assert before["approved_test_sha"] == before["executed_test_sha"] == h.t
+    assert before["effective_test_sha"] == repaired_test != h.t
+    assert before["candidate_sha"] == old_candidate
+    assert before["candidate_index"] == before["functional_correction_count"] == 0
+    h.bridge.consume(h.repaired_candidate(repair, invalid=invalid))
+    after = h.verify(api)
+    assert after["approved_test_sha"] == h.t
+    assert after["effective_test_sha"] == after["executed_test_sha"] == repaired_test
+    assert after["candidate_sha"] != old_candidate
+    assert after["candidate_index"] == after["functional_correction_count"] == 0
+
+@pytest.mark.parametrize("kind", ["command-result", "lesson", "disclosure-review"])
+def test_bound_evidence_at_ordinary_path_is_not_candidate_content(api, history, kind):
+    h = history
+    path = "tests/reference-fixture-bound.json"
+    if kind == "command-result":
+        raw = canonical({"schema_version": "1.0", "argv": ["python", "check.py"], "cwd": ".",
+                         "exit_code": 0, "outcome": "PASS", "environment_id": "fixture-environment"})
+    elif kind == "lesson":
+        raw = b"Separate Reviewer lesson evidence.\n"
+    else:
+        raw = canonical({"review_id": "fixture-review", "source_report_id": "fixture-report",
+            "source_report_sha256": "a" * 64, "reviewed_by": "orchestrator",
+            "authority_complete": True, "diagnostic_complete": True, "non_disclosing": True,
+            "anti_fitting": True, "mapping": [{"public_diagnosis_id": "public-diagnosis",
+                                              "confidential_finding_id": "private-finding"}]})
+    h.write(path, raw)
+    h.test_change(path, raw=raw)
+    report = copy.deepcopy(h.objects[h.tr["artifact_id"]])
+    import hashlib
+    report["unresolved"] = [{"id": "retained-evidence", "public_obligation_ids": ["R"],
+        "category": "OBSERVATION", "affected_operation": "source-proof",
+        "evidence": [{"path": path, "sha256": hashlib.sha256(raw).hexdigest(), "evidence_type": kind}],
+        "retained_work": "Synthetic attachment transport is separate from Candidate source.",
+        "requested_decision": None}]
+    h.tr = h.store(report)
+    human = copy.deepcopy(h.objects[h.human["artifact_id"]])
+    human["predecessors"] = [h.tr]
+    h.human = h.store(human)
+    h.ready().candidate_ready()
     assert_error(api, lambda: h.verify(api), "INVALID_EVIDENCE")
