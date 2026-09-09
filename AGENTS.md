@@ -2,8 +2,8 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.2.0 |
-| Date | 2026-09-06 |
+| Version | 0.2.7 |
+| Date | 2026-09-09 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Engineering boundaries, structured role handoffs, functional lifecycle, and Agent supervision. |
 
@@ -75,6 +75,11 @@ acceptance rather than becoming a narrow implementation worker.
 
 Every governed role handoff uses the versioned artifact protocol in
 `agent-discipline/skills/agent-workflow/references/structured-handoffs.md`.
+Before creating, transferring, indexing or cleaning local task material, follow
+[Local Execution State](agent-discipline/local-execution-state.md). Orchestrator
+owns the central navigation and selective, digest-checked lane-local transfer;
+ignored state is not automatically synchronized by Git. Do not create ad hoc
+top-level task directories or move bound historical evidence as housekeeping.
 The role prompt locates the input Envelope, expected digest, trusted context,
 output path and applicable rules; it does not hide task obligations in prose.
 The complete public Task Contract K is shared by reference, while private owner
@@ -82,6 +87,14 @@ Test material remains inaccessible to the Worker. Results must be checked
 against their exact task/G/W/K identities before consumption. Human-commanded
 manual bootstrap remains limited to its explicit authorization; the existence
 of these validators does not authorize autonomous dispatch or acceptance.
+
+The complete normal functional Loop has two routine Human reviews: Test Gate
+approval and final exact-Candidate PR review or failure review. Within scoped
+authorization, Orchestrator owns intervening handoffs, validation, repairs and
+bounded Worker corrections. Human-at-every-step bootstrap is a temporary mode,
+not a template for more permanent approval gates. Genuine scope/case changes
+or missing authority still require Human decisions; see the protocol's Human
+review boundaries and bootstrap section.
 
 ## External Dependency Memory
 
@@ -177,6 +190,13 @@ repository — missing project-level Agent directories (`.claude/`, `.opencode/`
 execute this Skill before beginning any other task, so every agent operates
 from the same project discipline.
 
+During an automated Loop, never launch the initialization GUI. Reuse verified
+discipline and the cached environment; missing ignored files in an isolated
+worktree do not themselves authorize restarting interactive initialization.
+Resolve only the affected setup operation using authorized noninteractive
+preparation or Human action outside the automated run. This operating rule
+does not claim that the deferred #92 initializer implementation is fixed.
+
 ## Subagent Roles and Collaboration
 
 Governed work pins `agent-discipline/workflow-contract.json` from Governor G as
@@ -204,8 +224,12 @@ explicit legacy record validation, never an implicit fallback for current work.
   requirements, affected surfaces and direct public dependencies; applicable RED,
   full-chain and known-good/known-bad evidence must be real. Non-applicability
   requires an explicit reason. At Test READY, Human Gate 1 reviews exact Test T
-  without waiting for Worker READY. Once approved, T, its manifest and Impact
-  Set remain frozen. The Tester executes that scoped functional gate on the
+  without waiting for Worker READY. Approval freezes reviewed cases, assertions,
+  expected results and selected acceptance scope. Tester may repair its non-case
+  metadata/drivers/support without another approval; frozen case changes require
+  prior Human approval. Preserve the original T/approval and bind any changed
+  support to its actual new source lineage and renewed execution evidence.
+  The Tester executes that scoped functional gate on the
   read-only Candidate and never writes production. For affected module checks,
   vendor PASS requires exit 0 and no SEVERE `[TOOL]`; selected E2E runs use the
   true black-box `tools/blackbox_e2e.py` harness (OpenCode by default, other
@@ -222,25 +246,65 @@ explicit legacy record validation, never an implicit fallback for current work.
   `agent-discipline/agent-lessons-learned.md` belongs to a separate evidence
   branch/change.
 
+Reviewer-discovered Implementation defects become independent follow-up issues
+with priority, impact, evidence and current-merge implications. Orchestrator
+publishes the Reviewer's findings when its interface is read-only. Human chooses
+immediate/deferred treatment at final review. Do not reopen the old task's
+attempts, discard reusable Implementation or dispatch a second Reviewer.
+Tester PASS covers its selected cases; it does not automatically lower a
+finding's severity or authorize merge.
+
 The functional lifecycle has independent parallel Test and Implementation lanes
-from G and the same K. Human Gate 1 freezes exact T as soon as Test is READY;
+from G and the same K. Human Gate 1 approves and binds exact T as soon as Test is READY;
 Worker does not wait for that approval. C0 joins approved T and I0, with ordered
 parents [T, I0] and the checked coverage join. Valid Implementation failures can
 authorize at most three incremental corrections, producing C1, C2 and C3 with
-the same frozen Test. There is no correction 4 or clean-room restart from G.
+the same Human-approved case semantics. There is no correction 4 or clean-room restart from G.
 Invalid runs rerun the same Candidate with a new execution identity; format-only
 delivery repairs do not change source tips, business verdicts or counters.
+That same-Candidate retry applies only while source is unchanged. Follow the
+[shared non-case repair boundary](agent-discipline/skills/agent-workflow/references/structured-handoffs.md#frozen-cases-and-non-case-repairs):
+original producers repair metadata; Tester repairs its non-case support with
+real new source/digest lineage when needed. Orchestrator corrects mistakes in
+execution handoffs and has Tester retest. If a handoff ambiguity affected
+Implementation and a valid test exposes a defect, remove that public ambiguity
+before the next original-Worker correction, which consumes a normal attempt.
+Do not require repeated approval for unchanged cases, hide changed source behind
+an old SHA, bypass checks or turn a local repair into an arbitrary terminal.
 Unknowns first become observations with one bounded diagnostic; preserve work,
 block only the affected operation and ask Human to classify genuine ambiguity.
 
 A PASS, exhausted corrections, invalid Test/contract/integrity terminal, or
 Human stop reaches one terminal Reviewer. A favorable failure review does not
-turn a failed run into success. Success requires Tester PASS and Reviewer
-APPROVED. Its PR head is the exact accepted Candidate, including both Test and
+turn a failed run into success. Encoded automatic success requires Tester PASS
+and Reviewer APPROVED. A different explicit Human disposition is preserved
+separately, not forged into those verdicts. The PR head is the exact
+Human-selected Candidate, including both Test and
 Implementation, with no lessons commit appended; final Human approval binds
 that same head. Failure preserves the latest Implementation and evidence, and
 does not create a success PR. KPI is separate later issue-driven post-merge work,
 not a functional gate or an automatic optimization loop.
+
+The Orchestrator owns visible delivery of the Reviewer's work to Human. Before
+requesting final review, place a readable Reviewer summary in the PR body, or
+in the terminal issue comment when there is no PR. Include the exact reviewed
+Candidate and review identity, original verdict, principal findings with
+severity/requirement/source evidence and impact, reviewed scope and limits,
+follow-up issue or authorized treatment status, key lessons, and the remaining
+Human decision. Explicitly state no findings when that is the actual result.
+Separate the Reviewer's original conclusions from later Orchestrator summaries,
+fixes or Human dispositions; never present an unreviewed successor as Reviewer
+APPROVED. A local ignored path, digest or generic "review completed" alone is
+not this delivery. Provide accessible evidence links where available, accurately
+label local-only originals, and check disclosure before publishing: no hidden
+owner Test literals or confidential Tester reports. Preserve original reports
+and keep lessons/evidence commits separate from the Candidate. This is the
+existing final Human review handoff, not another review or correction cycle.
+
+Before remote review, push the intended branch with an explicit refspec,
+set its same-name upstream and verify the remote SHA. Publish the current
+issue review entry with exact source links; local files or stale packets are
+not a remote review handoff. Never push feature/policy changes to master.
 
 Structured validation checks supplied bytes, identities and direct local
 predecessors. It does not prove global exactly-once execution, remote Human
@@ -251,10 +315,25 @@ are implemented.
 
 ## Testing Terminology
 
+- For new issues, explicitly including #85, `tests/doc/README.md` holds shared
+  guidance and a type/feature index, linking separate feature requirements and
+  case references. Persist the complete `K.payload.requirements` as readable
+  requirements, not an inaccessible local-K citation. Cases use a concise table
+  without execution steps or per-run evidence. Human Gate 1 primarily reviews
+  those two feature files. Orchestrator checks requirements against K and
+  case-to-script correspondence; exact Test binds the documents and scripts.
+  Metadata-only repair retains that source; non-case support source repair keeps
+  approved cases and binds actual revised source without another case approval.
+  Public requirements may reach Worker through its reviewed handoff; current/
+  unaccepted cases, scripts and the case-bearing index remain hidden Test.
+  KPI case documents remain under `docs/tests/`, maintained by KPI test issues.
+  Do not backfill case documents for historical accepted features. See the
+  functional case documentation rules in `agent-discipline/documentation-governance.md`.
 - Development testing is the delivery gate; runtime verification is the product
   behavior after editing a configuration. Runtime verification does not replace
   development tests that exercise it.
-- The functional gate is the frozen requirement-driven Test Impact Set, not an
+- The functional gate is the frozen requirement-driven selection in the Test
+  Impact Set, not an
   unconditional repository-wide test run. Selected unit, functional, static,
   vendor and E2E checks must cover mandatory requirements, actual changed paths
   and declared direct public dependencies. Missing coverage is a gap, not
@@ -305,7 +384,8 @@ are implemented.
 Project documentation is split into two physically separated categories, and the
 agent respects the boundary in both directions:
 
-- **Category A — development documentation (`docs/`)**: pure project/engineering
+- **Category A — development documentation (`docs/`, plus agent-agnostic RTD
+  CfgFile CLI feature references in `tests/doc/`)**: pure project/engineering
   content — architecture and contract (`specs/`), the test method and cases
   (`tests/`), delivery staging (`roadmaps/`), and development inputs
   (`references/`). Self-contained and agent-agnostic: **no** agent-discipline
@@ -315,7 +395,10 @@ agent respects the boundary in both directions:
   (`AGENTS.md`), the role definitions (`agent-discipline/subagents/`), and the charter's
   supplements (`agent-discipline/`: the lessons log, the owner's review-comment
   tracker, the documentation-governance rules, and the read-only review archive).
-  Category B **may** reference Category A; Category A must never reference B.
+  The shared `tests/doc/` guide, Agent feature references and requirements
+  renderings containing Agent obligations also belong to Category B. Category B
+  **may** reference Category A; Category A must never reference B. Classify by
+  content; the shared directory does not permit Agent rules in product cases.
 
 Usage rules:
 
@@ -336,3 +419,10 @@ The per-document map and full authoring rules are in
 | Date | Version | Description |
 | --- | --- | --- |
 | 2026-09-06 | 0.2.0 | Aligned active guidance with structured v2 handoffs, parallel lanes, frozen scoped Test, three incremental corrections, one terminal review and exact Candidate PR; retained passive monitoring and separated later KPI work. |
+| 2026-09-06 | 0.2.1 | Required prospective type-classified functional case documents as Human Gate 1's review surface, bound documents and scripts to the same Test, and retained separate issue-owned KPI documents without historical backfill. |
+| 2026-09-06 | 0.2.2 | Split functional review documentation into shared guidance and feature requirements/cases, made the two feature files primary for Human review, and retained public-requirement/private-case separation. |
+| 2026-09-07 | 0.2.3 | Clarified that Human freezes reviewed cases and acceptance semantics, not erroneous delivery metadata; required original-producer repair and renewed checks without new case approval or correction accounting. |
+| 2026-09-07 | 0.2.4 | Authorized unchanged-case Tester support repairs with truthful source lineage and retest, retained Human approval for case changes, and required normal counted Worker fixes after implementation-affecting handoff ambiguity is removed. |
+| 2026-09-08 | 0.2.5 | Recorded two routine Human reviews, terminal follow-up issues, bootstrap/runtime boundaries, automated-GUI prohibition and exact remote review delivery. |
+| 2026-09-08 | 0.2.6 | Made Orchestrator responsible for a substantive, source-bound Reviewer summary in the final PR or failure issue, with honest later disposition and disclosure boundaries. |
+| 2026-09-09 | 0.2.7 | Linked the single local-state policy for navigation, explicit central/lane transport, ownership and scoped cleanup without new workflow gates. |

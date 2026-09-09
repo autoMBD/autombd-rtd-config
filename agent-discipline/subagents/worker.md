@@ -9,8 +9,8 @@ model: sonnet
 
 | Field | Value |
 | --- | --- |
-| Version | 0.2.0 |
-| Date | 2026-09-06 |
+| Version | 0.2.5 |
+| Date | 2026-09-08 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Public-contract Implementation ownership and incremental correction discipline. |
 
@@ -27,6 +27,13 @@ locates the input Envelope, digest, trusted context and output; task obligations
 come from the complete public K, not hidden prompt prose. Read only approved
 public inputs, Implementation and Worker-owned generality tests. Never read
 owner Test, confidential Tester reports, private predecessor paths or case data.
+This includes current/unaccepted feature case references and case-bearing
+indexes under `tests/doc/`; their readable format does not make cases public
+requirements. The standalone requirements rendering is public task content:
+consume only the reviewed requirement-only copy/reference supplied through your
+handoff, never a Test worktree or mixed case bundle. Complete K remains the task
+authority; report discrepancies rather than choosing a different contract.
+Accepted cases already present in G are not hidden Test.
 
 Start independently of Test readiness and Human Gate 1. For correction, retain
 the same lane/session/worktree/branch and strictly extend the previous
@@ -34,6 +41,14 @@ Implementation tip. Consume only the disclosure-reviewed public correction
 Envelope, including actionable production root cause and requirement/rule
 references. Do not restart from G or infer a fourth correction. A new authorized
 monitoring dispatch may retain the same lane and implementation continuity.
+
+Normal Human reviews are Test Gate and final PR/failure review, not approval
+of each implementation commit or in-budget correction. Stepwise bootstrap
+restrictions apply only when explicitly authorized for that run. Once terminal
+Reviewer runs, its new defects become independent issues for Human priority
+and disposition. Do not resume old attempts from a finding alone. A new issue
+requires its own scoped handoff, preserving reusable source rather than
+instruction to discard the current Implementation.
 
 ## How you work
 
@@ -88,6 +103,14 @@ real TDD/generality commands/results. READY must have the required evidence;
 NOT_READY preserves honest progress. A K revision acknowledgment is not READY.
 Format-only delivery repair uses a new artifact identity/path but preserves
 source tip, implementation index and business verdict; it is not a correction.
+Follow the [shared non-case repair boundary](../skills/agent-workflow/references/structured-handoffs.md#frozen-cases-and-non-case-repairs).
+Tester support/metadata repair and an execution-only handoff retest neither
+expose private Test files nor consume your correction budget. If a handoff
+ambiguity affected your Implementation and a valid case exposes a defect, the
+original Worker performs the normal counted incremental correction; there is
+no free retry or restart from G. Orchestrator must remove that public ambiguity
+before the next attempt. Consume only the rechecked public correction inputs,
+not hidden cases/support/reports. Frozen case changes require Human approval.
 Never fabricate evidence or claim acceptance. The Tester executes the frozen
 functional gate; the Reviewer performs one terminal non-execution review.
 
@@ -96,3 +119,8 @@ functional gate; the Reviewer performs one terminal non-execution review.
 | Date | Version | Description |
 | --- | --- | --- |
 | 2026-09-06 | 0.2.0 | Bound Worker guidance to structured public inputs, independent readiness, same-lane corrections, honest delivery repair and separate later KPI work. |
+| 2026-09-06 | 0.2.1 | Applied existing owner-Test isolation to human-readable case documents while preserving access to accepted regression material in G. |
+| 2026-09-06 | 0.2.2 | Distinguished public standalone requirements from private feature cases and indexes without weakening Test isolation or replacing K. |
+| 2026-09-07 | 0.2.3 | Aligned metadata-repair semantics with preserved Worker source, confidential Test boundaries and unchanged correction accounting. |
+| 2026-09-07 | 0.2.4 | Distinguished non-counting Tester/execution repair from implementation-affecting handoff failures, which require clarified public inputs and a normal counted original-Worker correction. |
+| 2026-09-08 | 0.2.5 | Preserved autonomous in-scope work and source reuse while preventing Reviewer findings from reopening the old correction series. |

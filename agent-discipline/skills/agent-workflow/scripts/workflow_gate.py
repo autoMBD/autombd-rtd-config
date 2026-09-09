@@ -39,12 +39,12 @@
 # Project:     autoMBD RTD Config <https://github.com/autoMBD/autombd-rtd-config>
 # File:        workflow_gate.py
 # Author:      TkungL <tkung.lqk@foxmail.com>
-# Date:        2026-08-03
-# Version:     0.2.0
-# Description: Validate v2 workflow declarations and explicit legacy evidence.
+# Date:        2026-09-09
+# Version:     0.2.1
+# Description: Validate W2/W3 workflow declarations and explicit legacy evidence.
 # =================================================================================
 
-"""Contract-only v2 validation and explicit legacy v1 evidence compatibility."""
+"""Contract-only W2/W3 validation and explicit legacy v1 evidence compatibility."""
 
 from __future__ import annotations
 
@@ -216,8 +216,8 @@ def validate_contract(contract, *, contract_path):
     authoritative, _ = _read_contract(contract_path)
     _require(contract == authoritative, "contract object differs from contract_path")
     version = contract.get("contract_version")
-    _require(_is_int(version) and version in (1, 2), "unsupported workflow contract_version; expected 1 or 2")
-    if version == 2:
+    _require(_is_int(version) and version in (1, 2, 3), "unsupported workflow contract_version; expected 1, 2 or 3")
+    if version in (2, 3):
         _validate_v2_contract(contract)
         return
     _require("schema_version" not in contract, "unsupported workflow schema_version for legacy v1")
@@ -225,7 +225,15 @@ def validate_contract(contract, *, contract_path):
 
 
 def _validate_v2_contract(contract: dict[str, Any]) -> None:
-    _require(set(contract) == _V2_CONTRACT_KEYS, "v2 contract top-level fields are not closed")
+    version = contract["contract_version"]
+    fields = _V2_CONTRACT_KEYS | ({"non_case_repairs"} if version == 3 else set())
+    _require(set(contract) == fields, "v2 schema contract top-level fields are not closed")
+    if version == 3:
+        expected = {"version": "1.0", "metadata": True, "test_support": True}
+        capability = _closed_object(contract["non_case_repairs"], list(expected), "non_case_repairs")
+        for name, value in expected.items():
+            _require(type(capability[name]) is type(value) and capability[name] == value,
+                     f"non_case_repairs.{name} must be {value!r} with its exact type")
     _require(_is_int(contract["schema_version"]) and contract["schema_version"] == 2, "unsupported workflow schema_version; v2 requires integer 2")
     _require(contract["workflow_profile"] == "functional-development-v1", "unsupported workflow_profile")
     for name, expected in _V2_REFERENCES.items():
@@ -277,7 +285,7 @@ def _contract_context(contract_path: Any) -> tuple[dict[str, Any], str]:
     validate_contract(contract, contract_path=contract_path)
     _require(
         contract["contract_version"] == 1,
-        "v2 workflow records/manifests are unsupported by the legacy validator; "
+        "v2 schema workflow records/manifests (W2/W3) are unsupported by the legacy validator; "
         "use handoff_guard.py validate-artifact, or validate-contract for the declaration only",
     )
     return contract, _blob_sha(data)
@@ -844,7 +852,7 @@ def _parser() -> argparse.ArgumentParser:
     validate = subparsers.add_parser("validate", aliases=["validate-record"], help="validate a legacy v1 workflow record")
     validate.add_argument("--contract", required=True)
     validate.add_argument("--record", required=True)
-    contract = subparsers.add_parser("validate-contract", help="validate a v1/v2 declaration without any workflow record")
+    contract = subparsers.add_parser("validate-contract", help="validate a W1/W2/W3 declaration without any workflow record")
     contract.add_argument("--contract", required=True)
     return parser
 

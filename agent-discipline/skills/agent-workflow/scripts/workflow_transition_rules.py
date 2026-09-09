@@ -39,14 +39,15 @@
 # Project:     RTD CfgFile CLI <https://github.com/autoMBD/autombd-rtd-config>
 # File:        workflow_transition_rules.py
 # Author:      autoMBD <tkung.lqk@foxmail.com>
-# Date:        2026-09-07
-# Version:     0.1.3
+# Date:        2026-09-09
+# Version:     0.2.0
 # Description: Pure global lifecycle and identity rules for transitions.
 # =================================================================================
 
 import copy
 
-from workflow_transition_wire import WorkflowTransitionError, require
+import repair_protocol
+from workflow_transition_wire import WorkflowTransitionError, require, validate
 
 PRIORITY = {name: index for index, name in enumerate((
     "STALE_EVENT", "DUPLICATE_EVENT", "ILLEGAL_TRANSITION", "OUT_OF_ORDER_EVENT",
@@ -140,6 +141,42 @@ def history_bodies(state, memory, kind=None):
             (kind is None or body.get("artifact_kind") == kind)]
 
 
+def repair_bodies(state, memory):
+    """Only already consumed repairs establish attachment equivalence."""
+    return [body for ref in state["repairs"] if (body := memory.get(ref))]
+
+
+def latest_support(state, memory):
+    return next((ref for ref in reversed(state["repairs"])
+                 if repair_protocol.is_v1(memory.get(ref), "TEST_SUPPORT")), None)
+
+
+def evidence_equivalent(old, new, state, memory):
+    return repair_protocol.equivalent_evidence(old, new, repair_bodies(state, memory))
+
+
+def test_source(test, support, memory):
+    body = memory.get(support)
+    return repair_protocol.effective_test(test, payload(body) if repair_protocol.is_v1(body, "TEST_SUPPORT") else None)
+
+
+def validate_repair_evidence(artifact, memory, decision):
+    """Share byte/projection rules with Guard, never substitute filesystem facts."""
+    if not artifact:
+        return
+    try:
+        repair_protocol.require_capability(memory.context["protocol"]["workflow_contract"], artifact)
+        if repair_protocol.is_v1(artifact):
+            defs = memory.context["protocol"]["handoff_schema"]["$defs"]
+
+            def validate_after(body, name):
+                validate(body, defs[name], defs, "INVALID_EVIDENCE", "/artifact/payload/attachment_changes")
+
+            repair_protocol.validate_repair(artifact, memory.get, validate_after)
+    except (repair_protocol.RepairError, WorkflowTransitionError):
+        decision.check(False, "INVALID_EVIDENCE", "/artifact/payload/repair")
+
+
 def _replace_slots(state, original, replacement):
     for key in ("contract", "stop", "final_decision", "terminal"):
         if state[key] == original:
@@ -203,7 +240,30 @@ def business_plan(state, artifact, ref, memory, decision):
         stale(artifact["governor"] == state["governor"], "governor")
         if kind != "task-contract" and current_k:
             stale(artifact["task_contract"] == current_k, "task_contract")
+        validate_repair_evidence(artifact, memory, decision)
+        if repair_protocol.is_v1(artifact):
+            contract = memory.p(state["contract"])
+            if contract:
+                evidence(set(p["semantic_audit"]["requirement_ids"]) <=
+                         {item["id"] for item in contract["requirements"]}, "payload/semantic_audit/requirement_ids")
         if replacement:
+            metadata_ref = replacement.get("repair")
+            metadata = memory.get(metadata_ref)
+            if metadata_ref:
+                evidence(metadata_ref in state["repairs"], "replaces/repair")
+                evidence(repair_protocol.is_v1(metadata, "METADATA"), "replaces/repair")
+                if metadata:
+                    validate_repair_evidence(metadata, memory, decision)
+                    rp = payload(metadata)
+                    stale(rp.get("original") == replacement["original"], "replaces/original")
+                    if "dispatch_id" in p:
+                        stale(rp.get("dispatch_id") == p.get("dispatch_id"), "payload/dispatch_id")
+                    evidence(rp.get("replacement_output") == ref["path"] and
+                             ref["path"] != replacement["original"]["path"], "replaces/repair")
+                    evidence(metadata.get("consumer_role") == artifact["producer_role"], "producer_role")
+                    repaired_dispatch = rp.get("dispatch_id") == p.get("dispatch_id")
+                direct(metadata_ref)
+                direct(replacement["original"])
             if original:
                 stale(original.get("task") == artifact["task"] and
                       original.get("governor") == artifact["governor"] and
@@ -211,39 +271,31 @@ def business_plan(state, artifact, ref, memory, decision):
                       "replaces/original")
                 evidence(original.get("artifact_kind") == kind and
                          original.get("artifact_id") != artifact["artifact_id"], "replaces/original")
-                preserved = ("status", "outcome", "verdict", "implementation_index", "implementation_tip",
-                    "previous_implementation", "test_tip", "candidate", "candidate_index", "candidate_sha",
-                    "correction_count", "review_id", "lane", "result", "accepted_candidate",
-                    "preserved_implementation", "impact_set", "manifest", "test_manifest",
-                    "implementation_manifest", "execution_id", "coverage_join", "rerun_of",
-                    "previous_candidate", "terminal_reason", "last_implementation", "source_reports",
-                    "disposition", "pr", "final_decision", "revision_ack",
-                    "gate", "decision", "subject_sha")
-                for field in preserved:
-                    evidence(p.get(field) == original_payload.get(field), "payload/" + field)
-                preserves_business = all(p.get(field) == original_payload.get(field)
-                                         for field in preserved)
-                required_business = {"test-gate-report": "status", "implementation-report": "status",
-                    "tester-confidential-report": "outcome", "reviewer-report": "verdict",
-                    "terminal-record": "result"}.get(kind)
-                if required_business:
-                    evidence(required_business in original_payload, "replaces/original")
-                if kind == "human-decision":
-                    evidence(all(field in original_payload for field in
-                                 ("gate", "decision", "subject_sha")), "replaces/original")
+                try:
+                    repair_protocol.validate_metadata_replacement(original, artifact, metadata)
+                    preserves_business = True
+                except repair_protocol.RepairError as error:
+                    # Keep the published legacy diagnostic pointer while the
+                    # shared helper remains the sole preservation authority.
+                    changed = next((field for field in repair_protocol.PRESERVED
+                        if p.get(field) != original_payload.get(field)), None)
+                    field = ("payload/" + changed if changed and error.rule == "REPAIR_BUSINESS_CHANGE"
+                             else "replaces/original")
+                    evidence(False, field)
+                    preserves_business = False
                 if p.get("dispatch_id") != original_payload.get("dispatch_id"):
                     repairs = [memory.p(x) for x in state["repairs"]
                                if memory.p(x).get("original") == replacement["original"]]
                     match = next((r for r in repairs if r.get("dispatch_id") == p.get("dispatch_id")), None)
                     evidence(match is not None, "payload/dispatch_id")
                     repaired_dispatch = match is not None
-            rejection = memory.get(replacement["guard_result"])
+            rejection = memory.get(replacement.get("guard_result"))
             if rejection:
                 evidence(rejection.get("status") == "REJECTED" and
                     rejection.get("input") == {k: replacement["original"][k]
                                               for k in ("artifact_id", "path", "sha256")}, "replaces/guard_result")
             direct(replacement["original"]) if not accepted_replacement else None
-            direct(replacement["guard_result"])
+            direct(replacement.get("guard_result"))
 
     # Frozen/terminal restrictions are evaluated independently of missing evidence.
     closed = terminal.get("disposition") in ("MERGED", "RECORD_FAILURE")
@@ -277,6 +329,10 @@ def business_plan(state, artifact, ref, memory, decision):
                 "worker-launch", "test-launch", "test-gate-report", "task-contract") or accepted_replacement)
         if kind == "candidate-test-envelope":
             illegal(bool(p.get("rerun_of")) or accepted_replacement, "payload/rerun_of")
+    if repair_protocol.is_v1(artifact, "TEST_SUPPORT"):
+        illegal(not (state["stop"] or state["review"] or state["terminal"]))
+        illegal(outcome not in ("PASS", "TEST_GATE_INVALID", "CONTRACT_INVALID", "INTEGRITY_INVALID")
+                and not (outcome == "IMPLEMENTATION_FAIL" and candidate.get("candidate_index") == 3))
 
     # Logical repair does not replay READY, correction, execution or review.
     if accepted_replacement:
@@ -447,19 +503,33 @@ def business_plan(state, artifact, ref, memory, decision):
             impl["implementation_index"] == candidate["candidate_index"] + 1 and
             not state["worker"]["pending_correction"])
         if present:
+            support_ref = p.get("support_repair")
+            support = memory.get(support_ref)
+            known_support = repair_protocol.is_v1(support, "TEST_SUPPORT")
+            if support_ref:
+                evidence(known_support and support_ref in state["repairs"], "payload/support_repair")
+                if known_support:
+                    stale(support_ref == latest_support(state, memory), "payload/support_repair")
+                    direct(support_ref)
+            else:
+                stale(latest_support(state, memory) is None, "payload/support_repair")
+            executable_test = test_source(test, support_ref, memory)
             for needed in (state["test"]["approval"], state["test"]["ready"], state["worker"]["ready"]):
-                direct(needed)
+                if needed:
+                    order(any(equivalent_ref(predecessor, needed, memory)
+                              for predecessor in artifact["predecessors"]), "predecessors")
             for report_ref in (state["test"]["ready"], state["worker"]["ready"]):
                 report = memory.get(report_ref)
                 if report:
                     order(report["task_contract"] == current_k)
             if test:
-                for key, target in (("test_tip", "test_tip"), ("test_manifest", "manifest"),
-                                    ("impact_set", "impact_set")):
-                    stale(p[key] == test[target], "payload/" + key)
+                stale(p["test_tip"] == executable_test["test_tip"], "payload/test_tip")
+                for key in ("test_manifest", "impact_set"):
+                    stale(evidence_equivalent(p[key], executable_test[key], state, memory), "payload/" + key)
             if impl:
                 stale(p["implementation_tip"] == impl["implementation_tip"], "payload/implementation_tip")
-                stale(p["implementation_manifest"] == impl["manifest"], "payload/implementation_manifest")
+                stale(evidence_equivalent(p["implementation_manifest"], impl["manifest"], state, memory),
+                      "payload/implementation_manifest")
                 if preserves_business and (not state["candidate"] or p["rerun_of"] or next_implementation):
                     stale(p["candidate_index"] == impl["implementation_index"], "payload/candidate_index")
             if preserves_business:
@@ -478,9 +548,17 @@ def business_plan(state, artifact, ref, memory, decision):
                     direct(state["candidate"]["result"])
                     direct(state["candidate"]["envelope"])
                 if candidate:
-                    for key in ("candidate", "test_tip", "implementation_tip", "test_manifest",
-                                "implementation_manifest", "impact_set", "coverage_join",
-                                "candidate_index", "correction_count", "previous_candidate"):
+                    source_repair = bool(known_support and support_ref != candidate.get("support_repair"))
+                    if source_repair:
+                        stale(p["previous_candidate"] == state["candidate"]["envelope"], "payload/previous_candidate")
+                        stale(p["test_tip"] != candidate["test_tip"] and
+                              commit(p["candidate"]) != commit(candidate["candidate"]), "payload/candidate")
+                        unchanged = ("implementation_tip", "implementation_manifest", "candidate_index", "correction_count")
+                    else:
+                        unchanged = ("candidate", "test_tip", "implementation_tip", "test_manifest",
+                                     "implementation_manifest", "impact_set", "coverage_join",
+                                     "candidate_index", "correction_count", "previous_candidate")
+                    for key in unchanged:
                         stale(p[key] == candidate[key], "payload/" + key)
             elif state["candidate"]:
                 order(state["candidate"]["result"] is not None)
@@ -506,6 +584,12 @@ def business_plan(state, artifact, ref, memory, decision):
             for key in ("dispatch_id", "execution_id", "candidate_index"):
                 stale(p[key] == candidate[key], "payload/" + key)
             stale(p["candidate_sha"] == commit(candidate["candidate"]), "payload/candidate_sha")
+            try:
+                repair_protocol.validate_retest_evidence(artifact,
+                    memory.get(state["candidate"]["envelope"]),
+                    history_bodies(state, memory, "tester-confidential-report"), memory.get)
+            except repair_protocol.RepairError:
+                evidence(False, "payload/execution")
         if result["candidate"]:
             result["candidate"]["result"] = ref
     elif kind == "worker-correction-envelope":
@@ -611,8 +695,35 @@ def business_plan(state, artifact, ref, memory, decision):
             result["terminal"] = ref
     elif repair:
         if present:
+            if repair_protocol.is_v1(artifact, "TEST_SUPPORT"):
+                previous = latest_support(state, memory)
+                prior = test_source(test, previous, memory)
+                order(state["test"]["ready"] is not None and state["test"]["approval"] is not None)
+                stale(equivalent_ref(p["approved_test_report"], state["test"]["ready"], memory),
+                      "payload/approved_test_report")
+                stale(equivalent_ref(p["approval"], state["test"]["approval"], memory), "payload/approval")
+                stale(p["previous_support_repair"] == previous, "payload/previous_support_repair")
+                if test:
+                    stale(p["lane"] == test["lane"], "payload/lane")
+                    stale(p["from_test_tip"] == prior["test_tip"], "payload/from_test_tip")
+                # The real Guard proves strict Git ancestry; a source repair
+                # may contain multiple commits. Memory cannot invent that proof.
+                evidence(commit(p["to_test_tip"]) != commit(p["from_test_tip"]), "payload/to_test_tip")
+                stale(p["implementation_report"] == state["worker"]["ready"], "payload/implementation_report")
+                stale(p["previous_candidate"] == (state["candidate"]["envelope"] if state["candidate"] else None),
+                      "payload/previous_candidate")
+                stale(p["candidate_index"] == candidate.get("candidate_index"), "payload/candidate_index")
+                stale(p["correction_count"] == impl.get("implementation_index", 0), "payload/correction_count")
+                for needed in (p["approved_test_report"], p["approval"], previous,
+                               p["previous_candidate"], p["implementation_report"]):
+                    direct(needed)
+                for old in history_bodies(state, memory, "delivery-repair"):
+                    stale(p["dispatch_id"] != payload(old).get("dispatch_id"), "payload/dispatch_id")
+                result["repairs"].append(ref)
+                return result
             op = memory.get(p["original"])
-            rejection = memory.get(p["rejection"])
+            rejection_ref = p.get("rejection")
+            rejection = memory.get(rejection_ref)
             if op:
                 opayload = payload(op)
                 stale(op.get("task") == artifact["task"] and op.get("governor") == artifact["governor"]
@@ -646,7 +757,8 @@ def business_plan(state, artifact, ref, memory, decision):
                     rejection.get("input") == {k: p["original"][k] for k in ("artifact_id", "path", "sha256")},
                     "payload/rejection")
             # Originals/rejections need not be accepted business events.
-            evidence(p["original"] in artifact["predecessors"] and p["rejection"] in artifact["predecessors"],
-                     "predecessors")
+            if not repair_protocol.is_v1(artifact):
+                evidence(p["original"] in artifact["predecessors"] and rejection_ref in artifact["predecessors"],
+                         "predecessors")
             result["repairs"].append(ref)
     return result

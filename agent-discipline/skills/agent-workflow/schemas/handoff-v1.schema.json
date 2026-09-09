@@ -48,7 +48,14 @@
   ],
   "$defs": {
     "CwdPath": {
-      "anyOf": [{"const": "."}, {"$ref": "#/$defs/Path"}]
+      "anyOf": [
+        {
+          "const": "."
+        },
+        {
+          "$ref": "#/$defs/Path"
+        }
+      ]
     },
     "ID": {
       "type": "string",
@@ -438,20 +445,40 @@
       "additionalProperties": false
     },
     "Replacement": {
-      "type": "object",
-      "properties": {
-        "original": {
-          "$ref": "#/$defs/ArtifactRef"
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "original": {
+              "$ref": "#/$defs/ArtifactRef"
+            },
+            "guard_result": {
+              "$ref": "#/$defs/ArtifactRef"
+            }
+          },
+          "required": [
+            "original",
+            "guard_result"
+          ],
+          "additionalProperties": false
         },
-        "guard_result": {
-          "$ref": "#/$defs/ArtifactRef"
+        {
+          "type": "object",
+          "properties": {
+            "original": {
+              "$ref": "#/$defs/ArtifactRef"
+            },
+            "repair": {
+              "$ref": "#/$defs/ArtifactRef"
+            }
+          },
+          "required": [
+            "original",
+            "repair"
+          ],
+          "additionalProperties": false
         }
-      },
-      "required": [
-        "original",
-        "guard_result"
-      ],
-      "additionalProperties": false
+      ]
     },
     "RevisionAck": {
       "type": "object",
@@ -2544,86 +2571,176 @@
           ]
         },
         "payload": {
-          "type": "object",
-          "properties": {
-            "dispatch_id": {
-              "$ref": "#/$defs/ID"
-            },
-            "candidate_index": {
-              "$ref": "#/$defs/Index"
-            },
-            "correction_count": {
-              "$ref": "#/$defs/Index"
-            },
-            "candidate": {
-              "$ref": "#/$defs/Tip"
-            },
-            "test_tip": {
-              "$ref": "#/$defs/Tip"
-            },
-            "implementation_tip": {
-              "$ref": "#/$defs/Tip"
-            },
-            "test_manifest": {
-              "$ref": "#/$defs/EvidenceRef"
-            },
-            "implementation_manifest": {
-              "$ref": "#/$defs/EvidenceRef"
-            },
-            "impact_set": {
-              "$ref": "#/$defs/EvidenceRef"
-            },
-            "coverage_join": {
-              "$ref": "#/$defs/EvidenceRef"
-            },
-            "output_path": {
-              "$ref": "#/$defs/StatePath"
-            },
-            "execution_id": {
-              "$ref": "#/$defs/ID"
-            },
-            "rerun_of": {
-              "anyOf": [
-                {
-                  "$ref": "#/$defs/ArtifactRef"
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "dispatch_id": {
+                  "$ref": "#/$defs/ID"
                 },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "readonly_candidate": {
-              "const": true
-            },
-            "previous_candidate": {
-              "anyOf": [
-                {
-                  "$ref": "#/$defs/ArtifactRef"
+                "candidate_index": {
+                  "$ref": "#/$defs/Index"
                 },
-                {
-                  "type": "null"
+                "correction_count": {
+                  "$ref": "#/$defs/Index"
+                },
+                "candidate": {
+                  "$ref": "#/$defs/Tip"
+                },
+                "test_tip": {
+                  "$ref": "#/$defs/Tip"
+                },
+                "implementation_tip": {
+                  "$ref": "#/$defs/Tip"
+                },
+                "test_manifest": {
+                  "$ref": "#/$defs/EvidenceRef"
+                },
+                "implementation_manifest": {
+                  "$ref": "#/$defs/EvidenceRef"
+                },
+                "impact_set": {
+                  "$ref": "#/$defs/EvidenceRef"
+                },
+                "coverage_join": {
+                  "$ref": "#/$defs/EvidenceRef"
+                },
+                "output_path": {
+                  "$ref": "#/$defs/StatePath"
+                },
+                "execution_id": {
+                  "$ref": "#/$defs/ID"
+                },
+                "rerun_of": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/ArtifactRef"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "readonly_candidate": {
+                  "const": true
+                },
+                "previous_candidate": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/ArtifactRef"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
                 }
-              ]
+              },
+              "required": [
+                "dispatch_id",
+                "candidate_index",
+                "correction_count",
+                "candidate",
+                "test_tip",
+                "implementation_tip",
+                "test_manifest",
+                "implementation_manifest",
+                "impact_set",
+                "coverage_join",
+                "output_path",
+                "execution_id",
+                "rerun_of",
+                "readonly_candidate",
+                "previous_candidate"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "dispatch_id": {
+                  "$ref": "#/$defs/ID"
+                },
+                "candidate_index": {
+                  "$ref": "#/$defs/Index"
+                },
+                "correction_count": {
+                  "$ref": "#/$defs/Index"
+                },
+                "candidate": {
+                  "$ref": "#/$defs/Tip"
+                },
+                "test_tip": {
+                  "$ref": "#/$defs/Tip"
+                },
+                "implementation_tip": {
+                  "$ref": "#/$defs/Tip"
+                },
+                "test_manifest": {
+                  "$ref": "#/$defs/EvidenceRef"
+                },
+                "implementation_manifest": {
+                  "$ref": "#/$defs/EvidenceRef"
+                },
+                "impact_set": {
+                  "$ref": "#/$defs/EvidenceRef"
+                },
+                "coverage_join": {
+                  "$ref": "#/$defs/EvidenceRef"
+                },
+                "output_path": {
+                  "$ref": "#/$defs/StatePath"
+                },
+                "execution_id": {
+                  "$ref": "#/$defs/ID"
+                },
+                "rerun_of": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/ArtifactRef"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "readonly_candidate": {
+                  "const": true
+                },
+                "previous_candidate": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/ArtifactRef"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "support_repair": {
+                  "$ref": "#/$defs/ArtifactRef"
+                }
+              },
+              "required": [
+                "dispatch_id",
+                "candidate_index",
+                "correction_count",
+                "candidate",
+                "test_tip",
+                "implementation_tip",
+                "test_manifest",
+                "implementation_manifest",
+                "impact_set",
+                "coverage_join",
+                "output_path",
+                "execution_id",
+                "rerun_of",
+                "readonly_candidate",
+                "previous_candidate",
+                "support_repair"
+              ],
+              "additionalProperties": false
             }
-          },
-          "required": [
-            "dispatch_id",
-            "candidate_index",
-            "correction_count",
-            "candidate",
-            "test_tip",
-            "implementation_tip",
-            "test_manifest",
-            "implementation_manifest",
-            "impact_set",
-            "coverage_join",
-            "output_path",
-            "execution_id",
-            "rerun_of",
-            "readonly_candidate",
-            "previous_candidate"
-          ],
-          "additionalProperties": false
+          ]
         },
         "unresolved": {
           "type": "array",
@@ -3497,73 +3614,83 @@
           ]
         },
         "payload": {
-          "type": "object",
-          "properties": {
-            "dispatch_id": {
-              "$ref": "#/$defs/ID"
-            },
-            "original": {
-              "$ref": "#/$defs/ArtifactRef"
-            },
-            "rejection": {
-              "$ref": "#/$defs/ArtifactRef"
-            },
-            "lane": {
-              "$ref": "#/$defs/Lane"
-            },
-            "replacement_output": {
-              "$ref": "#/$defs/StatePath"
-            },
-            "preserve_tip": {
-              "anyOf": [
-                {
-                  "$ref": "#/$defs/SHA"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "preserve_candidate_index": {
-              "anyOf": [
-                {
-                  "$ref": "#/$defs/Index"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "preserve_correction_count": {
-              "$ref": "#/$defs/Index"
-            },
-            "preserve_review_id": {
-              "anyOf": [
-                {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "dispatch_id": {
                   "$ref": "#/$defs/ID"
                 },
-                {
-                  "type": "null"
+                "original": {
+                  "$ref": "#/$defs/ArtifactRef"
+                },
+                "rejection": {
+                  "$ref": "#/$defs/ArtifactRef"
+                },
+                "lane": {
+                  "$ref": "#/$defs/Lane"
+                },
+                "replacement_output": {
+                  "$ref": "#/$defs/StatePath"
+                },
+                "preserve_tip": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/SHA"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "preserve_candidate_index": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/Index"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "preserve_correction_count": {
+                  "$ref": "#/$defs/Index"
+                },
+                "preserve_review_id": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/ID"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "business_verdict_change_allowed": {
+                  "const": false
                 }
-              ]
+              },
+              "required": [
+                "dispatch_id",
+                "original",
+                "rejection",
+                "lane",
+                "replacement_output",
+                "preserve_tip",
+                "preserve_candidate_index",
+                "preserve_correction_count",
+                "preserve_review_id",
+                "business_verdict_change_allowed"
+              ],
+              "additionalProperties": false
             },
-            "business_verdict_change_allowed": {
-              "const": false
+            {
+              "$ref": "#/$defs/MetadataRepairPayload"
+            },
+            {
+              "$ref": "#/$defs/TestSupportRepairPayload"
             }
-          },
-          "required": [
-            "dispatch_id",
-            "original",
-            "rejection",
-            "lane",
-            "replacement_output",
-            "preserve_tip",
-            "preserve_candidate_index",
-            "preserve_correction_count",
-            "preserve_review_id",
-            "business_verdict_change_allowed"
-          ],
-          "additionalProperties": false
+          ]
         },
         "unresolved": {
           "type": "array",
@@ -3854,6 +3981,556 @@
         "expected_head",
         "predecessor_refs",
         "central_check"
+      ],
+      "additionalProperties": false
+    },
+    "RepairSourceBinding": {
+      "type": "object",
+      "properties": {
+        "commit": {
+          "$ref": "#/$defs/SHA"
+        },
+        "path": {
+          "$ref": "#/$defs/Path"
+        },
+        "blob": {
+          "$ref": "#/$defs/SHA"
+        }
+      },
+      "required": [
+        "commit",
+        "path",
+        "blob"
+      ],
+      "additionalProperties": false
+    },
+    "RepairSnapshot": {
+      "type": "object",
+      "properties": {
+        "ref": {
+          "$ref": "#/$defs/EvidenceRef"
+        },
+        "raw": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "ref",
+        "raw"
+      ],
+      "additionalProperties": false
+    },
+    "RepairSourceChange": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/Path"
+        },
+        "before_blob": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SHA"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "after_blob": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SHA"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reason": {
+          "$ref": "#/$defs/Text"
+        }
+      },
+      "required": [
+        "path",
+        "before_blob",
+        "after_blob",
+        "reason"
+      ],
+      "additionalProperties": false
+    },
+    "RepairDependencyAudit": {
+      "type": "object",
+      "properties": {
+        "before": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "from": {
+                  "$ref": "#/$defs/Path"
+                },
+                "to": {
+                  "$ref": "#/$defs/Path"
+                }
+              },
+              "required": [
+                "from",
+                "to"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "after": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "from": {
+                  "$ref": "#/$defs/Path"
+                },
+                "to": {
+                  "$ref": "#/$defs/Path"
+                }
+              },
+              "required": [
+                "from",
+                "to"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "source_bindings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/RepairSourceBinding"
+          },
+          "minItems": 1
+        },
+        "explanation": {
+          "$ref": "#/$defs/Text"
+        }
+      },
+      "required": [
+        "before",
+        "after",
+        "source_bindings",
+        "explanation"
+      ],
+      "additionalProperties": false
+    },
+    "RepairAttachmentChange": {
+      "type": "object",
+      "properties": {
+        "field": {
+          "enum": [
+            "manifest",
+            "impact_set",
+            "test_manifest",
+            "implementation_manifest",
+            "coverage_join"
+          ]
+        },
+        "before": {
+          "$ref": "#/$defs/RepairSnapshot"
+        },
+        "after": {
+          "$ref": "#/$defs/RepairSnapshot"
+        },
+        "changed_fields": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Text"
+          },
+          "minItems": 0,
+          "uniqueItems": true
+        },
+        "reason": {
+          "$ref": "#/$defs/Text"
+        },
+        "source_facts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/RepairSourceBinding"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "dependency_audit": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/RepairDependencyAudit"
+          },
+          "minItems": 0
+        }
+      },
+      "required": [
+        "field",
+        "before",
+        "after",
+        "changed_fields",
+        "reason",
+        "source_facts",
+        "dependency_audit"
+      ],
+      "additionalProperties": false
+    },
+    "RepairSemanticAudit": {
+      "type": "object",
+      "properties": {
+        "requirement_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ID"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "source_bindings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/RepairSourceBinding"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "dimensions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "dimension": {
+                "enum": [
+                  "scenarios",
+                  "conditions",
+                  "assertions",
+                  "expected_results",
+                  "pass_fail_criteria",
+                  "selected_checks",
+                  "exclusions",
+                  "coverage"
+                ]
+              },
+              "before": {
+                "$ref": "#/$defs/Text"
+              },
+              "after": {
+                "$ref": "#/$defs/Text"
+              },
+              "explanation": {
+                "$ref": "#/$defs/Text"
+              }
+            },
+            "required": [
+              "dimension",
+              "before",
+              "after",
+              "explanation"
+            ],
+            "additionalProperties": false
+          },
+          "minItems": 0
+        },
+        "affected_check_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ID"
+          },
+          "minItems": 0,
+          "uniqueItems": true
+        },
+        "reviewer_role": {
+          "const": "orchestrator"
+        },
+        "reviewer_id": {
+          "$ref": "#/$defs/ID"
+        }
+      },
+      "required": [
+        "requirement_ids",
+        "source_bindings",
+        "dimensions",
+        "affected_check_ids",
+        "reviewer_role",
+        "reviewer_id"
+      ],
+      "additionalProperties": false
+    },
+    "RepairTrigger": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "GUARD_REJECTED"
+            },
+            "receipt": {
+              "$ref": "#/$defs/ArtifactRef"
+            }
+          },
+          "required": [
+            "kind",
+            "receipt"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "ORCHESTRATOR_OBSERVED"
+            },
+            "checked": {
+              "$ref": "#/$defs/ArtifactRef"
+            },
+            "observation": {
+              "$ref": "#/$defs/Text"
+            }
+          },
+          "required": [
+            "kind",
+            "checked",
+            "observation"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "MetadataRepairPayload": {
+      "type": "object",
+      "properties": {
+        "repair_version": {
+          "const": "1.0"
+        },
+        "mode": {
+          "const": "METADATA"
+        },
+        "dispatch_id": {
+          "$ref": "#/$defs/ID"
+        },
+        "original": {
+          "$ref": "#/$defs/ArtifactRef"
+        },
+        "trigger": {
+          "$ref": "#/$defs/RepairTrigger"
+        },
+        "lane": {
+          "$ref": "#/$defs/Lane"
+        },
+        "replacement_output": {
+          "$ref": "#/$defs/StatePath"
+        },
+        "reason": {
+          "$ref": "#/$defs/Text"
+        },
+        "attachment_changes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/RepairAttachmentChange"
+          },
+          "minItems": 0
+        },
+        "semantic_audit": {
+          "$ref": "#/$defs/RepairSemanticAudit"
+        },
+        "preserve_tip": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SHA"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "preserve_candidate_index": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Index"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "preserve_correction_count": {
+          "$ref": "#/$defs/Index"
+        },
+        "preserve_review_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ID"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "repair_version",
+        "mode",
+        "dispatch_id",
+        "original",
+        "trigger",
+        "lane",
+        "replacement_output",
+        "reason",
+        "attachment_changes",
+        "semantic_audit",
+        "preserve_tip",
+        "preserve_candidate_index",
+        "preserve_correction_count",
+        "preserve_review_id"
+      ],
+      "additionalProperties": false
+    },
+    "TestSupportRepairPayload": {
+      "type": "object",
+      "properties": {
+        "repair_version": {
+          "const": "1.0"
+        },
+        "mode": {
+          "const": "TEST_SUPPORT"
+        },
+        "dispatch_id": {
+          "$ref": "#/$defs/ID"
+        },
+        "original": {
+          "$ref": "#/$defs/ArtifactRef"
+        },
+        "trigger": {
+          "$ref": "#/$defs/RepairTrigger"
+        },
+        "lane": {
+          "$ref": "#/$defs/Lane"
+        },
+        "replacement_output": {
+          "$ref": "#/$defs/StatePath"
+        },
+        "reason": {
+          "$ref": "#/$defs/Text"
+        },
+        "attachment_changes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/RepairAttachmentChange"
+          },
+          "minItems": 0
+        },
+        "semantic_audit": {
+          "$ref": "#/$defs/RepairSemanticAudit"
+        },
+        "approval": {
+          "$ref": "#/$defs/ArtifactRef"
+        },
+        "approved_test_report": {
+          "$ref": "#/$defs/ArtifactRef"
+        },
+        "previous_support_repair": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ArtifactRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "previous_candidate": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ArtifactRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "from_test_tip": {
+          "$ref": "#/$defs/Tip"
+        },
+        "to_test_tip": {
+          "$ref": "#/$defs/Tip"
+        },
+        "implementation_report": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ArtifactRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "candidate_index": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Index"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "correction_count": {
+          "$ref": "#/$defs/Index"
+        },
+        "test_manifest": {
+          "$ref": "#/$defs/EvidenceRef"
+        },
+        "impact_set": {
+          "$ref": "#/$defs/EvidenceRef"
+        },
+        "source_changes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/RepairSourceChange"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "retest_check_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ID"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "repair_version",
+        "mode",
+        "dispatch_id",
+        "original",
+        "trigger",
+        "lane",
+        "replacement_output",
+        "reason",
+        "attachment_changes",
+        "semantic_audit",
+        "approval",
+        "approved_test_report",
+        "previous_support_repair",
+        "previous_candidate",
+        "from_test_tip",
+        "to_test_tip",
+        "implementation_report",
+        "candidate_index",
+        "correction_count",
+        "test_manifest",
+        "impact_set",
+        "source_changes",
+        "retest_check_ids"
       ],
       "additionalProperties": false
     }

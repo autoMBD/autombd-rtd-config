@@ -2,8 +2,8 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.1.0 |
-| Date | 2026-09-06 |
+| Version | 0.1.7 |
+| Date | 2026-09-09 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Functional-development role interfaces, local delivery validation, confidentiality, and explicit legacy migration boundaries. |
 
@@ -28,8 +28,26 @@ diagnostic text. The guard checks shape, bindings and local order; it does not
 prove a natural-language requirement true, authenticate a Human, or discover
 all affected code automatically. Human Gate 1 reviews the Test Gate; it does not
 require Human review of the Worker's Implementation or every protocol field.
+For new issues including #85, its primary review surfaces are two feature
+references under `tests/doc/`: the complete readable `K.payload.requirements`
+and a concise case table. Shared explanation/index links both without copying
+their bodies. Follow the [documentation rules](../../../documentation-governance.md#functional-case-documents-and-human-review).
+Orchestrator checks requirement fidelity; Tester derives and implements cases.
+Execution steps, automation mapping and prevalidation evidence stay in scripts/
+reports, not the case reference. Exact Test binds both feature documents, index
+changes and scripts. The reviewed cases and expected results are frozen;
+non-case delivery and execution support follow the repair boundary below.
+Use existing report coverage/locations and exact-commit links; this rule adds
+no artifact kind, schema member, extra approval stage or executable validator.
 
 ## Storage, transport and dispatch
+
+Use [Local Execution State](../../../local-execution-state.md) for the single
+directory, ownership, transfer and retention rule. This section defines the
+handoff's semantic bindings, not a competing local layout. Git does not sync
+ignored state: Orchestrator delivers selective exact-byte lane-local inputs and
+checks returned reports/evidence before collecting central copies. Never mirror
+the central private directory or silently rewrite bound paths during transfer.
 
 Keep task artifacts in ignored `.agent-state/agent-loop/<run>/` storage. The
 Orchestrator maintains the canonical authority and confidential artifacts;
@@ -76,6 +94,37 @@ CONTINUE.
 
 ## Functional-development handoff map
 
+### Human review boundaries and bootstrap
+
+The normal complete functional-development workflow has exactly two routine
+Human review boundaries:
+
+1. **Test Gate approval:** review the feature requirements and case table as
+   the Test Gate as soon as Test is READY, without waiting for Worker READY.
+2. **Final review:** review the exact Candidate PR and terminal findings on the
+   functional-PASS path, or the terminal failure report and retained work on
+   the failure path. Failure review does not create a success PR.
+
+These are Human reviews, distinct from the single Agent Reviewer. K compilation,
+lane launch/readiness, prevalidation, handoff validation, disclosure review,
+metadata/support repair and in-budget Worker corrections are Agent-owned work,
+not additional routine Human gates. A scoped development authorization lets
+Orchestrator coordinate those steps; it does not grant merge or unrelated
+authority. Real new requirements or frozen-case changes require the relevant
+Human decision; case changes amend the Test Gate approval, not a third standard
+gate. Resolve ambiguity from existing public authority before asking Human for
+a genuinely missing semantic or operational decision.
+
+Manual bootstrap may deliberately require Human involvement at each step.
+Keep that run's explicit authority separate; do not turn its observation points
+or one-off exceptions into permanent gates. The authorized post-terminal #85 C2
+repair is retained history, not the normal route for later Reviewer findings.
+Missing runtime support is recorded honestly; written policy is not a deployed
+executor or a CHECKED receipt. Discipline improvements remain a separate
+reviewed change, not merge-only edits to the functional Candidate.
+
+### Artifact boundaries
+
 | Boundary | Artifact | Required meaning |
 | --- | --- | --- |
 | Authority compilation | task-contract | One public K for both lanes; evidence-backed requirements and precedence, no hidden cases |
@@ -91,13 +140,22 @@ CONTINUE.
 | Reviewer to Orchestrator | reviewer-report | Return review findings, lessons and reusable work; never reopen corrections |
 | Orchestrator to Human | terminal-record | Identify the accepted Candidate PR or truthful failure disposition |
 | Guard to authorized recipient | guard-result | Record this exact delivery check, not a functional verdict |
-| Orchestrator to original producer | delivery-repair | Repair rejected report structure/references without changing source, verdict or accounting |
+| Orchestrator to original producer | delivery-repair | Repair non-case delivery metadata, or register audited Tester support-source repair under explicit W3; preserve case approval, verdicts and Worker accounting |
 
 Tester is one role with two phases, not a new Test-author role. Gate authoring
 and prevalidation happen independently of Worker implementation. After Gate 1,
-Tester can read Test and Candidate Implementation to diagnose results but cannot
-modify either. Worker never reads the current or unaccepted hidden Test; normal
+Tester can read Test and Candidate Implementation to diagnose results. Executed
+snapshots remain read-only; Tester may repair its non-case support in its own
+lane under the shared boundary below, never production or unapproved case
+semantics. Worker never reads the current or unaccepted hidden Test; normal
 accepted regression code already in G is not a hidden source.
+Current/unaccepted case references and case-bearing indexes are never Worker
+inputs. The standalone requirements rendering is public, supplied separately
+through the reviewed handoff without Test worktree/case access. Its durable
+repository copy supports Human review; it neither replaces complete K nor
+requires committing runtime `.agent-state/` artifacts. KPI documents stay under `docs/tests/`,
+maintained by separate KPI test issues; historical accepted features are not
+retroactively required to receive functional case documents.
 
 ## Parallel readiness, freeze and correction
 
@@ -113,17 +171,173 @@ I3 and C1, C2 or C3. Each I continues the same Worker lane and is a strict
 descendant of the prior I; commits within a lane are not correction counts.
 Do not rebuild the same implementation as a fresh sibling from G.
 
-Within the approved series, K, Test, its manifest and the Test Impact Set stay
-frozen. An invalid execution can be repeated against the same Candidate using
-a new execution identity, without a new Candidate or correction. It is not
-permission to self-exempt an ambiguous implementation failure: escalate unclear
-responsibility to Human with evidence.
+Within the approved series, K and the reviewed cases, scenarios, assertions,
+expected results and selected acceptance scope remain controlling. Changing a
+frozen case requires prior Human approval. The approved Test tip is preserved as
+the original source anchor; non-case support repairs bind their actual new
+source identities and unchanged case approval as specified below. Never pretend
+changed source still has the old T SHA or reuse stale execution evidence.
+An invalid execution with unchanged source can repeat against the same Candidate
+using a new execution identity, without a Worker correction. Source-changing
+support repair requires a newly bound executable snapshot, not that same-source
+retry. Neither path exempts a valid Implementation failure from correction
+accounting; refer genuine unresolved responsibility to Human with evidence.
 
 Before Gate 1, a genuine K change produces a complete new revision, its change
 authority, updated Test and Worker Envelopes, and explicit acknowledgements from
 both lanes. Acknowledgement is not READY. Preserve unaffected source and list
-invalidated receipts. After Gate 1, do not mutate K/Test behind the existing
-approval; report the invalid series and obtain the required Human disposition.
+invalidated receipts. After Gate 1, do not mutate K or frozen cases behind the
+existing approval: obtain the required Human decision before a semantic change.
+An unchanged-case support repair follows the local path below; it is not by
+itself an invalid-series or terminal condition.
+
+### Frozen cases and non-case repairs
+
+Human freezes the reviewed cases: scenarios, discriminating inputs/conditions,
+assertions, expected results and pass/fail criteria, with their selected checks
+and exclusions. A change to those semantics requires Human approval before it
+is made, whether it appears in case prose, an assertion, a fixture or a driver.
+File location or a "support-only" label does not decide the boundary.
+
+Tester may repair its non-case metadata, execution drivers and support without
+another Human approval when those frozen semantics remain unchanged. Tester
+never fixes Worker production code. Orchestrator owns corrected execution
+handoffs and disclosure; implementation failures remain the original Worker's
+normal incremental corrections. Apply the following distinction:
+
+| Observed problem | Required action | Accounting and approval |
+| --- | --- | --- |
+| Erroneous delivery metadata only | Return it to its original producer; correct and recheck the delivery | Same source and historical verdict; no Worker attempt or repeated case approval |
+| Tester-owned non-case driver/support defect | Tester repairs its own lane; Orchestrator checks unchanged cases and binds corrected source/delivery; Tester reruns affected checks | New source/execution identities where bytes changed; no Worker attempt or new Human approval |
+| Orchestrator handoff mistake prevents or misdirects test execution | Orchestrator rewrites the affected handoff, removes ambiguity and sends rechecked inputs for Tester to retest | No Implementation failure inferred solely from broken execution; no Worker attempt for the handoff repair/retest |
+| A handoff ambiguity affected delivered Implementation and a valid case exposes its defect | Preserve the valid failure; Orchestrator removes public ambiguity before the next attempt; original Worker performs the incremental fix | Normal valid-failure path consumes one Worker attempt within the existing budget; no free restart or metadata exemption |
+
+If both execution support and Implementation are affected, first restore a
+trustworthy execution path, then use the real case result to route the
+Implementation defect. Do not relabel a valid failure as a delivery problem,
+weaken its expected result, or escalate every local mistake to a global terminal.
+
+A metadata-only repair must preserve the reviewed scenarios, discriminating
+conditions, assertions, expected results and pass/fail criteria, selected checks
+and exclusions, exact source tips and actual source inventory/content, recorded
+business verdicts and lifecycle identities/counts. It may describe an already
+existing dependency accurately;
+it must not invent a dependency or missing predecessor, change actual coverage,
+add/remove a check, replace a command, or relabel a failed result as PASS.
+Manifest/reference corrections must still describe that same existing source;
+their metadata is not immune to repair, and a changed digest needs fresh checks.
+For Human decisions this also preserves the original gate, decision and exact
+subject identity. A format fix cannot change REQUEST_CHANGES to APPROVE or
+redirect approval to another Test/Candidate. Do not infer missing business
+fields from the desired next action; actual binding drift is not metadata repair.
+
+The original producer supplies corrected delivery bytes at a new artifact
+path/identity, with the original input/rejection, reason and precise diff retained. The
+Orchestrator reviews semantic equivalence and disclosure, reconciles affected
+references to the new digest, then obtains fresh central and consumer checks
+before consumption. A metadata-only reconciled report/approval reference is not
+a new READY, Human vote, execution, Candidate or correction. Never rewrite
+original approval or run evidence, or reuse a receipt for changed bytes.
+Unaffected functional evidence need not rerun merely because descriptive
+metadata changed; a corrected execution handoff requires the directed retest.
+
+Repair of test execution code (for example a loader or fault-injection driver)
+is source repair, not metadata repair. When it is genuinely non-case support,
+Tester may perform it under this rule without a separate Human source-repair
+approval. Keep the original Test/source, failure and Human approval; record the
+incremental old/new source tips, changed files/digests and why all frozen case
+semantics are unchanged. Update source inventories/manifests, affected references
+and the exact executable Test/Candidate binding. A source change cannot claim
+the old Test or Candidate SHA. Orchestrator reissues the affected execution
+handoff; Tester reruns the affected selected checks and records fresh execution
+identities/results. This does not consume or reset a Worker attempt. A real
+case or requirement change still needs Human approval; ambiguity about that
+boundary blocks only the affected repair while the distinction is resolved.
+
+Use the registered repair representation below when pinned W enables it.
+Preserve legacy rejected-only deliveries as historical evidence; do not rewrite
+them into the new representation. An old W2 run does not acquire new authority
+merely because the installed checker has been upgraded. A real requirement or
+case change remains outside the unchanged-case repair path. Never fabricate a
+rejection, manufacture CHECKED, infer a missing original Human vote, or use an
+unsupported representation alone to declare terminal functional failure.
+
+### Versioned machine repair representation
+
+W3 opts in with `non_case_repairs` version `1.0`, with `metadata` and
+`test_support` enabled. The functional profile and fourteen artifact kinds
+remain the same. Old W2 inputs without repair extensions remain supported;
+new repair fields under W2 are rejected. W1 record validation remains explicit
+and separate. A task's pinned G/W is never silently changed during repair.
+
+The existing `delivery-repair` kind has a legacy rejected-only form and two
+explicit `payload.repair_version = "1.0"` forms. Use the closed schema for all
+members, including exact inline evidence; this table explains their meaning.
+
+| Form | Evidence and consumption | Source / accounting effect |
+| --- | --- | --- |
+| Legacy repair | Exact original and real REJECTED receipt; replacement uses `original` plus `guard_result` | Existing strict same-source/business preservation |
+| `METADATA` | Real rejection, or an Orchestrator observation linked to the original CHECKED receipt; exact before/after attachment bytes, references and semantic audit; replacement uses `original` plus `repair` | New delivery identity/digest, same original producer/source/verdict/counts; no new READY, Human vote or execution |
+| `TEST_SUPPORT` | Original approved Test/report and approval, prior effective source, strict descendant Test tip, exact source-change inventory, new manifest and Orchestrator semantic review | Registers new executable support source without changing original approval, Worker source, Candidate result or correction count |
+
+For an observed metadata error, preserve the old CHECKED receipt as it really
+was. The observation explains what was discovered afterward; it is not a
+retroactively fabricated guard rejection. Every changed supported attachment
+reference needs one exact before/after mapping. Each mapping binds raw UTF-8
+bytes, parsed JSON and SHA-256; the guard also verifies the real files. The pure
+state engine verifies the same inline byte/body evidence without file access.
+The replacement receives fresh guard checks before its event is consumed.
+
+The new attachment must satisfy its normal schema and source constraints. Old
+erroneous descriptive metadata can be retained without pretending it validates;
+its authoritative source and protected semantics must nevertheless be
+unambiguously recoverable. Metadata-only repair preserves selected check IDs,
+families, commands, requirement coverage and covered paths, excluded checks and
+prevalidation modes. It cannot alter a command result or relabel a failure.
+Public-dependency corrections require an exact per-edge audit tied to current
+source blobs, not just a new reason string. The Orchestrator still judges
+whether the claimed dependency accurately describes the unchanged source.
+
+For support source repair, the semantic audit identifies the exact old/new
+source, changed files and why scenarios, discriminating conditions, assertions,
+expectations and acceptance scope are unchanged. A flag or filename alone does
+not establish this. Real added/removed supporting files may be reflected in
+coverage metadata only with their exact source changes and per-path audit;
+this cannot add a check, weaken case coverage or introduce a new requirement.
+Tester owns the source repair; the Orchestrator reviews it and records the
+checked repair. The guard verifies real Git facts and the state engine checks
+the supplied evidence and lifecycle. Neither claims to prove arbitrary natural-
+language semantic equivalence or remote identity authentication.
+
+`state.test.ready` and `state.test.approval` retain the original approved
+case anchor. A Candidate's optional `payload.support_repair` identifies its
+actual executable Test/manifest. The latest registered support repair must
+continue the immediately preceding effective Test source, including a repair
+not yet executed. Later ordinary Worker corrections retain that latest source.
+Do not use an old Candidate's Test to restart a support branch.
+
+| Current execution state | Permitted next execution after support repair |
+| --- | --- |
+| No Candidate yet | C0 uses repaired Test and ready I0, with ordered Test/Implementation parents |
+| `INVALID_RUN` | Fresh source-bound Candidate, dispatch and execution, at the same Worker correction index; old invalid result retained |
+| Valid `IMPLEMENTATION_FAIL` | Failure remains; original Worker must complete the normal counted incremental correction before the next Candidate |
+| PASS, exhausted corrections, STOP or terminal review | No automatic reopening through support repair |
+
+Support registration is bookkeeping, not a test run and not a free Worker
+attempt. A newly assembled executable snapshot cannot claim the old Candidate
+SHA. Source-changing repair is distinct from an unchanged-source INVALID_RUN
+retry, which still uses the exact same Candidate. Rerun affected selected
+checks on the new executable source and retain fresh execution evidence; do
+not reuse old results to claim that changed support was tested.
+
+For the affected checks of a newly executed support snapshot, both layers reject
+reuse of an earlier execution's exact command-result reference. Accumulate the
+affected checks across intervening, not-yet-executed support repairs; already
+executed historical repairs do not create a perpetual new requirement. A fresh
+result identity may contain identical deterministic outcome bytes. A metadata
+replacement of the same business execution instead preserves its result
+identity and is not another execution. These checks detect known stale refs;
+they do not prove that an external command really ran.
 
 ## Scoped evidence and the diagnostic bridge
 
@@ -191,6 +405,9 @@ capability isolation. Those boundaries remain explicit.
 | Condition | Owning action | Resume condition |
 | --- | --- | --- |
 | Missing/illegal member or wrong reference | Original producer receives delivery-repair | Corrected delivery passes; source, verdict and counters unchanged |
+| Incorrect handoff metadata after Test approval | Original producer repairs under the shared non-case boundary | Same cases/scope and source; corrected bytes/references checked, no repeated case approval or Worker correction |
+| Non-case Tester support or execution-handoff defect | Tester repairs its support; Orchestrator corrects and rechecks execution handoff | Preserved cases; actual source lineage, fresh affected execution evidence, no Worker attempt |
+| Handoff ambiguity affected Implementation and valid testing exposes a defect | Orchestrator removes public ambiguity before the next attempt; original Worker fixes | Normal incremental valid-failure correction consumes an attempt; no clean-room restart |
 | Wrong cwd/HEAD/G/W/K or stale local copy | Orchestrator checks and restores only the correct owned context | Actual identities agree; do not overwrite user changes or rebase to hide drift |
 | Missing predecessor or skipped check | Orchestrator supplies the real missing step | Verified local order; do not invent a success receipt |
 | Private data in Worker-visible delivery | Orchestrator rejects before sending and repeats disclosure review | Public actionable delivery; an actual prior leak must still be recorded |
@@ -221,19 +438,62 @@ Implementation. Reviewer lessons and execution records stay outside that head;
 there is no lesson child commit substituted for the accepted Candidate. Final
 approval and merge evidence must bind that same delivery. PR-only repository
 protection is not bypassed by this local protocol.
+Before requesting review, push the exact intended branch with an explicit
+source:destination refspec, set its matching upstream and verify the remote
+head. Never let a feature/policy branch track master or use an ambiguous push.
+Publish or update the issue's current review entry with exact-commit links;
+local artifacts alone are not a usable remote review packet. A replacement
+packet supersedes the prior entry explicitly without rewriting old approvals.
+
+### Reviewer findings become follow-up issues
+
+A new Implementation defect discovered by the terminal Reviewer goes to an
+independent issue, not the old task's remaining attempts. Reviewer owns the
+technical description/evidence; Orchestrator publishes and links the issue when
+Reviewer has no authorized remote-write interface. Check for an equivalent
+issue first. Publication does not authorize another Worker or repair cycle.
+
+Each issue identifies the original task/Candidate and finding, public
+requirement, affected production surface, expected versus observed or statically
+inferred behavior, evidence/uncertainty, impact/risk, recommended priority with
+rationale, and implications for the current Candidate's merge. Keep hidden case
+literals, assertions and confidential reports out of public diagnoses. Use
+existing finding/evidence fields plus the issue body; do not invent members in
+the closed handoff schema.
+
+Human decides immediate/deferred treatment and current Candidate disposition
+at final review. A finding is neither automatically global-blocking nor
+automatically harmless because Tester passed: PASS establishes tested scope,
+not absence of other defects. A new issue cannot erase a mandatory/safety
+failure, reset the old budget, relabel a verdict or grant merge permission.
+A Human-selected follow-up has its own scoped G/K/Test and lifecycle, preserving
+reusable Implementation instead of rewriting it. Frozen-case changes still
+require their Test Gate approval.
+
+Keep the single Reviewer report and old Tester verdict immutable. Do not
+dispatch a second Reviewer or post-terminal correction by default. Existing
+automatic success validation still requires Tester PASS and Reviewer APPROVED;
+where explicit Human disposition differs from that encoded route, preserve it
+as manual authority, not a fabricated APPROVED or automatic SUCCESS.
+Runtime/intake support belongs to follow-on packages; this documentation change
+does not implement it.
+
+### Compatibility and runtime limits
 
 Legacy W v1 is preserved at `agent-discipline/contracts/workflow-v1.json` for
-explicit validation of old records. Active W v2 declares the new lifecycle and
-references this protocol. Do not feed new artifacts to a legacy validator or
+explicit validation of old records. W2 declares the structured lifecycle;
+active W3 preserves it and explicitly enables the non-case repair extension.
+Do not feed new artifacts to a legacy validator or
 silently fall back to old route/counting rules. Existing #88 wire fields and
 timeout aliases remain compatible. Its intentional behavior correction requires
 run to follow a successful CHECKED receipt matching the latest event; prepare
 alone is insufficient. The #90 compatibility command uses the same internal
 legacy packet validator exposed by the unified guard.
 
-This package does not implement the global transition engine (#85), complete
+The [pure transition engine](workflow-transitions.md) implements global
+consumption and repair ordering without executing the workflow. Complete
 remote-evidence/direct-union finalization (#86), capability isolation (#79),
-route executor (#87), or Human/GitHub intake (#80). Their contracts consume
+route execution (#87), and Human/GitHub intake (#80) remain separate. Their contracts consume
 these checked inputs/outputs; a local checker is not their implementation.
 Explorer and other workflow profiles are future schema/registry extensions.
 KPI is an independent Human-started, issue-driven, post-merge profile for RTD
@@ -245,3 +505,10 @@ case review, results and dashboard are separate #100–#102 work.
 | Date | Version | Description |
 | --- | --- | --- |
 | 2026-09-06 | 0.1.0 | Documented structured functional handoffs, scoped evidence, safe diagnostics, local guard boundaries and explicit legacy migration. |
+| 2026-09-06 | 0.1.1 | Bound document-first Human Test review to existing exact Test artifacts, type-classified prospective catalogues and the unchanged confidentiality/KPI boundaries. |
+| 2026-09-06 | 0.1.2 | Split the review surface into durable public requirements and concise private cases with a shared index; kept executable evidence in existing reports and added no schema or Gate. |
+| 2026-09-07 | 0.1.3 | Distinguished frozen case semantics from repairable delivery metadata; defined same-producer repair, semantic/digest checks and unchanged accounting, while separating Test-driver source changes and current runtime limitations. |
+| 2026-09-07 | 0.1.4 | Applied Human's non-case repair authority to Tester support, preserved case-change approval and real source lineage, and separated execution-handoff retests from counted Implementation corrections without claiming runtime changes. |
+| 2026-09-08 | 0.1.5 | Defined two routine Human reviews, issue-based terminal findings and preserved bootstrap exceptions; required Human-decision preservation in format repairs and exact remote review delivery, without claiming runtime changes. |
+| 2026-09-09 | 0.1.6 | Linked the single local-state rule and made selective, byte-checked central/lane transport explicit while preserving protocol identities and historical paths. |
+| 2026-09-09 | 0.1.7 | Defined W3 opt-in machine metadata/support repair, shared inline evidence, original case approval anchors and source-bound execution without freeing Worker corrections or reopening terminal review. |

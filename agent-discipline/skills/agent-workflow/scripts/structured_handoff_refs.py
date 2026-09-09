@@ -54,6 +54,7 @@ from structured_handoff_schema import (
     ProtocolError, load_registry, parse_json, require, validate_artifact,
     validate_definition,
 )
+from repair_protocol import RepairError, require_capability, validate_snapshot
 
 ATTACHMENTS = {"manifest": "LaneManifestV1", "impact-set": "ImpactSet",
                "coverage-join": "CoverageJoin", "command-result": "CommandResult",
@@ -115,6 +116,9 @@ class ReferenceGraph:
         self.private_context_ids = {r["artifact_id"] for r in context["predecessor_refs"]}
         self.public_inputs = []
         self.central_verified = False
+        # Low-level legacy callers may load a graph before environment checks.
+        # An unverified graph has no repair capability, never an implicit W3.
+        self.workflow_contract = {}
 
     def worker_allowed(self, ref):
         policy = self.registry["artifacts"][ref["kind"]]
@@ -134,6 +138,7 @@ class ReferenceGraph:
                 gov["workflow_contract_blob"], "GOVERNOR_BLOB")
         require(git(self.root, "cat-file", "-t", gov["workflow_contract_blob"]) == "blob", "GOVERNOR_BLOB")
         contract = parse_json(git(self.root, "cat-file", "blob", gov["workflow_contract_blob"]).encode("utf-8"), canonical=False)
+        self.workflow_contract = contract
         self.workflow_version = contract.get("contract_version")
         require(type(self.workflow_version) is int and self.workflow_version > 0, "GOVERNOR_CONTRACT_VERSION")
 
@@ -179,6 +184,10 @@ class ReferenceGraph:
         value = self.read(ref, state=True, canonical=not repair_original)
         if not repair_original:
             validate_artifact(value)
+        try:
+            require_capability(self.workflow_contract, value)
+        except RepairError as error:
+            require(False, error.rule)
         require(value["artifact_kind"] == ref["kind"] and value["artifact_id"] == aid, "REFERENCE_IDENTITY")
         if ref["kind"] != "guard-result":
             require(value["task"] == self.context["task"], "TASK_MISMATCH")
@@ -221,7 +230,17 @@ class ReferenceGraph:
                 self.walk(item, public, allow_private, repair_original_ref)
         elif isinstance(value, dict):
             keys = set(value)
-            if keys == ARTIFACT_KEYS:
+            if keys == {"ref", "raw"} and isinstance(value.get("ref"), dict) and set(value["ref"]) == EVIDENCE_KEYS:
+                # Inline snapshots deliberately retain potentially malformed old
+                # metadata. The repair rules validate their protected projection
+                # and the after body's normal schema; both raw files stay exact.
+                try:
+                    validate_snapshot(value)
+                except RepairError as error:
+                    require(False, error.rule)
+                target = safe_path(self.root, value["ref"]["path"])
+                require(target.read_bytes() == value["raw"].encode("utf-8"), "REPAIR_SNAPSHOT_BYTES")
+            elif keys == ARTIFACT_KEYS:
                 if public:
                     require(self.worker_allowed(value), "PRIVATE_REFERENCE")
                 self.artifact(value, allow_private=allow_private and not public,

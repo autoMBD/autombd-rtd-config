@@ -39,15 +39,16 @@
 # Project:     RTD CfgFile CLI <https://github.com/autoMBD/autombd-rtd-config>
 # File:        workflow_transition.py
 # Author:      autoMBD <tkung.lqk@foxmail.com>
-# Date:        2026-09-06
-# Version:     0.1.0
+# Date:        2026-09-09
+# Version:     0.2.0
 # Description: Pure transition API and explicit read-only JSON CLI adapter.
 # =================================================================================
 
 import copy
 
+import repair_protocol
 from workflow_transition_rules import (Decision, Memory, business_plan, commit, equivalent_ref, history_bodies,
-                                       payload, slot_refs)
+    payload, slot_refs, evidence_equivalent, test_source, validate_repair_evidence)
 from workflow_transition_wire import (PROFILE, WorkflowTransitionError, canonical, digest,
     initial_state, json_value, protocol, require, strict_json, validate, wire)
 
@@ -73,6 +74,21 @@ def _catalog_shape(context):
     for check in context["checks"]:
         other = artifacts.get(check["ref"]["artifact_id"])
         require(other is None or other == check, "MALFORMED_EVENT", "/context/checks")
+
+
+def _rejected_original(body, memory):
+    """The raw-original exception belongs to real rejected deliveries only."""
+    replacement = body.get("replaces")
+    if replacement:
+        if "guard_result" in replacement:
+            return replacement["original"]["artifact_id"]
+        repair = memory.get(replacement.get("repair"))
+        if repair and payload(repair).get("trigger", {}).get("kind") == "GUARD_REJECTED":
+            return replacement["original"]["artifact_id"]
+    if body.get("artifact_kind") == "delivery-repair":
+        if not repair_protocol.is_v1(body) or payload(body).get("trigger", {}).get("kind") == "GUARD_REJECTED":
+            return payload(body)["original"]["artifact_id"]
+    return None
 
 
 def _state_invariants(state, context, memory, defs):
@@ -129,9 +145,13 @@ def _state_invariants(state, context, memory, defs):
                 approval.get("subject_sha") == commit(test.get("test_tip")), "INVALID_STATE",
                 "/state/test/approval")
     if candidate and test:
-        require(candidate.get("test_tip") == test.get("test_tip") and
-                candidate.get("test_manifest") == test.get("manifest") and
-                candidate.get("impact_set") == test.get("impact_set"), "INVALID_STATE",
+        support = candidate.get("support_repair")
+        require(not support or (support in state["repairs"] and
+                repair_protocol.is_v1(memory.get(support), "TEST_SUPPORT")), "INVALID_STATE", "/state/candidate")
+        executable = test_source(test, support, memory)
+        require(candidate.get("test_tip") == executable["test_tip"] and
+                evidence_equivalent(candidate.get("test_manifest"), executable["test_manifest"], state, memory) and
+                evidence_equivalent(candidate.get("impact_set"), executable["impact_set"], state, memory), "INVALID_STATE",
                 "/state/candidate")
     if candidate and impl:
         ci, ii = candidate.get("candidate_index"), impl.get("implementation_index")
@@ -139,7 +159,7 @@ def _state_invariants(state, context, memory, defs):
                 "INVALID_STATE", "/state/worker/ready")
         if ii == ci:
             require(candidate.get("implementation_tip") == impl.get("implementation_tip") and
-                    candidate.get("implementation_manifest") == impl.get("manifest"),
+                    evidence_equivalent(candidate.get("implementation_manifest"), impl.get("manifest"), state, memory),
                     "INVALID_STATE", "/state/candidate")
         else:
             require(impl.get("previous_implementation") == commit(candidate.get("implementation_tip")),
@@ -166,10 +186,13 @@ def _state_invariants(state, context, memory, defs):
         return
     rejected_originals = set()
     for body in all_bodies:
-        if body.get("replaces"):
-            rejected_originals.add(body["replaces"]["original"]["artifact_id"])
-        if body.get("artifact_kind") == "delivery-repair":
-            rejected_originals.add(body["payload"]["original"]["artifact_id"])
+        try:
+            repair_protocol.require_capability(context["protocol"]["workflow_contract"], body)
+        except repair_protocol.RepairError:
+            raise WorkflowTransitionError("INVALID_STATE", "/state/consumed") from None
+        original = _rejected_original(body, memory)
+        if original:
+            rejected_originals.add(original)
     for body in all_bodies:
         if body["artifact_id"] not in rejected_originals:
             validate(body, defs[body["artifact_kind"]], defs, "INVALID_STATE", "/state/consumed")
@@ -223,10 +246,13 @@ def _evidence(state, event, artifact, memory, defs, decision):
     originals = set()
     active_bodies = history_bodies(state, memory) + ([artifact] if artifact else [])
     for body in active_bodies:
-        if body.get("replaces"):
-            originals.add(body["replaces"]["original"]["artifact_id"])
-        if body.get("artifact_kind") == "delivery-repair":
-            originals.add(body["payload"]["original"]["artifact_id"])
+        if repair_protocol.is_v1(body) or "repair" in (body.get("replaces") or {}):
+            # Repair triggers and inline source anchors stay digest-bound on
+            # later events, not only when the repair was first registered.
+            required_refs += list(_artifact_refs(body))
+        original = _rejected_original(body, memory)
+        if original:
+            originals.add(original)
     for entry in memory.context["artifacts"]:
         decision.check("raw" not in entry or entry["ref"]["artifact_id"] in originals,
                        "INVALID_EVIDENCE", "/context/artifacts/raw")
@@ -242,6 +268,7 @@ def _evidence(state, event, artifact, memory, defs, decision):
             continue
         decision.check(entry["ref"] == ref, "INVALID_EVIDENCE", "/context/catalog/ref")
         body = entry["body"]
+        validate_repair_evidence(body, memory, decision)
         is_original = ref["artifact_id"] in originals
         if "raw" in entry:
             try:

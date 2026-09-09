@@ -2,8 +2,8 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.5.0 |
-| Date | 2026-06-10 |
+| Version | 0.14.0 |
+| Date | 2026-09-09 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Tracks how review comments were resolved across design document revisions. |
 
@@ -120,6 +120,62 @@ test strategy. A future development-process document should capture the
 human-assisted agent development loop, skill growth, and closed-loop validation
 workflow as that process becomes concrete.
 
+## Prospective functional case-document review
+
+| ID | Original area | Comment intent | Resolution | Target document |
+| --- | --- | --- | --- | --- |
+| TEST-DOC-01 | [#85 Human Test Gate rejection](https://github.com/autoMBD/autombd-rtd-config/issues/85#issuecomment-5559022292) and confirming Human instruction | Human reviews readable case documents; incrementally classify functional cases by Agent/RTD CfgFile CLI; separate KPI and no historical backfill | Added reusable discipline, Tester/Worker/Reviewer boundaries and exact doc/script Test binding. #85 remains a rejected, unapproved Test until the revised document-led packet is approved; retained Implementation is unchanged. | `AGENTS.md`; `agent-discipline/documentation-governance.md`; role definitions; structured-handoff reference; #85 Test lane catalogue |
+| TEST-DOC-02 | Human review of `agent-functional-test-cases.md`: a monolithic catalogue grows too quickly; local `payload.requirements` is not a durable review source | One shared explanation/index, feature-scoped case references without execution steps, and a separate requirements file; primarily review requirements plus cases at Test Gate | Replaced the growing type catalogue rule with linked feature references; required complete readable requirements/source mapping and concise case tables. Reports/scripts retain execution detail and automation mapping. Updated only the requested policy branch; existing #85 Test/Implementation are not revised by this policy edit. | `agent-discipline/documentation-governance.md`; `AGENTS.md`; Tester/Worker/Reviewer definitions; structured-handoff reference |
+| TEST-DOC-03 | Human clarification and follow-up annotation: "冻结的是您审核的测试用例和预期结果；交接元数据错误应退回原提交者修正、重新校验，不重新审核用例，也不消耗 Worker 修正次数"; "这个要落实到agent纪律规则中，统一语义理解" | Freeze reviewed case semantics rather than mistakes in delivery files; apply the same repair meaning across roles | Added one shared metadata-only boundary and aligned charter, Skill, documentation governance and roles. Preserve case conditions/assertions/expected results, selected scope, source and verdict/counts; retain old/new delivery provenance, reconcile digests and recheck. Separated Test-driver source repair and acknowledged unchanged runtime restrictions. No #85 Test/Implementation or guard code changed by this policy edit. | `AGENTS.md`; `agent-discipline/skills/agent-workflow/SKILL.md`; structured-handoff reference; Tester/Worker/Reviewer definitions; documentation governance |
+| TEST-DOC-04 | Human clarification: "不涉及到测试用例的地方，都可以让Tester修改，测试用例冻结后，如果要修改必须经过人工审批"; execution-handoff mistakes require corrected handoff/retest, while implementation-affecting mistakes follow failed-test repair and consume an attempt after ambiguity is removed | Permit Tester-owned non-case support repair without another approval; preserve prior approval for frozen case changes and normal Worker attempt accounting | Extended the central rule beyond metadata to non-case driver/support source, with real old/new source/digest lineage and fresh affected execution evidence. Orchestrator corrects execution handoffs; valid Implementation failures go to the original Worker as counted corrections after public ambiguity is removed. This supersedes TEST-DOC-03's separate-approval treatment of non-case source repair; it does not change #85 sources or guard/schema/runtime. | `AGENTS.md`; documentation governance; workflow Skill and structured-handoff reference; Tester/Worker/Reviewer definitions |
+
+## Issue #85 bootstrap completeness audit
+
+The no-GUI operating requirement is also grounded in the existing
+[#92 issue](https://github.com/autoMBD/autombd-rtd-config/issues/92), which records
+the post-#90 restart of #85 and keeps machine enforcement deferred at P2.
+
+Historical resolution rows record what was true when written; they are not the
+live task status. The later K5 document-led Test was approved. The #85 C2 repair
+was specifically authorized and completed; it is preserved, not a precedent
+for reopening terminal review. The policy updates remain separate from the
+functional Candidate and do not claim deployed schema/executor changes.
+
+| ID | Human requirement / execution discovery | Landed discipline and boundary | Target |
+| --- | --- | --- | --- |
+| TEST-DOC-05 | Reviewer can find Implementation defects after Tester PASS; create independent issues with priority/impact for Human scheduling | Reviewer supplies issue-ready evidence, public diagnosis, priority/rationale and current merge impact; Orchestrator deduplicates/publishes when needed. Human decides now/later and merge. No old-attempt reopening, second Reviewer or source discard; no automatic downgrade or invented approval. | Structured Handoffs: Reviewer findings become follow-up issues; Reviewer/Worker/Tester; AGENTS; workflow Skill |
+| TEST-DOC-06 | The complete intended workflow has only Test Gate approval and final PR review or failure review; this bootstrap involved Human at every step | Defined exactly two routine Human review boundaries. Intermediate preparation, validation, disclosure, permitted repair and bounded correction are Agent responsibilities. Bootstrap authority is run-specific; genuinely new scope/case changes still need Human decisions, not a new routine Gate. | Structured Handoffs: Human review boundaries and bootstrap; AGENTS; roles; documentation governance; workflow Skill |
+| TEST-DOC-07 | Human-decision format replacement must not change approval semantics | Preserve gate, decision and exact subject; never infer missing business values, relabel REJECT/APPROVE or fake a guard/business event. The actual #85 implementation correction stays in its Candidate, not this policy branch. | Structured Handoffs: Frozen cases and non-case repairs |
+| TEST-DOC-08 | A remote review needs the correct published branch and current issue packet, not local-only files or a master upstream; automated Loop must not initialize GUI | Explicit branch refspec, same-name upstream and verified remote SHA; exact-commit review links and replacement packet identity. Automated Loop reuses verified environment and addresses only affected setup without GUI; #92 runtime remains deferred. | Structured Handoffs: Terminal review, PR and legacy boundaries; AGENTS; workflow Skill |
+| TEST-DOC-09 | Reviewer outputs must be visibly useful to Human: Orchestrator must at least summarize their key information in the PR | PR body (or failure issue) carries reviewed identity, original verdict, key findings/evidence/impact, scope/limits, treatment or follow-up issues, lessons and pending Human decision. Later fixes are not rewritten Reviewer approval; local-only originals are labelled, private Test material is not published. No extra review, artifact schema or Candidate commit is introduced. | AGENTS: visible Reviewer delivery before remote review; Reviewer: Output |
+
+The entire current #85 series was checked against retained decisions, launch/K
+revisions, source history, repair evidence and the single terminal review. The
+following requirements were already present and remain controlling:
+
+| Execution stage | Requirement retained | Existing policy location |
+| --- | --- | --- |
+| K and lane launch | Same G/public K, independent parallel lanes; local exact-byte copies, structured task inputs and responses; K revision and both ACKs before affected consumption | Structured Handoffs: Authority; Storage; Parallel readiness |
+| Test authoring and review | Separate feature requirements and concise case table, short type index, document/script fidelity; prospective only; KPI docs separate | TEST-DOC-01/02; Documentation governance: Functional case documents |
+| Gate prevalidation and execution | Real selected full-chain/known-good/bad evidence; Reference PASS not semantic completeness; only new/changed/affected checks, never default full unit | Structured Handoffs: Scoped evidence; Tester |
+| Gate-approved metadata failure | Return to original producer, correct real dependencies and digests, no new case approval or Worker attempt | TEST-DOC-03; shared non-case repair boundary |
+| Non-case driver defect and mixed handoff failure | Tester repairs own support, Orchestrator corrects execution handoff and retests; real Implementation failure remains counted after ambiguity is removed | TEST-DOC-04; shared four-way repair table |
+| Worker corrections | Original Worker/lane/session/worktree/branch, strict incremental source; C0 plus three correction opportunities, not three total Candidates; private report never forwarded | Structured Handoffs: Parallel readiness; diagnostic bridge; Worker |
+| Observation and terminal handling | One bounded probe, only affected operation held; dynamic Agent supervision, no fabricated outcomes or severity escalation; exact Candidate includes Test+Implementation, lessons/policy separate | Structured Handoffs: Rejection/terminal sections; AGENTS; Reviewer |
+
+## Local execution state policy
+
+The approved local-state/storage decision is tracked separately from Test
+semantics: **LOCAL-STATE-01**. Human requested a complete local-state and
+handoff rule, confirmed `.agent-state/README.md` as the ignored navigation,
+accepted explicit selective central/worktree copies, and authorized landing on
+`codex/test-case-documentation-policy`. Resolution:
+`agent-discipline/local-execution-state.md` centralizes layout, role ownership,
+identity/format rules, non-overwriting delivery, scoped failure routing,
+Human-visible terminal output, retention and cleanup. Charter/governance/Skill/
+handoff/monitoring link it. No new runtime/schema/Gate or historical migration;
+the main work area's ignored README applies navigation locally.
+
 ## Changelog
 
 | Date | Version | Description |
@@ -134,3 +190,10 @@ workflow as that process becomes concrete.
 | 2026-05-30 | 0.1.0 | Created review comment tracking table. |
 | 2026-06-15 | 0.6.0 | Issue #7 reorganization: moved from `docs/common/rtd-config-core-comments-tracking.md` to `agent-discipline/owner-review-comments.md`; updated all archive path references from `docs/OBSOLETE_NEVER_TOUCH!!!/` to `agent-discipline/review-archive/`. |
 | 2026-06-29 | 0.7.0 | Issue #35: renamed the review archive directory to `agent-discipline/review-archive-NOT-USED-NEVER-TOUCH!!!/` to make its frozen, never-a-requirements-source status explicit; updated the active archive pointers above. Frozen changelog rows retain the historical path. |
+| 2026-09-06 | 0.8.0 | Tracked the prospective document-first functional Test review decision, type catalogues, exact Test binding and separate KPI ownership without retrospective case-document work. |
+| 2026-09-06 | 0.9.0 | Recorded the Human-requested shared guide, feature-specific case references and durable requirements as the two primary Test review files, replacing the monolithic detailed-case format. |
+| 2026-09-07 | 0.10.0 | Tracked the explicit Human case-freeze versus delivery-metadata-repair clarification and its unified discipline wording without changing functional sources or runtime validators. |
+| 2026-09-07 | 0.11.0 | Recorded Human's expanded non-case Tester repair authority, truthful source lineage and execution-retest routing, while preserving case-change approval and counted original-Worker fixes for implementation-affecting handoff failures. |
+| 2026-09-08 | 0.12.0 | Audited the full current #85 bootstrap series; traced prior requirements and added terminal-finding issues, two routine Human reviews, decision-preserving repairs and exact remote/GUI boundaries. |
+| 2026-09-08 | 0.13.0 | Tracked explicit Orchestrator responsibility for a substantive Reviewer summary in PR/failure review instead of local-only report paths. |
+| 2026-09-09 | 0.14.0 | Tracked the approved unified local-state rules, central/lane selective byte transfer and ignored navigation, without runtime changes or migration. |

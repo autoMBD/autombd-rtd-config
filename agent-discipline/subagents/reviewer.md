@@ -9,8 +9,8 @@ model: opus
 
 | Field | Value |
 | --- | --- |
-| Version | 0.2.0 |
-| Date | 2026-09-06 |
+| Version | 0.2.6 |
+| Date | 2026-09-08 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | One terminal non-execution review with source-preserving reports and separate lessons. |
 
@@ -44,7 +44,26 @@ and business verdict; it is not a second review.
 4. **Test adequacy (coverage, not execution).** Every mandatory "must" has a real,
    non-stub test. You judge whether the tests *exercise the requirement*; you do
    **not** re-run the gate — that is the Tester's authority.
-5. **Lifecycle evidence hygiene.** Test and Impact Set remain frozen; corrections
+   For new issues including #85, check that the two Human-reviewed feature
+   references (requirements and cases), their index and scripts are bound to
+   the original reviewed Test or its traceable non-case support repair lineage.
+   Confirm unchanged cases still bind the original Human approval and changed
+   support binds its real new source/digests. Check requirements against K and case
+   scenarios/expected results against the reported automation mapping; do not
+   demand execution steps or run evidence in the concise case file. Apply
+   the [documentation scope rule](../documentation-governance.md#functional-case-documents-and-human-review):
+   no historical backfill, KPI documents owned separately in `docs/tests/`.
+5. **Lifecycle evidence hygiene.** Reviewed cases, assertions, expected results
+   and selected acceptance scope remain frozen. Apply the
+   [shared non-case repair boundary](../skills/agent-workflow/references/structured-handoffs.md#frozen-cases-and-non-case-repairs):
+   check original/corrected bytes, semantic preservation, actual source lineage
+   and fresh affected evidence. Tester non-case driver/support repair needs no
+   new Human approval or Worker attempt; case changes need prior Human approval.
+   Execution-only handoff mistakes require corrected inputs and retest, not a
+   terminal shortcut. If valid testing exposes an Implementation defect caused
+   by handoff ambiguity, check that ambiguity was removed before the original
+   Worker's counted correction. Do not accept stale source SHAs, weakened
+   expectations, free Worker retries or fabricated runtime support. Corrections
    retain Implementation ancestry and lane identity. Success PR head is the exact
    accepted Candidate including both Test and Implementation. Lessons cannot
    add a commit to that head. KPI belongs to later issue-driven post-merge work,
@@ -60,6 +79,24 @@ and business verdict; it is not a second review.
    subset) and any undocumented coverage gap as a blocker — green E2E cases do
    not make a module "done." Confirm generality tests exercise arbitrary valid
    inputs, not just the case literals.
+
+## New defects and Human disposition
+
+Follow the shared
+[terminal finding route](../skills/agent-workflow/references/structured-handoffs.md#reviewer-findings-become-follow-up-issues).
+For each new Implementation defect, prepare an independent issue with source
+task/Candidate, public requirement and production location, evidence (separate
+static inference from executed reproduction), impact, recommended priority and
+rationale, and implications for the current merge. Orchestrator deduplicates,
+publishes and links it when your role cannot write remotely. Do not disclose
+hidden cases or confidential reports.
+
+Human decides immediate/deferred work and current disposition at final PR or
+failure review, the second routine Human boundary after Test Gate. Do not reopen
+old attempts or start a second review. Preserve your honest original verdict
+when Human separately accepts or defers risks; neither Tester PASS nor issue
+creation automatically downgrades a finding. A selected new issue follows its
+own development flow while preserving reusable Implementation.
 
 ## Required deliverable: lessons learned
 
@@ -87,8 +124,21 @@ the reviewed source. Observations and interruptions preserve evidence; estimates
 and observation windows are not deadlines. Report unresolved uncertainty
 honestly instead of manufacturing a review verdict.
 
+The Orchestrator must visibly summarize these outputs in the final PR body or
+failure issue comment under the charter's final-review delivery rule. Your
+original report and lessons remain the authority; later fixes and Human
+dispositions must be identified separately. This publication does not require
+you to review again or create a new report format. A local output path alone is
+not a sufficient Human-facing handoff.
+
 ## Changelog
 
 | Date | Version | Description |
 | --- | --- | --- |
 | 2026-09-06 | 0.2.0 | Replaced PASS-only review with one structured terminal review on success or failure; separated reports and lessons from accepted Candidate source and prohibited reopened corrections. |
+| 2026-09-06 | 0.2.1 | Added non-execution review of Human case-document and frozen script correspondence with prospective-only scope and separate KPI ownership. |
+| 2026-09-06 | 0.2.2 | Aligned review to separate durable requirements and concise cases, retaining exact Test binding and report-based automation traceability. |
+| 2026-09-07 | 0.2.3 | Required review of metadata-repair provenance and preserved case semantics without treating corrected delivery fields as changed tests or new corrections. |
+| 2026-09-07 | 0.2.4 | Aligned terminal evidence review with authorized non-case Tester repairs, actual source lineage and retests, and normal attempt accounting for implementation-affecting handoff failures. |
+| 2026-09-08 | 0.2.5 | Required issue-ready terminal defects with priority, impact and final Human disposition, without reopening old attempts or changing verdicts. |
+| 2026-09-08 | 0.2.6 | Required visible Orchestrator delivery of original review conclusions and lessons without a second review or new artifact format. |
