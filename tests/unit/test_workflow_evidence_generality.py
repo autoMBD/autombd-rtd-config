@@ -40,7 +40,7 @@
 # File:        test_workflow_evidence_generality.py
 # Author:      autoMBD <tkung.lqk@foxmail.com>
 # Date:        2026-09-10
-# Version:     0.1.2
+# Version:     0.1.3
 # Description: Worker-owned real-source workflow evidence generality.
 # =================================================================================
 
@@ -527,6 +527,42 @@ class WorkflowEvidenceGenerality(unittest.TestCase):
         with self.assertRaises(ProtocolError) as caught:
             graph.artifact(ref)
         self.assertEqual("PRIVATE_REFERENCE", caught.exception.rule_id)
+
+    def test_h1_public_edge_rejects_confidential_conditional_references(self):
+        from structured_handoff_refs import ReferenceGraph
+        from structured_handoff_schema import ProtocolError
+        self.h.start(ready=True)
+        repair, _ = self.h.metadata()
+        for ref in (self.h.checked(self.h.tlaunch), repair):
+            for role in ("tester", "orchestrator"):
+                for view in ("consumer-local", "orchestrator-full"):
+                    with self.subTest(kind=ref["kind"], role=role, view=view):
+                        context = self.h.context(self.h.tlaunch, [ref])
+                        context["consumer_role"] = role
+                        graph = ReferenceGraph(context, view)
+                        graph.verify_environment()
+                        self.assertEqual("tester-confidential", graph.artifact(ref)["visibility"])
+                        with self.assertRaises(ProtocolError) as caught:
+                            graph.walk(ref, public=True)
+                        self.assertEqual("PRIVATE_REFERENCE", caught.exception.rule_id)
+
+    def test_h1_public_edge_repair_retains_worker_recipient_restriction(self):
+        from structured_handoff_refs import ReferenceGraph
+        from structured_handoff_schema import ProtocolError
+        self.h.start(ready=True)
+        repair, _ = self.h.metadata_for(self.h.ir)
+        value = copy.deepcopy(self.h.objects[repair["artifact_id"]])
+        value["consumer_role"] = "tester"
+        ref = self.h.store(value)
+        for role in ("tester", "orchestrator"):
+            with self.subTest(role=role):
+                context = self.h.context(self.h.tlaunch, [ref, self.h.checked(self.h.ir)])
+                context["consumer_role"] = role
+                graph = ReferenceGraph(context, "consumer-local")
+                graph.verify_environment()
+                with self.assertRaises(ProtocolError) as caught:
+                    graph.walk(ref, public=True)
+                self.assertEqual("PRIVATE_REFERENCE", caught.exception.rule_id)
 
 
 if __name__ == "__main__":
