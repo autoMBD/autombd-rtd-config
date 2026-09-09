@@ -39,8 +39,8 @@
 # Project:     RTD CfgFile CLI <https://github.com/autoMBD/autombd-rtd-config>
 # File:        structured_handoff_refs.py
 # Author:      autoMBD <tkung.lqk@foxmail.com>
-# Date:        2026-09-06
-# Version:     0.1.0
+# Date:        2026-09-09
+# Version:     0.1.1
 # Description: Safe byte-bound references and real Git identity checks.
 # =================================================================================
 
@@ -102,6 +102,12 @@ def git(root, *args):
 
 
 class ReferenceGraph:
+    def git(self, *args):
+        return git(self.root, *args)
+
+    def git_bytes(self, *args):
+        return git_bytes(self.root, *args)
+
     def __init__(self, context, view):
         self.context = context
         self.root = Path(context["worktree_root"])

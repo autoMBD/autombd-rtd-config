@@ -40,7 +40,7 @@
 # File:        workflow_transition.py
 # Author:      autoMBD <tkung.lqk@foxmail.com>
 # Date:        2026-09-09
-# Version:     0.2.0
+# Version:     0.2.1
 # Description: Pure transition API and explicit read-only JSON CLI adapter.
 # =================================================================================
 
@@ -299,6 +299,14 @@ def _evidence(state, event, artifact, memory, defs, decision):
             receipt.get("input") == expected_input and receipt.get("consumer_role") == artifact["consumer_role"] and
             receipt.get("visibility") == artifact["visibility"] and receipt.get("trusted_context") == expected_trust,
             "INVALID_EVIDENCE", "/event/checked")
+
+
+def validate_state(state, *, context):
+    """Check current accepted-state invariants without proposing an event or I/O."""
+    wire(context, "Context", "MALFORMED_EVENT")
+    defs = protocol(context)
+    _catalog_shape(context)
+    _state_invariants(state, context, Memory(context), defs)
 
 
 def transition(state, event, *, context):
