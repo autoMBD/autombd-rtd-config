@@ -141,6 +141,10 @@ def test_every_variant_rejects_each_missing_member_and_nested_extra_member():
         if "enum" in node:
             return node["enum"][0]
         if "anyOf" in node:
+            if node is definitions["candidate-test-envelope"]["properties"]["payload"]:
+                # Removing the extension binding is a valid legacy Candidate.
+                # Exercise required-field mutations on that complete legacy branch.
+                return example(node["anyOf"][0])
             return example(node["anyOf"][-1])
         kind = node["type"]
         if kind == "object":
