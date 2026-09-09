@@ -1,0 +1,577 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:autombd:workflow-transition:v1",
+  "title": "Pure functional-development workflow transition wire",
+  "$defs": {
+    "ID": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "Text": {
+      "type": "string",
+      "pattern": "\\S"
+    },
+    "SHA": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "Digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "Positive": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "Path": {
+      "type": "string",
+      "format": "relative-path"
+    },
+    "StatePath": {
+      "type": "string",
+      "format": "state-path"
+    },
+    "Kind": {
+      "enum": [
+        "task-contract",
+        "test-launch",
+        "worker-launch",
+        "test-gate-report",
+        "implementation-report",
+        "human-decision",
+        "candidate-test-envelope",
+        "tester-confidential-report",
+        "worker-correction-envelope",
+        "reviewer-launch",
+        "reviewer-report",
+        "terminal-record",
+        "delivery-repair",
+        "guard-result"
+      ]
+    },
+    "Task": {
+      "type": "object",
+      "properties": {
+        "repository": {
+          "$ref": "#/$defs/Text"
+        },
+        "issue_number": {
+          "$ref": "#/$defs/Positive"
+        },
+        "task_run": {
+          "$ref": "#/$defs/ID"
+        }
+      },
+      "required": [
+        "repository",
+        "issue_number",
+        "task_run"
+      ],
+      "additionalProperties": false
+    },
+    "Governor": {
+      "type": "object",
+      "properties": {
+        "commit": {
+          "$ref": "#/$defs/SHA"
+        },
+        "workflow_contract_path": {
+          "$ref": "#/$defs/Path"
+        },
+        "workflow_contract_blob": {
+          "$ref": "#/$defs/SHA"
+        }
+      },
+      "required": [
+        "commit",
+        "workflow_contract_path",
+        "workflow_contract_blob"
+      ],
+      "additionalProperties": false
+    },
+    "ArtifactRef": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/Kind"
+        },
+        "artifact_id": {
+          "$ref": "#/$defs/ID"
+        },
+        "path": {
+          "$ref": "#/$defs/StatePath"
+        },
+        "sha256": {
+          "$ref": "#/$defs/Digest"
+        }
+      },
+      "required": [
+        "kind",
+        "artifact_id",
+        "path",
+        "sha256"
+      ],
+      "additionalProperties": false
+    },
+    "State": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": "1.0"
+        },
+        "workflow_profile": {
+          "const": "functional-development-v1"
+        },
+        "task": {
+          "$ref": "#/$defs/Task"
+        },
+        "governor": {
+          "$ref": "#/$defs/Governor"
+        },
+        "contract": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ArtifactRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "test": {
+          "type": "object",
+          "properties": {
+            "launch": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ArtifactRef"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "ack": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ArtifactRef"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "ready": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ArtifactRef"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "approval": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ArtifactRef"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "launch",
+            "ack",
+            "ready",
+            "approval"
+          ],
+          "additionalProperties": false
+        },
+        "worker": {
+          "type": "object",
+          "properties": {
+            "launch": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ArtifactRef"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "ack": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ArtifactRef"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "ready": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ArtifactRef"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "pending_correction": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ArtifactRef"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "launch",
+            "ack",
+            "ready",
+            "pending_correction"
+          ],
+          "additionalProperties": false
+        },
+        "candidate": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "envelope": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/ArtifactRef"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "result": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/ArtifactRef"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "envelope",
+                "result"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "review": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "launch": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/ArtifactRef"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "report": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/ArtifactRef"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "launch",
+                "report"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "stop": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ArtifactRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "final_decision": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ArtifactRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "terminal": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ArtifactRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "repairs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ArtifactRef"
+          }
+        },
+        "consumed": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "event_id": {
+                "$ref": "#/$defs/ID"
+              },
+              "artifact": {
+                "$ref": "#/$defs/ArtifactRef"
+              }
+            },
+            "required": [
+              "event_id",
+              "artifact"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "schema_version",
+        "workflow_profile",
+        "task",
+        "governor",
+        "contract",
+        "test",
+        "worker",
+        "candidate",
+        "review",
+        "stop",
+        "final_decision",
+        "terminal",
+        "repairs",
+        "consumed"
+      ],
+      "additionalProperties": false
+    },
+    "Event": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": "1.0"
+        },
+        "type": {
+          "const": "CONSUME"
+        },
+        "event_id": {
+          "$ref": "#/$defs/ID"
+        },
+        "artifact": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "enum": [
+                "task-contract",
+                "test-launch",
+                "worker-launch",
+                "test-gate-report",
+                "implementation-report",
+                "human-decision",
+                "candidate-test-envelope",
+                "tester-confidential-report",
+                "worker-correction-envelope",
+                "reviewer-launch",
+                "reviewer-report",
+                "terminal-record",
+                "delivery-repair"
+              ]
+            },
+            "artifact_id": {
+              "$ref": "#/$defs/ID"
+            },
+            "path": {
+              "$ref": "#/$defs/StatePath"
+            },
+            "sha256": {
+              "$ref": "#/$defs/Digest"
+            }
+          },
+          "required": [
+            "kind",
+            "artifact_id",
+            "path",
+            "sha256"
+          ],
+          "additionalProperties": false
+        },
+        "checked": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "guard-result"
+            },
+            "artifact_id": {
+              "$ref": "#/$defs/ID"
+            },
+            "path": {
+              "$ref": "#/$defs/StatePath"
+            },
+            "sha256": {
+              "$ref": "#/$defs/Digest"
+            }
+          },
+          "required": [
+            "kind",
+            "artifact_id",
+            "path",
+            "sha256"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "schema_version",
+        "type",
+        "event_id",
+        "artifact",
+        "checked"
+      ],
+      "additionalProperties": false
+    },
+    "Context": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": "1.0"
+        },
+        "workflow_profile": {
+          "const": "functional-development-v1"
+        },
+        "task": {
+          "$ref": "#/$defs/Task"
+        },
+        "governor": {
+          "$ref": "#/$defs/Governor"
+        },
+        "protocol": {
+          "type": "object",
+          "properties": {
+            "handoff_schema": {
+              "type": "object"
+            },
+            "registry": {
+              "type": "object"
+            },
+            "workflow_contract": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "handoff_schema",
+            "registry",
+            "workflow_contract"
+          ],
+          "additionalProperties": false
+        },
+        "artifacts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "ref": {
+                "$ref": "#/$defs/ArtifactRef"
+              },
+              "body": {
+                "type": "object"
+              },
+              "raw": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "ref",
+              "body"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "checks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "ref": {
+                "$ref": "#/$defs/ArtifactRef"
+              },
+              "body": {
+                "type": "object"
+              }
+            },
+            "required": [
+              "ref",
+              "body"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "schema_version",
+        "workflow_profile",
+        "task",
+        "governor",
+        "protocol",
+        "artifacts",
+        "checks"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/State"
+    },
+    {
+      "$ref": "#/$defs/Event"
+    },
+    {
+      "$ref": "#/$defs/Context"
+    }
+  ]
+}
