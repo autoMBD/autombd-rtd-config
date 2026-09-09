@@ -2,7 +2,7 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.1.0 |
+| Version | 0.1.1 |
 | Date | 2026-09-09 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Real-source and exact remote proof over the existing accepted workflow state. |
@@ -93,6 +93,8 @@ Each consumed artifact needs a supplied exact CHECKED receipt. Matching receipts
 are considered in canonical full-reference order; the first fully valid receipt
 is used. Matching includes input path/ID/digest, task/G/K, consumer and visibility,
 canonical receipt digest, exit zero, no violations and available evidence.
+Recursive receipt attempts are isolated: a rejected attempt contributes no
+artifacts, attachment cache entries or deferred source checks to a later choice.
 No matching receipt is MISSING_EVIDENCE; candidates but none valid is
 INVALID_EVIDENCE. State does not retain event.checked: this selection does not
 prove it was the original execution receipt or that a guard actually ran.
@@ -103,6 +105,8 @@ coverage-join, correction, repair, execution and terminal rules. Incomplete
 catalog evidence cannot silently defer proof into VERIFIED.
 
 Every source Tip must match actual Git commit/tree/ordered-parent objects.
+Commit structure is read as bytes; only tree/parent object IDs are decoded as
+ASCII. Unrelated author, committer and message encodings do not affect this proof.
 G's exact workflow blob, schema and registry must agree with the supplied
 protocol. For each Candidate, real parents are exactly executable Test first
 and Implementation second. Both descend from G, and their complete merge-base set
@@ -181,3 +185,4 @@ part of this feature's Worker verification; Tester acceptance remains independen
 | Date | Version | Description |
 | --- | --- | --- |
 | 2026-09-09 | 0.1.0 | Added read-only source/remote proof contract, exact authority, repair continuity and CLI boundaries. |
+| 2026-09-09 | 0.1.1 | Clarified encoding-independent commit structure and isolated recursive receipt attempts. |

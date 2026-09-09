@@ -40,7 +40,7 @@
 # File:        test_workflow_evidence_generality.py
 # Author:      autoMBD <tkung.lqk@foxmail.com>
 # Date:        2026-09-09
-# Version:     0.1.0
+# Version:     0.1.1
 # Description: Worker-owned real-source workflow evidence generality.
 # =================================================================================
 
@@ -426,6 +426,41 @@ class WorkflowEvidenceGenerality(unittest.TestCase):
         bad = copy.deepcopy(self.h.context_data["checks"][0])
         bad["ref"]["artifact_id"] = "aaa-wrong-identity"
         self.h.context_data["checks"].insert(0, bad)
+        self.assertEqual("VERIFIED", self.verify()["status"])
+
+    def test_non_utf8_commit_metadata_preserves_structural_identity(self):
+        tree = self.h.tip(self.h.i)["tree"]
+        raw = (f"tree {tree}\nparent {self.h.g}\n".encode("ascii")
+               + b"author Andr\xe9 <author@example.invalid> 1700000000 +0000\n"
+               + b"committer Ren\xe9 <committer@example.invalid> 1700000001 +0000\n"
+               + b"encoding ISO-8859-1\n\nArbitrary non-UTF-8 metadata: \xff\n")
+        self.h.i = self.h.git("hash-object", "-t", "commit", "-w", "--stdin", data=raw)
+        self.h.ir = self.h.implementation(0, self.h.i, None, self.h.wlaunch)
+        self.h.assembled()
+        result = self.verify()
+        self.assertEqual("VERIFIED", result["status"])
+        self.assertEqual(self.h.i, result["implementation_sha"])
+
+    def test_failed_recursive_receipt_attempt_cannot_poison_later_valid_receipt(self):
+        self.h.assembled()
+        # This unconsumed recursive predecessor loads an attachment and a Tip,
+        # then fails at its missing manifest. None belong to the selected proof.
+        poison = copy.deepcopy(self.h.objects[self.h.ir["artifact_id"]])
+        poison["artifact_id"] = "unused-recursive-implementation"
+        poison["payload"]["implementation_tip"]["commit"] = "d" * 40
+        poison["payload"]["manifest"]["path"] = ".agent-state/missing-attempt-manifest.json"
+        run = poison["payload"]["generality"][0]
+        raw = (self.h.root / run["result"]["path"]).read_bytes()
+        run["result"]["path"] = "src/component.py"
+        self.h.write(run["result"]["path"], raw)
+        poison_ref = self.h.store(poison)
+        self.h.sync()
+        bad = copy.deepcopy(self.h.context_data["checks"][0]["body"])
+        bad["artifact_id"] = "aaa-recursive-invalid-receipt"
+        bad["predecessors"].append(poison_ref)
+        bad_ref = self.h.ref(bad)
+        self.h.write(bad_ref["path"], canonical(bad))
+        self.h.context_data["checks"].insert(0, {"ref": bad_ref, "body": bad})
         self.assertEqual("VERIFIED", self.verify()["status"])
 
 

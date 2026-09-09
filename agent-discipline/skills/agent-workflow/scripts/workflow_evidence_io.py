@@ -40,12 +40,13 @@
 # File:        workflow_evidence_io.py
 # Author:      autoMBD <tkung.lqk@foxmail.com>
 # Date:        2026-09-09
-# Version:     0.1.0
+# Version:     0.1.1
 # Description: Read-only exact workflow evidence verification.
 # =================================================================================
 
 """Read-only local proof adapter; neither history storage nor an executor."""
 
+import copy
 import hashlib
 import os
 import re
@@ -175,10 +176,13 @@ class EvidenceGraph(ReferenceGraph):
     def tip(self, sha):
         self.verify_commit(sha)
         if sha not in self.verified_tips:
-            raw = self.git("cat-file", "commit", sha)
-            headers = raw.split("\n\n", 1)[0].splitlines()
-            tree = [line[5:] for line in headers if line.startswith("tree ")]
-            parents = [line[7:] for line in headers if line.startswith("parent ")]
+            raw = self.git_bytes("cat-file", "commit", sha)
+            headers = raw.split(b"\n\n", 1)[0].split(b"\n")
+            try:
+                tree = [line[5:].decode("ascii") for line in headers if line.startswith(b"tree ")]
+                parents = [line[7:].decode("ascii") for line in headers if line.startswith(b"parent ")]
+            except UnicodeError:
+                raise WorkflowEvidenceError("INVALID_EVIDENCE", "/repository/tip") from None
             require(len(tree) == 1, pointer="/repository/tip")
             require(self.git("cat-file", "-t", tree[0]) == "tree", pointer="/repository/tree")
             for parent in parents:
@@ -238,6 +242,11 @@ class EvidenceGraph(ReferenceGraph):
             require(receipts, "MISSING_EVIDENCE", "/context/checks")
             trust = {"task": self.state["task"], "governor": self.state["governor"],
                      "task_contract": body["task_contract"]}
+            # Recursive closure changes only these containers; cached values
+            # are read-only, and Git proof has not started. Publish their
+            # additions only after the entire receipt attempt succeeds.
+            proof_fields = ("artifacts", "refs", "attachments", "artifact_validations",
+                            "loading", "pending_tips")
             for entry in receipts:
                 try:
                     r = self.read(entry["ref"], state=True)
@@ -247,14 +256,14 @@ class EvidenceGraph(ReferenceGraph):
                             and r["consumer_role"] == body["consumer_role"] and r["visibility"] == body["visibility"]
                             and r["exit_code"] == 0 and r["evidence_available"] is True and r["violations"] == [],
                             pointer="/context/checks")
-                    self.artifact(entry["ref"], allow_private=True)
+                    attempt = copy.copy(self)
+                    for name in proof_fields:
+                        setattr(attempt, name, getattr(self, name).copy())
+                    attempt.artifact(entry["ref"], allow_private=True)
                 except (WorkflowEvidenceError, WorkflowTransitionError, ProtocolError):
-                    aid = entry["ref"]["artifact_id"]
-                    self.loading.clear()
-                    self.artifacts.pop(aid, None)
-                    self.refs.pop(aid, None)
-                    self.artifact_validations = {key for key in self.artifact_validations if key[0] != aid}
                     continue
+                for name in proof_fields:
+                    setattr(self, name, getattr(attempt, name))
                 break
             else:
                 require(False, pointer="/context/checks")
