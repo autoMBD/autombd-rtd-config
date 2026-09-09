@@ -2,7 +2,7 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.1.4 |
+| Version | 0.1.5 |
 | Date | 2026-09-09 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Public memory-only transition API, wire, lifecycle, error order and evidence boundary. |
@@ -52,6 +52,10 @@ except WorkflowTransitionError as error:
 `initial_state(task, governor)` creates the complete empty state. The fixed
 workflow contract path is `agent-discipline/workflow-contract.json`.
 `transition(state, event, *, context)` returns a detached complete next state.
+`validate_state(state, *, context)` exposes the same current-state invariants
+without a hypothetical incoming event or any I/O. The separate
+[evidence verifier](workflow-evidence.md) adds complete real-source and remote
+proof; this entrypoint alone retains the pure reducer's partial-catalog boundary.
 No input is mutated on success or rejection; editing the returned state does
 not modify the input event or catalog.
 
@@ -323,3 +327,4 @@ approval.
 | 2026-09-07 | 0.1.2 | Explained applicable progression predicates, current-K prerequisite eligibility and replacement preservation without changing error priority. |
 | 2026-09-07 | 0.1.3 | Documented Human decision field preservation, explicit nullable subjects and independently active subject identity precedence. |
 | 2026-09-09 | 0.1.4 | Documented explicit W3 repair compatibility, immutable approval anchors, orthogonal support registration, same-index invalid-execution recovery and retained counted Implementation failures. |
+| 2026-09-09 | 0.1.5 | Exposed pure current-state validation for the separate read-only evidence verifier. |

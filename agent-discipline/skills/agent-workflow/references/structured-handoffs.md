@@ -2,7 +2,7 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.1.7 |
+| Version | 0.1.8 |
 | Date | 2026-09-09 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Functional-development role interfaces, local delivery validation, confidentiality, and explicit legacy migration boundaries. |
@@ -492,9 +492,10 @@ legacy packet validator exposed by the unified guard.
 
 The [pure transition engine](workflow-transitions.md) implements global
 consumption and repair ordering without executing the workflow. Complete
-remote-evidence/direct-union finalization (#86), capability isolation (#79),
-route execution (#87), and Human/GitHub intake (#80) remain separate. Their contracts consume
-these checked inputs/outputs; a local checker is not their implementation.
+remote-evidence/direct-union proof is provided by the read-only
+[evidence verifier](workflow-evidence.md). Capability isolation (#79),
+route execution (#87), and Human/GitHub intake (#80) remain separate. Their contracts
+consume these checked inputs/outputs; read-only proof is not their implementation.
 Explorer and other workflow profiles are future schema/registry extensions.
 KPI is an independent Human-started, issue-driven, post-merge profile for RTD
 CfgFile CLI, not a functional correction/optimization branch. Its dedicated
@@ -512,3 +513,4 @@ case review, results and dashboard are separate #100–#102 work.
 | 2026-09-08 | 0.1.5 | Defined two routine Human reviews, issue-based terminal findings and preserved bootstrap exceptions; required Human-decision preservation in format repairs and exact remote review delivery, without claiming runtime changes. |
 | 2026-09-09 | 0.1.6 | Linked the single local-state rule and made selective, byte-checked central/lane transport explicit while preserving protocol identities and historical paths. |
 | 2026-09-09 | 0.1.7 | Defined W3 opt-in machine metadata/support repair, shared inline evidence, original case approval anchors and source-bound execution without freeing Worker corrections or reopening terminal review. |
+| 2026-09-09 | 0.1.8 | Linked read-only real-source, direct-union and remote finalization proof while retaining separate execution/intake boundaries. |

@@ -1,0 +1,367 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workflow-evidence-v1.schema.json",
+  "title": "Workflow evidence authority and result v1",
+  "description": "Read-only transport definitions; State and Context remain owned by workflow-transition-v1.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/Authority"
+    },
+    {
+      "$ref": "#/$defs/Result"
+    }
+  ],
+  "$defs": {
+    "Task": {
+      "type": "object",
+      "properties": {
+        "repository": {
+          "$ref": "#/$defs/Text"
+        },
+        "issue_number": {
+          "$ref": "#/$defs/Positive"
+        },
+        "task_run": {
+          "$ref": "#/$defs/ID"
+        }
+      },
+      "required": [
+        "repository",
+        "issue_number",
+        "task_run"
+      ],
+      "additionalProperties": false
+    },
+    "Governor": {
+      "type": "object",
+      "properties": {
+        "commit": {
+          "$ref": "#/$defs/SHA"
+        },
+        "workflow_contract_path": {
+          "$ref": "#/$defs/Path"
+        },
+        "workflow_contract_blob": {
+          "$ref": "#/$defs/SHA"
+        }
+      },
+      "required": [
+        "commit",
+        "workflow_contract_path",
+        "workflow_contract_blob"
+      ],
+      "additionalProperties": false
+    },
+    "KRef": {
+      "type": "object",
+      "properties": {
+        "revision": {
+          "$ref": "#/$defs/Nonnegative"
+        },
+        "path": {
+          "$ref": "#/$defs/StatePath"
+        },
+        "sha256": {
+          "$ref": "#/$defs/Digest"
+        }
+      },
+      "required": [
+        "revision",
+        "path",
+        "sha256"
+      ],
+      "additionalProperties": false
+    },
+    "SHA": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "Digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "ID": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "Path": {
+      "type": "string",
+      "format": "relative-path"
+    },
+    "StatePath": {
+      "type": "string",
+      "format": "state-path"
+    },
+    "Text": {
+      "type": "string",
+      "pattern": "\\S"
+    },
+    "Positive": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "Nonnegative": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "Authority": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": "1.0"
+        },
+        "authorized_actors": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/Text"
+          }
+        },
+        "base_ref": {
+          "$ref": "#/$defs/Text"
+        },
+        "packets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "decision_artifact_id": {
+                "$ref": "#/$defs/ID"
+              },
+              "packet_comment_id": {
+                "$ref": "#/$defs/Positive"
+              }
+            },
+            "required": [
+              "decision_artifact_id",
+              "packet_comment_id"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "schema_version",
+        "authorized_actors",
+        "base_ref",
+        "packets"
+      ],
+      "additionalProperties": false
+    },
+    "Result": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": "1.0"
+        },
+        "status": {
+          "const": "VERIFIED"
+        },
+        "task": {
+          "$ref": "#/$defs/Task"
+        },
+        "governor": {
+          "$ref": "#/$defs/Governor"
+        },
+        "task_contract": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/KRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "input_sha256": {
+          "type": "object",
+          "properties": {
+            "state": {
+              "$ref": "#/$defs/Digest"
+            },
+            "context": {
+              "$ref": "#/$defs/Digest"
+            },
+            "authority": {
+              "$ref": "#/$defs/Digest"
+            }
+          },
+          "required": [
+            "state",
+            "context",
+            "authority"
+          ],
+          "additionalProperties": false
+        },
+        "approved_test_sha": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SHA"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "effective_test_sha": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SHA"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "executed_test_sha": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SHA"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "implementation_sha": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SHA"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "candidate_sha": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SHA"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "candidate_index": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 3
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "functional_correction_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3
+        },
+        "accepted_candidate_sha": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SHA"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "terminal_disposition": {
+          "anyOf": [
+            {
+              "enum": [
+                "OPEN_SUCCESS_PR",
+                "RECORD_FAILURE",
+                "MERGED"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "checks": {
+          "type": "object",
+          "properties": {
+            "state": {
+              "enum": [
+                "PASS",
+                "NOT_APPLICABLE"
+              ]
+            },
+            "git": {
+              "enum": [
+                "PASS",
+                "NOT_APPLICABLE"
+              ]
+            },
+            "human_authority": {
+              "enum": [
+                "PASS",
+                "NOT_APPLICABLE"
+              ]
+            },
+            "finalization": {
+              "enum": [
+                "PASS",
+                "NOT_APPLICABLE"
+              ]
+            }
+          },
+          "required": [
+            "state",
+            "git",
+            "human_authority",
+            "finalization"
+          ],
+          "additionalProperties": false
+        },
+        "remote_evidence": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "endpoint": {
+                "type": "string",
+                "pattern": "^/repos/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/(issues/comments|pulls)/[1-9][0-9]*$"
+              },
+              "sha256": {
+                "$ref": "#/$defs/Digest"
+              }
+            },
+            "required": [
+              "endpoint",
+              "sha256"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "schema_version",
+        "status",
+        "task",
+        "governor",
+        "task_contract",
+        "input_sha256",
+        "approved_test_sha",
+        "effective_test_sha",
+        "executed_test_sha",
+        "implementation_sha",
+        "candidate_sha",
+        "candidate_index",
+        "functional_correction_count",
+        "accepted_candidate_sha",
+        "terminal_disposition",
+        "checks",
+        "remote_evidence"
+      ],
+      "additionalProperties": false
+    }
+  }
+}
