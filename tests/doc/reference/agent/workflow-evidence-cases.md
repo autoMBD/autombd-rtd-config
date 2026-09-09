@@ -43,4 +43,3 @@
 | Date | Version | Description |
 | --- | --- | --- |
 | 2026-09-09 | 0.1.0 | Added independently derived K1 evidence-verifier cases; execution details and evidence remain outside this reference. |
-

@@ -157,4 +157,3 @@ Sources: A01, A02, A03, A04, A05.
 | Date | Version | Description |
 | --- | --- | --- |
 | 2026-09-09 | 0.1.0 | Rendered complete #86 K1 requirements and public interface/error definitions. |
-
