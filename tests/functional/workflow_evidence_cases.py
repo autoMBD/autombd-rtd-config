@@ -39,8 +39,8 @@
 # Project:     RTD CfgFile CLI <https://github.com/autoMBD/autombd-rtd-config>
 # File:        workflow_evidence_cases.py
 # Author:      autoMBD <tkung.lqk@foxmail.com>
-# Date:        2026-09-09
-# Version:     0.1.0
+# Date:        2026-09-10
+# Version:     0.1.1
 # Description: Owner evidence verifier synthetic Git and transport fixtures.
 # =================================================================================
 
@@ -106,6 +106,12 @@ class History(RepairLifecycle):
         self.bridge = GuardBridge(self)
 
     def write(self, name, raw):
+        if name == "agent-discipline/workflow-contract.json":
+            # Include declared protocol dependencies before the Governor commit.
+            workflow = json.loads((ROOT / name).read_bytes())
+            for key in ("artifact_schema", "registry"):
+                path = workflow[key]
+                super().write(path, (ROOT / path).read_bytes())
         if name == "src/component.py" and raw == b"baseline\n":
             super().write("tests/accepted-evidence-fixture.py", b"inherited = True\n")
         return super().write(name, raw)
