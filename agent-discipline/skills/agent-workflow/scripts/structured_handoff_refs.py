@@ -39,8 +39,8 @@
 # Project:     RTD CfgFile CLI <https://github.com/autoMBD/autombd-rtd-config>
 # File:        structured_handoff_refs.py
 # Author:      autoMBD <tkung.lqk@foxmail.com>
-# Date:        2026-09-09
-# Version:     0.1.1
+# Date:        2026-09-10
+# Version:     0.1.2
 # Description: Safe byte-bound references and real Git identity checks.
 # =================================================================================
 
@@ -198,7 +198,7 @@ class ReferenceGraph:
         if ref["kind"] != "guard-result":
             require(value["task"] == self.context["task"], "TASK_MISMATCH")
             require(value["governor"] == self.context["governor"], "GOVERNOR_MISMATCH")
-        if not allow_private:
+        if self.context["consumer_role"] == "worker" and not allow_private:
             policy = self.registry["artifacts"][ref["kind"]]
             if "worker_conditional_visibility" in policy:
                 require(value["visibility"] in policy["worker_conditional_visibility"], "PRIVATE_REFERENCE")

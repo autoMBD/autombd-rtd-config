@@ -39,8 +39,8 @@
 # Project:     RTD CfgFile CLI <https://github.com/autoMBD/autombd-rtd-config>
 # File:        test_workflow_evidence_generality.py
 # Author:      autoMBD <tkung.lqk@foxmail.com>
-# Date:        2026-09-09
-# Version:     0.1.1
+# Date:        2026-09-10
+# Version:     0.1.2
 # Description: Worker-owned real-source workflow evidence generality.
 # =================================================================================
 
@@ -462,6 +462,71 @@ class WorkflowEvidenceGenerality(unittest.TestCase):
         self.h.write(bad_ref["path"], canonical(bad))
         self.h.context_data["checks"].insert(0, {"ref": bad_ref, "body": bad})
         self.assertEqual("VERIFIED", self.verify()["status"])
+
+    def test_h1_tester_confidential_receipt_is_not_worker_filtered(self):
+        from structured_handoff_refs import ReferenceGraph
+        self.h.start()
+        ref = self.h.checked(self.h.tlaunch)
+        graph = ReferenceGraph(self.h.context(self.h.tlaunch, [ref]), "consumer-local")
+        value = graph.artifact(ref)
+        self.assertEqual("tester", value["consumer_role"])
+        self.assertEqual("tester-confidential", value["visibility"])
+
+    def test_h1_tester_confidential_repair_passes_local_guard(self):
+        self.h.start(ready=True)
+        repair, _ = self.h.metadata()
+        central_path = ".agent-state/h1-tester-central.json"
+        code, result = self.h.validate(repair, result_name=central_path)
+        self.assertEqual(0, code, result)
+        central = {"path": central_path, "sha256": digest(result)}
+        code, result = self.h.validate(repair, view="consumer-local", central=central)
+        self.assertEqual(0, code, result)
+        self.assertEqual("CHECKED", result["status"])
+
+    def test_h1_worker_unknown_private_reference_rejects_before_open(self):
+        from structured_handoff_refs import ReferenceGraph
+        from structured_handoff_schema import ProtocolError
+        for kind in ("guard-result", "delivery-repair", "tester-confidential-report"):
+            with self.subTest(kind=kind):
+                graph = ReferenceGraph(self.h.context(self.h.wlaunch), "consumer-local")
+                ref = {"kind": kind, "artifact_id": "unavailable-private",
+                       "path": ".agent-state/never-open.json", "sha256": "a" * 64}
+                with self.assertRaises(ProtocolError) as caught:
+                    graph.artifact(ref)
+                self.assertEqual("PRIVATE_REFERENCE", caught.exception.rule_id)
+
+    def test_h1_worker_keeps_public_receipt_predecessor_exception(self):
+        from structured_handoff_refs import ReferenceGraph
+        self.h.start(ready=True)
+        ref = self.h.checked(self.h.ir)
+        graph = ReferenceGraph(self.h.context(self.h.wlaunch, [ref]), "consumer-local")
+        value = graph.artifact(ref)
+        self.assertEqual("public-task", value["visibility"])
+        self.assertEqual("orchestrator", value["consumer_role"])
+
+    def test_h1_worker_listed_private_receipt_stays_rejected(self):
+        from structured_handoff_refs import ReferenceGraph
+        from structured_handoff_schema import ProtocolError
+        self.h.start()
+        ref = self.h.checked(self.h.tlaunch)
+        graph = ReferenceGraph(self.h.context(self.h.wlaunch, [ref]), "consumer-local")
+        with self.assertRaises(ProtocolError) as caught:
+            graph.artifact(ref)
+        self.assertEqual("PRIVATE_REFERENCE", caught.exception.rule_id)
+
+    def test_h1_worker_public_repair_still_requires_worker_recipient(self):
+        from structured_handoff_refs import ReferenceGraph
+        from structured_handoff_schema import ProtocolError
+        self.h.start(ready=True)
+        repair, _ = self.h.metadata()
+        value = copy.deepcopy(self.h.objects[repair["artifact_id"]])
+        value["visibility"] = "public-task"
+        ref = self.h.store(value)
+        graph = ReferenceGraph(self.h.context(self.h.wlaunch, [ref]), "consumer-local")
+        graph.verify_environment()
+        with self.assertRaises(ProtocolError) as caught:
+            graph.artifact(ref)
+        self.assertEqual("PRIVATE_REFERENCE", caught.exception.rule_id)
 
 
 if __name__ == "__main__":
