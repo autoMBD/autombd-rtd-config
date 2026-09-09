@@ -1,10 +1,15 @@
 {
   "schema_version": 2,
-  "contract_version": 2,
+  "contract_version": 3,
   "workflow_profile": "functional-development-v1",
   "artifact_schema": "agent-discipline/skills/agent-workflow/schemas/handoff-v1.schema.json",
   "registry": "agent-discipline/skills/agent-workflow/schemas/functional-development-v1.json",
   "legacy_contract": "agent-discipline/contracts/workflow-v1.json",
+  "non_case_repairs": {
+    "version": "1.0",
+    "metadata": true,
+    "test_support": true
+  },
   "lifecycle": {
     "parallel_lanes": true,
     "gate1_requires_worker_ready": false,

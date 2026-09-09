@@ -2,8 +2,8 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.1.3 |
-| Date | 2026-09-07 |
+| Version | 0.1.4 |
+| Date | 2026-09-09 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Public memory-only transition API, wire, lifecycle, error order and evidence boundary. |
 
@@ -14,9 +14,11 @@ artifacts. It adds global consumption order, active identity, replay rejection,
 parallel readiness, frozen approval, bounded incremental corrections and one
 terminal review. It does not execute the workflow.
 
-The [structured handoff protocol](structured-handoffs.md), artifact schema,
-profile registry and Wv2 declaration remain unchanged. The legacy
-record/path/validate commands and file guard retain their ownership.
+The [structured handoff protocol](structured-handoffs.md) defines the role
+artifacts. W3 explicitly enables non-case repair; W2 remains supported without
+that extension. Profile, fourteen artifact kinds and State/Event/Context wire
+shapes remain stable. The legacy record/path/validate commands and file guard
+retain their ownership.
 This core is not a wrapper for the obsolete seven-checkpoint or F0/F1 lifecycle.
 
 | File relative to this skill | Responsibility |
@@ -121,8 +123,8 @@ Other artifact and receipt entries cannot use this exception.
 | Initial K | First business artifact, revision zero, initializes contract |
 | INITIAL lane launch | Either lane starts independently; Worker never waits for Test or approval |
 | READY report | Establishes its own readiness; a pre-freeze withdrawal clears only that lane |
-| Test decision | REQUEST_CHANGES clears Test READY; APPROVE freezes exact Test/K without waiting for Worker |
-| New Candidate | Joins approved current Test with latest READY I; later C requires next completed I |
+| Test decision | REQUEST_CHANGES clears Test READY; APPROVE preserves the original case/source approval anchor and K without waiting for Worker |
+| New Candidate | Joins approved Test (or explicitly repaired executable support source) with latest READY I; ordinary later C requires next completed I |
 | Tester result | PASS enables review; Implementation failure enables correction; explicit invalid gate/contract/integrity enables failure review |
 | INVALID_RUN rerun | New execution/dispatch for identical Candidate; rerun_of is active INVALID_RUN report, with it and prior envelope as direct predecessors |
 | Correction | One pending authorization, same lane/session/worktree/branch and previous I |
@@ -134,13 +136,14 @@ Other artifact and receipt entries cannot use this exception.
 | FINAL decision | Binds exact proposal/Candidate; REQUEST_CHANGES cancels success without reopening corrections |
 | MERGED / RECORD_FAILURE | Requires corresponding exact final route and closes business progression |
 | Delivery repair | Orthogonal bookkeeping; replacements preserve business values and update only active delivery references |
+| W3 support repair | Registers strict descendant Test support and its audit while retaining original READY/approval, Worker and current Candidate/result |
 
 There is no correction four, clean-room restart, automatic invalid-Test
 reclassification, second review cycle or KPI retry. Candidate indices are 0–3.
 New READY I may temporarily be one increment ahead of current C; STOP preserves
 both actual facts.
 
-Reruns retain Candidate, Test/Implementation tips, manifests, Impact Set,
+Unchanged-source reruns retain Candidate, Test/Implementation tips, manifests, Impact Set,
 coverage join and indices. Execution and dispatch identities cannot be reused.
 A proposed new rerun reusing either identity from accepted history is
 `STALE_EVENT` at identity priority 3, even with otherwise current bindings.
@@ -154,6 +157,49 @@ For an already consumed repaired report, replacement does not reapply the
 business transition. Historical bytes remain unchanged. A repaired Reviewer
 delivery can update the current report while a prior accepted proposal retains
 its reference to the equivalent original delivery.
+
+### Non-case repair and executable source
+
+Read the [machine repair representation](structured-handoffs.md#versioned-machine-repair-representation)
+for the closed forms and trust boundary. W3 is required for versioned METADATA,
+TEST_SUPPORT and Candidate `support_repair`; an upgraded local schema does not
+enable them under an old W2 authority. Existing legacy repair inputs still take
+their rejected-only path.
+
+Metadata replacements can reconcile a previously CHECKED delivery through a
+real Orchestrator observation and repair record. Inline before/after attachment
+bytes and bodies make preservation checks visible to this memory-only core.
+Original Human `gate`, `decision` and `subject_sha`, source and historical
+outcomes remain unchanged. A changed attachment digest alone neither proves
+semantic drift nor authorizes changing the checked meaning.
+
+TEST_SUPPORT adds a record to `repairs`; it does not overwrite original
+`test.ready`/`test.approval`, clear `candidate.result`, advance Worker index or
+replay READY. Three source identities stay distinct: the original approved
+Test, latest registered support source, and the active Candidate's executable
+Test. An old Candidate remains honest history while newer support awaits
+execution. A new Candidate must use the latest registered source and exact
+support reference; repeated repairs continue that source even before execution.
+
+With no Candidate, repaired support enters C0 when I0 is ready. After an
+INVALID_RUN, an explicitly support-bound execution uses real new Test/Candidate
+source, a fresh execution/dispatch and the same correction index. It retains
+the old envelope and invalid result as predecessors, rather than pretending to
+be an unchanged-source rerun. A valid Implementation failure still requires the
+original Worker's next counted correction; registering support cannot erase
+that failure or pending correction. PASS, exhaustion, STOP and terminal review
+cannot reopen automatically. Later ordinary Worker corrections retain the
+latest support source and original case approval.
+
+The current correction index identifies Worker progress, not the number of
+delivery metadata revisions or support-only executable snapshots. All old
+source/execution artifacts remain immutable and visible in history. Fresh
+affected evidence belongs to the newly executed snapshot, never its predecessor.
+For intervening unexecuted support repairs, affected check IDs accumulate up to
+the previous executed support source. Their new execution must not reuse exact
+old command-result references. Fresh evidence with identical deterministic
+bytes is allowed; same-execution metadata replacement preserves its existing
+results. This is reference freshness, not external-execution authentication.
 
 ## Ordered rejection
 
@@ -241,7 +287,10 @@ persist state, guarantee durable globally exactly-once processing or dispatch
 an Agent. The caller owns these boundaries and atomic durable acceptance.
 Manifest, authority, command-result and other raw attachments are checked by the
 existing handoff guard; this reducer neither reads their files nor executes
-LocalRules.
+LocalRules. Versioned repair records carry the exact limited attachment
+before/after bytes and source-audit facts inline, so both layers can check the
+same semantic-preservation projection. The guard adds actual filesystem/Git
+checks; supplied facts do not make the pure reducer a Git or semantic oracle.
 
 ## Source salvage and verification scope
 
@@ -273,3 +322,4 @@ approval.
 | 2026-09-06 | 0.1.1 | Clarified historical rerun identity reuse as priority-3 STALE_EVENT with its offending field pointer. |
 | 2026-09-07 | 0.1.2 | Explained applicable progression predicates, current-K prerequisite eligibility and replacement preservation without changing error priority. |
 | 2026-09-07 | 0.1.3 | Documented Human decision field preservation, explicit nullable subjects and independently active subject identity precedence. |
+| 2026-09-09 | 0.1.4 | Documented explicit W3 repair compatibility, immutable approval anchors, orthogonal support registration, same-index invalid-execution recovery and retained counted Implementation failures. |

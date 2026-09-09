@@ -44,8 +44,10 @@
 # Description: Declarative protocol local-edge and evidence invariants.
 # =================================================================================
 
-from structured_handoff_schema import require
-from structured_handoff_refs import git
+from structured_handoff_schema import require, validate_artifact, validate_definition
+from structured_handoff_refs import git, git_bytes
+from repair_protocol import (RepairError, effective_test, equivalent_artifact_ref, is_v1,
+    validate_metadata_replacement, validate_repair, validate_retest_evidence)
 
 
 def unique(values, rule="DUPLICATE_ID"):
@@ -151,7 +153,9 @@ class LocalRules:
     def dispatch(self, a, launch):
         expected = launch["payload"]["dispatch_id"]
         if a["replaces"] and self.g.direct(a, "delivery-repair"):
-            expected = self.g.one(a, "delivery-repair")["payload"]["dispatch_id"]
+            repair_ref = a["replaces"].get("repair")
+            repair = self.g.artifacts[repair_ref["artifact_id"]] if repair_ref else self.g.one(a, "delivery-repair")
+            expected = repair["payload"]["dispatch_id"]
         require(a["payload"]["dispatch_id"] == expected, "DISPATCH_IDENTITY")
         if "lane" in a["payload"]:
             require(a["payload"]["lane"] == launch["payload"]["lane"], "LANE_IDENTITY")
@@ -289,28 +293,52 @@ class LocalRules:
         approval = self.g.one(a, "human-decision", lambda x: x["payload"]["gate"] == "TEST" and x["payload"]["decision"] == "APPROVE")
         for predecessor in (tr, ir, approval):
             self.g.same_k(a, predecessor)
-        require(p["test_tip"] == tr["payload"]["test_tip"] and p["test_manifest"] == tr["payload"]["manifest"] and p["impact_set"] == tr["payload"]["impact_set"], "FROZEN_TEST")
-        require(approval["payload"]["subject_sha"] == p["test_tip"]["commit"], "FROZEN_APPROVAL")
-        require(self.g.one(approval, "test-gate-report")["artifact_id"] == tr["artifact_id"], "FROZEN_TEST_REPORT")
+        support = self.g.artifacts[p["support_repair"]["artifact_id"]] if "support_repair" in p else None
+        if support:
+            require(p["support_repair"] in a["predecessors"] and is_v1(support, "TEST_SUPPORT"), "REPAIR_SUPPORT_BINDING")
+            self.g.same_k(a, support)
+            require(self.equivalent(support["payload"]["approval"], self.g.refs[approval["artifact_id"]]) and
+                    self.equivalent(support["payload"]["approved_test_report"], self.g.refs[tr["artifact_id"]]), "REPAIR_APPROVAL")
+        effective = effective_test(tr["payload"], support["payload"] if support else None)
+        require(all(p[key] == effective[key] for key in effective), "FROZEN_TEST")
+        require(approval["payload"]["subject_sha"] == tr["payload"]["test_tip"]["commit"], "FROZEN_APPROVAL")
+        approved_report = self.g.one(approval, "test-gate-report")
+        require(self.equivalent(self.g.refs[approved_report["artifact_id"]], self.g.refs[tr["artifact_id"]]), "FROZEN_TEST_REPORT")
         require(p["implementation_tip"] == ir["payload"]["implementation_tip"] and p["implementation_manifest"] == ir["payload"]["manifest"] and index == ir["payload"]["implementation_index"], "CANDIDATE_IMPLEMENTATION")
+        support_rerun = False
         if p["rerun_of"]:
             invalid = self.g.artifacts[p["rerun_of"]["artifact_id"]]
             require(p["rerun_of"] in a["predecessors"] and invalid["artifact_kind"] == "tester-confidential-report" and invalid["payload"]["outcome"] == "INVALID_RUN", "RERUN_INVALID")
             old = self.g.one(invalid, "candidate-test-envelope")
             require(self.g.refs[old["artifact_id"]] in a["predecessors"], "RERUN_PREDECESSOR")
-            fields = ("candidate_index", "correction_count", "candidate", "test_tip", "implementation_tip", "test_manifest", "implementation_manifest", "impact_set", "coverage_join", "previous_candidate")
+            support_rerun = bool(support and p["support_repair"] != old["payload"].get("support_repair"))
+            fields = (("candidate_index", "correction_count", "implementation_tip", "implementation_manifest")
+                if support_rerun else ("candidate_index", "correction_count", "candidate", "test_tip", "implementation_tip", "test_manifest", "implementation_manifest", "impact_set", "coverage_join", "previous_candidate"))
             require(all(p[f] == old["payload"][f] for f in fields), "RERUN_IDENTITY")
-            require(p["execution_id"] != old["payload"]["execution_id"], "RERUN_EXECUTION")
-        if index == 0:
+            require(p["execution_id"] != old["payload"]["execution_id"] and
+                    p["dispatch_id"] != old["payload"]["dispatch_id"], "RERUN_EXECUTION")
+            if support_rerun:
+                require(p["candidate"]["commit"] != old["payload"]["candidate"]["commit"] and
+                        p["previous_candidate"] == self.g.refs[old["artifact_id"]] and
+                        support["payload"]["previous_candidate"] == p["previous_candidate"], "REPAIR_CANDIDATE_LINEAGE")
+        if support_rerun:
+            pass
+        elif index == 0:
             require(p["previous_candidate"] is None, "INITIAL_CANDIDATE")
         else:
             require(p["previous_candidate"] is not None and p["previous_candidate"] in a["predecessors"], "PREVIOUS_CANDIDATE")
             previous = self.g.artifacts[p["previous_candidate"]["artifact_id"]]
             require(previous["artifact_kind"] == "candidate-test-envelope" and previous["payload"]["candidate_index"] + 1 == index, "CANDIDATE_SEQUENCE")
-            for key in ("test_tip", "test_manifest", "impact_set"):
-                require(p[key] == previous["payload"][key], "FROZEN_TEST")
+            if not support:
+                require("support_repair" not in previous["payload"], "REPAIR_SUPPORT_BINDING")
+                for key in ("test_tip", "test_manifest", "impact_set"):
+                    require(p[key] == previous["payload"][key], "FROZEN_TEST")
             self.g.same_k(a, previous)
         self.coverage_join(a)
+
+    def equivalent(self, original, current):
+        return equivalent_artifact_ref(original, current,
+                                       lambda ref: self.g.artifacts.get(ref["artifact_id"]))
 
     def coverage_join(self, a):
         p = a["payload"]
@@ -340,6 +368,12 @@ class LocalRules:
     def tester_confidential_report(self, a):
         p = a["payload"]
         launch = self.g.one(a, "candidate-test-envelope")
+        try:
+            validate_retest_evidence(a, launch,
+                [body for body in self.g.artifacts.values() if body["artifact_kind"] == "tester-confidential-report"],
+                lambda ref: self.g.artifacts.get(ref["artifact_id"]))
+        except RepairError as error:
+            require(False, error.rule)
         self.dispatch(a, launch)
         for report_key, launch_key in (("candidate_index", "candidate_index"), ("execution_id", "execution_id")):
             require(p[report_key] == launch["payload"][launch_key], "EXECUTION_IDENTITY")
@@ -506,10 +540,15 @@ class LocalRules:
 
     def delivery_repair(self, a):
         p = a["payload"]
+        if is_v1(a):
+            self.versioned_repair(a)
+            if p["mode"] == "TEST_SUPPORT":
+                return
         original = self.g.artifacts[p["original"]["artifact_id"]]
-        rejection = self.g.artifacts[p["rejection"]["artifact_id"]]
-        require(p["original"] in a["predecessors"] and p["rejection"] in a["predecessors"], "REPAIR_PREDECESSOR")
-        require(rejection["artifact_kind"] == "guard-result" and rejection["status"] == "REJECTED" and rejection["input"]["sha256"] == p["original"]["sha256"], "REPAIR_REJECTION")
+        if not is_v1(a):
+            rejection = self.g.artifacts[p["rejection"]["artifact_id"]]
+            require(p["original"] in a["predecessors"] and p["rejection"] in a["predecessors"], "REPAIR_PREDECESSOR")
+            require(rejection["artifact_kind"] == "guard-result" and rejection["status"] == "REJECTED" and rejection["input"]["sha256"] == p["original"]["sha256"], "REPAIR_REJECTION")
         require(a["consumer_role"] == original["producer_role"], "REPAIR_CONSUMER")
         require(a["visibility"] == original["visibility"], "REPAIR_VISIBILITY")
         op = original["payload"]
@@ -533,6 +572,43 @@ class LocalRules:
         require(p["preserve_tip"] == source, "REPAIR_TIP")
         require(p["preserve_candidate_index"] == index and p["preserve_correction_count"] == count and p["preserve_review_id"] == op.get("review_id"), "REPAIR_IDENTITY")
 
+    def versioned_repair(self, a):
+        p = a["payload"]
+        try:
+            validate_repair(a, lambda ref: self.g.artifacts.get(ref["artifact_id"]), validate_definition)
+        except RepairError as error:
+            require(False, error.rule)
+        original = self.g.artifacts[p["original"]["artifact_id"]]
+        if p["trigger"]["kind"] == "ORCHESTRATOR_OBSERVED":
+            validate_artifact(original)
+            self.check(original)
+        for fact in p["semantic_audit"]["source_bindings"]:
+            self.g.verify_commit(fact["commit"])
+            require(git(self.g.root, "rev-parse", fact["commit"] + ":" + fact["path"]) == fact["blob"],
+                    "REPAIR_SOURCE_BLOB")
+            require(git(self.g.root, "cat-file", "-t", fact["blob"]) == "blob", "REPAIR_SOURCE_BLOB")
+        if p["mode"] != "TEST_SUPPORT":
+            return
+        old, new = p["from_test_tip"]["commit"], p["to_test_tip"]["commit"]
+        self.g.strict_ancestor(old, new)
+        def inventory(commit):
+            entries = git_bytes(self.g.root, "ls-tree", "-r", "-z", commit).split(b"\0")
+            return {entry.split(b"\t", 1)[1].decode("utf-8"): entry.split(b"\t", 1)[0].split()
+                    for entry in entries if entry}
+        before, after = inventory(old), inventory(new)
+        changed = {path for path in before.keys() | after.keys() if before.get(path) != after.get(path)}
+        require(changed == {x["path"] for x in p["source_changes"]}, "REPAIR_SOURCE_INVENTORY")
+        for change in p["source_changes"]:
+            path = change["path"]
+            for entries, key in ((before, "before_blob"), (after, "after_blob")):
+                entry = entries.get(path)
+                require(entry is None or entry[1] == b"blob", "REPAIR_SOURCE_BLOB")
+                require((entry[2].decode() if entry else None) == change[key], "REPAIR_SOURCE_BLOB")
+        implementation = self.g.artifacts[p["implementation_report"]["artifact_id"]] if p["implementation_report"] else None
+        worker_paths = self.g.changed_paths(implementation["payload"]["implementation_tip"]["commit"]) if implementation else set()
+        require(not (changed & worker_paths) and self.g.context["governor"]["workflow_contract_path"] not in changed,
+                "REPAIR_SOURCE_OWNERSHIP")
+
     def repair_predecessor(self, envelope, original, kind):
         refs = [ref for ref in original["predecessors"] if ref["kind"] == kind]
         require(len(refs) == 1 and (refs[0] in envelope["predecessors"] or refs[0] in self.g.context["predecessor_refs"]), "REPAIR_SOURCE_REFERENCE")
@@ -544,8 +620,22 @@ class LocalRules:
     def replacement(self, a):
         replacement = a["replaces"]
         original = self.g.artifacts[replacement["original"]["artifact_id"]]
+        repair = None
+        if "repair" in replacement:
+            repair = self.g.artifacts[replacement["repair"]["artifact_id"]]
+            require(is_v1(repair, "METADATA") and repair["payload"]["original"] == replacement["original"] and
+                    replacement["repair"] in a["predecessors"] and replacement["original"] in a["predecessors"], "REPAIR_METADATA_REQUIRED")
+            require(self.g.refs[a["artifact_id"]]["path"] == repair["payload"]["replacement_output"] and
+                    a["payload"].get("dispatch_id", repair["payload"]["dispatch_id"]) == repair["payload"]["dispatch_id"],
+                    "REPAIR_DISPATCH")
+        try:
+            validate_metadata_replacement(original, a, repair)
+        except RepairError as error:
+            require(False, error.rule)
         require(original["artifact_id"] != a["artifact_id"] and original["artifact_kind"] == a["artifact_kind"], "REPLACEMENT_IDENTITY")
         require(original["task_contract"] == a["task_contract"], "REPAIR_CONTRACT")
+        if repair:
+            return
         guard = self.g.artifacts[replacement["guard_result"]["artifact_id"]]
         require(guard["artifact_kind"] == "guard-result" and guard["status"] == "REJECTED" and guard["input"]["sha256"] == replacement["original"]["sha256"], "REPAIR_REJECTION")
         preserved = ("status", "outcome", "verdict", "implementation_index", "implementation_tip", "previous_implementation",

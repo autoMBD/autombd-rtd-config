@@ -39,8 +39,8 @@
 # Project:     RTD CfgFile CLI <https://github.com/autoMBD/autombd-rtd-config>
 # File:        workflow_transition_wire.py
 # Author:      autoMBD <tkung.lqk@foxmail.com>
-# Date:        2026-09-06
-# Version:     0.1.0
+# Date:        2026-09-09
+# Version:     0.1.1
 # Description: Pure JSON, schema and wire checks for workflow transitions.
 # =================================================================================
 
@@ -337,11 +337,27 @@ def protocol(context):
     require(type(workflow.get("lifecycle")) is dict and
             all(type(workflow["lifecycle"].get(key)) is type(value)
                 for key, value in lifecycle.items()), code, pointer)
+    version = workflow.get("contract_version")
+    require(type(version) is int and version in (2, 3), code, pointer)
+    workflow_fields = {"schema_version", "contract_version", "workflow_profile",
+                       "artifact_schema", "registry", "legacy_contract", "lifecycle",
+                       "deferred_runtime_capabilities"}
+    if version == 3:
+        workflow_fields.add("non_case_repairs")
+        capability = workflow.get("non_case_repairs")
+        expected_capability = {"version": "1.0", "metadata": True, "test_support": True}
+        closed(capability, expected_capability, code, pointer + "/non_case_repairs")
+        require(all(type(capability[key]) is type(value) and capability[key] == value
+                    for key, value in expected_capability.items()), code, pointer)
+    closed(workflow, workflow_fields, code, pointer + "/workflow_contract")
     require(type(workflow.get("schema_version")) is int and workflow["schema_version"] == 2 and
-            type(workflow.get("contract_version")) is int and workflow["contract_version"] == 2 and
             workflow.get("workflow_profile") == PROFILE and workflow.get("lifecycle") == lifecycle and
             workflow.get("artifact_schema") == "agent-discipline/skills/agent-workflow/schemas/handoff-v1.schema.json" and
-            workflow.get("registry") == "agent-discipline/skills/agent-workflow/schemas/functional-development-v1.json",
+            workflow.get("registry") == "agent-discipline/skills/agent-workflow/schemas/functional-development-v1.json" and
+            workflow.get("legacy_contract") == "agent-discipline/contracts/workflow-v1.json" and
+            workflow.get("deferred_runtime_capabilities") == [
+                "transition-executor", "remote-authority-verification", "candidate-direct-union",
+                "capability-sandbox", "global-exactly-once", "kpi-profile"],
             code, pointer)
     return defs
 

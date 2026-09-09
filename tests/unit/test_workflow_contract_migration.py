@@ -141,9 +141,14 @@ def test_legacy_snapshot_checkout_retains_exact_bytes_with_autocrlf(tmp_path):
     assert attributes.decode("utf-8").strip().endswith(": eol: lf")
 
 
-def test_active_contract_is_the_approved_small_v2_declaration(gate):
-    assert json.loads(ACTIVE.read_text(encoding="utf-8")) == declaration()
-    gate.validate_contract(declaration(), contract_path=ACTIVE)
+def test_active_contract_is_the_approved_w3_declaration(gate):
+    expected = declaration()
+    expected["contract_version"] = 3
+    expected["non_case_repairs"] = {
+        "version": "1.0", "metadata": True, "test_support": True,
+    }
+    assert json.loads(ACTIVE.read_text(encoding="utf-8")) == expected
+    gate.validate_contract(expected, contract_path=ACTIVE)
 
 
 def test_v2_contract_validates_without_any_workflow_record(gate, tmp_path):
