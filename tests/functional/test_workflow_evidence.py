@@ -57,7 +57,7 @@ from pathlib import Path
 
 import pytest
 
-from workflow_evidence_cases import (ROOT, SCRIPTS, History, canonical, digest,
+from workflow_evidence_cases import (ROOT, SCRIPTS, History, ProcessAdapter, canonical, digest,
                                       load_target, snapshot, target_path)
 import workflow_transition
 
@@ -429,24 +429,24 @@ def test_readonly_real_git_commands_and_deadlines(api, history, monkeypatch):
     h = history.ready().candidate_ready()
     before = snapshot(h.root)
     calls = []
-    run = subprocess.run
     forbidden = {"merge", "checkout", "commit", "commit-tree", "read-tree", "write-tree",
                  "update-index", "update-ref", "add", "reset", "fetch", "push"}
-    def observed(argv, *args, **kwargs):
+    def observed(argv, options):
         if isinstance(argv, (list, tuple)) and Path(str(argv[0])).stem.lower() == "git":
             assert not forbidden.intersection(argv)
             assert not ("hash-object" in argv and "-w" in argv)
-            assert kwargs.get("timeout") == 7.25
+            assert options.get("shell", False) is False
             calls.append(list(argv))
-        return run(argv, *args, **kwargs)
-    monkeypatch.setattr(subprocess, "run", observed)
+        return None
+    adapter = ProcessAdapter(monkeypatch, observed, budget=7.25)
     assert h.verify(api, command_timeout_seconds=7.25)["status"] == "VERIFIED"
-    assert calls and snapshot(h.root) == before
+    assert calls and adapter.records and all(r["timeouts"] for r in adapter.records)
+    assert snapshot(h.root) == before
 
 def test_git_timeout_is_stable_without_private_output(api, history, monkeypatch):
-    def timed_out(argv, *args, **kwargs):
-        raise subprocess.TimeoutExpired(argv, kwargs.get("timeout", 1), output=b"private-case")
-    monkeypatch.setattr(subprocess, "run", timed_out)
+    def timed_out(argv, options):
+        return {"timeout": True, "stdout": b"private-case"}
+    ProcessAdapter(monkeypatch, timed_out, budget=15)
     assert_error(api, lambda: history.verify(api), "COMMAND_TIMEOUT")
 
 def test_explicit_absolute_repository_path_is_required(api, history):
@@ -466,13 +466,12 @@ def test_cli_authenticated_get_only_and_http_mapping(api, history, monkeypatch, 
     for name, value in (("state", state), ("context", context), ("authority", authority)):
         h.write("cli/" + name + ".json", canonical(value))
     executable = h.write("cli/transport.exe", b"intercepted trusted GET transport")
-    original = subprocess.run
     calls = []
-    def transport(argv, *args, **kwargs):
+    def transport(argv, options):
         if str(argv[0]) != str(executable):
-            return original(argv, *args, **kwargs)
+            return None
         assert "api" in argv and "--hostname" in argv and "github.com" in argv
-        assert kwargs.get("shell", False) is False and kwargs.get("timeout") == 6.5
+        assert options.get("shell", False) is False
         if "--method" in argv:
             assert argv[argv.index("--method") + 1] == "GET"
         if "-X" in argv:
@@ -482,15 +481,13 @@ def test_cli_authenticated_get_only_and_http_mapping(api, history, monkeypatch, 
         endpoint = "/" + endpoint.lstrip("/")
         calls.append(endpoint)
         if status == "timeout":
-            raise subprocess.TimeoutExpired(argv, 6.5, output=b"private-case", stderr=b"private-node")
+            return {"timeout": True, "stdout": b"private-case", "stderr": b"private-node"}
         body = canonical(h.responses[endpoint]["body"])
         if "--include" in argv or "-i" in argv:
             body = f"HTTP/2.0 {status}\r\ncontent-type: application/json\r\n\r\n".encode() + body
         stderr = b"" if status == 200 else f"gh: HTTP {status}\n".encode()
-        if kwargs.get("text") or kwargs.get("encoding"):
-            body, stderr = body.decode(), stderr.decode()
-        return subprocess.CompletedProcess(argv, 0 if status == 200 else 1, body, stderr)
-    monkeypatch.setattr(subprocess, "run", transport)
+        return {"returncode": 0 if status == 200 else 1, "stdout": body, "stderr": stderr}
+    adapter = ProcessAdapter(monkeypatch, transport, budget=6.5)
     monkeypatch.setattr(sys, "argv", [str(target_path()), "verify",
         "--state", str(h.root / "cli/state.json"), "--context", str(h.root / "cli/context.json"),
         "--authority", str(h.root / "cli/authority.json"), "--repository-root", str(h.root),
@@ -504,7 +501,7 @@ def test_cli_authenticated_get_only_and_http_mapping(api, history, monkeypatch, 
     else:
         assert not captured.out and json.loads(captured.err)["error"]["code"] == error_code
         assert not any(secret in captured.err for secret in (b"private-case", b"private-node", b"Traceback"))
-    assert calls
+    assert calls and adapter.records and all(r["timeouts"] for r in adapter.records)
 
 def test_closed_authority_result_schema_only(api, history):
     schema_path = Path(os.environ.get("RTD_EVIDENCE_SCHEMA",

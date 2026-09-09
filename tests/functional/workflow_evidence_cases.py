@@ -48,6 +48,7 @@
 import copy
 import hashlib
 import importlib.util
+import itertools
 import json
 import os
 import shutil
@@ -63,6 +64,8 @@ from structured_handoff_fixture import Lifecycle
 from test_handoff_repair_guard import RepairLifecycle, GuardBridge
 import workflow_transition
 
+_TARGET_SERIAL = itertools.count()
+
 def canonical(value):
     return canonical_bytes(value)
 
@@ -75,10 +78,16 @@ def target_path():
 def load_target():
     path = target_path()
     assert path.is_file(), "R02: the public workflow_evidence.py API does not yet exist"
-    spec = importlib.util.spec_from_file_location("owner_workflow_evidence_target", path)
+    name = "owner_workflow_evidence_target_" + str(next(_TARGET_SERIAL))
+    spec = importlib.util.spec_from_file_location(name, path)
     module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    assert callable(getattr(module, "verify_evidence", None)), "R02 missing verify_evidence"
+    sys.modules[name] = module
+    try:
+        spec.loader.exec_module(module)
+        assert callable(getattr(module, "verify_evidence", None)), "R02 missing verify_evidence"
+    except BaseException:
+        sys.modules.pop(name, None)
+        raise
     return module
 
 def snapshot(root):
@@ -305,3 +314,116 @@ class History(RepairLifecycle):
         state, context, authority = self.inputs()
         return api.verify_evidence(state, context=context, repository_root=str(self.root.resolve()),
             authority=authority, github_get=self.get, **kwargs)
+
+
+class ProcessAdapter:
+    """Observe the Popen boundary, including cached normal import aliases.
+
+    The injected process is a test transport, not a purported Windows executable.
+    Both subprocess.run and direct Popen/communicate use the same adapter.
+    """
+    def __init__(self, monkeypatch, intercept, *, budget):
+        import io
+        import math
+        import types
+
+        original = subprocess.Popen
+        self.records = []
+
+        class InjectedProcess:
+            def __init__(self, argv, response, options):
+                self.args = argv
+                self.returncode = None
+                self.response = response
+                self.killed = False
+                self.text = bool(options.get("text") or options.get("encoding") or options.get("universal_newlines"))
+                empty = "" if self.text else b""
+                self.output = response.get("stdout", empty)
+                self.error = response.get("stderr", empty)
+                if self.text:
+                    self.output = self.output.decode() if isinstance(self.output, bytes) else self.output
+                    self.error = self.error.decode() if isinstance(self.error, bytes) else self.error
+                self.stdout = io.StringIO(self.output) if self.text else io.BytesIO(self.output)
+                self.stderr = io.StringIO(self.error) if self.text else io.BytesIO(self.error)
+                self.stdin = None
+
+            def communicate(self, input=None, timeout=None):
+                if self.response.get("timeout") and not self.killed:
+                    assert timeout is not None, "The observed blocking operation has no deadline"
+                    raise subprocess.TimeoutExpired(self.args, timeout, output=self.output, stderr=self.error)
+                if self.returncode is None:
+                    self.returncode = self.response.get("returncode", 0)
+                return self.output, self.error
+
+            def wait(self, timeout=None):
+                if self.response.get("timeout") and not self.killed:
+                    assert timeout is not None, "The observed blocking operation has no deadline"
+                    raise subprocess.TimeoutExpired(self.args, timeout)
+                if self.returncode is None:
+                    self.returncode = self.response.get("returncode", 0)
+                return self.returncode
+
+            def poll(self):
+                if not self.response.get("timeout") and self.returncode is None:
+                    self.returncode = self.response.get("returncode", 0)
+                return self.returncode
+
+            def kill(self):
+                self.killed, self.returncode = True, -9
+
+            def terminate(self):
+                self.killed, self.returncode = True, -15
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+        class ObservedProcess:
+            def __init__(self, child, record):
+                self.child, self.record = child, record
+
+            def __getattr__(self, name):
+                return getattr(self.child, name)
+
+            def deadline(self, timeout):
+                if timeout is not None:
+                    assert type(timeout) in (int, float) and math.isfinite(timeout)
+                    assert 0 < timeout <= budget
+                    self.record["timeouts"].append(timeout)
+
+            def communicate(self, *args, **kwargs):
+                timeout = kwargs.get("timeout", args[1] if len(args) > 1 else None)
+                self.deadline(timeout)
+                return self.child.communicate(*args, **kwargs)
+
+            def wait(self, *args, **kwargs):
+                timeout = kwargs.get("timeout", args[0] if args else None)
+                self.deadline(timeout)
+                return self.child.wait(*args, **kwargs)
+
+            def __enter__(self):
+                self.child.__enter__()
+                return self
+
+            def __exit__(self, *args):
+                return self.child.__exit__(*args)
+
+        def launch(*args, **kwargs):
+            argv = args[0] if args else kwargs["args"]
+            assert isinstance(argv, (list, tuple)), "Process argv must remain explicit"
+            response = intercept(argv, kwargs)
+            record = {"argv": list(argv), "timeouts": []}
+            self.records.append(record)
+            child = original(*args, **kwargs) if response is None else InjectedProcess(argv, response, kwargs)
+            return ObservedProcess(child, record)
+
+        # Normal "from subprocess import Popen" aliases are part of the same
+        # process boundary; no production module names or source are inspected.
+        for module in list(sys.modules.values()):
+            if not isinstance(module, types.ModuleType):
+                continue
+            for name, value in list(vars(module).items()):
+                if value is original:
+                    monkeypatch.setattr(module, name, launch)
