@@ -3289,6 +3289,12 @@
             "lessons": {
               "$ref": "#/$defs/EvidenceRef"
             },
+            "lesson_commit": {
+              "anyOf": [
+                {"$ref": "#/$defs/Tip"},
+                {"type": "null"}
+              ]
+            },
             "salvage": {
               "type": "array",
               "items": {

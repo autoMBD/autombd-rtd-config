@@ -2,11 +2,27 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.12.2 |
-| Date | 2026-09-06 |
+| Version | 0.12.3 |
+| Date | 2026-09-10 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Status | #93 manual implementation and focused verification completed in the feature worktree; Human inspection pending; no commit, push or merge |
 | Description | Agent Loop 的 Category B trust-tracing lane：保留现状审计与历史教训，维护结构化交接、统一守卫、双 lane 与 Candidate 0 加三次修正、人工自举、动态监督和工具超时，并记录三级测试、RTD CfgFile CLI 单向 KPI Issue 与本地结果展示的批准设计及实施边界。 |
+
+## Current applicability notice — 2026-09-10 / #111
+
+以下既有设计、派生快照、BT 事件和历史结论保留原始上下文，不作为 W4 的新授权。
+Human 在 #111 澄清：Reviewer 应在 Candidate 分支追加并提交当前 lessons；禁止的是
+直接推 master，不是让 lessons 随最终 PR 交付。因此，以下把“PR head 必须等于 C”
+或“lesson child 必须与最终 PR 分离”写成未来通用规则的段落，对 W4 已被
+[当前 terminal protocol](skills/agent-workflow/references/structured-handoffs.md#terminal-review-pr-and-legacy-boundaries)
+取代。C 仍是实际 tested/reviewed 的双 lane direct union；Reviewer 仅修改 lessons
+文件、保留全部旧字节并非空追加，产生唯一直接父提交为 C 的 L；PR 和最终 Human
+approval 绑定 L，同时保留 C、单次 Reviewer 的原 verdict/findings 和原测试证据。
+成功和失败都保存 lessons；尚无 Candidate 时保留 raw lessons 与显式 null
+lesson_commit，不虚构 C、成功 PR 或重测。control/evidence worktree 可继续固定于 G，
+不因此另建 lessons 分支，也不等待 #109 聚合。W2/W3 保留其原 exact-C/separate-lessons
+绑定；W1 仍是显式 legacy record validation。本文旧正文、事件、引文和 changelog
+不回写；其旧状态不是本次任务的当前执行状态。
 
 ## 0. Trust-tracing lane 的权威与维护边界
 
@@ -3805,6 +3821,7 @@ canonical execution index，不另建竞争清单。
 
 | Version | Date | Changes |
 | --- | --- | --- |
+| 0.12.3 | 2026-09-10 | Added #111 W4 applicability/supersession notice for lessons-only C→L delivery while preserving all prior design prose, bootstrap events, quotes and historical changelog rows. |
 | 0.12.2 | 2026-09-06 | Recorded Human-commanded #93 implementation, final scoped verification and independent closure of actual findings in BT-0011; distinguished unmerged worktree capability from the preserved audit baseline, retained source and old evidence, and stopped for Human inspection without commit/PR/merge. |
 | 0.12.1 | 2026-09-06 | Recorded Human closure of #95 and manual #93 contract preparation, verified the same-name published branch/upstream, and appended BT-0010; new wire details remain an unapproved ignored draft rather than active rules. |
 | 0.12.0 | 2026-09-06 | Recorded Human-approved Worker-unit / Tester-functional / CLI-only comprehensive KPI tiers; defined Reviewer-to-PR ticket intake, merge plus Human-start prerequisites, one-way KPI issue with Human case/result review and no Worker correction, direct legacy case migration without retrospective test backfill, local JSON/Dashboard delivery and deferred server CT; split #100/#101/#102, narrowed #98 dependencies, synchronized current planning authority and added BT-0009 while preserving historical events and changelog rows. |

@@ -2,8 +2,8 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.1.14 |
-| Date | 2026-09-09 |
+| Version | 0.1.15 |
+| Date | 2026-09-10 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Documentation-governance rules for the RTD CfgFile CLI project. Defines the two-category split, official tool name, changelog integrity, archive policy, and the authoritative cross-category documentation map. |
 
@@ -95,7 +95,9 @@ approval. Historical document links/approval are retained, not overwritten to
 make repaired support appear to have been in the originally reviewed Test.
 Prevalidation details and results remain supporting evidence, not case prose.
 The complete normal functional workflow has two routine Human review boundaries:
-this Test Gate and final exact-Candidate PR review or terminal failure review.
+this Test Gate and final exact-delivery PR review or terminal failure review.
+Under W4 that delivery is lessons-only child L of tested/reviewed Candidate C;
+the second Human review receives both identities and the original verdict.
 Document formatting, metadata repair and Agent handoff checks do not add Human
 gates. Stepwise Human bootstrap is a separately authorized temporary mode.
 Reviewer-discovered defects are captured as independent issues with priority,
@@ -171,6 +173,19 @@ second task contract. Plans remain in `plans/`; runtime handoffs and monitoring
 use their defined locations. Do not move durable code/cases/rules into ignored
 state, or commit local execution files to make them appear delivered. Existing
 bound historical material is indexed, not silently migrated or rewritten.
+
+### Durable Reviewer lessons
+
+Under W4, Reviewer preserves current success/failure lessons by appending,
+staging and committing only `agent-discipline/agent-lessons-learned.md` once on
+the Candidate branch. L is C's sole-parent direct child with all old file bytes
+retained plus a nonempty append; Test/Implementation and prior entries do not
+change. Raw report/lesson evidence stays in ignored state with exact bindings.
+If no Candidate exists, retain raw lessons and explicit null lesson_commit.
+Later #109 aggregation is not a reason to defer this current update. Follow
+[the shared terminal rule](skills/agent-workflow/references/structured-handoffs.md#terminal-review-pr-and-legacy-boundaries)
+for C/L identity, actual source checks, final Human delivery and legacy limits.
+This permits no production fix, extra review/correction or direct master push.
 
 ### Review archive is read-only
 
@@ -259,6 +274,7 @@ flowchart TD
 
 | Date | Version | Description |
 | --- | --- | --- |
+| 2026-09-10 | 0.1.15 | Distinguished durable W4 Reviewer lessons commit L from raw evidence and tested C, preserving historical entries and the two Human review boundaries. |
 | 2026-09-09 | 0.1.14 | Added the central local-state rule and distinguished ignored navigation, plans and execution evidence from durable documents without historical migration. |
 | 2026-09-08 | 0.1.13 | Clarified two routine Human reviews and issue-based terminal findings without adding case-review burdens or publishing hidden cases. |
 | 2026-09-07 | 0.1.12 | Preserved original case-review evidence while permitting non-case Tester support repairs without renewed approval, with revised source identities and affected execution evidence kept separate from frozen case semantics. |

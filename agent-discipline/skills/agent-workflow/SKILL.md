@@ -7,16 +7,17 @@ description: Validate structured role handoffs and exact identities for the func
 
 | Field | Value |
 | --- | --- |
-| Version | 0.2.6 |
-| Date | 2026-09-09 |
+| Version | 0.2.7 |
+| Date | 2026-09-10 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Structured role handoff guidance, declarative lifecycle boundaries, legacy compatibility and passive monitoring. |
 
 Use this Skill for work governed by
 `agent-discipline/workflow-contract.json`. Pin W from Governor G; do not infer
-it from the current HEAD. W3 is a small closed declaration referencing the
-single artifact schema and registry and explicitly enabling non-case repairs.
-W2 remains supported without the extension. The registry owns roles, visibility,
+it from the current HEAD. W4 is a small closed declaration referencing the
+single artifact schema and registry, preserving W3 non-case repairs and opting
+in to Reviewer lessons delivery. W2 and W3 remain supported with their pinned
+capabilities. The registry owns roles, visibility,
 named checkpoints and local predecessors; do not copy those domains into
 another route list. No validator is a transition executor.
 
@@ -38,7 +39,8 @@ Human-commanded manual bootstrap remains bounded by its explicit authorization.
 A passing checker does not authorize dispatch, Candidate assembly, acceptance,
 remote writes, deployment or progression.
 The normal complete profile has two routine Human reviews: Test Gate, then
-exact Candidate PR or terminal failure review. Intermediate Agent checkpoints
+exact delivery PR or terminal failure review. Under W4 the delivery head is
+lessons-only child L of tested/reviewed C. Intermediate Agent checkpoints
 are not additional Human gates. Read the protocol's
 [Human review boundaries](references/structured-handoffs.md#human-review-boundaries-and-bootstrap)
 and [terminal finding route](references/structured-handoffs.md#reviewer-findings-become-follow-up-issues).
@@ -61,7 +63,7 @@ Never launch initialization GUI during an automated Loop.
   the same Worker lane/session/worktree/branch and strict Implementation
   ancestry. Invalid runs with unchanged source rerun the same Candidate with a
   new execution identity.
-  Legacy and METADATA delivery repair preserve source and counts; W3
+  Legacy and METADATA delivery repair preserve source and counts; W3/W4
   TEST_SUPPORT binds real incremental non-case Test source separately from
   the original case approval.
 - Apply the [shared non-case repair boundary](references/structured-handoffs.md#frozen-cases-and-non-case-repairs).
@@ -84,9 +86,16 @@ Never launch initialization GUI during an automated Loop.
   disposition, not another old-task correction cycle. Encoded automatic success
   requires Tester PASS plus Reviewer APPROVED; preserve any different explicit
   Human disposition separately without inventing a verdict.
-  The success PR head is the exact accepted Candidate including Test and
-  Implementation; lessons and review artifacts stay outside that head.
-  Failure preserves the latest Implementation and does not become a success PR.
+  Under W4, Reviewer appends/stages/commits lessons once on the Candidate branch:
+  L is C's direct sole-parent child changing only the lessons document, retaining
+  existing bytes plus a nonempty append. accepted_candidate and Tester evidence
+  remain C; final PR/approval bind L, without another test execution, correction
+  or review. Failure also retains lessons; before C exists, raw lessons accompany
+  explicit null lesson_commit. W2/W3 retain their historical exact-C PR rule;
+  W1 remains explicit legacy validation.
+  See the [shared terminal rule](references/structured-handoffs.md#terminal-review-pr-and-legacy-boundaries)
+  for actual Git/content proof and control-worktree boundaries. Raw reports stay
+  outside committed source. Failure does not become a success PR.
 - Unknowns first become observations with one bounded diagnostic. Preserve work,
   block only the affected operation and refer ambiguous responsibility to Human.
   KPI is separate later issue-driven post-merge work; it never enters this
@@ -177,9 +186,9 @@ python agent-discipline/skills/agent-workflow/scripts/workflow_gate.py validate 
 ```
 
 `validate-record` is an alias of `validate`. The importable `load_contract`
-and `validate_contract` accept explicit v1, v2 or v3 paths. Legacy record and
+and `validate_contract` accept explicit v1, v2, v3 or v4 paths. Legacy record and
 lane-manifest functions retain their v1 fields and digest interpretation; they
-explicitly reject structured v2/v3 with guidance to use `validate-artifact`. Unsupported
+explicitly reject structured v2/v3/v4 with guidance to use `validate-artifact`. Unsupported
 versions never silently fall back. Contract-only validation checks the closed
 declaration, not asset file existence, workflow progression or acceptance.
 Exit 0 means the requested validation passed, 1 means invalid evidence/contract,
@@ -215,3 +224,4 @@ lane/session/Implementation identity.
 | 2026-09-09 | 0.2.4 | Routed local storage, explicit selective transfers and cleanup to one shared policy without new schema fields or validator claims. |
 | 2026-09-09 | 0.2.5 | Routed W3 opted-in metadata/support repair through shared guard/reducer evidence while preserving original approvals, old W2 behavior and counted Worker corrections. |
 | 2026-09-09 | 0.2.6 | Linked the read-only real-source/GitHub/finalization verifier without a new execution route. |
+| 2026-09-10 | 0.2.7 | Routed W4 Reviewer lessons-only C→L delivery and final approval through the shared protocol, preserving original C evidence, one terminal review and explicit W1–W3 behavior. |

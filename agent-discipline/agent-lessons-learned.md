@@ -218,3 +218,153 @@ What happened -> Issue #83 Candidate v8 attempt 1/3 reached review with a trustw
 ## LL-046 - Public Semantics and Frozen-Fixture Lifetime Need Separate Guards (2026-08-25)
 
 What happened -> Issue #90 Candidate A1 was rejected because the owner Test accepted only `digest` or contiguous `sha256`, although the public contract allowed the implementation's hyphenated `SHA-256` diagnostic; the bounded `OWNER_TEST / TEST_CONTRACT` correction added only the missing lexical alternative, retained the isolated Implementation byte-for-byte, regenerated the Test-bound packet, and received fresh approval and Tester PASS. A separate acceptance run removed the ignored frozen packet/receipt because they crossed a test-runner-owned temporary-fixture lifecycle; their exact canonical bytes were restored and verified, the incident remained `PROCESS/F0`, and no Candidate attempt was consumed. Root cause -> The owner Test silently narrowed a meaning-based diagnostic contract into punctuation-sensitive vocabulary, while frozen evidence lifetime was coupled to a cleanup boundary that legitimately removes transient fixtures. Durable guard -> Diagnostic tests must pin the frozen prefix, streams, line shape, and violated field/class without adding unstated lexical spellings; if exact vocabulary matters, freeze it in the public packet first. Keep canonical ignored evidence and its digests outside runner-owned cleanup roots, materialize only disposable execution copies under `tests/.tmp`, and rehash continuity before guarded execution; an unexpected deletion is recorded as `PROCESS/F0`, followed by exact-byte restoration and fresh affected acceptance evidence, never by weakening the gate or spending a Candidate attempt.
+
+## LL-047 - Receipt Choice Must Include Deferred Source Proof (2026-09-10)
+
+Review identity: issue86-review-r1, dispatch issue86-reviewer-terminal-r1.
+Exact reviewed Candidate: bc19e9382c0292f126db5de0d57e46f2c877bb83;
+tree cc31d0be7d086c824b7eeee098f0e8e3a7dcc613; ordered parents
+[ca7ab19f7f81641257406b9f91edb91b4822cf44,
+03b431327d689933bfa5374adebc6e4ca3d5e93d].
+Governor: e6022241ff9a097aae462abd382ba5b12aef9e54.
+Public K revision 1: SHA-256
+2542ea0ebcec840179edcd949ebaba995dba3eaec17906cbc7d0758e69b33c38.
+
+### Terminal finding and merge implication
+
+Original Reviewer verdict: REJECTED. Finding REV86-01 is MAJOR,
+recommended priority P1, against public requirement R03 (with R04 source-proof
+interaction). It is an availability/correctness defect: an otherwise provable
+accepted history can be rejected because an earlier invalid matching receipt
+prevents selection of a later valid one. This finding does not claim an unsafe
+approval, data write, confidential disclosure, or an executed reproduction.
+Static source evidence is sufficiently concrete to require an independent
+follow-up; do not reopen this task's Worker corrections.
+
+At this exact Candidate, workflow_evidence_io.py:193-196 defers every Tip into
+pending_tips while git_phase is false. In closure(), lines 259-267 copy the
+attempt's pending_tips into the shared graph and break after artifact/schema/
+local-file traversal, before validating its Git facts. sources(), lines 286-287,
+then checks those Tips outside the receipt-selection loop. A source mismatch
+there exits the verifier; there is no edge back to the next matching receipt.
+
+The publicly describable discriminating situation is: an accepted history has
+two exact matching CHECKED receipts; the canonically earlier one additionally
+references a same-task, well-shaped, byte-bound but unconsumed source artifact
+whose claimed Tip disagrees with real Git; the later receipt has a valid complete
+closure. All local files, catalog entries and structural bindings can be present,
+so the earlier traversal finishes and is selected. Its delayed invalid Tip then
+rejects the whole verification. R03 instead requires the first fully valid
+matching receipt, allowing the later valid receipt to establish proof. The
+read-only state catalog does not reject this solely because the additional
+artifact is unconsumed: workflow_transition.py:68-76 checks catalog identities;
+accepted-history replay is limited to consumed artifacts.
+
+What happened -> Earlier transactional receipt work isolates traversal failures,
+but not failures discovered after the selection is committed. Root cause ->
+receipt eligibility is finalized at local-closure completion while a required
+part of the same recursive proof remains deferred. Durable guard -> Retain
+attempt-local source obligations through complete eligibility evaluation, or
+retain ordered alternatives and backtrack on attempt-exclusive source failure;
+never discard genuinely required accepted-history evidence or bypass Git proof.
+A follow-up should add public-generality coverage for a locally complete earlier
+alternative with an invalid real Git Tip and a later fully valid alternative,
+plus the no-valid-alternative case, while preserving the specified local-before-
+Git stage ordering and stable error semantics.
+
+Current merge recommendation: do not use the encoded automatic-success route
+for this exact Candidate while REV86-01 is unresolved. Orchestrator should
+deduplicate/publish the independent P1 issue and present this original verdict
+and impact at final Human review. Human may explicitly choose immediate or
+deferred treatment; record that separately and never relabel this report as
+APPROVED. Preserve the complete Candidate and its maintained Implementation;
+no source or frozen case needs to be discarded.
+
+### Reviewed scope and evidence limits
+
+The review covered all 18 changed files: 13 Implementation-owned and five
+Test-owned paths. Read-only Git inspection independently confirmed the exact
+ordered parents, singleton merge-base G, 290-leaf direct union, zero ownership
+overlap and zero union mismatches, and clean Candidate tracked source.
+The three Human-reviewed documentation/index blobs are unchanged from the
+original Test anchor through S2. Complete K R01-R19 obligations and public
+interfaces were reconciled with the readable requirements and reviewed source.
+The functional scenarios and Worker generality are substantial real-Git,
+injected-transport checks, not production stubs; the remaining receipt-selection
+interaction above is not covered sufficiently to establish its requirement.
+
+The current Tester PASS remains its honest selected-scope verdict. Original
+command-result hashes and raw outputs were inspected: the affected owner/static
+checks are fresh on the exact S2 Candidate; the three unchanged selections retain
+their original H1 execution identities and source, with a separately inspected
+per-path applicability audit (SHA-256
+3b0e85740cc6ec08d90c148feaed5d4ee42ebe392afe55fbc413aa70a6d6112b).
+No functional gate, vendor run, external-agent E2E or KPI was executed by Reviewer.
+K1 R19 excludes those latter domains; module XDM and surface-coverage checks are
+not applicable to this Agent-framework-only change. No product documentation,
+runtime assets, W/profile, initializer, deployer or review archive was changed.
+New Python sources carry the complete established MIT header. No additional
+missed-skill finding was established from the supplied lane/QA evidence.
+
+The supplied H1 and S2 source repairs, original approvals, actual successor
+identities, preserved invalid reports and explicit Human checkpoint continuations
+were examined. The Human-authorized bridges are outside the closed reducer,
+not normal automatic events; they do not establish a general reset permission.
+This review neither overwrites the earlier TEST_GATE_INVALID verdict nor
+mistakes source QA or reference prevalidation for Candidate acceptance.
+
+### Process lessons
+
+What happened -> A read-only operation observer confused a Git object-type
+operand with an operation name, and the resulting support defect was initially
+classified too strictly. Root cause -> token spelling and implementation syntax
+were conflated with the frozen behavioral requirement. Durable guard -> compare
+the exact old/new discriminating conditions, scenarios and expectations when
+classifying a support repair; command observers must distinguish global-option
+values, subcommands and operands. Preserve source lineage, old verdicts and
+fresh affected execution without inventing a normal machine continuation.
+
+What happened -> Reviewer control initially used legitimately changed Candidate
+guidance as if it were pinned G authority; a narrative-only applicability evidence
+reference also needed a subsequent selective transfer. Root cause -> control
+authority, reviewed source and transitive evidence locations were not fully
+separated. Durable guard -> keep digest-pinned G control and exact Candidate
+source explicit, and transport every cited raw evidence dependency before
+consumption. The local missing evidence was supplied and hash-checked during
+this same review; it is not an unresolved acceptance gap or a new workflow gate.
+
+These lessons are separate evidence on codex/issue-86-review-evidence-g. They
+must never be appended as a commit to the reviewed Candidate PR head.
+
+## Human correction to LL-047 publication boundary (2026-09-10)
+
+Source: Human decision tracked in issue #111. The original LL-047 review and
+its REJECTED verdict above are preserved, not rewritten. Its final sentence
+requiring lessons to remain outside the Candidate PR head is superseded for
+new W4 tasks: the one terminal Reviewer commits this append-only document on
+the Candidate branch; the lessons-only direct child becomes the final PR head.
+Tester evidence still binds its actual pre-lessons Candidate. This correction
+prohibits direct master pushes, not delivery of lessons through a reviewed PR.
+The #86 append is recovered here after its original PR already merged; this
+is a separate Human-authorized recovery, not a second #86 review or a change
+to its historical Candidate, approval, merge, or verdict. #109 later consolidates
+lessons without postponing each task's own committed documentation.
+
+## LL-048 - Recovered Issue #85 Terminal Reviewer Lessons (2026-09-10)
+
+Original review: `issue85-v2-terminal-review1`, written 2026-09-07 for
+Candidate C1 `8dc43c3d2c8af0232b389c723dde10721a56444c`; original verdict
+REJECTED. Source: the Reviewer report's digest-bound
+`.agent-state/agent-loop/issue85-v2/outbox/terminal-review-lessons.md`, SHA-256
+`7e520dcbf364b23843565b2796c097cbbd42c620365bbd6a294e4b004c4f9215`.
+The following three paragraphs are recovered verbatim from its Lessons section.
+This is documentation recovery under Human-authorized #111, not another review.
+Later Human-authorized C2 correction and disposition remain separate from this
+original C1 verdict; the following historical diagnosis is not a claim that
+its defect still exists in current master. Local original evidence is retained.
+
+What happened: a green scoped functional gate left a format-replacement path able to alter a final Human decision. Root cause: semantic preservation was implemented as a shared hand-maintained field tuple centered on reports, while the generic accepted-replacement branch also applies to decision artifacts. Tests exercised report replacement but not the cross-kind semantic invariant. Prevention: review replacement coverage by registered artifact kind and meaningful business fields, not only by already-covered example reports; add negative preservation cases tied to the public invariant.
+
+What happened: consumer-local Git identity initially failed although digest and HEAD were correct. Root cause: the guard removes GIT-prefixed environment settings and runs with the invocation user's context, so the sandbox invocation did not share the known successful repository-user Git context. Prevention: preserve the failed receipt, diagnose exact identities once, and reuse a scoped approved execution context rather than changing global Git trust or weakening the guard.
+
+What happened: a fault-injection test adapter required two loader setup lines after a source-module decomposition. Root cause: python -c plus runpy did not establish the same sibling import path as direct script execution. Prevention: independently prevalidate the complete thin CLI injection adapter in the same import topology as delivered code; retain raw historical evidence and explicitly bind any Human-authorized non-case repair.

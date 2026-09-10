@@ -2,8 +2,8 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.1.0 |
-| Date | 2026-09-09 |
+| Version | 0.1.1 |
+| Date | 2026-09-10 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Local state ownership, directory layout, selective lane transfer, evidence lifecycle and scoped cleanup. |
 
@@ -67,7 +67,7 @@ Within `agent-loop/<task_run>/`, use these categories as needed:
 | --- | --- |
 | `authority/` | Relevant Issue/specification/Human source snapshots with origin and capture context; not fabricated remote approvals |
 | `inbox/` | Public K, dispatch Envelopes, trusted context and authorized input attachments |
-| `outbox/` | Role reports, guard results, terminal records, separate Reviewer lessons and clearly labelled Orchestrator summaries |
+| `outbox/` | Role reports, guard results, terminal records, raw Reviewer lesson evidence and clearly labelled Orchestrator summaries |
 | `evidence/<execution_id-or-check-id>/` | Raw command outputs, execution context and report-referenced attachments |
 
 K is the public contract in inbox, with sources under authority. Manifests,
@@ -82,8 +82,12 @@ Active test throwaways and staged fixtures stay in that worktree's `tests/.tmp/`
 not system TEMP or new scratch folders in `.agent-state/`. Preserve selected
 raw evidence needed by a report before cleanup, with accurate paths/digests;
 do not retain every rebuildable temporary tree or convert raw output into
-rewritten evidence. Reviewer JSON and Markdown lessons remain separate outputs,
-never a child commit appended to the Candidate.
+rewritten evidence. Reviewer JSON and raw Markdown lesson evidence remain
+separate outputs. Under W4 the durable lessons document is also appended and
+committed once by Reviewer on the Candidate branch as C's lessons-only child L;
+the raw lesson snapshot binds the complete L document. W2/W3 retain their
+historical separate-lessons rule; W1 remains explicit legacy validation. See the shared
+[terminal protocol](skills/agent-workflow/references/structured-handoffs.md#terminal-review-pr-and-legacy-boundaries).
 
 ## Identities and continuity
 
@@ -118,7 +122,7 @@ selective file copies; no mirroring or shared-directory link is implied.
 | Orchestrator | Canonical authority/K, dispatches, public diagnoses, central checks, navigation and Human-facing delivery |
 | Worker | Its Implementation/unit tests, reports and evidence in its own lane |
 | Tester | Its Test, prevalidation/results and authorized non-case support repairs; never Worker production |
-| Reviewer | Its one terminal report and separate lessons; Test/Implementation remain read-only |
+| Reviewer | Its one terminal report and raw lesson evidence; under W4 also the append-only lessons commit on Candidate branch; Test/Implementation remain read-only |
 
 For a handoff:
 
@@ -150,6 +154,12 @@ case-bearing index into Worker. Do not link its inbox to another lane's state.
 Use the existing safe consumer-local evidence view; central CHECKED receipts
 with confidential paths cannot be forwarded wholesale. Directory separation is
 an operating rule, not proof of OS capability isolation or automatic transport.
+
+A control/evidence worktree pinned to G need not move to L. Under W4,
+Orchestrator identifies the authorized Candidate branch/worktree for Reviewer's
+lessons-only append/commit and collects its exact complete-document snapshot
+and report using the same selective transfer rules. This does not require a
+separate lessons branch, broaden source access or synchronize ignored state.
 
 ## Formats, publication and mutation
 
@@ -244,3 +254,4 @@ this documentation change.
 | Date | Version | Description |
 | --- | --- | --- |
 | 2026-09-09 | 0.1.0 | Established the Human-approved local layout, explicit selective lane transfer, evidence lifecycle, navigation and scoped cleanup without new runtime or migration. |
+| 2026-09-10 | 0.1.1 | Distinguished raw report/lesson storage from W4 Reviewer lessons commit on Candidate branch while preserving a G-pinned control worktree and historical W1–W3 behavior. |
