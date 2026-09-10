@@ -141,12 +141,14 @@ def test_legacy_snapshot_checkout_retains_exact_bytes_with_autocrlf(tmp_path):
     assert attributes.decode("utf-8").strip().endswith(": eol: lf")
 
 
-def test_active_contract_is_the_approved_w3_declaration(gate):
+def test_active_contract_is_the_approved_w4_declaration(gate):
     expected = declaration()
-    expected["contract_version"] = 3
+    expected["contract_version"] = 4
     expected["non_case_repairs"] = {
         "version": "1.0", "metadata": True, "test_support": True,
     }
+    expected["reviewer_lessons"] = {"version": "1.0", "path": "agent-discipline/agent-lessons-learned.md", "append_only": True}
+    expected["lifecycle"]["pr_head"] = "reviewer_lesson_commit"
     assert json.loads(ACTIVE.read_text(encoding="utf-8")) == expected
     gate.validate_contract(expected, contract_path=ACTIVE)
 

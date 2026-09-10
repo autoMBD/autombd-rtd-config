@@ -79,6 +79,8 @@ def gate():
 def protocol_data(version):
     workflow = json.loads((ROOT / "agent-discipline/workflow-contract.json").read_text(encoding="utf-8"))
     workflow["contract_version"] = version
+    workflow.pop("reviewer_lessons", None)
+    workflow["lifecycle"]["pr_head"] = "accepted_candidate"
     workflow.pop("non_case_repairs", None)
     if version == 3:
         workflow["non_case_repairs"] = copy.deepcopy(CAPABILITY)
@@ -161,7 +163,7 @@ def sample(schema, defs):
 
 def test_active_contract_explicitly_declares_non_case_repairs():
     workflow = json.loads((ROOT / "agent-discipline/workflow-contract.json").read_text(encoding="utf-8"))
-    assert workflow["contract_version"] == 3
+    assert workflow["contract_version"] == 4
     assert workflow["non_case_repairs"] == CAPABILITY
 
 

@@ -2,8 +2,8 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.1.5 |
-| Date | 2026-09-09 |
+| Version | 0.1.6 |
+| Date | 2026-09-10 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Public memory-only transition API, wire, lifecycle, error order and evidence boundary. |
 
@@ -15,9 +15,11 @@ parallel readiness, frozen approval, bounded incremental corrections and one
 terminal review. It does not execute the workflow.
 
 The [structured handoff protocol](structured-handoffs.md) defines the role
-artifacts. W3 explicitly enables non-case repair; W2 remains supported without
-that extension. Profile, fourteen artifact kinds and State/Event/Context wire
-shapes remain stable. The legacy record/path/validate commands and file guard
+artifacts. W3 explicitly enables non-case repair; W4 retains it and opts into
+Reviewer lessons delivery. W2 remains supported without those extensions;
+W3 keeps its original exact-C finalization. Profile, fourteen artifact kinds
+and State/Event/Context wire shapes remain stable. The legacy
+record/path/validate commands and file guard
 retain their ownership.
 This core is not a wrapper for the obsolete seven-checkpoint or F0/F1 lifecycle.
 
@@ -137,10 +139,10 @@ Other artifact and receipt entries cannot use this exception.
 | FINAL/STOP | Preserves latest I, Candidate and pending work, enables truthful failure finalization |
 | Reviewer launch/report | One logical terminal review on success or failure; STOP after launch retains it |
 | Success proposal | Requires Tester PASS and Reviewer APPROVED; does not mean merged |
-| FINAL decision | Binds exact proposal/Candidate; REQUEST_CHANGES cancels success without reopening corrections |
+| FINAL decision | Binds exact proposal delivery head (W4 L, W2/W3 C); REQUEST_CHANGES cancels success without reopening corrections |
 | MERGED / RECORD_FAILURE | Requires corresponding exact final route and closes business progression |
 | Delivery repair | Orthogonal bookkeeping; replacements preserve business values and update only active delivery references |
-| W3 support repair | Registers strict descendant Test support and its audit while retaining original READY/approval, Worker and current Candidate/result |
+| W3/W4 support repair | Registers strict descendant Test support and its audit while retaining original READY/approval, Worker and current Candidate/result |
 
 There is no correction four, clean-room restart, automatic invalid-Test
 reclassification, second review cycle or KPI retry. Candidate indices are 0–3.
@@ -162,10 +164,32 @@ business transition. Historical bytes remain unchanged. A repaired Reviewer
 delivery can update the current report while a prior accepted proposal retains
 its reference to the equivalent original delivery.
 
+### W4 Reviewer lessons and finalization identity
+
+Under the pinned W4 `reviewer_lessons` capability, the single reviewer-report
+includes `payload.lesson_commit`: non-null Tip L whenever review has Candidate
+C, explicit null before any Candidate. L declares C as its sole direct parent
+and remains separate from state.candidate and accepted_candidate. Consuming the
+report does not assemble a Candidate, advance corrections, replace Tester
+results or create another review. Failure retains the report/lessons without
+becoming success. W2/W3 reject the member and retain their original bindings;
+W1 remains explicit legacy validation, not this State interface.
+
+Success still needs Tester PASS and Reviewer APPROVED for C. A W4 proposal's
+accepted_candidate stays C, but PR head and FINAL subject bind L. Old C approval
+cannot approve L. Equivalent report-format repairs preserve the original C/L,
+review identity, verdict and lessons evidence. The pure core checks supplied
+Tip/parent and active identity only; actual sole-parent history, lessons-only
+changed paths and byte-preserving append are proven by the guard and read-only
+evidence verifier. The protocol's
+[terminal rule](structured-handoffs.md#terminal-review-pr-and-legacy-boundaries)
+owns Reviewer commit and Orchestrator delivery responsibilities. No retest is
+required solely for that verified append, and no claim is made that L ran.
+
 ### Non-case repair and executable source
 
 Read the [machine repair representation](structured-handoffs.md#versioned-machine-repair-representation)
-for the closed forms and trust boundary. W3 is required for versioned METADATA,
+for the closed forms and trust boundary. W3 or W4 is required for versioned METADATA,
 TEST_SUPPORT and Candidate `support_repair`; an upgraded local schema does not
 enable them under an old W2 authority. Existing legacy repair inputs still take
 their rejected-only path.
@@ -328,3 +352,4 @@ approval.
 | 2026-09-07 | 0.1.3 | Documented Human decision field preservation, explicit nullable subjects and independently active subject identity precedence. |
 | 2026-09-09 | 0.1.4 | Documented explicit W3 repair compatibility, immutable approval anchors, orthogonal support registration, same-index invalid-execution recovery and retained counted Implementation failures. |
 | 2026-09-09 | 0.1.5 | Exposed pure current-state validation for the separate read-only evidence verifier. |
+| 2026-09-10 | 0.1.6 | Documented W4 lessons Tip and L-bound PR/FINAL identity without changing C, correction/review accounting or the pure reducer's no-I/O boundary. |

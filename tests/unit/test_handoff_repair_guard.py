@@ -59,12 +59,13 @@ sys.path.insert(0, str(ROOT / "tests"))
 from structured_handoff_fixture import Lifecycle
 from structured_handoff_schema import canonical_bytes, load_schema, load_registry
 from repair_protocol import changed_fields
+from workflow_transition_generality_support import legacy_workflow
 
 
 class RepairLifecycle(Lifecycle):
     def write(self, name, raw):
         if name == "agent-discipline/workflow-contract.json":
-            raw = (ROOT / name).read_bytes()
+            raw = canonical_bytes(legacy_workflow())
         return super().write(name, raw)
 
     def manifest(self, sha):
@@ -258,7 +259,7 @@ class GuardBridge:
         context = {"schema_version": "1.0", "workflow_profile": "functional-development-v1",
             "task": self.life.task, "governor": self.life.gov,
             "protocol": {"handoff_schema": load_schema(), "registry": load_registry(),
-                "workflow_contract": json.loads((ROOT / "agent-discipline/workflow-contract.json").read_text())},
+                "workflow_contract": json.loads(self.life.git("cat-file", "blob", self.life.gov["workflow_contract_blob"]))},
             "artifacts": [], "checks": []}
         for body in self.life.objects.values():
             path = ".agent-state/" + body["artifact_id"] + ".json"

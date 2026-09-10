@@ -44,7 +44,7 @@
 # Description: Read-only exact workflow evidence verification.
 # =================================================================================
 
-"""Exact read-only GitHub authority and accepted-Candidate finalization."""
+"""Exact GitHub authority and versioned Candidate/lesson-head finalization."""
 
 import json
 import copy
@@ -191,12 +191,21 @@ class RemoteProof:
         require(terminal["accepted_candidate"] == sha and result["candidate_sha"] == sha
                 and result["outcome"] == "PASS" and review["verdict"] == "APPROVED",
                 pointer="/terminal")
+        # Source proof retains tested C and independently verifies the W4 lesson
+        # child. Only publication, final approval and merge use that child's SHA.
+        publication_sha = sha
+        if self.graph.workflow_version == 4:
+            lesson = review.get("lesson_commit")
+            require(type(lesson) is dict and type(lesson.get("commit")) is str
+                    and re.fullmatch("[0-9a-f]{40}", lesson["commit"]),
+                    pointer="/terminal/lesson_commit")
+            publication_sha = lesson["commit"]
         pr = terminal["pr"]
         if pr is None and terminal["disposition"] == "OPEN_SUCCESS_PR":
             return "NOT_APPLICABLE"
         require(pr is not None, "MISSING_EVIDENCE", "/terminal/pr")
         match = re.fullmatch(rf"https://github\.com/{re.escape(self.repository)}/pull/([1-9][0-9]*)", pr["url"])
-        require(match is not None and pr["head_sha"] == sha, pointer="/terminal/pr")
+        require(match is not None and pr["head_sha"] == publication_sha, pointer="/terminal/pr")
         number = int(match.group(1))
         remote = self.fetch(f"/repos/{self.repository}/pulls/{number}")
         require(type(remote.get("number")) is int and remote["number"] == number
@@ -205,7 +214,7 @@ class RemoteProof:
         require(type(base) is dict and type(head) is dict
                 and type(base.get("repo")) is dict
                 and base["repo"].get("full_name") == self.repository
-                and base.get("ref") == self.authority["base_ref"] and head.get("sha") == sha,
+                and base.get("ref") == self.authority["base_ref"] and head.get("sha") == publication_sha,
                 pointer="/terminal/pr")
         if terminal["disposition"] == "OPEN_SUCCESS_PR":
             require(remote.get("state") == "open" and remote.get("merged") is False
@@ -218,10 +227,11 @@ class RemoteProof:
             require(final_ref is not None, "MISSING_EVIDENCE", "/terminal/approval")
             final = self.graph.artifacts[final_ref["artifact_id"]]["payload"]
             require(final["gate"] == "FINAL" and final["decision"] == "APPROVE"
-                    and final["subject_sha"] == sha, pointer="/terminal/approval")
+                    and final["subject_sha"] == publication_sha, pointer="/terminal/approval")
             actual = self.graph.tip(merge)
-            require(merge == sha or (actual["parents"] == [state["governor"]["commit"], sha]
-                    and actual["tree"] == self.graph.tip(sha)["tree"]),
+            require(merge == publication_sha or (
+                    actual["parents"] == [state["governor"]["commit"], publication_sha]
+                    and actual["tree"] == self.graph.tip(publication_sha)["tree"]),
                     pointer="/terminal/merge")
         return "PASS"
 
