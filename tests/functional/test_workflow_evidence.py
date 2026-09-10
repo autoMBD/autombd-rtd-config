@@ -39,8 +39,8 @@
 # Project:     RTD CfgFile CLI <https://github.com/autoMBD/autombd-rtd-config>
 # File:        test_workflow_evidence.py
 # Author:      autoMBD <tkung.lqk@foxmail.com>
-# Date:        2026-09-09
-# Version:     0.1.0
+# Date:        2026-09-10
+# Version:     0.1.1
 # Description: Independent owner functional evidence verification gate.
 # =================================================================================
 
@@ -433,8 +433,17 @@ def test_readonly_real_git_commands_and_deadlines(api, history, monkeypatch):
                  "update-index", "update-ref", "add", "reset", "fetch", "push"}
     def observed(argv, options):
         if isinstance(argv, (list, tuple)) and Path(str(argv[0])).stem.lower() == "git":
-            assert not forbidden.intersection(argv)
-            assert not ("hash-object" in argv and "-w" in argv)
+            # Global option values and command operands are not subcommands.
+            arguments = iter(argv[1:])
+            command = None
+            for argument in arguments:
+                if argument in {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--config-env"}:
+                    next(arguments, None)
+                elif not str(argument).startswith("-"):
+                    command = argument
+                    break
+            assert command not in forbidden
+            assert not (command == "hash-object" and "-w" in arguments)
             assert options.get("shell", False) is False
             calls.append(list(argv))
         return None
