@@ -2,10 +2,23 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.14.0 |
-| Date | 2026-09-09 |
+| Version | 0.15.0 |
+| Date | 2026-09-10 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Tracks how review comments were resolved across design document revisions. |
+
+## Current applicability notice — 2026-09-10
+
+The tracking entries below preserve their original review context; they do not
+override a task's pinned W. Human's #111 clarification supersedes older
+exact-C/no-lessons interpretations for W4: Reviewer appends and commits the
+current lessons on the Candidate branch as sole-parent child L of C, while
+Test/Implementation and original C evidence remain unchanged. Final PR/approval
+bind L and visibly retain C plus the original review findings. W2/W3 keep their
+original exact-C/separate-lessons bindings; W1 remains explicit legacy
+validation. See the current
+[terminal protocol](skills/agent-workflow/references/structured-handoffs.md#terminal-review-pr-and-legacy-boundaries).
+Original comments, resolution records and changelog rows below are not rewritten.
 
 This file tracks how the user's inline `REVIEW` comments were resolved. The
 reviewed draft with comments preserved in context is archived at:
@@ -176,6 +189,19 @@ Human-visible terminal output, retention and cleanup. Charter/governance/Skill/
 handoff/monitoring link it. No new runtime/schema/Gate or historical migration;
 the main work area's ignored README applies navigation locally.
 
+## Reviewer lessons clarification — #111
+
+**REVIEW-LESSONS-111**, Human direction recorded 2026-09-10: Reviewer must save
+and commit the current lessons on the Candidate branch; the prohibited action
+is a direct master push, not including that lessons update in the final PR.
+Source: Human clarification for [issue #111](https://github.com/autoMBD/autombd-rtd-config/issues/111),
+preserved in this maintenance task's authority. Resolution: the W4 shared rule
+separates tested/reviewed C from append-only delivery L, preserves success and
+failure lessons, keeps one terminal review and does not wait for #109
+aggregation. Before C exists, raw lessons and explicit null lesson_commit
+preserve the real failure state. This entry supersedes conflicting prospective
+readings of older tracking rows, not their original quotes or historical facts.
+
 ## Changelog
 
 | Date | Version | Description |
@@ -197,3 +223,4 @@ the main work area's ignored README applies navigation locally.
 | 2026-09-08 | 0.12.0 | Audited the full current #85 bootstrap series; traced prior requirements and added terminal-finding issues, two routine Human reviews, decision-preserving repairs and exact remote/GUI boundaries. |
 | 2026-09-08 | 0.13.0 | Tracked explicit Orchestrator responsibility for a substantive Reviewer summary in PR/failure review instead of local-only report paths. |
 | 2026-09-09 | 0.14.0 | Tracked the approved unified local-state rules, central/lane selective byte transfer and ignored navigation, without runtime changes or migration. |
+| 2026-09-10 | 0.15.0 | Appended #111 Human lessons clarification and versioned applicability notice without rewriting prior review records or quoted authority. |

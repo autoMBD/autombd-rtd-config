@@ -338,17 +338,25 @@ def protocol(context):
             all(type(workflow["lifecycle"].get(key)) is type(value)
                 for key, value in lifecycle.items()), code, pointer)
     version = workflow.get("contract_version")
-    require(type(version) is int and version in (2, 3), code, pointer)
+    require(type(version) is int and version in (2, 3, 4), code, pointer)
     workflow_fields = {"schema_version", "contract_version", "workflow_profile",
                        "artifact_schema", "registry", "legacy_contract", "lifecycle",
                        "deferred_runtime_capabilities"}
-    if version == 3:
+    if version >= 3:
         workflow_fields.add("non_case_repairs")
         capability = workflow.get("non_case_repairs")
         expected_capability = {"version": "1.0", "metadata": True, "test_support": True}
         closed(capability, expected_capability, code, pointer + "/non_case_repairs")
         require(all(type(capability[key]) is type(value) and capability[key] == value
                     for key, value in expected_capability.items()), code, pointer)
+    if version == 4:
+        from repair_protocol import LESSON_CAPABILITY
+        workflow_fields.add("reviewer_lessons")
+        capability = workflow.get("reviewer_lessons")
+        closed(capability, LESSON_CAPABILITY, code, pointer + "/reviewer_lessons")
+        require(all(type(capability[key]) is type(value) and capability[key] == value
+                    for key, value in LESSON_CAPABILITY.items()), code, pointer)
+        lifecycle["pr_head"] = "reviewer_lesson_commit"
     closed(workflow, workflow_fields, code, pointer + "/workflow_contract")
     require(type(workflow.get("schema_version")) is int and workflow["schema_version"] == 2 and
             workflow.get("workflow_profile") == PROFILE and workflow.get("lifecycle") == lifecycle and

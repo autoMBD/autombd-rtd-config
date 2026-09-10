@@ -2,8 +2,8 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.2.7 |
-| Date | 2026-09-09 |
+| Version | 0.2.8 |
+| Date | 2026-09-10 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Engineering boundaries, structured role handoffs, functional lifecycle, and Agent supervision. |
 
@@ -89,7 +89,8 @@ manual bootstrap remains limited to its explicit authorization; the existence
 of these validators does not authorize autonomous dispatch or acceptance.
 
 The complete normal functional Loop has two routine Human reviews: Test Gate
-approval and final exact-Candidate PR review or failure review. Within scoped
+approval and final exact-delivery PR review or failure review. Under W4, that
+delivery is the reviewed Candidate C plus its lessons-only child L. Within scoped
 authorization, Orchestrator owns intervening handoffs, validation, repairs and
 bounded Worker corrections. Human-at-every-step bootstrap is a temporary mode,
 not a template for more permanent approval gates. Genuine scope/case changes
@@ -241,10 +242,14 @@ explicit legacy record validation, never an implicit fallback for current work.
   coverage adequacy, ownership, skills, standards and diff hygiene. May inspect
   terminal evidence including Test; never edits Test or Implementation, reruns
   the functional gate, or reopens corrections. Writes a structured report to the
-  ignored outbox and preserves lessons separately from the accepted Candidate
-  head. An authorized append-only update to
-  `agent-discipline/agent-lessons-learned.md` belongs to a separate evidence
-  branch/change.
+  ignored outbox. Under W4, Reviewer appends, stages and commits the current
+  lessons once on the Candidate branch as L, a direct sole-parent child of C
+  changing only `agent-discipline/agent-lessons-learned.md`; all existing bytes
+  are retained plus a nonempty append. Test/Implementation remain read-only.
+  The report keeps C as the reviewed identity and binds L separately. Success
+  and failure both retain lessons; before any Candidate exists, preserve raw
+  lessons with explicit null `lesson_commit`, never an invented C. W1–W3 keep
+  their pinned historical behavior; see the shared terminal-review rule.
 
 Reviewer-discovered Implementation defects become independent follow-up issues
 with priority, impact, evidence and current-merge implications. Orchestrator
@@ -278,18 +283,22 @@ A PASS, exhausted corrections, invalid Test/contract/integrity terminal, or
 Human stop reaches one terminal Reviewer. A favorable failure review does not
 turn a failed run into success. Encoded automatic success requires Tester PASS
 and Reviewer APPROVED. A different explicit Human disposition is preserved
-separately, not forged into those verdicts. The PR head is the exact
-Human-selected Candidate, including both Test and
-Implementation, with no lessons commit appended; final Human approval binds
-that same head. Failure preserves the latest Implementation and evidence, and
-does not create a success PR. KPI is separate later issue-driven post-merge work,
-not a functional gate or an automatic optimization loop.
+separately, not forged into those verdicts. Under W4, accepted_candidate remains
+the exact tested/reviewed C, including both Test and Implementation; PR head and
+final Human approval bind L, its verified lessons-only child. L is not another
+Candidate, correction or Tester execution. No retest is required solely for
+that verified append, and Tester PASS must not be presented as execution of L.
+W2/W3 retain exact-C PR behavior without the W4 extension; W1 remains explicit
+legacy validation. Failure preserves the latest Implementation, lessons and
+evidence, and does not create a success
+PR. KPI is separate later issue-driven post-merge work, not a functional gate
+or an automatic optimization loop.
 
 The Orchestrator owns visible delivery of the Reviewer's work to Human. Before
 requesting final review, place a readable Reviewer summary in the PR body, or
 in the terminal issue comment when there is no PR. Include the exact reviewed
-Candidate and review identity, original verdict, principal findings with
-severity/requirement/source evidence and impact, reviewed scope and limits,
+Candidate C, W4 delivery L and review identity, original verdict, principal
+findings with severity/requirement/source evidence and impact, reviewed scope and limits,
 follow-up issue or authorized treatment status, key lessons, and the remaining
 Human decision. Explicitly state no findings when that is the actual result.
 Separate the Reviewer's original conclusions from later Orchestrator summaries,
@@ -298,8 +307,13 @@ APPROVED. A local ignored path, digest or generic "review completed" alone is
 not this delivery. Provide accessible evidence links where available, accurately
 label local-only originals, and check disclosure before publishing: no hidden
 owner Test literals or confidential Tester reports. Preserve original reports
-and keep lessons/evidence commits separate from the Candidate. This is the
-existing final Human review handoff, not another review or correction cycle.
+and keep raw execution/review records outside committed source. Orchestrator
+checks C→L's actual sole-parent lineage and lessons-only byte-preserving append;
+no separate lessons branch is required. A control/evidence worktree may remain
+pinned to G while the authorized Candidate branch receives L. Saving current
+lessons is not deferred to #109's later aggregation. This is the existing final
+Human review handoff, not another review or correction cycle. Follow
+[the versioned terminal rule](agent-discipline/skills/agent-workflow/references/structured-handoffs.md#terminal-review-pr-and-legacy-boundaries).
 
 Before remote review, push the intended branch with an explicit refspec,
 set its same-name upstream and verify the remote SHA. Publish the current
@@ -426,3 +440,4 @@ The per-document map and full authoring rules are in
 | 2026-09-08 | 0.2.5 | Recorded two routine Human reviews, terminal follow-up issues, bootstrap/runtime boundaries, automated-GUI prohibition and exact remote review delivery. |
 | 2026-09-08 | 0.2.6 | Made Orchestrator responsible for a substantive, source-bound Reviewer summary in the final PR or failure issue, with honest later disposition and disclosure boundaries. |
 | 2026-09-09 | 0.2.7 | Linked the single local-state policy for navigation, explicit central/lane transport, ownership and scoped cleanup without new workflow gates. |
+| 2026-09-10 | 0.2.8 | Corrected W4 terminal delivery to Reviewer-owned append-only lessons child L on Candidate branch, retaining tested C, one review, failure lessons and exact final approval without changing W1–W3 history. |

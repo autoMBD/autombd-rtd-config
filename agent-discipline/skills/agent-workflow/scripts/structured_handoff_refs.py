@@ -91,6 +91,8 @@ def command_timeout():
 def git_bytes(root, *args):
     timeout = command_timeout()
     environment = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    environment.update(GIT_NO_REPLACE_OBJECTS="1", GIT_NO_LAZY_FETCH="1",
+                       GIT_OPTIONAL_LOCKS="0", GIT_TERMINAL_PROMPT="0")
     result = subprocess.run(["git", "-C", str(root), *args], capture_output=True,
                             timeout=timeout, env=environment)
     require(result.returncode == 0, "GIT_IDENTITY")
@@ -171,6 +173,33 @@ class ReferenceGraph:
         self.verify_commit(old)
         self.verify_commit(new)
         require(git(self.root, "merge-base", old, new) == old, "STRICT_ANCESTRY")
+
+    def verify_lesson_commit(self, candidate, tip, evidence):
+        """Prove actual immutable Git bytes, independently of CHECKED receipts."""
+        from repair_protocol import LESSON_CAPABILITY
+        path = LESSON_CAPABILITY["path"]
+        require(tip is not None and tip["parents"] == [candidate["commit"]], "LESSON_PARENT")
+        self.verify_tip(candidate)
+        self.verify_tip(tip)
+        changed = self.git_bytes("diff", "--no-ext-diff", "--no-textconv", "--no-renames",
+                                 "--ignore-submodules=none", "--name-only", "-z", candidate["commit"], tip["commit"], "--")
+        require(changed == path.encode("utf-8") + b"\0", "LESSON_CHANGED_PATHS")
+        entries = []
+        for commit in (candidate["commit"], tip["commit"]):
+            raw = self.git_bytes("ls-tree", "-z", commit, "--", path)
+            records = raw.rstrip(b"\0").split(b"\0")
+            require(len(records) == 1 and b"\t" in records[0], "LESSON_FILE")
+            metadata, name = records[0].split(b"\t", 1)
+            fields = metadata.split()
+            require(name == path.encode() and len(fields) == 3 and
+                    fields[0] in (b"100644", b"100755") and fields[1] == b"blob", "LESSON_FILE")
+            entries.append((fields[0], self.git_bytes("cat-file", "blob", fields[2].decode("ascii"))))
+        (old_mode, before), (new_mode, after) = entries
+        require(old_mode == new_mode, "LESSON_MODE")
+        require(after.startswith(before) and len(after) > len(before), "LESSON_APPEND")
+        require(evidence["evidence_type"] == "lesson" and
+                hashlib.sha256(after).hexdigest() == evidence["sha256"] and
+                self.evidence(evidence) == after, "LESSON_BINDING")
 
     def changed_paths(self, sha):
         raw = git_bytes(self.root, "diff", "--name-only", "-z", self.context["governor"]["commit"], sha, "--")

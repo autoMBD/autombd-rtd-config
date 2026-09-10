@@ -172,7 +172,8 @@ def validate_repair_evidence(artifact, memory, decision):
             def validate_after(body, name):
                 validate(body, defs[name], defs, "INVALID_EVIDENCE", "/artifact/payload/attachment_changes")
 
-            repair_protocol.validate_repair(artifact, memory.get, validate_after)
+            repair_protocol.validate_repair(artifact, memory.get, validate_after,
+                workflow_version=memory.context["protocol"]["workflow_contract"]["contract_version"])
     except (repair_protocol.RepairError, WorkflowTransitionError):
         decision.check(False, "INVALID_EVIDENCE", "/artifact/payload/repair")
 
@@ -204,6 +205,8 @@ def business_plan(state, artifact, ref, memory, decision):
     tester = memory.p(state["candidate"]["result"]) if state["candidate"] else {}
     review = memory.p(state["review"]["launch"]) if state["review"] else {}
     reviewed = memory.p(state["review"]["report"]) if state["review"] else {}
+    lesson_mode = memory.context["protocol"]["workflow_contract"]["contract_version"] == 4
+    publication_head = commit(reviewed.get("lesson_commit")) if lesson_mode else commit(candidate.get("candidate"))
     terminal = memory.p(state["terminal"])
     final = memory.p(state["final_decision"])
     outcome = tester.get("outcome")
@@ -353,7 +356,8 @@ def business_plan(state, artifact, ref, memory, decision):
             elif (original_payload.get("gate") == "FINAL" and
                     replacement["original"] in (state["stop"], state["final_decision"]) and
                     (candidate or state["candidate"] is None)):
-                expected = commit(candidate.get("candidate")) if state["candidate"] else None
+                expected = (commit(candidate.get("candidate")) if replacement["original"] == state["stop"]
+                            else publication_head)
                 stale(p.get("subject_sha") == expected, "payload/subject_sha")
         _replace_slots(result, replacement["original"], ref)
         return result
@@ -481,7 +485,7 @@ def business_plan(state, artifact, ref, memory, decision):
                 elif p["decision"] == "REQUEST_CHANGES":
                     result["test"]["ready"] = None
             else:
-                expected = commit(candidate.get("candidate")) if state["candidate"] else None
+                expected = commit(candidate.get("candidate")) if stop else publication_head
                 if candidate or state["candidate"] is None:
                     stale(p["subject_sha"] == expected, "payload/subject_sha")
                 if stop:
@@ -649,6 +653,16 @@ def business_plan(state, artifact, ref, memory, decision):
         if present and review:
             stale(p["review_id"] == review["review_id"], "payload/review_id")
             stale(p["dispatch_id"] == review["dispatch_id"] or repaired_dispatch, "payload/dispatch_id")
+            if lesson_mode:
+                tip = p.get("lesson_commit")
+                reviewed_candidate = review.get("candidate")
+                if reviewed_candidate is None:
+                    evidence(tip is None, "payload/lesson_commit")
+                else:
+                    evidence(tip is not None, "payload/lesson_commit")
+                    if tip:
+                        stale(tip["parents"] == [commit(reviewed_candidate)] and
+                              tip["commit"] != commit(reviewed_candidate), "payload/lesson_commit")
         if result["review"]:
             result["review"]["report"] = ref
     elif kind == "terminal-record":
@@ -675,7 +689,7 @@ def business_plan(state, artifact, ref, memory, decision):
                 if candidate:
                     stale(p["accepted_candidate"] == commit(candidate["candidate"]), "payload/accepted_candidate")
                 if p["pr"]:
-                    stale(p["pr"]["head_sha"] == p["accepted_candidate"], "payload/pr/head_sha")
+                    stale(p["pr"]["head_sha"] == publication_head, "payload/pr/head_sha")
                 if p["disposition"] == "MERGED":
                     order(state["terminal"] is not None and state["final_decision"] is not None)
                     if final:

@@ -2,8 +2,8 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.1.1 |
-| Date | 2026-09-09 |
+| Version | 0.1.2 |
+| Date | 2026-09-10 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Real-source and exact remote proof over the existing accepted workflow state. |
 
@@ -15,7 +15,8 @@ write receipts, fetch Git objects, create/approve/merge a PR, dispatch an Agent
 or implement a second workflow ledger. Use the existing [transition engine](workflow-transitions.md)
 and [handoff protocol](structured-handoffs.md) for their respective boundaries.
 
-Existing State/Context wire and W3 repair semantics are reused. The new schema
+Existing State/Context wire and W3/W4 repair semantics are reused. W4 adds the
+separate Reviewer lessons Tip under its explicitly pinned capability. The schema
 contains only Authority/Result transport and their shared scalar/reference
 definitions, not a duplicate State or Context.
 
@@ -76,12 +77,14 @@ must be unedited and created strictly after its packet. Extra official response
 fields are allowed; absent `in_reply_to_id` is valid, non-null is not.
 
 Approved commands are entire exact `/approve-test <full-T>` or
-`/approve-candidate <full-C>`. Request changes is the exact
+`/approve-candidate <full-delivery-head>`. Request changes is the exact
 `/request-test-changes <full-T> <reason>` or
-`/request-candidate-changes <full-C> <reason>`, with a nonempty reason equal to
+`/request-candidate-changes <full-delivery-head> <reason>`, with a nonempty reason equal to
 the recorded reason. Approval is not whitespace-normalized. STOP and the manual
 human-command route remain preserved authority but return AUTHORITY_UNVERIFIABLE
-in this remote adapter; they do not become automatic VERIFIED.
+in this remote adapter; they do not become automatic VERIFIED. The command name
+is unchanged: delivery head means L under W4 and C under W2/W3. TEST approval
+continues to bind original T; W1 remains the separate legacy interface.
 
 ## Ordered proof and source continuity
 
@@ -100,7 +103,7 @@ INVALID_EVIDENCE. State does not retain event.checked: this selection does not
 prove it was the original execution receipt or that a guard actually ran.
 
 The full local closure remains raw-byte bound, including rejected originals and
-W3 inline attachment snapshots. LocalRules preserve readiness, manifest,
+W3/W4 inline attachment snapshots. LocalRules preserve readiness, manifest,
 coverage-join, correction, repair, execution and terminal rules. Incomplete
 catalog evidence cannot silently defer proof into VERIFIED.
 
@@ -115,12 +118,18 @@ including deletions. Disjoint lane ownership agrees with CoverageJoin; Candidate
 content is the exact direct union over G, without merge-only or omitted edits.
 Verification never writes Git objects or invokes a merge/checkout.
 
-The mechanical acceptance-content exclusions apply only to paths changed from G:
+The mechanical Candidate-content exclusions apply only to paths changed from G:
 `.agent-state` and descendants, `tests/.tmp` and descendants,
 `agent-discipline/agent-lessons-learned.md`, and exact referenced command-result,
 lesson or disclosure-review attachment paths. Ordinary test/fixture/reference
 names are legal. Inherited unchanged G content is not retroactively rejected.
-Unmarked semantic contamination remains Orchestrator inspection.
+Unmarked semantic contamination remains Orchestrator inspection. Under W4,
+these exclusions still protect C and its two-lane union; they do not prohibit
+the separately proved C→L lessons append. L must have sole parent C and exactly
+one changed regular-file path, `agent-discipline/agent-lessons-learned.md`, with
+unchanged mode/type and all old bytes retained plus a nonempty append. The
+complete L lessons blob must match the report's raw lesson evidence digest.
+This verifies source preservation, not a new execution of L.
 
 Completed same-lane READY Implementation determines functional correction count.
 Candidate index is independent: corrected READY may be one ahead before assembly.
@@ -137,15 +146,20 @@ A successful proposal requires the same current Candidate's Tester PASS and
 Reviewer APPROVED, with truthful preserved source and terminal binding.
 OPEN_SUCCESS_PR with null PR verifies the local record but owns no remote PR
 proof: finalization is NOT_APPLICABLE. A present open PR must target the authorized
-base branch at G and the exact accepted Candidate head. This proves proposal
-availability, not final Human approval.
+base branch at G and the exact delivery head: L under W4, C under W2/W3. The
+accepted_candidate field continues to identify C. This proves proposal
+availability, not final Human approval; the original Tester and Reviewer
+technical evidence continues to bind C.
 
 MERGED additionally needs exact final approval and the matching local merge
-object. It is either the Candidate itself (fast-forward) or a two-parent
-`[G, Candidate]` merge with Candidate-identical tree. Squash/rebase/extra edits
+object. It is either the delivery head itself (fast-forward) or a two-parent
+`[G, delivery head]` merge with delivery-head-identical tree. Squash/rebase/extra edits
 are rejected. Historical G is established by actual merge ancestry, not mutable
 post-merge PR base.sha. Failure stays failure with null accepted Candidate/PR and
-preserved Implementation, never a success conversion.
+preserved Implementation, never a success conversion. W4 failure with C retains
+the separately checked L; before C exists the report has explicit null
+lesson_commit and raw lesson evidence. Neither case manufactures accepted C
+or a success PR. No retest follows solely from the verified lessons append.
 
 Result contains exactly version/status, task/G/K, input digests, approved/
 effective/executed Test SHAs, Implementation/Candidate SHA, Candidate index,
@@ -186,3 +200,4 @@ part of this feature's Worker verification; Tester acceptance remains independen
 | --- | --- | --- |
 | 2026-09-09 | 0.1.0 | Added read-only source/remote proof contract, exact authority, repair continuity and CLI boundaries. |
 | 2026-09-09 | 0.1.1 | Clarified encoding-independent commit structure and isolated recursive receipt attempts. |
+| 2026-09-10 | 0.1.2 | Distinguished W4 tested Candidate C from lessons-only delivery L, with real append/blob proof and exact L-bound remote approval/merge while retaining older-version authority. |
