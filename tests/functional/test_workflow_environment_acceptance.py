@@ -264,7 +264,8 @@ class TestHydration:
             worker = tomllib.loads((agent_root / "worker.toml").read_text(encoding="utf-8"))
             reviewer = tomllib.loads((agent_root / "reviewer.toml").read_text(encoding="utf-8"))
             assert worker["sandbox_mode"] == "workspace-write"
-            assert reviewer["sandbox_mode"] == "read-only"
+            source_reviewer = tomllib.loads((lab.source / ".codex/agents/reviewer.toml").read_text(encoding="utf-8"))
+            assert reviewer["sandbox_mode"] == source_reviewer["sandbox_mode"]
         skill_root = target / (".claude/skills" if platform == "claude" else ".agents/skills")
         assert (skill_root / "agent-workflow").resolve() == (target / "agent-discipline/skills/agent-workflow").resolve()
         assert (skill_root / "owner-extra").resolve() == lab.external.resolve()
@@ -533,9 +534,14 @@ class TestProbesAndActor:
             context = "auto-elevated"
         else:
             deadline = 0
+        codes = ("INVALID_INPUT", "CAPABILITY_UNAVAILABLE")
+        if fault == "cwd":
+            codes += ("PATH_BOUNDARY",)
         rejected(module, lambda: module.probe_command(argv, cwd, approved=approved,
-                 context=context, timeout_seconds=deadline), ("INVALID_INPUT", "CAPABILITY_UNAVAILABLE"))
+                 context=context, timeout_seconds=deadline), codes)
         assert not marker.exists()
+        if fault == "cwd":
+            assert not cwd.exists()
 
     @pytest.mark.parametrize("platform", ["codex", "claude", "opencode"])
     def test_c25_current_actor_and_explicit_override(self, platform):
