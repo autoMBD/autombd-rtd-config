@@ -67,7 +67,7 @@ def snapshot(h, label, body, kind):
 
 
 def manifest(h, tip):
-    return {"contract_version": 3, "contract_blob_sha": h.governor["workflow_contract_blob"],
+    return {"contract_version": h.context["protocol"]["workflow_contract"]["contract_version"], "contract_blob_sha": h.governor["workflow_contract_blob"],
             "base_sha": h.governor["commit"], "lane_sha": tip["commit"], "requirement_ids": [h.seed]}
 
 

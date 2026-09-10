@@ -281,7 +281,9 @@ class LocalRules:
                 require(p["subject_sha"] == report["payload"]["test_tip"]["commit"], "APPROVAL_SUBJECT")
         elif p["decision"] == "APPROVE":
             terminal = self.g.one(a, "terminal-record")
-            require(terminal["payload"]["result"] == "SUCCESS" and p["subject_sha"] == terminal["payload"]["accepted_candidate"], "FINAL_SUBJECT")
+            review = self.g.one(terminal, "reviewer-report")
+            subject = self.publication_head(review, terminal["payload"]["accepted_candidate"])
+            require(terminal["payload"]["result"] == "SUCCESS" and p["subject_sha"] == subject, "FINAL_SUBJECT")
 
     def candidate_test_envelope(self, a):
         p = a["payload"]
@@ -510,6 +512,19 @@ class LocalRules:
         require(p["review_id"] == launch["payload"]["review_id"], "REVIEW_IDENTITY")
         require(p["verdict"] != "APPROVED" or not any(f["severity"] == "BLOCKER" for f in p["findings"]), "REVIEW_BLOCKER")
         require(p["lessons"]["evidence_type"] == "lesson", "LESSON_TYPE")
+        if self.g.workflow_version == 4:
+            candidate = launch["payload"]["candidate"]
+            if candidate is None:
+                require(p["lesson_commit"] is None, "LESSON_NO_CANDIDATE")
+            else:
+                self.g.verify_lesson_commit(candidate, p["lesson_commit"], p["lessons"])
+
+    def publication_head(self, review, candidate):
+        if self.g.workflow_version == 4:
+            tip = review["payload"].get("lesson_commit")
+            require(tip is not None, "LESSON_REQUIRED")
+            return tip["commit"]
+        return candidate
 
     def terminal_record(self, a):
         p = a["payload"]
@@ -525,12 +540,13 @@ class LocalRules:
         if p["result"] == "SUCCESS":
             require(lp["terminal_reason"] == "TESTER_PASS" and review["payload"]["verdict"] == "APPROVED", "SUCCESS_EVIDENCE")
             require(p["accepted_candidate"] == lp["candidate"]["commit"] and p["disposition"] in {"OPEN_SUCCESS_PR", "MERGED"}, "SUCCESS_CANDIDATE")
+            head = self.publication_head(review, p["accepted_candidate"])
             if p["pr"]:
-                require(p["pr"]["head_sha"] == p["accepted_candidate"], "PR_HEAD")
+                require(p["pr"]["head_sha"] == head, "PR_HEAD")
             if p["disposition"] == "MERGED":
                 require(p["pr"] is not None and p["pr"]["merge_sha"] is not None and p["final_decision"] is not None, "MERGE_EVIDENCE")
                 decision = self.g.artifacts[p["final_decision"]["artifact_id"]]
-                require(decision["artifact_kind"] == "human-decision" and decision["payload"]["gate"] == "FINAL" and decision["payload"]["decision"] == "APPROVE" and decision["payload"]["subject_sha"] == p["accepted_candidate"], "MERGE_APPROVAL")
+                require(decision["artifact_kind"] == "human-decision" and decision["payload"]["gate"] == "FINAL" and decision["payload"]["decision"] == "APPROVE" and decision["payload"]["subject_sha"] == head, "MERGE_APPROVAL")
         else:
             require(p["accepted_candidate"] is None and p["pr"] is None and p["disposition"] == "RECORD_FAILURE", "FAILURE_NOT_PR")
 
@@ -575,7 +591,8 @@ class LocalRules:
     def versioned_repair(self, a):
         p = a["payload"]
         try:
-            validate_repair(a, lambda ref: self.g.artifacts.get(ref["artifact_id"]), validate_definition)
+            validate_repair(a, lambda ref: self.g.artifacts.get(ref["artifact_id"]), validate_definition,
+                            workflow_version=self.g.workflow_version)
         except RepairError as error:
             require(False, error.rule)
         original = self.g.artifacts[p["original"]["artifact_id"]]
@@ -640,7 +657,7 @@ class LocalRules:
         require(guard["artifact_kind"] == "guard-result" and guard["status"] == "REJECTED" and guard["input"]["sha256"] == replacement["original"]["sha256"], "REPAIR_REJECTION")
         preserved = ("status", "outcome", "verdict", "implementation_index", "implementation_tip", "previous_implementation",
                      "test_tip", "candidate", "candidate_index", "candidate_sha", "correction_count", "review_id", "lane", "result",
-                     "accepted_candidate", "preserved_implementation", "impact_set", "test_manifest", "implementation_manifest")
+                     "accepted_candidate", "preserved_implementation", "impact_set", "test_manifest", "implementation_manifest", "lesson_commit")
         for key in preserved:
             require(a["payload"].get(key) == original["payload"].get(key), "REPAIR_BUSINESS_CHANGE")
         if a["payload"].get("dispatch_id") != original["payload"].get("dispatch_id"):

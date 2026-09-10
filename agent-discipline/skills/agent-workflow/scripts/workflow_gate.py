@@ -216,8 +216,8 @@ def validate_contract(contract, *, contract_path):
     authoritative, _ = _read_contract(contract_path)
     _require(contract == authoritative, "contract object differs from contract_path")
     version = contract.get("contract_version")
-    _require(_is_int(version) and version in (1, 2, 3), "unsupported workflow contract_version; expected 1, 2 or 3")
-    if version in (2, 3):
+    _require(_is_int(version) and version in (1, 2, 3, 4), "unsupported workflow contract_version; expected 1, 2, 3 or 4")
+    if version in (2, 3, 4):
         _validate_v2_contract(contract)
         return
     _require("schema_version" not in contract, "unsupported workflow schema_version for legacy v1")
@@ -226,20 +226,30 @@ def validate_contract(contract, *, contract_path):
 
 def _validate_v2_contract(contract: dict[str, Any]) -> None:
     version = contract["contract_version"]
-    fields = _V2_CONTRACT_KEYS | ({"non_case_repairs"} if version == 3 else set())
+    fields = _V2_CONTRACT_KEYS | ({"non_case_repairs"} if version >= 3 else set())
+    if version == 4:
+        fields.add("reviewer_lessons")
     _require(set(contract) == fields, "v2 schema contract top-level fields are not closed")
-    if version == 3:
+    if version >= 3:
         expected = {"version": "1.0", "metadata": True, "test_support": True}
         capability = _closed_object(contract["non_case_repairs"], list(expected), "non_case_repairs")
         for name, value in expected.items():
             _require(type(capability[name]) is type(value) and capability[name] == value,
                      f"non_case_repairs.{name} must be {value!r} with its exact type")
+    if version == 4:
+        expected = {"version": "1.0", "path": "agent-discipline/agent-lessons-learned.md", "append_only": True}
+        capability = _closed_object(contract["reviewer_lessons"], list(expected), "reviewer_lessons")
+        for name, value in expected.items():
+            _require(type(capability[name]) is type(value) and capability[name] == value,
+                     f"reviewer_lessons.{name} must be {value!r} with its exact type")
     _require(_is_int(contract["schema_version"]) and contract["schema_version"] == 2, "unsupported workflow schema_version; v2 requires integer 2")
     _require(contract["workflow_profile"] == "functional-development-v1", "unsupported workflow_profile")
     for name, expected in _V2_REFERENCES.items():
         _require(contract[name] == expected, f"v2 {name} must reference the approved repo-relative authority {expected}")
     lifecycle = _closed_object(contract["lifecycle"], list(_V2_LIFECYCLE), "lifecycle")
     for name, expected in _V2_LIFECYCLE.items():
+        if version == 4 and name == "pr_head":
+            expected = "reviewer_lesson_commit"
         actual = lifecycle[name]
         _require(type(actual) is type(expected) and actual == expected, f"lifecycle.{name} must be {expected!r} with its exact type")
     _require(contract["deferred_runtime_capabilities"] == _V2_DEFERRED, "deferred_runtime_capabilities must preserve the approved capability boundary")

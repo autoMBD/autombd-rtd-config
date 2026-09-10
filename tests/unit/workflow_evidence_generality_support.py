@@ -58,6 +58,7 @@ import workflow_transition
 from structured_handoff_fixture import Lifecycle
 from workflow_transition_wire import canonical, digest
 from test_handoff_repair_guard import RepairLifecycle
+from workflow_transition_generality_support import legacy_workflow
 
 
 class EvidenceHistory(Lifecycle):
@@ -80,6 +81,7 @@ class EvidenceHistory(Lifecycle):
                 "registry": "agent-discipline/skills/agent-workflow/schemas/functional-development-v1.json",
                 "workflow_contract": "agent-discipline/workflow-contract.json"}.items()},
             "artifacts": [], "checks": []}
+        self.context_data["protocol"]["workflow_contract"] = legacy_workflow()
         self.state = workflow_transition.initial_state(self.task, self.gov)
 
     def git(self, *args, data=None):
@@ -102,7 +104,7 @@ class EvidenceHistory(Lifecycle):
 
     def write(self, name, raw):
         if name == "agent-discipline/workflow-contract.json":
-            raw = (ROOT / name).read_bytes()
+            raw = canonical(legacy_workflow())
             for filename in ("handoff-v1.schema.json", "functional-development-v1.json"):
                 schema = "agent-discipline/skills/agent-workflow/schemas/" + filename
                 super().write(schema, (ROOT / schema).read_bytes())

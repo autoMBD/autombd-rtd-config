@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "contract_version": 3,
+  "contract_version": 4,
   "workflow_profile": "functional-development-v1",
   "artifact_schema": "agent-discipline/skills/agent-workflow/schemas/handoff-v1.schema.json",
   "registry": "agent-discipline/skills/agent-workflow/schemas/functional-development-v1.json",
@@ -9,6 +9,11 @@
     "version": "1.0",
     "metadata": true,
     "test_support": true
+  },
+  "reviewer_lessons": {
+    "version": "1.0",
+    "path": "agent-discipline/agent-lessons-learned.md",
+    "append_only": true
   },
   "lifecycle": {
     "parallel_lanes": true,
@@ -20,7 +25,7 @@
     "incremental_same_lane": true,
     "terminal_review_once": true,
     "review_on_success_and_failure": true,
-    "pr_head": "accepted_candidate",
+    "pr_head": "reviewer_lesson_commit",
     "pr_includes_test_and_implementation": true,
     "kpi_in_functional_gate": false
   },

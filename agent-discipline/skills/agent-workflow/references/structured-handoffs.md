@@ -2,8 +2,8 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.1.8 |
-| Date | 2026-09-09 |
+| Version | 0.1.9 |
+| Date | 2026-09-10 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Functional-development role interfaces, local delivery validation, confidentiality, and explicit legacy migration boundaries. |
 
@@ -101,9 +101,10 @@ Human review boundaries:
 
 1. **Test Gate approval:** review the feature requirements and case table as
    the Test Gate as soon as Test is READY, without waiting for Worker READY.
-2. **Final review:** review the exact Candidate PR and terminal findings on the
+2. **Final review:** review the exact delivery PR and terminal findings on the
    functional-PASS path, or the terminal failure report and retained work on
-   the failure path. Failure review does not create a success PR.
+   the failure path. Under W4, the PR head is lessons-only child L of reviewed C.
+   Failure review does not create a success PR.
 
 These are Human reviews, distinct from the single Agent Reviewer. K compilation,
 lane launch/readiness, prevalidation, handoff validation, disclosure review,
@@ -137,10 +138,10 @@ reviewed change, not merge-only edits to the functional Candidate.
 | Tester to Orchestrator | tester-confidential-report | Return actual execution status and evidence-backed diagnosis; never send directly to Worker |
 | Orchestrator to original Worker | worker-correction-envelope | Deliver public, actionable implementation diagnosis without case disclosure |
 | Orchestrator to Reviewer | reviewer-launch | Start the single terminal review, on success or failure |
-| Reviewer to Orchestrator | reviewer-report | Return review findings, lessons and reusable work; never reopen corrections |
-| Orchestrator to Human | terminal-record | Identify the accepted Candidate PR or truthful failure disposition |
+| Reviewer to Orchestrator | reviewer-report | Return review findings, lessons and reusable work; W4 separately binds lessons commit L; never reopen corrections |
+| Orchestrator to Human | terminal-record | Identify accepted Candidate C and exact delivery PR (L under W4), or truthful failure disposition |
 | Guard to authorized recipient | guard-result | Record this exact delivery check, not a functional verdict |
-| Orchestrator to original producer | delivery-repair | Repair non-case delivery metadata, or register audited Tester support-source repair under explicit W3; preserve case approval, verdicts and Worker accounting |
+| Orchestrator to original producer | delivery-repair | Repair non-case delivery metadata, or register audited Tester support-source repair under explicit W3/W4; preserve case approval, verdicts and Worker accounting |
 
 Tester is one role with two phases, not a new Test-author role. Gate authoring
 and prevalidation happen independently of Worker implementation. After Gate 1,
@@ -265,8 +266,8 @@ unsupported representation alone to declare terminal functional failure.
 ### Versioned machine repair representation
 
 W3 opts in with `non_case_repairs` version `1.0`, with `metadata` and
-`test_support` enabled. The functional profile and fourteen artifact kinds
-remain the same. Old W2 inputs without repair extensions remain supported;
+`test_support` enabled; W4 retains that capability. The functional profile and
+fourteen artifact kinds remain the same. Old W2 inputs without repair extensions remain supported;
 new repair fields under W2 are rejected. W1 record validation remains explicit
 and separate. A task's pinned G/W is never silently changed during repair.
 
@@ -433,14 +434,60 @@ Reviewer accepting the analysis of a failed task does not turn it into success.
 Report-format repair preserves the same review identity and does not reopen
 review or correction. Preserve the final Implementation on failure.
 
-A successful PR uses the exact accepted Candidate head, including Test and
-Implementation. Reviewer lessons and execution records stay outside that head;
-there is no lesson child commit substituted for the accepted Candidate. Final
-approval and merge evidence must bind that same delivery. PR-only repository
-protection is not bypassed by this local protocol.
+### W4 Reviewer lessons and exact delivery
+
+W4 explicitly enables `reviewer_lessons` and sets `lifecycle.pr_head` to
+`reviewer_lesson_commit`. Its `reviewer-report.payload.lesson_commit` is a
+nullable Tip: it is required and non-null whenever the terminal review has a
+Candidate C; it is explicitly null when failure occurred before any Candidate.
+W2/W3 reject this extension. W1 legacy records keep their own interface.
+An upgraded checker does not change a run's pinned G/W or rewrite old authority.
+
+The tested/reviewed Candidate C remains the exact two-lane direct union, with
+ordered parents [effective Test, Implementation]. Reviewer writes its terminal
+report and appends, stages and commits the current lessons once on that Candidate
+branch. Lessons commit L has C as its sole direct parent and changes only
+`agent-discipline/agent-lessons-learned.md`, retaining the complete existing
+file bytes plus a nonempty append. Do not amend C, rewrite prior lessons, add
+another parent, change file mode/type or include Test/Implementation, policy,
+raw reports or execution evidence. This is not a new Candidate, correction,
+Tester execution or second review.
+
+Bind L's actual commit/tree/parent identity in `lesson_commit`. The referenced
+raw lesson evidence must match the complete lessons-document blob at L, not
+just its appended fragment. Orchestrator checks actual C→L lineage and changed
+source against the allowed append. The guard and read-only evidence verifier
+prove those local Git/blob facts; the pure reducer checks declared Tip/parent
+and lifecycle identity only, not filesystem content or actual Git history.
+Neither that proof nor Tester PASS claims that L was executed. No retest is
+required solely for a verified lessons-only append; actual code/test changes
+are prohibited by this terminal step, not excused as lessons.
+
+The control/evidence worktree may remain pinned to G while the explicitly
+authorized Candidate branch/worktree receives L. Selective raw evidence transfer
+still follows the local-state rule; this arrangement does not force a separate
+lessons branch. The Reviewer saves current lessons on success and failure rather
+than deferring them to #109's later aggregation. Failure before C exists retains
+raw lessons with null `lesson_commit`, never a manufactured Candidate/commit.
+Failure after C retains C, L, final Implementation and original verdicts without
+automatically opening a success PR.
+
+For W4 success, `accepted_candidate` remains C while PR head, FINAL decision and
+merge evidence bind L. The final Human review receives both C and L, the single
+original review identity/verdict, findings with severity/evidence/impact, scope,
+treatment or follow-up issues, lessons and remaining decision. Preserve the
+original report; later summaries or Human dispositions are labelled separately.
+W2/W3 retain their historical exact-C PR and separate-lessons bindings. W1
+remains explicit legacy-record validation, not the structured representation.
+Old reports, decisions, tests and changelog entries are not migrated in place.
+PR-only repository protection is not bypassed by either version.
+
+### Remote delivery
+
 Before requesting review, push the exact intended branch with an explicit
 source:destination refspec, set its matching upstream and verify the remote
-head. Never let a feature/policy branch track master or use an ambiguous push.
+head. Never push directly to master, let a feature/policy branch track master
+or use an ambiguous push.
 Publish or update the issue's current review entry with exact-commit links;
 local artifacts alone are not a usable remote review packet. A replacement
 packet supersedes the prior entry explicitly without rewriting old approvals.
@@ -482,7 +529,8 @@ does not implement it.
 
 Legacy W v1 is preserved at `agent-discipline/contracts/workflow-v1.json` for
 explicit validation of old records. W2 declares the structured lifecycle;
-active W3 preserves it and explicitly enables the non-case repair extension.
+W3 enables non-case repairs; active W4 preserves both and explicitly enables
+the Reviewer lessons C→L delivery extension.
 Do not feed new artifacts to a legacy validator or
 silently fall back to old route/counting rules. Existing #88 wire fields and
 timeout aliases remain compatible. Its intentional behavior correction requires
@@ -514,3 +562,4 @@ case review, results and dashboard are separate #100–#102 work.
 | 2026-09-09 | 0.1.6 | Linked the single local-state rule and made selective, byte-checked central/lane transport explicit while preserving protocol identities and historical paths. |
 | 2026-09-09 | 0.1.7 | Defined W3 opt-in machine metadata/support repair, shared inline evidence, original case approval anchors and source-bound execution without freeing Worker corrections or reopening terminal review. |
 | 2026-09-09 | 0.1.8 | Linked read-only real-source, direct-union and remote finalization proof while retaining separate execution/intake boundaries. |
+| 2026-09-10 | 0.1.9 | Defined W4 Reviewer-owned lessons-only C→L lineage, complete lessons evidence, separate tested/PR identities, failure preservation and old-version compatibility without a new review or retest. |

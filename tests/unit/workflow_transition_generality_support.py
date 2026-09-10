@@ -63,6 +63,15 @@ def digest(value):
     return hashlib.sha256(canonical(value)).hexdigest()
 
 
+def legacy_workflow():
+    """Keep historical generality histories explicitly pinned to W3."""
+    value = json.loads((ROOT / "agent-discipline/workflow-contract.json").read_text())
+    value["contract_version"] = 3
+    value.pop("reviewer_lessons", None)
+    value["lifecycle"]["pr_head"] = "accepted_candidate"
+    return value
+
+
 class History:
     """Generate arbitrary protocol artifacts from public definitions, not cases."""
 
@@ -80,7 +89,7 @@ class History:
         self.context = {"schema_version": "1.0", "workflow_profile": "functional-development-v1",
                         "task": self.task, "governor": self.governor,
                         "protocol": {"handoff_schema": self.schema, "registry": self.registry,
-                                     "workflow_contract": json.loads((ROOT / "agent-discipline/workflow-contract.json").read_text())},
+                                     "workflow_contract": legacy_workflow()},
                         "artifacts": [], "checks": []}
         self.state = module.initial_state(self.task, self.governor)
         self.contract = None

@@ -49,6 +49,8 @@ import json
 
 
 CAPABILITY = {"version": "1.0", "metadata": True, "test_support": True}
+LESSON_CAPABILITY = {"version": "1.0", "path": "agent-discipline/agent-lessons-learned.md",
+                     "append_only": True}
 ATTACHMENTS = {"manifest": "LaneManifestV1", "test_manifest": "LaneManifestV1",
     "implementation_manifest": "LaneManifestV1", "impact_set": "ImpactSet", "coverage_join": "CoverageJoin"}
 PRESERVED = ("status", "outcome", "verdict", "implementation_index", "implementation_tip",
@@ -58,7 +60,7 @@ PRESERVED = ("status", "outcome", "verdict", "implementation_index", "implementa
     "implementation_manifest", "execution_id", "coverage_join", "rerun_of",
     "previous_candidate", "terminal_reason", "last_implementation", "source_reports",
     "disposition", "pr", "final_decision", "revision_ack", "gate", "decision", "subject_sha",
-    "support_repair")
+    "support_repair", "lesson_commit")
 DIMENSIONS = {"scenarios", "conditions", "assertions", "expected_results", "pass_fail_criteria",
               "selected_checks", "exclusions", "coverage"}
 
@@ -87,10 +89,20 @@ def require_capability(workflow, artifact):
     extension = "repair_version" in p or "support_repair" in p or "repair" in (artifact.get("replaces") or {})
     if extension:
         _require(type(workflow.get("schema_version")) is int and workflow["schema_version"] == 2 and
-                 type(workflow.get("contract_version")) is int and workflow["contract_version"] == 3 and
+                 type(workflow.get("contract_version")) is int and workflow["contract_version"] in (3, 4) and
                  workflow.get("non_case_repairs") == CAPABILITY and
                  all(type(workflow["non_case_repairs"].get(k)) is type(v) for k, v in CAPABILITY.items()),
                  "REPAIR_CAPABILITY")
+    if artifact.get("artifact_kind") == "reviewer-report":
+        enabled = workflow.get("contract_version") == 4
+        _require(("lesson_commit" in p) == enabled, "LESSON_CAPABILITY")
+        if enabled:
+            capability = workflow.get("reviewer_lessons")
+            _require(type(workflow.get("schema_version")) is int and workflow["schema_version"] == 2 and
+                     type(workflow.get("contract_version")) is int and
+                     type(capability) is dict and capability == LESSON_CAPABILITY and
+                     all(type(capability[k]) is type(v) for k, v in LESSON_CAPABILITY.items()),
+                     "LESSON_CAPABILITY")
 
 
 def validate_snapshot(snapshot):
@@ -368,14 +380,14 @@ def _dependency_audit(change, before, after):
              len(audited_old) == len(removed) and len(audited_new) == len(added), "REPAIR_DEPENDENCY_AUDIT")
 
 
-def _manifest(body, source, artifact, requirements):
+def _manifest(body, source, artifact, requirements, workflow_version=3):
     gov = artifact["governor"]
-    _require(body["contract_version"] == 3 and body["contract_blob_sha"] == gov["workflow_contract_blob"] and
+    _require(type(body["contract_version"]) is int and body["contract_version"] == workflow_version and body["contract_blob_sha"] == gov["workflow_contract_blob"] and
              body["base_sha"] == gov["commit"] and body["lane_sha"] == source and
              set(body["requirement_ids"]) == set(requirements), "REPAIR_MANIFEST_IDENTITY")
 
 
-def _attachment_changes(artifact, original, validate_after, expected_before, expected_after=None):
+def _attachment_changes(artifact, original, validate_after, expected_before, expected_after=None, workflow_version=3):
     p, op = artifact["payload"], original["payload"]
     support = p["mode"] == "TEST_SUPPORT"
     changes = _indexed(p["attachment_changes"], "field")
@@ -412,9 +424,9 @@ def _attachment_changes(artifact, original, validate_after, expected_before, exp
                 if not requirements:
                     _require("requirement_ids" in before, "REPAIR_BUSINESS_MISSING")
                     requirements = before["requirement_ids"]
-                _manifest(after, tip["commit"], artifact, requirements)
+                _manifest(after, tip["commit"], artifact, requirements, workflow_version)
                 if support:
-                    _manifest(before, p["from_test_tip"]["commit"], artifact, requirements)
+                    _manifest(before, p["from_test_tip"]["commit"], artifact, requirements, workflow_version)
                 _require(any(x[0] == tip["commit"] for x in facts), "REPAIR_SOURCE_BINDINGS")
             else:
                 for key in ("schema_version", "test_commit", "implementation_commit"):
@@ -430,7 +442,7 @@ def _attachment_changes(artifact, original, validate_after, expected_before, exp
     return changes
 
 
-def validate_repair(artifact, resolve, validate_after):
+def validate_repair(artifact, resolve, validate_after, *, workflow_version=3):
     """Validate supplied repair evidence only; caller adds live order or Git truth."""
     try:
         _require(is_v1(artifact), "REPAIR_VERSION")
@@ -462,7 +474,7 @@ def validate_repair(artifact, resolve, validate_after):
             # Missing business fields remain an error even before replacement.
             validate_metadata_replacement(original, original)
             _attachment_changes(artifact, original, validate_after,
-                                {key: op[key] for key in ATTACHMENTS if key in op})
+                                {key: op[key] for key in ATTACHMENTS if key in op}, workflow_version=workflow_version)
             return
         _require(p["mode"] == "TEST_SUPPORT", "REPAIR_MODE")
         approved = _resolved(p["approved_test_report"], resolve, "test-gate-report")
@@ -489,7 +501,7 @@ def validate_repair(artifact, resolve, validate_after):
                  "REPAIR_RETEST_SCOPE")
         mappings = _attachment_changes(artifact, approved, validate_after,
             {"test_manifest": old["test_manifest"], "impact_set": old["impact_set"]},
-            {"test_manifest": p["test_manifest"], "impact_set": p["impact_set"]})
+            {"test_manifest": p["test_manifest"], "impact_set": p["impact_set"]}, workflow_version)
         _require(set(mappings) == {"test_manifest", "impact_set"}, "REPAIR_SUPPORT_ATTACHMENTS")
         impact = validate_snapshot(mappings["impact_set"]["after"])
         checks = _indexed(impact["selected_checks"])
