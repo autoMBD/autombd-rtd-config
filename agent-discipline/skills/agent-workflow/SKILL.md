@@ -7,7 +7,7 @@ description: Validate structured role handoffs and exact identities for the func
 
 | Field | Value |
 | --- | --- |
-| Version | 0.2.5 |
+| Version | 0.2.6 |
 | Date | 2026-09-09 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Structured role handoff guidance, declarative lifecycle boundaries, legacy compatibility and passive monitoring. |
@@ -141,6 +141,15 @@ such as `cmd.exe /d /c`. Operational observations do not imply semantic classifi
 This sequence does not implement cross-process locking or global exactly-once
 command consumption.
 
+## Read-only source and finalization proof
+
+Use [Workflow Evidence](references/workflow-evidence.md) when the accepted State
+needs complete local source, direct-union, exact GitHub authority or PR/merge
+proof. Supply explicit State, Context, Authority and repository root to
+`scripts/workflow_evidence.py verify`. This operation neither consumes an event
+nor writes workflow/Git/remote state. Its VERIFIED result is evidence, not
+permission to dispatch, approve, merge or replace Human decisions.
+
 ## Explicit compatibility
 
 The #90 interface packet remains available through its original adapter:
@@ -205,3 +214,4 @@ lane/session/Implementation identity.
 | 2026-09-08 | 0.2.3 | Linked two routine Human reviews and independent terminal-finding issues, preserving explicit bootstrap and runtime limits. |
 | 2026-09-09 | 0.2.4 | Routed local storage, explicit selective transfers and cleanup to one shared policy without new schema fields or validator claims. |
 | 2026-09-09 | 0.2.5 | Routed W3 opted-in metadata/support repair through shared guard/reducer evidence while preserving original approvals, old W2 behavior and counted Worker corrections. |
+| 2026-09-09 | 0.2.6 | Linked the read-only real-source/GitHub/finalization verifier without a new execution route. |

@@ -39,8 +39,8 @@
 # Project:     RTD CfgFile CLI <https://github.com/autoMBD/autombd-rtd-config>
 # File:        structured_handoff_refs.py
 # Author:      autoMBD <tkung.lqk@foxmail.com>
-# Date:        2026-09-06
-# Version:     0.1.0
+# Date:        2026-09-10
+# Version:     0.1.3
 # Description: Safe byte-bound references and real Git identity checks.
 # =================================================================================
 
@@ -102,6 +102,12 @@ def git(root, *args):
 
 
 class ReferenceGraph:
+    def git(self, *args):
+        return git(self.root, *args)
+
+    def git_bytes(self, *args):
+        return git_bytes(self.root, *args)
+
     def __init__(self, context, view):
         self.context = context
         self.root = Path(context["worktree_root"])
@@ -127,6 +133,13 @@ class ReferenceGraph:
         if "worker_conditional_visibility" not in policy:
             return False
         return self.view == "orchestrator-full" or ref in self.context["predecessor_refs"] or ref in self.public_inputs
+
+    def _worker_visibility(self, ref, value):
+        policy = self.registry["artifacts"][ref["kind"]]
+        if "worker_conditional_visibility" in policy:
+            require(value["visibility"] in policy["worker_conditional_visibility"], "PRIVATE_REFERENCE")
+            if ref["kind"] != "guard-result":
+                require(value["consumer_role"] == "worker", "PRIVATE_REFERENCE")
 
     def verify_environment(self):
         require(Path(git(self.root, "rev-parse", "--show-toplevel")).resolve() == self.root, "WORKTREE_ROOT")
@@ -192,12 +205,8 @@ class ReferenceGraph:
         if ref["kind"] != "guard-result":
             require(value["task"] == self.context["task"], "TASK_MISMATCH")
             require(value["governor"] == self.context["governor"], "GOVERNOR_MISMATCH")
-        if not allow_private:
-            policy = self.registry["artifacts"][ref["kind"]]
-            if "worker_conditional_visibility" in policy:
-                require(value["visibility"] in policy["worker_conditional_visibility"], "PRIVATE_REFERENCE")
-                if ref["kind"] != "guard-result":
-                    require(value["consumer_role"] == "worker", "PRIVATE_REFERENCE")
+        if self.context["consumer_role"] == "worker" and not allow_private:
+            self._worker_visibility(ref, value)
         self.artifacts[aid] = value
         self.refs[aid] = ref
         if not repair_original:
@@ -243,6 +252,12 @@ class ReferenceGraph:
             elif keys == ARTIFACT_KEYS:
                 if public:
                     require(self.worker_allowed(value), "PRIVATE_REFERENCE")
+                    # A public edge stays public even for an authorized private
+                    # reader or an already-cached artifact. Check before walking
+                    # the target's own references, independently of reader role.
+                    if "worker_conditional_visibility" in self.registry["artifacts"][value["kind"]]:
+                        target = self.read(value, state=True, canonical=value != repair_original_ref)
+                        self._worker_visibility(value, target)
                 self.artifact(value, allow_private=allow_private and not public,
                               repair_original=value == repair_original_ref)
             elif keys == EVIDENCE_KEYS:

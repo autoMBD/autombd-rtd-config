@@ -39,8 +39,8 @@
 # Project:     RTD CfgFile CLI <https://github.com/autoMBD/autombd-rtd-config>
 # File:        structured_handoff_rules.py
 # Author:      autoMBD <tkung.lqk@foxmail.com>
-# Date:        2026-09-06
-# Version:     0.1.0
+# Date:        2026-09-09
+# Version:     0.1.1
 # Description: Declarative protocol local-edge and evidence invariants.
 # =================================================================================
 
@@ -584,15 +584,15 @@ class LocalRules:
             self.check(original)
         for fact in p["semantic_audit"]["source_bindings"]:
             self.g.verify_commit(fact["commit"])
-            require(git(self.g.root, "rev-parse", fact["commit"] + ":" + fact["path"]) == fact["blob"],
+            require(self.g.git("rev-parse", fact["commit"] + ":" + fact["path"]) == fact["blob"],
                     "REPAIR_SOURCE_BLOB")
-            require(git(self.g.root, "cat-file", "-t", fact["blob"]) == "blob", "REPAIR_SOURCE_BLOB")
+            require(self.g.git("cat-file", "-t", fact["blob"]) == "blob", "REPAIR_SOURCE_BLOB")
         if p["mode"] != "TEST_SUPPORT":
             return
         old, new = p["from_test_tip"]["commit"], p["to_test_tip"]["commit"]
         self.g.strict_ancestor(old, new)
         def inventory(commit):
-            entries = git_bytes(self.g.root, "ls-tree", "-r", "-z", commit).split(b"\0")
+            entries = self.g.git_bytes("ls-tree", "-r", "-z", commit).split(b"\0")
             return {entry.split(b"\t", 1)[1].decode("utf-8"): entry.split(b"\t", 1)[0].split()
                     for entry in entries if entry}
         before, after = inventory(old), inventory(new)
