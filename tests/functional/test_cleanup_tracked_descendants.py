@@ -109,27 +109,37 @@ def test_c01_indexed_descendants_reject_all_source_states(cleanup_api, lab, stat
 
 @pytest.mark.parametrize("dry_run", [True, False])
 @pytest.mark.parametrize("source_position", [0, 1, 2])
-def test_c02_source_rejection_is_atomic_over_complete_plan(cleanup_api, lab, dry_run, source_position):
+@pytest.mark.parametrize("target_spelling", ["index-name", "case-alias"])
+def test_c02_source_rejection_is_atomic_over_complete_plan(cleanup_api, lab, dry_run, source_position, target_spelling):
     """CTD-02: a source target anywhere in a batch forbids every mutation."""
     source = lab.tracked()
     targets = [s.write(lab.base / f"scratch-{i}/data.bin").parent for i in range(2)]
     targets.insert(source_position, source.parents[1])
-    rejected_without_mutation(cleanup_api, lab, [lab.rel(p) for p in targets], dry_run=dry_run)
+    names = [lab.rel(p) for p in targets]
+    if target_spelling == "case-alias":
+        names[source_position] = names[source_position].upper()
+        assert (lab.root / names[source_position]).samefile(source.parents[1])
+    rejected_without_mutation(cleanup_api, lab, names, dry_run=dry_run)
 
 
 @pytest.mark.parametrize("dry_run", [True, False])
+@pytest.mark.parametrize("target_spelling", ["index-name", "case-alias"])
 @pytest.mark.parametrize("tracked_name", [
     "box [ab]/deep [5]/file with spaces.txt",
     "控制 盒/层 β/源文件.bin",
     "box+/--odd/quote' & ! %= #.bin",
     "box(9)/a,b;d/line_end_é.bin",
 ])
-def test_c03_real_names_do_not_evade_index_membership(cleanup_api, lab, tracked_name, dry_run):
+def test_c03_real_names_do_not_evade_index_membership(cleanup_api, lab, tracked_name, dry_run, target_spelling):
     """CTD-03: real supported special/Unicode filenames and literal path boundaries."""
     source = lab.tracked(tracked_name, "staged")
     target = lab.base / Path(tracked_name).parts[0]
     assert source.is_file()
-    rejected_without_mutation(cleanup_api, lab, [lab.rel(target)], dry_run=dry_run)
+    name = lab.rel(target)
+    if target_spelling == "case-alias":
+        name = name.upper()
+        assert (lab.root / name).samefile(target)
+    rejected_without_mutation(cleanup_api, lab, [name], dry_run=dry_run)
 
 
 @pytest.mark.parametrize("seed", [7, 23, 61])

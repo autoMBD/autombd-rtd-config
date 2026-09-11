@@ -93,9 +93,9 @@ def control_api(base, mode):
             return {"version": 1, "status": "CLEANED", "paths": list(paths)}
         names = indexed(root)
         for target in paths:
-            components = PurePosixPath(target).parts
+            components = tuple(os.path.normcase(part) for part in PurePosixPath(target).parts)
             for tracked in names:
-                parts = PurePosixPath(tracked).parts
+                parts = tuple(os.path.normcase(part) for part in PurePosixPath(tracked).parts)
                 matches = parts[:len(components)] == components
                 if mode == "prefix-match":
                     matches = tracked.startswith(target)
