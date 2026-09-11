@@ -148,11 +148,20 @@ def run_validation(artifact_path: str, expected_sha256: str,
         identity["path"] = relative
         raw = path.read_bytes()
         identity["sha256"] = hashlib.sha256(raw).hexdigest()
-        value = parse_json(raw, expected_sha256)
+        value = parse_json(raw, expected_sha256, canonical=False)
+        # Retain a safely parsed identity even when formatting or shape fails.
+        # This identifies rejected bytes; it does not accept the artifact.
+        if isinstance(value, dict):
+            try:
+                validate_definition(value.get("artifact_id"), "ID")
+            except ProtocolError:
+                pass
+            else:
+                identity["artifact_id"] = value["artifact_id"]
+        require(raw == canonical_bytes(value), "NON_CANONICAL")
         phase = "SHAPE"
         validate_artifact(value)
         artifact = value
-        identity["artifact_id"] = artifact["artifact_id"]
         graph = ReferenceGraph(context, view)
         phase = "CONTEXT"
         require(artifact["artifact_kind"] != "guard-result", "RESULT_NOT_TASK_INPUT")
