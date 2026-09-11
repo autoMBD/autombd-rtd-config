@@ -62,7 +62,8 @@ REQUIREMENTS = "tests/doc/reference/agent/coverage-dependencies-requirements.md"
 CASES = "tests/doc/reference/agent/coverage-dependencies-cases.md"
 FIXTURE = ROOT / "tests/fixtures/coverage-dependencies/public_requirements.json"
 OWNED = {RULES, REFERENCE, "tests/unit/test_coverage_dependencies_generality.py", REQUIREMENTS, CASES,
-         "tests/doc/README.md", "tests/functional/test_coverage_dependencies.py", "tests/functional/test_coverage_dependencies_scope.py"}
+         "tests/doc/README.md", "tests/functional/test_coverage_dependencies.py", "tests/functional/test_coverage_dependencies_scope.py",
+         "agent-discipline/skills/agent-workflow/scripts/repair_protocol.py"}
 
 
 def git(*argv):
@@ -73,7 +74,7 @@ def test_complete_readable_requirements_and_source_associations():
     contract = json.loads(FIXTURE.read_bytes())
     text = (ROOT / REQUIREMENTS).read_text("utf-8")
     assert contract["task_contract_sha256"] in text
-    assert {r["id"] for r in contract["requirements"]} == {f"R{i:02d}" for i in range(1, 9)}
+    assert {r["id"] for r in contract["requirements"]} == {f"R{i:02d}" for i in range(1, 10)}
     for requirement in contract["requirements"]:
         assert "## " + requirement["id"] + "\n" in text
         assert requirement["obligation"] in text
@@ -84,8 +85,8 @@ def test_complete_readable_requirements_and_source_associations():
 def test_case_table_and_index_are_paired_and_traceable():
     cases = (ROOT / CASES).read_text("utf-8")
     rows = [line for line in cases.splitlines() if line.startswith("| CD-")]
-    assert len(rows) == 15 and len(set(re.findall(r"CD-\d{3}", "\n".join(rows)))) == 15
-    assert {f"R{i:02d}" for i in range(1, 9)} <= set(re.findall(r"R\d{2}", "\n".join(rows)))
+    assert len(rows) == 20 and len(set(re.findall(r"CD-\d{3}", "\n".join(rows)))) == 20
+    assert {f"R{i:02d}" for i in range(1, 10)} <= set(re.findall(r"R\d{2}", "\n".join(rows)))
     assert all(len(line.split("|")) == 6 for line in rows)
     assert not any(token in cases for token in ("pytest", "--basetemp", ".agent-state/", "test_coverage_dependencies.py::"))
     index = (ROOT / "tests/doc/README.md").read_text("utf-8")
@@ -97,7 +98,7 @@ def test_public_reference_names_declared_graph_and_version_boundaries():
     # This checks accessible contract vocabulary only. Source-semantic truth and
     # completeness of prose remain the Orchestrator/Reviewer responsibility.
     text = (SOURCE / REFERENCE).read_text("utf-8")
-    for term in ("covered_paths", "public_dependency_edges", "Orchestrator", "Governor", "W1", "W2", "W3", "W4"):
+    for term in ("covered_paths", "public_dependency_edges", "Orchestrator", "Governor", "W1", "W2", "W3", "W4", "METADATA", "preserve_tip", "affected_check_ids"):
         assert term in text, f"Missing public contract vocabulary: {term}"
 
 
@@ -112,7 +113,6 @@ def test_schema_registry_workflow_and_other_rules_remain_byte_identical():
     paths = ["agent-discipline/workflow-contract.json", "agent-discipline/contracts/workflow-v1.json",
              "agent-discipline/skills/agent-workflow/schemas/handoff-v1.schema.json",
              "agent-discipline/skills/agent-workflow/schemas/functional-development-v1.json",
-             "agent-discipline/skills/agent-workflow/scripts/repair_protocol.py",
              "agent-discipline/skills/agent-workflow/scripts/structured_handoff.py",
              "agent-discipline/skills/agent-workflow/scripts/structured_handoff_refs.py",
              "agent-discipline/skills/agent-workflow/scripts/workflow_evidence.py"]
@@ -138,3 +138,26 @@ def test_rule_changes_are_local_to_join_and_direct_helpers():
             assert dump(old[name]) == dump(new[name]), name
     assert set(new) - set(old) <= direct
     assert [dump(n) for n in before.body if not isinstance(n, ast.ClassDef)] == [dump(n) for n in after.body if not isinstance(n, ast.ClassDef)]
+
+
+def test_repair_change_stays_local_and_existing_projection_call_shape_survives():
+    path = "agent-discipline/skills/agent-workflow/scripts/repair_protocol.py"
+    before = ast.parse(git("show", G + ":" + path).decode())
+    after = ast.parse((SOURCE / path).read_text("utf-8"))
+    old = {n.name: n for n in before.body if isinstance(n, ast.FunctionDef)}
+    new = {n.name: n for n in after.body if isinstance(n, ast.FunctionDef)}
+    assert old.keys() <= new.keys()
+    allowed = {"validate_impact_projection", "validate_repair", "_attachment_changes", "_audit"}
+    while True:
+        direct = {node.func.id for key in allowed for node in ast.walk(new[key]) if isinstance(node, ast.Call)
+                  and isinstance(node.func, ast.Name) and node.func.id in new}
+        updated = allowed | direct
+        if updated == allowed:
+            break
+        allowed = updated
+    assert set(new) - set(old) <= allowed
+    for name in old.keys() - allowed:
+        assert ast.dump(old[name], include_attributes=False) == ast.dump(new[name], include_attributes=False), name
+    args = new["validate_impact_projection"].args
+    assert [a.arg for a in args.args][:2] == ["before", "after"]
+    assert "source_changes" in [a.arg for a in args.kwonlyargs]

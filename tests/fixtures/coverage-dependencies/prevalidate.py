@@ -64,9 +64,6 @@ REGRESSIONS = [
     "tests/unit/test_handoff_repair_guard.py::test_support_retest_requires_fresh_result_ref_even_for_identical_pass",
     "tests/unit/test_handoff_repair_schema.py::test_gate_retains_explicit_legacy_v1",
     "tests/unit/test_handoff_repair_schema.py::test_gate_loads_supported_declarations_but_never_as_legacy_records",
-    "tests/functional/test_workflow_evidence.py::test_source_projection_and_count_are_independent",
-    "tests/functional/test_workflow_evidence.py::test_present_attachment_tamper_is_invalid",
-    "tests/functional/test_workflow_evidence.py::test_real_candidate_direct_union_not_only_parent_claim",
 ]
 
 REFERENCE_JOIN = '''    def coverage_join(self, a):
@@ -99,6 +96,34 @@ REFERENCE_JOIN = '''    def coverage_join(self, a):
 
 '''
 
+REFERENCE_METADATA = '''
+def _reference_attribution_projection(original, payload, mapping, before, after):
+    """Controlled K1 reference with full proof; no public direct-call bypass."""
+    old = {item["id"]: item for item in before["selected_checks"]}
+    new = {item["id"]: item for item in after["selected_checks"]}
+    _require(old.keys() == new.keys(), "REPAIR_SELECTION_CHANGE")
+    added = {}
+    for key in old:
+        prior, current = set(old[key]["covered_paths"]), set(new[key]["covered_paths"])
+        _require(prior <= current, "REPAIR_COVERAGE_CHANGE")
+        if current - prior:
+            added[key] = current - prior
+    if not added:
+        return validate_impact_projection(before, after)
+    source = original.get("payload", {}).get("test_tip")
+    _require(original["artifact_kind"] == "test-gate-report" and source and
+             payload["preserve_tip"] == source["commit"], "REPAIR_SOURCE_BINDINGS")
+    _require(set(payload["semantic_audit"]["affected_check_ids"]) == set(added), "REPAIR_RETEST_SCOPE")
+    facts = {(item["commit"], item["path"]) for item in mapping["source_facts"]}
+    for paths in added.values():
+        _require(all((source["commit"], path) in facts for path in paths), "REPAIR_SOURCE_BINDINGS")
+    projected = json.loads(json.dumps(after))
+    for check in projected["selected_checks"]:
+        check["covered_paths"] = list(old[check["id"]]["covered_paths"])
+    validate_impact_projection(before, projected)
+
+'''
+
 
 def canonical(value):
     return (json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False) + "\n").encode()
@@ -120,8 +145,17 @@ def reference(directory):
             start = text.index("    def coverage_join(self, a):")
             end = text.index("    def tester_confidential_report", start)
             raw = (text[:start] + REFERENCE_JOIN + text[end:]).encode()
+        elif path.endswith("/repair_protocol.py"):
+            text = raw.decode()
+            old = '            validate_impact_projection(before, after, source_changes=p["source_changes"] if support else None)'
+            assert text.count(old) == 1
+            replacement = ('            if support:\n'
+                '                validate_impact_projection(before, after, source_changes=p["source_changes"])\n'
+                '            else:\n'
+                '                _reference_attribution_projection(original, p, change, before, after)')
+            raw = (text.replace(old, replacement) + REFERENCE_METADATA).encode()
         elif path.endswith("/structured-handoffs.md"):
-            raw += b"\nControlled K0 reference only: covered_paths assigns checks; public_dependency_edges declares directed source relationships. Shared coverage does not imply direct edges. Each declared endpoint needs selected coverage, and directed pairs are unique. Orchestrator checks exact source truth, completeness and reason; structural CHECKED does not execute commands or authenticate approval. An upgraded verifier records its own exact source while retaining each task Governor and W2/W3/W4; explicit W1 behavior remains unchanged.\n"
+            raw += b"\nControlled K1 reference only: covered_paths assigns checks; public_dependency_edges declares directed source relationships. Shared coverage does not imply direct edges. Each declared endpoint needs selected coverage, and directed pairs are unique. Orchestrator checks exact source truth, completeness and reason; structural CHECKED does not execute commands or authenticate approval. An upgraded verifier records its own exact source while retaining each task Governor and W2/W3/W4; explicit W1 behavior remains unchanged. Complete METADATA attribution repair is add-only with exact preserve_tip, unchanged commands and all affected_check_ids, source facts for every added path, and all semantic_audit dimensions. All old coverage and acceptance remain; direct projection without proof stays strict.\n"
         target = directory / path
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(raw)
@@ -143,6 +177,7 @@ def main():
     env = os.environ.copy()
     env.pop("RTD_COVERAGE_SCRIPTS", None)
     env.pop("RTD_COVERAGE_SOURCE_ROOT", None)
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
     metadata = {"mode": args.mode, "governor": G, "environment_id": "windows-host-python314-real-git", "source": []}
     if args.mode == "reference":
         ref = temp / "controlled-reference"
@@ -162,7 +197,7 @@ def main():
             nodes = ["tests/functional/test_coverage_dependencies.py::test_known_good_full_local_chain_and_cli"]
         elif args.mode == "regressions":
             nodes = REGRESSIONS
-        argv = [sys.executable, "-m", "pytest", *nodes, "-q", "--basetemp", str(temp / "pytest"),
+        argv = [sys.executable, "-B", "-m", "pytest", *nodes, "-q", "-p", "no:cacheprovider", "--basetemp", str(temp / "pytest"),
                 "--junitxml", str(out / "junit.xml")]
     result = subprocess.run(argv, cwd=ROOT, env=env, capture_output=True, timeout=1200)
     (out / "stdout.log").write_bytes(result.stdout)

@@ -305,3 +305,73 @@ def test_coverage_join_uses_real_reference_graph_direct_entry(repo):
     graph = repo.graph()
     LocalRules(graph).coverage_join(graph.artifacts[repo.envelope["artifact_id"]])
     validate_definition(repo.impact_body, "ImpactSet")
+
+
+@pytest.mark.parametrize("version", [3, 4])
+@pytest.mark.parametrize("count,multiple", [(1, False), (2, True)])
+def test_source_bound_add_only_metadata_full_chain(tmp_path, version, count, multiple):
+    from repair_support import AttributionRepository
+    h = AttributionRepository(tmp_path / "source", version=version, count=count, multiple_checks=multiple)
+    before = h.fingerprints()
+    authority_bytes = (h.root / h.approval["path"]).read_bytes()
+    invocation_before = h.invocation()
+    repair, replacement = h.repair()
+    accepted(h.validate(repair))
+    accepted(h.validate(replacement))
+    candidate = h.repaired_candidate(replacement)
+    accepted(h.validate(candidate))
+    body = h.objects[candidate["artifact_id"]]["payload"]
+    assert body["test_tip"]["commit"] == h.t and body["candidate"]["commit"] == h.c
+    assert body["candidate_index"] == body["correction_count"] == 0
+    assert h.fingerprints() == before and h.invocation() == invocation_before
+    assert (h.root / h.approval["path"]).read_bytes() == authority_bytes
+
+
+@pytest.mark.parametrize("mutation", ["no-added-binding", "wrong-blob", "wrong-source", "no-affected-checks",
+    "partial-affected-checks", "extra-affected-check", "empty-audit", "missing-coverage-dimension",
+    "wrong-preserved-tip", "missing-changed-fields", "permission-flag", "remove-old-path", "transfer-old-path",
+    "argv", "check-id", "family", "requirements", "exclusions", "prevalidation"])
+def test_add_only_repair_rejects_incomplete_proof_or_scope_change(tmp_path, mutation):
+    from repair_support import AttributionRepository
+    h = AttributionRepository(tmp_path / "source", count=2, multiple_checks=True)
+    repair, _ = h.repair()
+    before = h.fingerprints()
+    rejected(h.validate(h.changed_repair(repair, mutation)))
+    assert h.fingerprints() == before
+
+
+def test_unproved_direct_projection_still_rejects_additions(repo):
+    after = copy.deepcopy(repo.impact_body)
+    after["selected_checks"][0]["covered_paths"].append(repo.paths["leaf"])
+    with pytest.raises(RepairError):
+        validate_impact_projection(repo.impact_body, after)
+
+
+def test_metadata_capability_is_not_backported_into_w2(tmp_path):
+    from repair_support import AttributionRepository
+    h = AttributionRepository(tmp_path / "source", version=2)
+    repair, _ = h.repair()
+    rejected(h.validate(repair))
+
+
+@pytest.mark.parametrize("changed", ["test_tip", "approval", "dispatch", "count"])
+def test_attribution_replacement_cannot_rebind_original_source_or_authority(tmp_path, changed):
+    from repair_support import AttributionRepository
+    h = AttributionRepository(tmp_path / "source")
+    repair, replacement = h.repair()
+    body = copy.deepcopy(h.objects[replacement["artifact_id"]])
+    if changed == "test_tip":
+        body["payload"]["test_tip"] = h.tip(h.g)
+    elif changed == "approval":
+        body["replaces"]["original"] = h.approval
+    elif changed == "dispatch":
+        body["payload"]["dispatch_id"] = "not-the-repair-dispatch"
+    else:
+        body["payload"]["correction_count"] = 0
+    rejected(h.validate(h.store(body)))
+
+
+@pytest.mark.parametrize("case", ["ready", "candidate", "gap", "corrected", "tamper", "union"])
+def test_existing_evidence_checks_with_exact_fixture_protocol(tmp_path, case):
+    from evidence_adapter import run_original_case
+    run_original_case(tmp_path / "source", case)
