@@ -183,6 +183,15 @@ def cleanup_paths(root: Path, paths: Sequence[str], *, allowed_base: Path, prote
         targets.append(target)
     if any(a != b and a.is_relative_to(b) for a in targets for b in targets):
         fail("PATH_BOUNDARY", "Cleanup targets must not overlap.")
+    if targets:
+        # check-ignore is not a source inventory (for example, Git's case
+        # matching can differ from the filesystem). Read the complete index,
+        # using NUL records and native path components, never user pathspecs.
+        # Do not resolve links: only their own indexed names belong to a target.
+        tracked = git(root, "ls-files", "--cached", "-z").split("\x00")
+        for name in tracked:
+            if name and any((root / name).is_relative_to(target) for target in targets):
+                fail("PATH_BOUNDARY", "Cleanup target contains Git-tracked source.")
     if not dry_run:
         for target in targets:
             if bool(getattr(target, "is_junction", lambda: False)()):
