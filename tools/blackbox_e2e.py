@@ -39,10 +39,10 @@
 # Project:     RTD CfgFile CLI <https://github.com/autoMBD/autombd-rtd-config>
 # File:        blackbox_e2e.py
 # Author:      autoMBD <tkung.lqk@foxmail.com>
-# Date:        2026-06-17
-# Version:     0.4.0
+# Date:        2026-09-11
+# Version:     0.5.0
 # Description: True black-box isolated E2E harness that drives a third-party
-#              agent CLI (Codex, OpenCode; others via adapter registry) to
+#              agent CLI (Codex, Claude, OpenCode; extensible registry) to
 #              exercise the released autombd-rtd skill. A Tester uses this to
 #              run an E2E case as a genuine black box: fresh temp dir, deployed
 #              skill, copied fixture, and the agent sees only skill + fixture +
@@ -51,9 +51,8 @@
 #              the [context-injected -> static-check-passed] window) plus
 #              diagnostic-only evidence (edit-attempt count and
 #              validation-excluded time), all derived from the agent's session
-#              output. OpenCode is the DEFAULT agent; an explicit --agent flag
-#              persists the choice to .agent-state/e2e-preferences.json for
-#              subsequent runs.
+#              output. The current contributor is the default actor; an
+#              explicit --agent persists preference without becoming identity.
 # =================================================================================
 
 from __future__ import annotations
@@ -72,7 +71,7 @@ import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Sequence
 
 # ---------------------------------------------------------------------------
 # Public data types
@@ -80,6 +79,12 @@ from typing import Any, Callable
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SKILL_NAME = "autombd-rtd"
+
+_WORKFLOW_SCRIPTS = REPO_ROOT / "agent-discipline/skills/agent-workflow/scripts"
+if str(_WORKFLOW_SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(_WORKFLOW_SCRIPTS))
+from workflow_environment import EnvironmentError, select_agent
+
 
 
 @dataclass(frozen=True)
@@ -627,7 +632,7 @@ def compute_opencode_kpi(stdout: str) -> dict[str, Any]:
 # Agent adapter registry
 # ---------------------------------------------------------------------------
 
-DEFAULT_AGENT = "opencode"
+DEFAULT_AGENT = None  # Compatibility symbol; there is no unconditional vendor default.
 
 
 @dataclass(frozen=True)
@@ -767,8 +772,68 @@ def _opencode_compute_kpi(rr: RunResult) -> "dict[str, Any] | None":
     return compute_opencode_kpi(rr.stdout)
 
 
+def _claude_prepare_workdir(workdir: Path) -> None:
+    """Root Git discovery in the staged directory; this is not OS isolation."""
+    clean = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+    subprocess.run(["git", "init", str(workdir)], env=clean, stdin=subprocess.DEVNULL,
+                   check=True, capture_output=True)
+
+
+def run_claude(prompt: str, workdir: Path, timeout_s: int, sandbox: str,
+               model: str | None = None) -> RunResult:
+    """Run one new noninteractive Claude session in the preflight-approved context.
+
+    The official CLI reference documents print/text input, bare discovery,
+    dontAsk permission mode, JSON output and no-session-persistence. No prior
+    conversation or model is inferred; this does not redesign runner lifecycle.
+    """
+    executable = shutil.which("claude")
+    if executable is None or Path(executable).suffix.lower() in (".cmd", ".bat"):
+        raise EnvironmentError("CAPABILITY_UNAVAILABLE", "A native Claude executable is required on PATH.")
+    argv = [executable, "-p", "--bare", "--output-format", "json",
+            "--permission-mode", "dontAsk", "--no-session-persistence",
+            "--allowedTools", "Read,Edit,Write,Bash,Glob,Grep"]
+    if model is not None:
+        argv.extend(["--model", model])
+    start = time.monotonic()
+    try:
+        completed = subprocess.run(argv, cwd=workdir, input=prompt, text=True,
+                                   capture_output=True, timeout=timeout_s, shell=False)
+        return RunResult(completed.returncode, False, completed.stdout or "",
+                         completed.stderr or "", time.monotonic() - start)
+    except subprocess.TimeoutExpired as exc:
+        def text_output(value):
+            return value if isinstance(value, str) else (value or b"").decode(errors="replace")
+        return RunResult(-1, True, text_output(exc.stdout), text_output(exc.stderr),
+                         time.monotonic() - start)
+
+
+def _claude_extract_result(result: RunResult) -> dict[str, Any] | None:
+    try:
+        envelope = json.loads(result.stdout)
+    except (ValueError, TypeError):
+        return None
+    if not isinstance(envelope, dict) or envelope.get("is_error") is not False:
+        return None
+    text = envelope.get("result")
+    return _extract_terminal_blackbox_result(text) if isinstance(text, str) else None
+
+
+def _claude_compute_kpi(result: RunResult) -> None:
+    """No canonical KPI timestamps are supplied by the one-shot JSON result."""
+    return None
+
+
 #: Registry mapping agent name -> AgentAdapter.
 AGENT_ADAPTERS: dict[str, AgentAdapter] = {
+    "claude": AgentAdapter(
+        name="claude",
+        deploy_agent="claude",
+        prepare_workdir=_claude_prepare_workdir,
+        run=run_claude,
+        extract_result=_claude_extract_result,
+        compute_kpi=_claude_compute_kpi,
+    ),
     "codex": AgentAdapter(
         name="codex",
         deploy_agent="codex",
@@ -907,45 +972,56 @@ def write_agent_cache(path: Path, agent: str) -> None:
     _retry_fs(lambda: tmp_path.replace(path))
 
 
+def _available_agents() -> list[str]:
+    """Inspect PATH only; executable discovery is not authentication evidence."""
+    return [name for name in AGENT_ADAPTERS
+            if shutil.which(name) or shutil.which(name + ".cmd")]
+
+
+def _current_platform_signal() -> str | None:
+    explicit = os.environ.get("RTD_CURRENT_PLATFORM")
+    if explicit is not None:
+        if explicit not in AGENT_ADAPTERS:
+            raise EnvironmentError("INVALID_INPUT", "RTD_CURRENT_PLATFORM is unsupported.")
+        return explicit
+    signals = [name for name, key in (("codex", "CODEX_THREAD_ID"),
+               ("claude", "CLAUDECODE"), ("opencode", "OPENCODE")) if os.environ.get(key)]
+    if len(signals) > 1:
+        raise EnvironmentError("INVALID_INPUT", "Contributor platform signals are ambiguous; specify --current-platform.")
+    return signals[0] if signals else None
+
+
 def resolve_agent(
     cli_agent: str | None,
     cache_path: Path,
+    *,
+    current_platform: str | None = None,
+    available_agents: Sequence[str] | None = None,
 ) -> tuple[str, str]:
-    """Resolve the active agent from the CLI flag and/or the cache.
+    """Choose an explicit available actor, current contributor, or unique adapter.
 
-    Returns ``(agent, source)`` where source is one of ``"flag"``,
-    ``"cache"``, or ``"default"``.
-
-    - ``cli_agent`` not None: validate against ``AGENT_ADAPTERS`` (raise
-      ``ValueError`` for unknown agents); best-effort persist to cache
-      (a write failure that survives ``write_agent_cache``'s own transient-
-      lock retry is logged to stderr and swallowed — losing a preference
-      write must never abort the run); return ``(cli_agent, "flag")``.
-    - else: read cache; if a valid cached agent is found, return
-      ``(cached, "cache")``.
-    - else: return ``(DEFAULT_AGENT, "default")`` — do NOT rewrite the cache
-      on fallback.
+    Cache is preference provenance only; it never identifies a contributor or
+    breaks an ambiguous availability tie. PATH discovery does not prove auth,
+    OS read isolation or permission to launch an unattended Agent.
     """
+    available = _available_agents() if available_agents is None else list(available_agents)
     if cli_agent is not None:
-        if cli_agent not in AGENT_ADAPTERS:
-            supported = ", ".join(sorted(AGENT_ADAPTERS))
-            raise ValueError(
-                f"unsupported agent {cli_agent!r}; supported agents are: {supported}"
-            )
+        selected = select_agent(None, available, explicit_agent=cli_agent)
+        get_adapter(selected)
         try:
-            write_agent_cache(cache_path, cli_agent)
-        except OSError as exc:
-            print(
-                f"warning: could not persist agent preference to {cache_path}: {exc}",
-                file=sys.stderr,
-            )
-        return (cli_agent, "flag")
-
+            write_agent_cache(cache_path, selected)
+        except OSError:
+            print("warning: could not persist agent preference", file=sys.stderr)
+        return selected, "flag"
+    current = current_platform if current_platform is not None else _current_platform_signal()
+    if current is not None:
+        return select_agent(current, available), "current-platform"
+    # A single available adapter is an unambiguous current execution context.
+    if len(available) != 1:
+        raise EnvironmentError("INVALID_INPUT", "Contributor context is missing or ambiguous; specify --current-platform or --agent.")
+    selected = select_agent(available[0], available)
     cached = read_agent_cache(cache_path)
-    if cached is not None and cached in AGENT_ADAPTERS:
-        return (cached, "cache")
-
-    return (DEFAULT_AGENT, "default")
+    return selected, "cache" if cached == selected else "available"
 
 
 # ---------------------------------------------------------------------------
@@ -1290,7 +1366,7 @@ def run_pipeline(
     deploy_fn: Callable[..., Any] | None = None,
     runner_fn: Callable[..., RunResult] | None = None,
     keep: bool = False,
-    agent_source: str = "default",
+    agent_source: str = "flag",
     model: str | None = None,
     prepare_workdir_fn: "Callable[[Path], None] | None" = None,
 ) -> dict[str, Any]:
@@ -1439,7 +1515,7 @@ def build_parser() -> argparse.ArgumentParser:
             "Black-box isolated E2E harness for the RTD CfgFile CLI autombd-rtd skill.\n"
             "Deploys the released skill into a fresh temp dir, copies the case fixture,\n"
             "and drives a third-party agent CLI with the case's Subagent Prompt.\n"
-            f"Default agent: {DEFAULT_AGENT}  |  Supported agents: {supported_agents}"
+            f"Default actor: current contributor  |  Supported agents: {supported_agents}"
         )
     )
     parser.add_argument(
@@ -1453,10 +1529,14 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         metavar="NAME",
         help=(
-            "agent backend to use; if omitted, uses the cached choice or the built-in "
-            f"default ({DEFAULT_AGENT}); an explicit value is cached for next time. "
+            "explicit available actor; otherwise use the current contributor. "
+            "An explicit value is cached as preference, not contributor identity. "
             f"Supported: {supported_agents}"
         ),
+    )
+    parser.add_argument(
+        "--current-platform", choices=tuple(AGENT_ADAPTERS), default=None,
+        help="current contributor platform; overrides another contributor's cached preference",
     )
     parser.add_argument(
         "--model",
@@ -1514,7 +1594,7 @@ def main(argv: list[str] | None = None) -> int:
     # Resolve agent from CLI flag + cache (PERSIST-ON-USE semantics)
     cache_path = repo_root / ".agent-state" / "e2e-preferences.json"
     try:
-        agent, agent_source = resolve_agent(args.agent, cache_path)
+        agent, agent_source = resolve_agent(args.agent, cache_path, current_platform=args.current_platform)
     except ValueError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1

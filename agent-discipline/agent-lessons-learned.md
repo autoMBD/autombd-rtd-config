@@ -368,3 +368,50 @@ What happened: a green scoped functional gate left a format-replacement path abl
 What happened: consumer-local Git identity initially failed although digest and HEAD were correct. Root cause: the guard removes GIT-prefixed environment settings and runs with the invocation user's context, so the sandbox invocation did not share the known successful repository-user Git context. Prevention: preserve the failed receipt, diagnose exact identities once, and reuse a scoped approved execution context rather than changing global Git trust or weakening the guard.
 
 What happened: a fault-injection test adapter required two loader setup lines after a source-module decomposition. Root cause: python -c plus runpy did not establish the same sibling import path as direct script execution. Prevention: independently prevalidate the complete thin CLI injection adapter in the same import topology as delivered code; retain raw historical evidence and explicitly bind any Human-authorized non-case repair.
+
+
+## LL-049 - Issue #79 Human-authorized Test v2 terminal review (2026-09-11)
+
+Source: [issue #79](https://github.com/autoMBD/autombd-rtd-config/issues/79),
+review `issue79-terminal-review-test-v2-r0`, reviewed Candidate
+`d8e8284c32362af6939eb8802501e07f3c50ccc7`, Governor
+`72977f1bda04e28fc0e3595f578f9ca0875cadad` / W4.
+Current verdict: REJECTED. The scoped Tester gate passed; the unresolved
+MAJOR/P1 source-preservation finding is tracked by
+[issue #112](https://github.com/autoMBD/autombd-rtd-config/issues/112).
+The first review `issue79-terminal-review-r0` remains REJECTED on its original
+Candidate `0682f8e2b2df31e5c44456d5501cd504571818bd`; this second review was
+expressly authorized by Human and does not rewrite or routinely reopen it.
+
+What happened: the selected functional gate passed while recursive cleanup
+could still remove a tracked descendant beneath an ignored directory.
+Root cause: ignore membership of the directory was used as a substitute for
+source ownership of everything below it. Existing coverage checked ordinary
+temporary trees and protected paths but omitted that Git-index relationship.
+Prevention: in the separately authorized #112 work, inspect source/index
+membership for every recursive target before the first deletion, reject a
+source-bearing target, and cover both an ignored parent with a tracked child
+and a mixed cleanup plan whose earlier valid target must survive rejection.
+This is a static review inference, not a new executed reproduction; no fix is
+claimed in the reviewed Candidate. Tester PASS and publication of a follow-up
+issue do not reduce the finding or authorize merge. Human decides treatment
+and current delivery disposition separately from the original verdict.
+
+What happened: Human authorized narrow case corrections and a new Governor
+baseline while retaining the original review and its evidence. Root cause:
+selected expectations had diverged from existing deployment semantics and
+valid public error behavior, while the later policy merge changed fixed
+baseline identities. Prevention: bind each exact approved patch and resulting
+Test blob, retain the earlier source and failed evidence, and record new
+Candidate execution under its real G/W/K/T/I identities. Do not relabel a
+historical result, claim a production correction when source is unchanged,
+or generalize explicit Human authorization into an automatic retry policy.
+
+What happened: W4 requires terminal lessons to be saved with the Candidate
+on both success and failure. Root cause of delivery confusion would be
+conflating the tested Candidate with its documentation-only successor.
+Prevention: keep C as tested/reviewed, append current lessons once on the same
+branch as a sole-parent child L, verify all prior blob bytes and file mode are
+preserved, and bind the complete committed lessons document in the report.
+Do not describe L as tested, put raw review/test evidence in committed source,
+or use the lessons step to change Test or Implementation.
