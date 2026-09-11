@@ -356,16 +356,17 @@ class LocalRules:
         impact = self.impact(a, p["impact_set"])
         checks = {x["id"]: x for x in impact["selected_checks"]}
         requirements = {x["id"] for x in self.g.contract(a)["payload"]["requirements"]}
-        edges = {(x["from"], x["to"]) for x in impact["public_dependency_edges"]}
-        unique(list(edges), "DEPENDENCY_EDGE")
         for change in join["changed_paths"]:
             require(set(change["requirement_ids"]) <= requirements and set(change["selected_check_ids"]) <= checks.keys(), "COVERAGE_REFERENCE")
             for check_id in change["selected_check_ids"]:
                 check = checks[check_id]
                 require(change["path"] in check["covered_paths"] and set(change["requirement_ids"]) <= set(check["requirement_ids"]), "COVERAGE_JOIN_MISSING")
-                for target in set(check["covered_paths"]) & actual_test:
-                    if change["owner"] == "IMPLEMENTATION":
-                        require((change["path"], target) in edges, "PUBLIC_DEPENDENCY_MISSING")
+        # Shared check coverage does not imply a direct source dependency.
+        edges = [(x["from"], x["to"]) for x in impact["public_dependency_edges"]]
+        unique(edges, "DEPENDENCY_EDGE")
+        covered_paths = {path for check in checks.values() for path in check["covered_paths"]}
+        for source, target in edges:
+            require(source in covered_paths and target in covered_paths, "DEPENDENCY_COVERAGE")
 
     def tester_confidential_report(self, a):
         p = a["payload"]
