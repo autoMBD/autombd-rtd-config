@@ -46,6 +46,7 @@
 
 
 import copy
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -267,6 +268,8 @@ class GuardBridge:
             item_ref = {"kind": body["artifact_kind"], "artifact_id": body["artifact_id"],
                 "path": path, "sha256": hashlib.sha256((self.life.root / path).read_bytes()).hexdigest()}
             item = {"ref": item_ref, "body": body}
+            if (self.life.root / path).read_bytes() != canonical_bytes(body):
+                item["raw"] = (self.life.root / path).read_bytes().decode("utf-8")
             context["checks" if body["artifact_kind"] == "guard-result" else "artifacts"].append(item)
         event = {"schema_version": "1.0", "type": "CONSUME", "event_id": "consume-" + ref["artifact_id"],
                  "artifact": ref, "checked": checked}
@@ -295,6 +298,74 @@ class GuardBridge:
 @pytest.fixture
 def life(tmp_path):
     return RepairLifecycle(tmp_path / "repo")
+
+
+@pytest.mark.parametrize("defect", ["crlf", "shape"])
+def test_rejected_report_identity_allows_real_guard_to_reducer_repair(life, defect):
+    bridge = GuardBridge(life)
+    bridge.ready()
+    bridge.consume(life.candidate(0))
+    execution = life.report("PASS")
+    bridge.consume(execution)
+    terminal = life.terminal(execution, True, 0)
+    terminal_body = life.objects[terminal["artifact_id"]]
+    original = terminal_body["payload"]["review"]
+    good = copy.deepcopy(life.objects[original["artifact_id"]])
+    bridge.consume(good["predecessors"][0])
+    if defect == "crlf":
+        raw = canonical_bytes(good)[:-1] + b"\r\n"
+        life.write(original["path"], raw)
+        original = {**original, "sha256": hashlib.sha256(raw).hexdigest()}
+    else:
+        original = life.store({**good, "unexpected": True})
+    code, rejected = life.validate(original)
+    assert code == 1
+    assert rejected["phase"] == ("PARSE" if defect == "crlf" else "SHAPE")
+    assert rejected["violations"][0]["rule_id"] == ("NON_CANONICAL" if defect == "crlf" else "EXTRA_MEMBER")
+    assert rejected["input"] == {k: original[k] for k in ("artifact_id", "path", "sha256")}
+    rejection = life.store(rejected)
+    replacement_path = ".agent-state/repaired-review.json"
+    repair = life.artifact("delivery-repair", {
+        "dispatch_id": good["payload"]["dispatch_id"], "original": original,
+        "rejection": rejection, "lane": life.lane("reviewer"),
+        "replacement_output": replacement_path, "preserve_tip": life.objects[life.c["artifact_id"]]["payload"]["candidate"]["commit"],
+        "preserve_candidate_index": 0, "preserve_correction_count": 0,
+        "preserve_review_id": good["payload"]["review_id"],
+        "business_verdict_change_allowed": False},
+        [original, rejection, *good["predecessors"]], consumer_role="reviewer", visibility=good["visibility"])
+    bridge.consume(repair)
+    fixed = copy.deepcopy(good)
+    fixed["artifact_id"] = "repaired-review"
+    fixed["replaces"] = {"original": original, "guard_result": rejection}
+    fixed["predecessors"] += [original, rejection, repair]
+    replacement = life.store(fixed)
+    assert replacement["path"] == replacement_path
+    bridge.consume(replacement)
+    terminal_body["payload"]["review"] = replacement
+    terminal_body["predecessors"] = [replacement, execution]
+    bridge.consume(life.store(terminal_body))
+    assert bridge.state["review"]["report"] == replacement
+    assert bridge.state["terminal"] is not None
+    assert fixed["payload"] == good["payload"]
+
+
+@pytest.mark.parametrize("raw,digest_override", [
+    (b'{"artifact_id":"valid-id",broken', None),
+    (b'{"artifact_id":"first","artifact_id":"second"}\n', None),
+    (b'{"artifact_id":"unsafe/path"}\n', None),
+    (b'{"artifact_id":42}\n', None),
+    (b'{}\n', None),
+    (b'{"artifact_id":"valid-id"}\n', "0" * 64),
+])
+def test_rejection_does_not_invent_or_trust_an_invalid_report_id(life, raw, digest_override):
+    original = life.ir
+    life.write(original["path"], raw)
+    original = {**original, "sha256": digest_override or hashlib.sha256(raw).hexdigest()}
+    code, rejected = life.validate(original)
+    assert code == 1
+    assert rejected["input"]["artifact_id"] is None
+    assert rejected["input"]["sha256"] == hashlib.sha256(raw).hexdigest()
+    assert rejected["command_started"] == "NOT_STARTED"
 
 
 def test_observed_checked_metadata_and_fresh_replacement_guard(life):
