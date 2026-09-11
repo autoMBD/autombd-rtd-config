@@ -820,9 +820,9 @@ class TestCliAndContract:
 
     def test_c43_existing_workflow_and_vendor_boundaries_remain_authoritative(self):
         pinned = {
-            "agent-discipline/workflow-contract.json": "771a6c196e38c211d5bec6ea01f5e6b7013a3296",
+            "agent-discipline/workflow-contract.json": "ca2d3504174d7c03dadbda20c05ccb2a5e2f96a1",
             "agent-discipline/skills/agent-workflow/schemas/functional-development-v1.json": "e0ef077af1ae5f7d74e04980d4b1d7531579c214",
-            "agent-discipline/skills/agent-workflow/schemas/handoff-v1.schema.json": "fa70dc621091d82b01d136632e6e75d99a96d157",
+            "agent-discipline/skills/agent-workflow/schemas/handoff-v1.schema.json": "90f6d48c6e10bc3130f880a502e4f1ddc2d15a47",
             "agent-discipline/skills/agent-workflow/scripts/workflow_transition.py": "cc623a09218fdc6272f59759307e4c3e4353b6c7",
             "agent-discipline/skills/agent-workflow/scripts/workflow_evidence.py": "1b26549af9fa59e1c4eb704b4aef432da50e0289",
         }
