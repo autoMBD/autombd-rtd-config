@@ -2,7 +2,7 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.1.10 |
+| Version | 0.1.11 |
 | Date | 2026-09-11 |
 | Author | autoMBD <tkung.lqk@foxmail.com> (AI-assisted) |
 | Description | Functional-development role interfaces, local delivery validation, confidentiality, and explicit legacy migration boundaries. |
@@ -293,11 +293,42 @@ The new attachment must satisfy its normal schema and source constraints. Old
 erroneous descriptive metadata can be retained without pretending it validates;
 its authoritative source and protected semantics must nevertheless be
 unambiguously recoverable. Metadata-only repair preserves selected check IDs,
-families, commands, requirement coverage and covered paths, excluded checks and
+families, commands, requirement coverage and all old covered paths, excluded checks and
 prevalidation modes. It cannot alter a command result or relabel a failure.
 Public-dependency corrections require an exact per-edge audit tied to current
 source blobs, not just a new reason string. The Orchestrator still judges
 whether the claimed dependency accurately describes the unchanged source.
+
+An omitted `covered_paths` attribution may be added through complete METADATA
+repair only when the exact original Test and unchanged selected invocation
+already exercised that path. This repairs the recorded attribution without
+expanding real acceptance scope. Keep every old path in its original check;
+do not remove or transfer coverage, add or change checks, alter their family,
+command or requirements, change exclusions or prevalidation modes, or change
+any frozen scenario, assertion, expected result or pass/fail criterion. A real
+acceptance expansion still requires a Human decision.
+
+Use the existing original report and before/after Impact Set snapshots with
+their exact digests and `changed_fields`. `preserve_tip` must equal the original
+report's Test commit. Each newly attributed path must have a `source_facts`
+binding for its real blob at that exact Test commit, included in the
+Orchestrator `semantic_audit.source_bindings`. Its `affected_check_ids` must
+identify exactly all checks receiving attribution additions. The semantic audit
+must explicitly examine coverage and every existing frozen dimension, confirming
+that the same invocation already exercised the added paths. Dependency changes
+retain their independent per-edge source audit. The guard checks actual Git
+blobs; the pure repair rules check the supplied bindings and projections.
+Neither proves execution or the truth of the audit's source interpretation.
+
+A permission flag, reason string, incomplete audit, unrelated source version or
+missing blob binding cannot authorize this exception. Direct
+`validate_impact_projection` calls remain strict without complete repair evidence;
+no new public flag, schema field or workflow capability is added. The original
+producer delivers a replacement with a new digest and fresh checks under the
+existing replacement chain, preserving T/approval, source, verdicts and counts.
+W2 does not acquire W3/W4 repair capabilities from a checker upgrade. Actual
+Test support source changes still use their existing source-repair and retest
+route; stale evidence cannot become a new execution result.
 
 For support source repair, the semantic audit identifies the exact old/new
 source, changed files and why scenarios, discriminating conditions, assertions,
@@ -385,9 +416,10 @@ new automatic trust guarantee is provided.
 This distinction does not relax the frozen-case or non-case repair boundaries.
 Descriptive dependency repair still requires the original producer, an exact
 per-edge audit bound to real source blobs, the original T/approval and the
-replacement chain. Selected check IDs, commands, requirements and covered paths,
+replacement chain. Selected check IDs, commands, requirements and all old covered paths,
 exclusions and prevalidation modes retain their existing protections. Metadata
-repair cannot change source or reuse stale results as a new execution. Actual
+repair may add omitted attribution only under the complete source-bound rule
+above; it cannot change source or reuse stale results as a new execution. Actual
 Test support changes retain their source, semantic-audit and retest obligations.
 
 Worker unit/generality tests and Tester functional tests are separate layers.
@@ -616,3 +648,4 @@ case review, results and dashboard are separate #100–#102 work.
 | 2026-09-09 | 0.1.8 | Linked read-only real-source, direct-union and remote finalization proof while retaining separate execution/intake boundaries. |
 | 2026-09-10 | 0.1.9 | Defined W4 Reviewer-owned lessons-only C→L lineage, complete lessons evidence, separate tested/PR identities, failure preservation and old-version compatibility without a new review or retest. |
 | 2026-09-11 | 0.1.10 | Separated selected-check coverage from declared direct dependencies, retained endpoint/source/frozen-repair checks and stated exact checker-upgrade provenance. |
+| 2026-09-11 | 0.1.11 | Allowed audited additions of omitted coverage attribution through complete METADATA repair, binding exact Test blobs and affected checks while preserving old paths, frozen semantics and strict direct projection calls. |
