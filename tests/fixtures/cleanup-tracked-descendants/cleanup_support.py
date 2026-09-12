@@ -83,6 +83,21 @@ def git(root, *args, check=True):
                     "-C", root, *args], root, check=check)
 
 
+def cleanup_scope_changes(root, base):
+    """Account for the exact retained lessons in the authorized master merge."""
+    result = git(root, "diff", "--name-only", "-z", base, "HEAD").stdout
+    changed = {part.decode("utf-8") for part in result.split(b"\0") if part}
+    lesson = "agent-discipline/agent-lessons-learned.md"
+    # Exact tree entry from integration 9732081d7cc5c74091890850a4c4a3b0582f6c0d.
+    retained = ("100644 blob 815ed5025b4310eab2a1ac01aa57d66647d437b3\t"
+                + lesson + "\0").encode("utf-8")
+    if git(root, "ls-tree", "-z", "HEAD", "--", lesson).stdout == retained:
+        changed.discard(lesson)
+    else:
+        changed.add(lesson)
+    return changed
+
+
 def write(path, data=b"temporary\x00bytes\r\n"):
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(data if isinstance(data, bytes) else data.encode("utf-8"))

@@ -57,7 +57,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tests/fixtures/cleanup-tracked-descendants"))
 import cleanup_support as s
 
-G = "cf78144a3786d1dc3f1e92d27157674a7ebea85c"
+G = "9f2357d5b4983b3b2465c442920626cb440b0e9e"
 DOCS = ROOT / "tests/doc/reference/agent"
 REQUIREMENTS = DOCS / "cleanup-tracked-descendants-requirements.md"
 CASES = DOCS / "cleanup-tracked-descendants-cases.md"
@@ -99,8 +99,7 @@ def test_c14_complete_requirements_and_case_correspondence():
 
 
 def test_c14_changes_stay_within_declared_surface():
-    result = s.git(ROOT, "diff", "--name-only", "-z", G, "HEAD").stdout
-    changed = {part.decode("utf-8") for part in result.split(b"\0") if part}
+    changed = s.cleanup_scope_changes(ROOT, G)
     assert changed <= ALLOWED, sorted(changed - ALLOWED)
     production = {p for p in changed if "/scripts/" in p}
     if production:
