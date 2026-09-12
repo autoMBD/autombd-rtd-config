@@ -415,3 +415,59 @@ branch as a sole-parent child L, verify all prior blob bytes and file mode are
 preserved, and bind the complete committed lessons document in the report.
 Do not describe L as tested, put raw review/test evidence in committed source,
 or use the lessons step to change Test or Implementation.
+
+## 2026-09-12 — #112 terminal review: source identity must survive filesystem aliases
+
+Review/dispatch: `issue112-terminal-review-r0`. Reviewed Candidate C:
+`c159e38c526f1ef80708461f24b7eea58129115b`; Test:
+`acdf831066e0e804da2d85172adba3ce785daaa0`; retained Implementation I0:
+`3c09c60f435cce4688b00fdf0f29b9f88ef5b5c8`. Original Reviewer verdict:
+**REJECTED**, one **MAJOR / P1** finding,
+`RF01_WINDOWS_TRAILING_DOT_SOURCE_ALIAS`. The Tester's five selected C0 commands
+retain their actual 164-item PASS. This review did not rerun the functional gate,
+invoke cleanup, inspect CI or authorize a correction.
+
+- **What happened:** the complete index preflight rejects the exercised source
+  spellings, but a read-only Windows observation found that a trailing-dot
+  directory spelling reaches the same directory and child while
+  `Path.is_relative_to` returns false for the indexed child's ordinary spelling.
+  **Root cause:** native lexical component comparison is not a complete
+  filesystem identity check. The caller target remains unresolved and accepts
+  the ambiguous spelling. **Durable guard:** separately validate or reject such
+  platform aliases before any deletion, preserving the distinction between a
+  leaf link and its destination. Add generality checks for actual filesystem
+  aliases and mixed plans, retaining source/index bytes. The source-loss path is
+  static control-flow inference, not an executed deletion reproduction.
+
+- **What happened:** meaningful real-Git tests and case-alias generality were
+  green while this additional alias class remained uncovered. **Root cause:**
+  representative cases do not enumerate every identity supported by a host
+  filesystem. **Durable guard:** review identity/normalization semantics
+  independently of the case table; derive arbitrary valid path variants from
+  the platform boundary. Preserve the original Test approval, actual PASS and
+  new finding separately. A follow-up issue and Human disposition cannot
+  silently convert the original REJECTED verdict into APPROVED.
+
+- **What happened:** unchanged-case Test attribution and Worker command-result
+  formatting were repaired without changing actual source or commands; a
+  whole-evidence aggregator still rejected the preserved raw legacy original.
+  **Root cause:** source identity, recorded coverage and evidence traversal are
+  separate concerns. **Durable guard:** retain raw before/after bytes, check
+  parsed semantic equality and exact original-Test blobs, and record
+  source-bound fresh receipts. State an unresolved aggregation limit honestly;
+  do not rewrite history, invent CHECKED or change G/W/K to satisfy a tool.
+
+- **What happened:** the initial Reviewer context contained extra closed-schema
+  fields, then the sandbox's Git ownership boundary rejected validation.
+  **Root cause:** an ArtifactRef was used where the context expects only a
+  path/digest, and sanitized Git ran under a different owner. **Durable guard:**
+  inspect the exact schema, let the original producer repair context, preserve
+  failed observations, and use only an authorized minimum host validation.
+  For W4 delivery, verify the lessons-only C-to-L parent and compare the raw
+  complete Git blob, avoiding worktree CRLF versus committed LF confusion.
+
+Retained salvage: I0's narrow preflight/reference and the original approved
+Test remain reusable. They do not establish source-safe cleanup for every
+Windows spelling. New work needs a separately authorized issue; #112's terminal
+attempts remain closed. These lessons are review evidence, not new executable
+requirements or an automatic expansion of the frozen gate.
