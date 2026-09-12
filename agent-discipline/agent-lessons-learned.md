@@ -471,3 +471,70 @@ Test remain reusable. They do not establish source-safe cleanup for every
 Windows spelling. New work needs a separately authorized issue; #112's terminal
 attempts remain closed. These lessons are review evidence, not new executable
 requirements or an automatic expansion of the frozen gate.
+
+
+## 2026-09-12 — Issue #116: coverage attribution and public dependencies
+
+Review identity: `issue116-terminal-review-r0`; dispatch: `issue116-reviewer-r0`.
+Original terminal verdict: **APPROVED**, with no BLOCKER, MAJOR or MINOR findings.
+Reviewed Candidate C: `52bc6e90a0a7d8c5532440566e986462d5d80186`.
+Original Test T: `2fed908194463be34ab2c2643f0915212119ecee`;
+Implementation I: `450b4b01c3ae62528d9a07ae081a5008d659dc8c`.
+Public scope: [Issue #116](https://github.com/autoMBD/autombd-rtd-config/issues/116)
+and its [complete reviewed requirements](https://github.com/autoMBD/autombd-rtd-config/blob/2fed908194463be34ab2c2643f0915212119ecee/tests/doc/reference/agent/coverage-dependencies-requirements.md).
+
+This entry is terminal review evidence, not an executable requirement or a new
+workflow authority. The Reviewer inspected source, scope, coverage adequacy and
+preserved evidence without re-executing the functional gate. Tester evidence
+belongs to C; this lessons-only child does not acquire a new test execution.
+
+1. **Shared coverage does not establish a direct dependency.** The previous
+   join required Cartesian pairs between implementation and Test paths sharing
+   a check, while collecting declared pairs into a set also concealed duplicate
+   declarations. The root cause was conflating attribution with dependency
+   direction. The durable guard is to review these declarations independently:
+   retain exact changed-path ownership and check/requirement mapping; inspect
+   duplicate directed pairs before deduplication; check every declared endpoint
+   against selected coverage. Independent varied grouping and multilevel-source
+   checks exercise that distinction. Source review still decides whether an
+   edge, its direction and reason describe an actual relationship.
+
+2. **Repair an omitted attribution with complete source proof.** The original
+   strict projection rejected additions even when unchanged commands already
+   exercised the omitted paths. Human authorized a narrow add-only repair.
+   The durable guard is the complete existing METADATA chain: original Test and
+   report, preserved tip, before/after attachment digests, exact changed fields,
+   real blobs for added paths, exact affected checks and every semantic-audit
+   dimension. Strict comparison of the remaining projection protects all old
+   paths, commands and acceptance semantics. Direct comparisons without that
+   proof remain strict; a permission flag or plausible prose does not supply
+   source truth. Real support-source changes retain their distinct lineage and
+   retest requirements.
+
+3. **Dependency descriptions need source review after structural checks.**
+   Current-run review corrected a source-reader name, bound the public
+   Implementation report and added six directly observed Worker dependencies.
+   These were descriptive repairs; the original T, reviewed cases, selected
+   commands, covered paths and prevalidation evidence remained unchanged.
+   The durable guard is to inspect exact callable/import/read sites and preserve
+   each producer replacement chain. A fixed-source comparison is provenance;
+   an imported helper is not evidence that every branch executes. Read-only
+   graph checks cannot certify semantic completeness or command execution.
+
+4. **Bind execution tooling separately from examined authority.** This task
+   exercised its exact Candidate checker while G/W/K remained pinned. Controlled
+   prevalidation references were identified separately from actual C execution.
+   Windows checkout CRLF conversion and a sandbox Git identity failure could
+   otherwise be mistaken for source drift or functional failure. The durable
+   guard is to record Git-blob and working-byte digests separately, preserve
+   failed environment observations, and use a fresh process with the intended
+   source path and cleared test overrides. For lessons delivery, compare the
+   committed C and L blobs, not normalized display text. Resuming #112 still
+   requires a separate exact reviewed-checker provenance and revalidation record
+   in that run's original context; this review does not perform that rollout.
+
+The retained scope is the narrow workflow-rule repair and both independent
+source lanes. No RTD module, descriptor, runtime asset, .mex file, schema,
+registry, workflow capability, correction count or prior approval changed.
+No follow-up Implementation issue was identified. Final Human review remains
+responsible for the exact lessons-only delivery head and current disposition.

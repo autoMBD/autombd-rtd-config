@@ -387,6 +387,34 @@ def _manifest(body, source, artifact, requirements, workflow_version=3):
              set(body["requirement_ids"]) == set(requirements), "REPAIR_MANIFEST_IDENTITY")
 
 
+def _metadata_impact_projection(payload, original, change, before, after):
+    """Allow proved attribution additions only inside complete metadata repair."""
+    old, new = _indexed(before["selected_checks"]), _indexed(after["selected_checks"])
+    _require(old.keys() == new.keys(), "REPAIR_SELECTION_CHANGE")
+    additions = {key: set(check["covered_paths"]) - set(old[key]["covered_paths"])
+                 for key, check in new.items()}
+    additions = {key: paths for key, paths in additions.items() if paths}
+    if not additions:
+        validate_impact_projection(before, after)
+        return
+
+    # Remove only proposed additions for the strict frozen projection check;
+    # removals, transfers, changed commands and other scope changes still fail.
+    projected = dict(after, selected_checks=[dict(check, covered_paths=[
+        path for path in check["covered_paths"] if path not in additions.get(check["id"], set())])
+        for check in after["selected_checks"]])
+    validate_impact_projection(before, projected)
+    tip = original.get("test_tip")
+    _require(tip is not None and payload["preserve_tip"] == tip["commit"], "REPAIR_TIP")
+    facts = {path for commit, path, blob in _source_tuples(change["source_facts"])
+             if commit == tip["commit"]}
+    _require(all(paths <= facts for paths in additions.values()), "REPAIR_SOURCE_BINDINGS")
+    _require(set(payload["semantic_audit"]["affected_check_ids"]) == set(additions),
+             "REPAIR_SEMANTIC_AUDIT")
+    # The complete repair validates every audit dimension and binding; its
+    # caller checks the actual Git blobs. Source meaning remains reviewed.
+
+
 def _attachment_changes(artifact, original, validate_after, expected_before, expected_after=None, workflow_version=3):
     p, op = artifact["payload"], original["payload"]
     support = p["mode"] == "TEST_SUPPORT"
@@ -410,7 +438,10 @@ def _attachment_changes(artifact, original, validate_after, expected_before, exp
         _require(all(change[name]["ref"]["evidence_type"] == expected_type for name in ("before", "after")),
                  "REPAIR_ATTACHMENT_TYPE")
         if field == "impact_set":
-            validate_impact_projection(before, after, source_changes=p["source_changes"] if support else None)
+            if support:
+                validate_impact_projection(before, after, source_changes=p["source_changes"])
+            else:
+                _metadata_impact_projection(p, op, change, before, after)
             _require(after["task"] == artifact["task"] and after["task_contract"] == artifact["task_contract"],
                      "REPAIR_IMPACT_IDENTITY")
             _dependency_audit(change, before, after)
