@@ -2,7 +2,7 @@
 
 | Field | Value |
 | --- | --- |
-| Version | 0.1.0 |
+| Version | 0.1.1 |
 | Date | 2026-09-11 |
 | Author | autoMBD <tkung.lqk@foxmail.com> |
 | Description | Portable capability preflight, derived initialization and source/evidence hygiene. |
@@ -298,6 +298,15 @@ Cleanup accepts named paths strictly below a declared current-run base under
 tests/.tmp/ or .agent-state/agent-loop/. It validates the complete request
 before deletion, rejects overlap, source/Git roots, nested repositories,
 escaping ancestors and protected evidence, and defaults to PLANNED.
+Before deletion, it checks the complete checkout Git index for each target's
+own path and all descendants. Any tracked content rejects the entire plan with
+PATH_BOUNDARY, even under ignored directories, when only staged, or when working
+bytes are modified or missing. Ignore rules cannot authorize source deletion.
+NUL-delimited index names are compared as native path components, preserving
+literal characters and directory boundaries without following link destinations.
+An unavailable or failed index query rejects through the existing EnvironmentError
+contract; it is never treated as an empty inventory. Invalid plans preserve all
+targets, working bytes, the index and commits in both dry-run and execution modes.
 A valid dry_run=False request returns CLEANED. A permitted leaf symlink/junction
 is unlinked itself, never its destination. No branch/process cleanup or
 automatic age-based deletion is implemented.
@@ -340,3 +349,4 @@ lifecycle, Human approval or KPI gate is introduced.
 | Date | Version | Description |
 | --- | --- | --- |
 | 2026-09-11 | 0.1.0 | Added portable capability, checkout, hydration, actor and evidence interfaces with explicit evidence limits. |
+| 2026-09-11 | 0.1.1 | Required complete Git-index source protection before cleanup, including literal path boundaries and fail-closed inventory errors. |
